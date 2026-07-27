@@ -37,6 +37,7 @@ import {
 } from '../components/ui'
 import { Heart, ImageOff, ListPlus, Plus, ReceiptText, Save, Search, Trash2, User, WalletCards, X } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
+import { ImageUploadField } from '../components/ImageUploadField'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
@@ -308,11 +309,12 @@ function AccountSettingsPanel() {
             </span>
             <div className="min-w-0 flex-1 space-y-3">
               <Input label="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={255} />
-              <Input
-                label="Profile image URL"
+              <ImageUploadField
+                label="Profile image"
                 value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
+                onChange={setAvatarUrl}
                 placeholder="https://…/me.jpg (blank = initials)"
+                hint="Upload a picture or paste an image URL."
               />
             </div>
           </div>
