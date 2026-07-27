@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\CardCondition;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -34,9 +35,25 @@ class SellSubmissionItem
     #[ORM\Column]
     private int $quantity = 1;
 
-    /** Store's per-copy cash offer at submission time, in cents. */
+    /** Store's per-copy payout offer at submission time, in cents. */
     #[ORM\Column]
     private int $offerCentsEach = 0;
+
+    /** Per-copy market price snapshot at submission time, in cents. */
+    #[ORM\Column(options: ['default' => 0])]
+    private int $marketPriceCents = 0;
+
+    /** Customer-declared condition; verified by staff at the counter. */
+    #[ORM\Column(enumType: CardCondition::class, options: ['default' => 'NM'])]
+    private CardCondition $condition = CardCondition::NM;
+
+    /** True when the line came from the store's buy list (premium rate or fixed offer). */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $isFromBuylist = false;
+
+    /** Copies staff agreed to buy during review; null until the submission is finalized. */
+    #[ORM\Column(nullable: true)]
+    private ?int $acceptedQuantity = null;
 
     public function getId(): ?int { return $this->id; }
 
@@ -57,4 +74,16 @@ class SellSubmissionItem
 
     public function getOfferCentsEach(): int { return $this->offerCentsEach; }
     public function setOfferCentsEach(int $offerCentsEach): static { $this->offerCentsEach = max(0, $offerCentsEach); return $this; }
+
+    public function getMarketPriceCents(): int { return $this->marketPriceCents; }
+    public function setMarketPriceCents(int $marketPriceCents): static { $this->marketPriceCents = max(0, $marketPriceCents); return $this; }
+
+    public function getCondition(): CardCondition { return $this->condition; }
+    public function setCondition(CardCondition $condition): static { $this->condition = $condition; return $this; }
+
+    public function isFromBuylist(): bool { return $this->isFromBuylist; }
+    public function setIsFromBuylist(bool $isFromBuylist): static { $this->isFromBuylist = $isFromBuylist; return $this; }
+
+    public function getAcceptedQuantity(): ?int { return $this->acceptedQuantity; }
+    public function setAcceptedQuantity(?int $acceptedQuantity): static { $this->acceptedQuantity = $acceptedQuantity; return $this; }
 }

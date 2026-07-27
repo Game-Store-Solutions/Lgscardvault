@@ -151,6 +151,10 @@ final readonly class StoreSettingsUpdater
             }
         }
 
+        if (array_key_exists('tradeRates', $payload)) {
+            $store->setTradeRates($this->cleanTradeRates($payload['tradeRates']));
+        }
+
         if (array_key_exists('contactEmail', $payload)) {
             $value = $this->stringValue($payload['contactEmail']);
             if ('' === $value) {
@@ -185,6 +189,7 @@ final readonly class StoreSettingsUpdater
             'tagline' => $store->getTagline(),
             'cardDisplayStyle' => $store->getCardDisplayStyle(),
             'darkColors' => $store->getDarkColors(),
+            'tradeRates' => $store->getTradeRates(),
             'hoursText' => $store->getHoursText(),
             'contactEmail' => $store->getContactEmail(),
             'websiteUrl' => $store->getWebsiteUrl(),
@@ -193,6 +198,59 @@ final readonly class StoreSettingsUpdater
             'twitterUrl' => $store->getTwitterUrl(),
             'discordUrl' => $store->getDiscordUrl(),
         ];
+    }
+
+    /**
+     * Validate the sell/trade rate settings: percentages must be whole
+     * numbers 0–100, promo dates must be valid ISO dates in a coherent
+     * window. All-empty payload clears the column (platform defaults).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function cleanTradeRates(mixed $raw): ?array
+    {
+        if (null === $raw || [] === $raw) {
+            return null;
+        }
+        if (!is_array($raw)) {
+            throw new \InvalidArgumentException('tradeRates must be an object.');
+        }
+
+        $clean = [];
+        $percentKeys = [
+            'creditRatePercent', 'cashRatePercent',
+            'buylistCreditRatePercent', 'buylistCashRatePercent',
+            'promoCreditRatePercent', 'promoCashRatePercent',
+        ];
+        foreach ($percentKeys as $key) {
+            $value = $raw[$key] ?? null;
+            if (null === $value || '' === $value) {
+                continue;
+            }
+            if (!is_numeric($value) || (int) $value < 0 || (int) $value > 100) {
+                throw new \InvalidArgumentException(sprintf('tradeRates.%s must be a whole number between 0 and 100.', $key));
+            }
+            $clean[$key] = (int) $value;
+        }
+
+        $dates = [];
+        foreach (['promoStartsAt', 'promoEndsAt'] as $key) {
+            $value = $this->stringValue($raw[$key] ?? '');
+            if ('' === $value) {
+                continue;
+            }
+            try {
+                $dates[$key] = new \DateTimeImmutable($value);
+            } catch (\Exception) {
+                throw new \InvalidArgumentException(sprintf('tradeRates.%s must be a valid date.', $key));
+            }
+            $clean[$key] = $dates[$key]->format(DATE_ATOM);
+        }
+        if (isset($dates['promoStartsAt'], $dates['promoEndsAt']) && $dates['promoEndsAt'] <= $dates['promoStartsAt']) {
+            throw new \InvalidArgumentException('tradeRates.promoEndsAt must be after promoStartsAt.');
+        }
+
+        return [] === $clean ? null : $clean;
     }
 
     private function stringValue(mixed $value): string

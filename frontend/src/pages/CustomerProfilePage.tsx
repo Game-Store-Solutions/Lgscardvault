@@ -168,7 +168,7 @@ function SellTradeHistoryPanel({ slug }: { slug: string }) {
       {submissions.map((submission) => (
         <Card key={submission.id}>
           <CardHeader
-            title={`${submission.items.reduce((n, item) => n + item.quantity, 0)} cards · store pays ${formatPrice(submission.totalOfferCents)}`}
+            title={`${submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)} cards · store pays ${formatPrice(submission.totalOfferCents)} in ${submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}`}
             subtitle={new Date(submission.createdAt).toLocaleString()}
             actions={<Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">{submission.status}</Badge>}
           />

@@ -30,6 +30,8 @@ export interface Store {
   cardDisplayStyle?: CardDisplayStyle
   /** Optional dark-mode palette (same keys as the base colors); used when the shopper's theme is dark. */
   darkColors?: Partial<Record<'primaryColor' | 'accentColor' | 'backgroundColor' | 'surfaceColor' | 'textColor' | 'mutedColor' | 'borderColor', string>> | null
+  /** Raw sell/trade rate settings; resolve effective rates via GET /stores/{slug}/trade-rates. */
+  tradeRates?: TradeRateSettings | null
   // Storefront footer (owner-managed via /settings)
   hoursText?: string | null
   contactEmail?: string | null
@@ -475,25 +477,57 @@ export interface Order {
 
 export type OrderStatus = 'pending' | 'received' | 'fulfilled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
 
-/** One card a store wants to buy, with its cash offer. */
+/** A store's effective sell/trade payout rates right now (promo-resolved server-side). */
+export interface TradeRates {
+  creditPercent: number
+  cashPercent: number
+  buylistCreditPercent: number
+  buylistCashPercent: number
+  promoActive: boolean
+  promoEndsAt: string | null
+}
+
+/** Raw per-store rate settings as stored (admin settings form). */
+export interface TradeRateSettings {
+  creditRatePercent?: number
+  cashRatePercent?: number
+  buylistCreditRatePercent?: number
+  buylistCashRatePercent?: number
+  promoCreditRatePercent?: number
+  promoCashRatePercent?: number
+  promoStartsAt?: string
+  promoEndsAt?: string
+}
+
+/**
+ * One card a store wants to buy. offerCents is a fixed pinned per-copy
+ * offer; null means the store's premium buy-list rate × market applies.
+ */
 export interface BuylistEntry {
   id: number
-  offerCents: number
+  offerCents: number | null
   wantsFoil: boolean
   maxQuantity: number | null
+  active: boolean
   notes: string | null
   createdAt: string
   card: CardSummary | null
 }
 
 export type SellSubmissionStatus = 'pending' | 'accepted' | 'declined' | 'completed'
+export type SellPayoutMethod = 'credit' | 'cash'
 
 export interface SellSubmissionItem {
   id: number
+  cardId?: string | null
   cardName: string
   isFoil: boolean
+  condition: string
   quantity: number
+  acceptedQuantity: number | null
   offerCentsEach: number
+  marketPriceCents: number
+  isFromBuylist: boolean
   imageUris?: { normal?: string; small?: string } | null
   setCode?: string | null
 }
@@ -501,7 +535,11 @@ export interface SellSubmissionItem {
 export interface SellSubmission {
   id: number
   status: SellSubmissionStatus
+  payoutMethod: SellPayoutMethod
+  channel: 'online' | 'kiosk'
+  kioskCustomerName?: string | null
   totalOfferCents: number
+  totalMarketCents: number
   createdAt: string
   decidedAt: string | null
   customerName?: string | null

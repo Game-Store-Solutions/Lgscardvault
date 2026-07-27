@@ -17,17 +17,20 @@ class BuylistEntryRepository extends ServiceEntityRepository
         parent::__construct($registry, BuylistEntry::class);
     }
 
-    /** @return list<BuylistEntry> highest offers first */
-    public function findForStore(Store $store): array
+    /** @return list<BuylistEntry> highest fixed offers first, then newest */
+    public function findForStore(Store $store, bool $activeOnly = false): array
     {
-        return $this->createQueryBuilder('b')
+        $qb = $this->createQueryBuilder('b')
             ->join('b.card', 'c')->addSelect('c')
             ->andWhere('b.store = :store')
             ->setParameter('store', $store)
             ->orderBy('b.offerCents', 'DESC')
-            ->addOrderBy('b.id', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->addOrderBy('b.id', 'DESC');
+        if ($activeOnly) {
+            $qb->andWhere('b.active = true');
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     public function findOneForStore(Store $store, int $id): ?BuylistEntry

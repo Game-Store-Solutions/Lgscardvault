@@ -8,11 +8,14 @@ use App\Entity\SellSubmission;
 use App\Entity\SellSubmissionItem;
 use App\Entity\Store;
 use App\Entity\User;
+use App\Enum\CardCondition;
 use App\Repository\BuylistEntryRepository;
 use App\Repository\CardRepository;
 use App\Repository\SellSubmissionRepository;
 use App\Repository\StoreRepository;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Inventory\StoreInventoryWriter;
+use App\Service\Store\TradeRateResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,14 +25,18 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Sell/Trade portal: the store-curated buy list (what the store pays for
- * which cards) and customer sell submissions against it.
+ * Sell/Trade portal: customers sell cards to the store for store credit or
+ * cash at a percentage of market price; buy-list cards pay a premium rate
+ * (or a fixed per-copy offer the store pinned on the entry).
  *
- * - Buy list reads are public (storefront portal).
+ * - Buy list + trade rates reads are public (storefront portal).
  * - Buy list writes require STORE_MANAGE.
- * - Submissions: customers create + read their own; staff list and decide.
- *   Offers are snapshotted onto submission lines, so later buylist edits
- *   never change an in-flight submission.
+ * - Submissions: customers create + read their own; kiosk submissions are
+ *   entered by staff with the walk-up customer's name; staff review with
+ *   per-line accepted quantities, and completing a submission stocks the
+ *   accepted cards into inventory at the payout as acquisition cost.
+ * - All money is snapshotted server-side at submission time, so later
+ *   market moves or buylist edits never change an in-flight submission.
  */
 #[Route('/api/stores/{slug}')]
 final class StoreBuylistController extends AbstractController
@@ -42,20 +49,39 @@ final class StoreBuylistController extends AbstractController
         private readonly SellSubmissionRepository $submissions,
         private readonly CardRepository $cardRepository,
         private readonly CatalogCardResolver $catalogCardResolver,
+        private readonly TradeRateResolver $tradeRates,
+        private readonly StoreInventoryWriter $inventoryWriter,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
-    /** Public: the store's buy list, highest offers first. */
-    #[Route('/buylist', name: 'api_store_buylist_list', methods: ['GET'])]
-    public function list(string $slug): JsonResponse
+    /** Public: the store's effective payout rates right now (promo-resolved). */
+    #[Route('/trade-rates', name: 'api_store_trade_rates', methods: ['GET'])]
+    public function tradeRates(string $slug): JsonResponse
     {
         $store = $this->storeRepository->findOneBySlug($slug);
         if (null === $store) {
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        return $this->json(array_map($this->serializeEntry(...), $this->buylistEntries->findForStore($store)));
+        return $this->json($this->tradeRates->resolve($store));
+    }
+
+    /** Public: the store's buy list. Staff (?all=1) also see inactive entries. */
+    #[Route('/buylist', name: 'api_store_buylist_list', methods: ['GET'])]
+    public function list(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (null === $store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $includeInactive = $request->query->getBoolean('all') && $this->isGranted('STORE_MANAGE', $store);
+
+        return $this->json(array_map(
+            $this->serializeEntry(...),
+            $this->buylistEntries->findForStore($store, activeOnly: !$includeInactive),
+        ));
     }
 
     #[Route('/buylist', name: 'api_store_buylist_create', methods: ['POST'])]
@@ -81,8 +107,8 @@ final class StoreBuylistController extends AbstractController
             return $this->json(['detail' => 'A valid cardId is required.'], 422);
         }
 
-        $offerCents = (int) ($payload['offerCents'] ?? -1);
-        if ($offerCents < 0) {
+        $offerCents = $this->readNullableNonNegativeInt($payload['offerCents'] ?? null);
+        if (false === $offerCents) {
             return $this->json(['detail' => 'offerCents must be zero or more.'], 422);
         }
 
@@ -91,6 +117,7 @@ final class StoreBuylistController extends AbstractController
         $entry = $existing ?? (new BuylistEntry())->setStore($store)->setCard($card)->setWantsFoil($wantsFoil);
         $entry->setOfferCents($offerCents);
         $entry->setMaxQuantity($this->readNullablePositiveInt($payload['maxQuantity'] ?? null));
+        $entry->setActive((bool) ($payload['active'] ?? true));
         $notes = trim((string) ($payload['notes'] ?? ''));
         $entry->setNotes('' === $notes ? null : mb_substr($notes, 0, 255));
 
@@ -116,14 +143,17 @@ final class StoreBuylistController extends AbstractController
         }
 
         if (array_key_exists('offerCents', $payload)) {
-            $offer = (int) $payload['offerCents'];
-            if ($offer < 0) {
+            $offer = $this->readNullableNonNegativeInt($payload['offerCents']);
+            if (false === $offer) {
                 return $this->json(['detail' => 'offerCents must be zero or more.'], 422);
             }
             $entry->setOfferCents($offer);
         }
         if (array_key_exists('maxQuantity', $payload)) {
             $entry->setMaxQuantity($this->readNullablePositiveInt($payload['maxQuantity']));
+        }
+        if (array_key_exists('active', $payload)) {
+            $entry->setActive((bool) $payload['active']);
         }
         if (array_key_exists('notes', $payload)) {
             $notes = trim((string) ($payload['notes'] ?? ''));
@@ -151,7 +181,11 @@ final class StoreBuylistController extends AbstractController
         return $this->json(null, 204);
     }
 
-    /** Customer: submit an offer to sell cards from the buy list. */
+    /**
+     * Customer: submit cards to sell — any card at the base rate, buy-list
+     * cards at the premium rate (or the entry's fixed offer). Staff submit
+     * on the kiosk channel with the walk-up customer's name.
+     */
     #[Route('/sell-submissions', name: 'api_store_sell_submission_create', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
     public function createSubmission(Request $request, string $slug): JsonResponse
@@ -167,7 +201,28 @@ final class StoreBuylistController extends AbstractController
         }
 
         $payload = json_decode($request->getContent(), true);
-        $items = is_array($payload) && is_array($payload['items'] ?? null) ? $payload['items'] : [];
+        $payload = is_array($payload) ? $payload : [];
+
+        $payoutMethod = (string) ($payload['payoutMethod'] ?? SellSubmission::PAYOUT_CASH);
+        if (!in_array($payoutMethod, SellSubmission::PAYOUT_METHODS, true)) {
+            return $this->json(['detail' => sprintf('Unknown payout method. Valid: %s.', implode(', ', SellSubmission::PAYOUT_METHODS))], 422);
+        }
+
+        $isKiosk = SellSubmission::CHANNEL_KIOSK === ($payload['channel'] ?? null);
+        $kioskCustomerName = null;
+        if ($isKiosk) {
+            // Kiosk terminals run under a staff login; the walk-up customer
+            // is identified by the typed name, mirroring kiosk orders.
+            if (!$this->isGranted('STORE_MANAGE', $store)) {
+                throw $this->createAccessDeniedException('Kiosk submissions require store staff.');
+            }
+            $kioskCustomerName = trim((string) ($payload['customerName'] ?? ''));
+            if ('' === $kioskCustomerName) {
+                return $this->json(['detail' => 'Kiosk submissions need the customer\'s name.'], 422);
+            }
+        }
+
+        $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
         if ([] === $items) {
             return $this->json(['detail' => 'Add at least one card to your submission.'], 422);
         }
@@ -175,47 +230,88 @@ final class StoreBuylistController extends AbstractController
             return $this->json(['detail' => sprintf('Too many lines: maximum %d per submission.', self::MAX_SUBMISSION_ITEMS)], 422);
         }
 
-        // Merge duplicate lines per buy-list entry BEFORE clamping, so
-        // splitting one card across several lines can't exceed the entry's
-        // max-quantity cap.
-        $quantityByEntryId = [];
-        foreach ($items as $i => $itemData) {
-            if (!is_array($itemData)) {
-                return $this->json(['detail' => sprintf('Line %d is invalid.', $i)], 422);
-            }
-            $quantity = (int) ($itemData['quantity'] ?? 0);
-            if ($quantity < 1) {
-                return $this->json(['detail' => sprintf('Line %d must have a quantity of at least 1.', $i)], 422);
-            }
-            $entryId = (int) ($itemData['buylistEntryId'] ?? 0);
-            $quantityByEntryId[$entryId] = ($quantityByEntryId[$entryId] ?? 0) + $quantity;
+        $lines = $this->mergeSubmissionLines($items);
+        if ($lines instanceof JsonResponse) {
+            return $lines;
         }
 
-        $submission = (new SellSubmission())->setStore($store)->setUser($user);
-        $total = 0;
+        $rates = $this->tradeRates->resolve($store);
+        $ratePercent = SellSubmission::PAYOUT_CREDIT === $payoutMethod ? $rates['creditPercent'] : $rates['cashPercent'];
+        $buylistRatePercent = SellSubmission::PAYOUT_CREDIT === $payoutMethod ? $rates['buylistCreditPercent'] : $rates['buylistCashPercent'];
 
-        foreach ($quantityByEntryId as $entryId => $quantity) {
-            $entry = $this->buylistEntries->findOneForStore($store, $entryId);
-            if (!$entry instanceof BuylistEntry) {
-                return $this->json(['detail' => 'One of the lines does not reference this store\'s buy list.'], 422);
+        $submission = (new SellSubmission())
+            ->setStore($store)
+            ->setUser($user)
+            ->setPayoutMethod($payoutMethod)
+            ->setChannel($isKiosk ? SellSubmission::CHANNEL_KIOSK : SellSubmission::CHANNEL_ONLINE)
+            ->setKioskCustomerName($kioskCustomerName ?? null);
+
+        $totalOffer = 0;
+        $totalMarket = 0;
+        $quantityLeftByEntryId = [];
+
+        foreach ($lines as $line) {
+            if (null !== $line['entryId']) {
+                $entry = $this->buylistEntries->findOneForStore($store, $line['entryId']);
+                if (!$entry instanceof BuylistEntry || !$entry->isActive()) {
+                    return $this->json(['detail' => 'One of the lines does not reference this store\'s buy list.'], 422);
+                }
+                $card = $entry->getCard();
+                $isFoil = $entry->wantsFoil();
+                $marketCents = null !== $card ? $this->marketPriceCents($card, $isFoil) : null;
+                $offerCents = $entry->getOfferCents()
+                    ?? $this->tradeRates->offerCents((int) $marketCents, $buylistRatePercent);
+                if (null === $entry->getOfferCents() && null === $marketCents) {
+                    return $this->json(['detail' => sprintf('No market price for "%s" — ask the store at the counter.', $card?->getName() ?? 'that card')], 422);
+                }
+
+                // Clamp the entry's cap across every line of the entry, so
+                // split lines (different conditions) can't exceed it together.
+                $quantity = $line['quantity'];
+                if (null !== $entry->getMaxQuantity()) {
+                    $quantityLeftByEntryId[$entry->getId()] ??= $entry->getMaxQuantity();
+                    $quantity = min($quantity, $quantityLeftByEntryId[$entry->getId()]);
+                    $quantityLeftByEntryId[$entry->getId()] -= $quantity;
+                    if ($quantity < 1) {
+                        continue;
+                    }
+                }
+                $isFromBuylist = true;
+            } else {
+                $card = $this->cardRepository->find($line['cardId']);
+                if (!$card instanceof Card) {
+                    return $this->json(['detail' => 'One of the lines references an unknown card.'], 422);
+                }
+                $isFoil = $line['isFoil'];
+                $marketCents = $this->marketPriceCents($card, $isFoil);
+                if (null === $marketCents) {
+                    return $this->json(['detail' => sprintf('No market price for "%s"%s — ask the store at the counter.', $card->getName(), $isFoil ? ' (foil)' : '')], 422);
+                }
+                $offerCents = $this->tradeRates->offerCents($marketCents, $ratePercent);
+                $quantity = $line['quantity'];
+                $isFromBuylist = false;
             }
 
-            if (null !== $entry->getMaxQuantity()) {
-                $quantity = min($quantity, $entry->getMaxQuantity());
-            }
-
-            $line = (new SellSubmissionItem())
-                ->setCard($entry->getCard())
-                ->setCardName($entry->getCard()?->getName() ?? 'Unknown card')
-                ->setIsFoil($entry->wantsFoil())
+            $submission->addItem((new SellSubmissionItem())
+                ->setCard($card)
+                ->setCardName($card?->getName() ?? 'Unknown card')
+                ->setIsFoil($isFoil)
+                ->setCondition($line['condition'])
                 ->setQuantity($quantity)
-                ->setOfferCentsEach($entry->getOfferCents());
+                ->setMarketPriceCents($marketCents ?? 0)
+                ->setOfferCentsEach($offerCents)
+                ->setIsFromBuylist($isFromBuylist));
 
-            $submission->addItem($line);
-            $total += $quantity * $entry->getOfferCents();
+            $totalOffer += $quantity * $offerCents;
+            $totalMarket += $quantity * ($marketCents ?? 0);
         }
 
-        $submission->setTotalOfferCents($total);
+        if ($submission->getItems()->isEmpty()) {
+            return $this->json(['detail' => 'Nothing left to submit — the buy list caps for these cards are already met.'], 422);
+        }
+
+        $submission->setTotalOfferCents($totalOffer);
+        $submission->setTotalMarketCents($totalMarket);
         $this->entityManager->persist($submission);
         $this->entityManager->flush();
 
@@ -253,7 +349,12 @@ final class StoreBuylistController extends AbstractController
         return $this->json(array_map($this->serializeSubmission(...), $this->submissions->findForStore($store)));
     }
 
-    /** Staff: accept / decline / complete a submission. */
+    /**
+     * Staff: decide a submission. Accepting may carry per-line accepted
+     * quantities (partial accepts) and recomputes the offer totals to match
+     * the finalized deal. Completing stocks the accepted cards into
+     * inventory with the per-copy payout recorded as acquisition cost.
+     */
     #[Route('/sell-submissions/{id}', name: 'api_store_sell_submission_update', methods: ['PATCH'])]
     #[IsGranted('ROLE_USER')]
     public function updateSubmission(Request $request, string $slug, int $id): JsonResponse
@@ -265,12 +366,55 @@ final class StoreBuylistController extends AbstractController
         }
 
         $payload = json_decode($request->getContent(), true);
-        $status = is_array($payload) ? (string) ($payload['status'] ?? '') : '';
+        $payload = is_array($payload) ? $payload : [];
+        $status = (string) ($payload['status'] ?? '');
         if (!in_array($status, SellSubmission::STATUSES, true)) {
             return $this->json(['detail' => sprintf('Unknown status. Valid: %s.', implode(', ', SellSubmission::STATUSES))], 422);
         }
         if (!in_array($status, SellSubmission::TRANSITIONS[$submission->getStatus()] ?? [], true)) {
             return $this->json(['detail' => sprintf('Cannot move a %s submission to %s.', $submission->getStatus(), $status)], 409);
+        }
+
+        if (SellSubmission::STATUS_ACCEPTED === $status) {
+            $acceptedById = [];
+            foreach (is_array($payload['items'] ?? null) ? $payload['items'] : [] as $itemData) {
+                if (is_array($itemData) && isset($itemData['id'])) {
+                    $acceptedById[(int) $itemData['id']] = max(0, (int) ($itemData['acceptedQuantity'] ?? 0));
+                }
+            }
+
+            $totalOffer = 0;
+            $totalMarket = 0;
+            foreach ($submission->getItems() as $item) {
+                $accepted = min($acceptedById[$item->getId()] ?? $item->getQuantity(), $item->getQuantity());
+                $item->setAcceptedQuantity($accepted);
+                $totalOffer += $accepted * $item->getOfferCentsEach();
+                $totalMarket += $accepted * $item->getMarketPriceCents();
+            }
+            if (0 === $totalOffer && 0 === $totalMarket) {
+                return $this->json(['detail' => 'Accepting a submission needs at least one accepted copy — decline it instead.'], 422);
+            }
+            $submission->setTotalOfferCents($totalOffer);
+            $submission->setTotalMarketCents($totalMarket);
+        }
+
+        if (SellSubmission::STATUS_COMPLETED === $status) {
+            foreach ($submission->getItems() as $item) {
+                $quantity = $item->getAcceptedQuantity() ?? $item->getQuantity();
+                $card = $item->getCard();
+                if ($quantity < 1 || !$card instanceof Card) {
+                    continue;
+                }
+                $this->inventoryWriter->write(
+                    $store,
+                    $card,
+                    $quantity,
+                    $item->getCondition(),
+                    $item->isFoil(),
+                    flush: false,
+                    acquisitionCostCents: $item->getOfferCentsEach(),
+                );
+            }
         }
 
         $submission->setStatus($status);
@@ -292,6 +436,69 @@ final class StoreBuylistController extends AbstractController
         return $store;
     }
 
+    /**
+     * Normalize + merge raw submission lines. Duplicate lines of the same
+     * buy-list entry / card + finish + condition merge into one; a line must
+     * reference exactly one of buylistEntryId or cardId.
+     *
+     * @param array<int, mixed> $items
+     *
+     * @return JsonResponse|list<array{entryId: ?int, cardId: ?Uuid, isFoil: bool, condition: CardCondition, quantity: int}>
+     */
+    private function mergeSubmissionLines(array $items): JsonResponse|array
+    {
+        $merged = [];
+        foreach ($items as $i => $itemData) {
+            if (!is_array($itemData)) {
+                return $this->json(['detail' => sprintf('Line %d is invalid.', $i)], 422);
+            }
+            $quantity = (int) ($itemData['quantity'] ?? 0);
+            if ($quantity < 1) {
+                return $this->json(['detail' => sprintf('Line %d must have a quantity of at least 1.', $i)], 422);
+            }
+            $condition = CardCondition::tryFrom(strtoupper((string) ($itemData['condition'] ?? 'NM'))) ?? CardCondition::NM;
+
+            $entryId = null;
+            $cardId = null;
+            if (isset($itemData['buylistEntryId'])) {
+                $entryId = (int) $itemData['buylistEntryId'];
+                $isFoil = false; // finish comes from the entry
+                $key = sprintf('entry:%d:%s', $entryId, $condition->value);
+            } else {
+                try {
+                    $cardId = Uuid::fromString((string) ($itemData['cardId'] ?? ''));
+                } catch (\InvalidArgumentException) {
+                    return $this->json(['detail' => sprintf('Line %d needs a buylistEntryId or a valid cardId.', $i)], 422);
+                }
+                $isFoil = (bool) ($itemData['isFoil'] ?? false);
+                $key = sprintf('card:%s:%d:%s', $cardId, $isFoil ? 1 : 0, $condition->value);
+            }
+
+            if (isset($merged[$key])) {
+                $merged[$key]['quantity'] += $quantity;
+            } else {
+                $merged[$key] = ['entryId' => $entryId, 'cardId' => $cardId, 'isFoil' => $isFoil, 'condition' => $condition, 'quantity' => $quantity];
+            }
+        }
+
+        return array_values($merged);
+    }
+
+    /** Scryfall market price in cents for the requested finish, null when unpriced. */
+    private function marketPriceCents(Card $card, bool $isFoil): ?int
+    {
+        $prices = $card->getPrices() ?? [];
+        $raw = $prices[$isFoil ? 'usd_foil' : 'usd'] ?? null;
+        // Foil-only printings put their price under usd_foil; fall back so
+        // "the" price of such a card resolves either way.
+        $raw ??= $prices[$isFoil ? 'usd' : 'usd_foil'] ?? null;
+        if (!is_numeric($raw)) {
+            return null;
+        }
+
+        return (int) round(((float) $raw) * 100);
+    }
+
     private function readNullablePositiveInt(mixed $value): ?int
     {
         if (null === $value || '' === $value) {
@@ -300,6 +507,19 @@ final class StoreBuylistController extends AbstractController
         $int = (int) $value;
 
         return $int > 0 ? $int : null;
+    }
+
+    /** Null/'' → null (rate-based); numeric >= 0 → cents; anything else → false (invalid). */
+    private function readNullableNonNegativeInt(mixed $value): int|null|false
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        if (!is_numeric($value) || (int) $value < 0) {
+            return false;
+        }
+
+        return (int) $value;
     }
 
     /** @return array<string, mixed> */
@@ -312,6 +532,7 @@ final class StoreBuylistController extends AbstractController
             'offerCents' => $entry->getOfferCents(),
             'wantsFoil' => $entry->wantsFoil(),
             'maxQuantity' => $entry->getMaxQuantity(),
+            'active' => $entry->isActive(),
             'notes' => $entry->getNotes(),
             'createdAt' => $entry->getCreatedAt()->format(DATE_ATOM),
             'card' => null !== $card ? $this->catalogCardResolver->serializeCard($card) : null,
@@ -325,10 +546,15 @@ final class StoreBuylistController extends AbstractController
         foreach ($submission->getItems() as $item) {
             $items[] = [
                 'id' => $item->getId(),
+                'cardId' => null !== $item->getCard() ? (string) $item->getCard()->getId() : null,
                 'cardName' => $item->getCardName(),
                 'isFoil' => $item->isFoil(),
+                'condition' => $item->getCondition()->value,
                 'quantity' => $item->getQuantity(),
+                'acceptedQuantity' => $item->getAcceptedQuantity(),
                 'offerCentsEach' => $item->getOfferCentsEach(),
+                'marketPriceCents' => $item->getMarketPriceCents(),
+                'isFromBuylist' => $item->isFromBuylist(),
                 'imageUris' => $item->getCard()?->getImageUris(),
                 'setCode' => $item->getCard()?->getSetCode(),
             ];
@@ -337,11 +563,15 @@ final class StoreBuylistController extends AbstractController
         return [
             'id' => $submission->getId(),
             'status' => $submission->getStatus(),
+            'payoutMethod' => $submission->getPayoutMethod(),
+            'channel' => $submission->getChannel(),
+            'kioskCustomerName' => $submission->getKioskCustomerName(),
             'totalOfferCents' => $submission->getTotalOfferCents(),
+            'totalMarketCents' => $submission->getTotalMarketCents(),
             'createdAt' => $submission->getCreatedAt()->format(DATE_ATOM),
             'decidedAt' => $submission->getDecidedAt()?->format(DATE_ATOM),
-            'customerName' => $submission->getUser()?->getDisplayName(),
-            'customerEmail' => $submission->getUser()?->getEmail(),
+            'customerName' => $submission->getKioskCustomerName() ?? $submission->getUser()?->getDisplayName(),
+            'customerEmail' => SellSubmission::CHANNEL_KIOSK === $submission->getChannel() ? null : $submission->getUser()?->getEmail(),
             'items' => $items,
         ];
     }
