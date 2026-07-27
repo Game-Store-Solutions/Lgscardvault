@@ -206,6 +206,49 @@ final class CasePurchaseFlowTest extends WebTestCase
         self::assertSame(4, $fresh->getQuantity(), 'refunding restores the purchased copies');
     }
 
+    /**
+     * Kiosk orders (staff-entered, channel=kiosk) behave like checkout when
+     * lines reference real listings: stock is consumed, case pools deplete,
+     * and a typed customer user id attributes the order to that account.
+     */
+    public function testKioskOrderConsumesStockAndAttributesCustomer(): void
+    {
+        [$store, $section, $item] = $this->storeWithCasedListing(stock: 5, pool: 2);
+        $customer = $this->fixtures->user(['ROLE_USER'], 'kiosk-shopper@test.local');
+        $this->authenticate($store->getOwner());
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders", [
+            'channel' => 'kiosk',
+            'fulfillment' => 'pickup',
+            'kioskUserId' => $customer->getId(),
+            'inputLines' => [['inventoryItemId' => $item->getId(), 'quantity' => 2]],
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertSame('kiosk', $order['channel']);
+        self::assertSame('kiosk-shopper@test.local', $order['customerEmail']);
+        self::assertSame(2 * 2500, $order['totalCents']);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        self::assertSame(3, $fresh->getQuantity(), 'the kiosk sale consumes real stock');
+
+        $pool = $this->em->getRepository(StoreSectionCard::class)->findOneBy(['section' => $section->getId()]);
+        self::assertSame(2, $pool->getSoldQuantity(), 'case pool depletes like an online sale');
+    }
+
+    public function testKioskOrderRejectsUnknownCustomerId(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 2, pool: 1);
+        $this->authenticate($store->getOwner());
+
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders", [
+            'channel' => 'kiosk',
+            'kioskUserId' => 999999,
+            'inputLines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testCancellationRestoresThePool(): void
     {
         [$store, $section, $item] = $this->storeWithCasedListing(stock: 5, pool: 1);

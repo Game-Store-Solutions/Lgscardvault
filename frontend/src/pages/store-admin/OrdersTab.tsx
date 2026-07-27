@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Clock3, PackageCheck, Printer, ReceiptText, RotateCcw, XCircle, type LucideIcon } from 'lucide-react'
-import api, { formatPrice, httpStatus } from '../../api/client'
-import type { Order, OrderStatus } from '../../api/types'
-import { ordersKey, useOrders } from '../../hooks'
+import { CheckCircle2, Clock3, Monitor, PackageCheck, Plus, Printer, ReceiptText, RotateCcw, Search, X, XCircle, type LucideIcon } from 'lucide-react'
+import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
+import type { InventoryItem, Order, OrderChannel, OrderStatus } from '../../api/types'
+import { inventoryKey, ordersKey, useDebouncedValue, useInventory, useOrders } from '../../hooks'
 import {
   Badge,
   Button,
@@ -12,7 +12,9 @@ import {
   CardHeader,
   EmptyState,
   ErrorState,
+  Input,
   LoadingPanel,
+  Modal,
   Table,
   TBody,
   TD,
@@ -47,11 +49,16 @@ export default function OrdersTab({ slug }: { slug: string }) {
   const { data = [], isLoading, error, refetch } = useOrders(slug)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
+  const [channelFilter, setChannelFilter] = useState<OrderChannel | 'all'>('all')
+  const [kioskOpen, setKioskOpen] = useState(false)
 
   const selected = data.find((order) => order.id === selectedId) ?? data[0] ?? null
   const filtered = useMemo(
-    () => (statusFilter === 'all' ? data : data.filter((order) => order.status === statusFilter)),
-    [data, statusFilter],
+    () =>
+      data
+        .filter((order) => statusFilter === 'all' || order.status === statusFilter)
+        .filter((order) => channelFilter === 'all' || (order.channel ?? 'online') === channelFilter),
+    [data, statusFilter, channelFilter],
   )
   const metrics = useMemo(() => {
     const open = data.filter((order) => order.status === 'pending' || order.status === 'received' || order.status === 'paid' || order.status === 'shipped')
@@ -110,11 +117,24 @@ export default function OrdersTab({ slug }: { slug: string }) {
 
   if (data.length === 0) {
     return (
-      <Card>
-        <CardBody>
-          <EmptyState icon={ReceiptText} title="No orders yet" description="Customer orders will appear here." />
-        </CardBody>
-      </Card>
+      <>
+        <Card>
+          <CardBody>
+            <EmptyState
+              icon={ReceiptText}
+              title="No orders yet"
+              description="Customer orders will appear here — or ring up the first sale at the kiosk."
+              action={
+                <Button size="sm" onClick={() => setKioskOpen(true)}>
+                  <Monitor className="size-4" aria-hidden />
+                  New kiosk order
+                </Button>
+              }
+            />
+          </CardBody>
+        </Card>
+        {kioskOpen && <KioskOrderModal slug={slug} onClose={() => setKioskOpen(false)} />}
+      </>
     )
   }
 
@@ -133,19 +153,35 @@ export default function OrdersTab({ slug }: { slug: string }) {
           title="Past orders"
           subtitle={`${data.length} ${data.length === 1 ? 'order' : 'orders'} for this store.`}
           actions={
-            <select
-              aria-label="Filter orders by status"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as OrderStatus | 'all')}
-              className="h-9 rounded-btn border border-border bg-surface px-3 text-sm font-medium text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-            >
-              <option value="all">All statuses</option>
-              {ACTIVE_ORDER_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {ORDER_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                aria-label="Filter orders by channel"
+                value={channelFilter}
+                onChange={(event) => setChannelFilter(event.target.value as OrderChannel | 'all')}
+                className="h-9 rounded-btn border border-border bg-surface px-3 text-sm font-medium text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <option value="all">All channels</option>
+                <option value="online">Online</option>
+                <option value="kiosk">Kiosk</option>
+              </select>
+              <select
+                aria-label="Filter orders by status"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as OrderStatus | 'all')}
+                className="h-9 rounded-btn border border-border bg-surface px-3 text-sm font-medium text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <option value="all">All statuses</option>
+                {ACTIVE_ORDER_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {ORDER_STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+              <Button size="sm" onClick={() => setKioskOpen(true)}>
+                <Plus className="size-4" aria-hidden />
+                Kiosk order
+              </Button>
+            </div>
           }
         />
         <CardBody className="p-0">
@@ -176,6 +212,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
                   <TD>
                     <div className="flex items-center gap-1.5">
                       <OrderStatusBadge status={order.status} />
+                      {order.channel === 'kiosk' && <Badge tone="brand">Kiosk</Badge>}
                       {order.fulfillment === 'pickup' && <Badge tone="neutral">Pickup</Badge>}
                       {order.fulfillment === 'shipping' && <Badge tone="neutral">Ship</Badge>}
                     </div>
@@ -201,7 +238,184 @@ export default function OrdersTab({ slug }: { slug: string }) {
           onUpdateStatus={(status) => selected && updateStatus.mutate({ order: selected, status })}
         />
       </div>
+
+      {kioskOpen && <KioskOrderModal slug={slug} onClose={() => setKioskOpen(false)} />}
     </div>
+  )
+}
+
+interface KioskLine {
+  item: InventoryItem
+  quantity: number
+}
+
+/**
+ * Kiosk order entry: staff search live inventory, build the line list, and
+ * optionally attribute the sale to a customer account by user id. Lines
+ * reference real listings, so the backend consumes stock and depletes case
+ * pools exactly like an online checkout.
+ */
+function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const { data: inventory = [], isLoading } = useInventory(slug)
+  const [query, setQuery] = useState('')
+  const debounced = useDebouncedValue(query, 200)
+  const [lines, setLines] = useState<KioskLine[]>([])
+  const [kioskUserId, setKioskUserId] = useState('')
+  const [created, setCreated] = useState<Order | null>(null)
+
+  const results = useMemo(() => {
+    const q = debounced.trim().toLowerCase()
+    if (!q) return []
+    return inventory
+      .filter((item) => item.quantity > 0 && item.card.name.toLowerCase().includes(q))
+      .slice(0, 12)
+  }, [inventory, debounced])
+
+  const totalCents = lines.reduce((sum, line) => sum + line.item.priceCents * line.quantity, 0)
+
+  const create = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<Order>(`/stores/${slug}/orders`, {
+        channel: 'kiosk',
+        fulfillment: 'pickup',
+        ...(kioskUserId.trim() ? { kioskUserId: Number(kioskUserId.trim()) } : {}),
+        inputLines: lines.map((line) => ({ inventoryItemId: line.item.id, quantity: line.quantity })),
+      })
+      return data
+    },
+    onSuccess: async (order) => {
+      setCreated(order)
+      setLines([])
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ordersKey(slug) }),
+        queryClient.invalidateQueries({ queryKey: inventoryKey(slug) }),
+      ])
+    },
+  })
+
+  function addLine(item: InventoryItem) {
+    setCreated(null)
+    setLines((current) => {
+      const existing = current.find((line) => line.item.id === item.id)
+      if (existing) {
+        return current.map((line) =>
+          line.item.id === item.id ? { ...line, quantity: Math.min(line.quantity + 1, item.quantity) } : line,
+        )
+      }
+      return [...current, { item, quantity: 1 }]
+    })
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="New kiosk order"
+      className="max-w-3xl"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={() => create.mutate()} loading={create.isPending} disabled={lines.length === 0}>
+            <Monitor className="size-4" aria-hidden />
+            Create order · {formatPrice(totalCents)}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+          <Input
+            label="Search inventory"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Card name…"
+            autoFocus
+          />
+          <Input
+            label="Customer user ID (optional)"
+            value={kioskUserId}
+            onChange={(e) => setKioskUserId(e.target.value.replace(/\D/g, ''))}
+            inputMode="numeric"
+            placeholder="e.g. 42"
+          />
+        </div>
+
+        {isLoading ? (
+          <LoadingPanel />
+        ) : results.length > 0 ? (
+          <ul className="max-h-48 space-y-1 overflow-y-auto">
+            {results.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => addLine(item)}
+                  className="flex w-full items-center gap-3 rounded-card border border-border bg-surface p-2 text-left transition-colors hover:border-brand-300"
+                >
+                  {cardImage(item.card) && (
+                    <img src={cardImage(item.card)} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold text-fg">{item.card.name}</span>
+                    <span className="block text-xs text-fg-muted">
+                      {item.card.setCode?.toUpperCase()} · {item.condition}
+                      {item.isFoil ? ' · Foil' : ''} · {item.quantity} in stock
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-sm font-bold text-fg">{formatPrice(item.priceCents)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : query.trim() ? (
+          <EmptyState icon={Search} title="No in-stock matches" description="Try a different name." />
+        ) : null}
+
+        {lines.length > 0 && (
+          <div className="space-y-2 border-t border-border pt-3">
+            {lines.map((line) => (
+              <div key={line.item.id} className="flex items-center gap-3 text-sm">
+                <span className="min-w-0 flex-1 truncate font-bold text-fg">{line.item.card.name}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={line.item.quantity}
+                  value={line.quantity}
+                  onChange={(e) => {
+                    const next = Math.max(1, Math.min(Number(e.target.value) || 1, line.item.quantity))
+                    setLines((current) => current.map((l) => (l.item.id === line.item.id ? { ...l, quantity: next } : l)))
+                  }}
+                  aria-label={`Quantity of ${line.item.card.name}`}
+                  className="w-16 rounded-btn border border-border bg-surface px-2 py-1 text-fg"
+                />
+                <span className="w-20 text-right font-bold text-fg">{formatPrice(line.item.priceCents * line.quantity)}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${line.item.card.name}`}
+                  onClick={() => setLines((current) => current.filter((l) => l.item.id !== line.item.id))}
+                  className="rounded-full p-1 text-fg-muted hover:bg-bg hover:text-danger-700"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {create.isError && (
+          <p className="text-sm font-medium text-danger-700" role="alert">
+            {extractErrorMessage(create.error, 'Could not create the kiosk order.')}
+          </p>
+        )}
+        {created && (
+          <p className="rounded-btn border border-success-500/30 bg-success-50 px-3 py-2 text-sm font-medium text-success-700" role="status">
+            Created {created.reference} · {formatPrice(created.totalCents)}. Add cards to ring up another.
+          </p>
+        )}
+      </div>
+    </Modal>
   )
 }
 

@@ -675,6 +675,7 @@ final class StoreCustomerController extends AbstractController
             'customerName' => $order->getCustomerName(),
             'customerEmail' => $order->getCustomerEmail(),
             'fulfillment' => $order->getFulfillment(),
+            'channel' => $order->getChannel(),
             'totalCents' => $order->getTotalCents(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),

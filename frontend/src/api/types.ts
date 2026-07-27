@@ -449,6 +449,8 @@ export interface OrderLine {
 
 export type OrderFulfillment = 'pickup' | 'shipping'
 
+export type OrderChannel = 'online' | 'kiosk'
+
 export interface Order {
   id: number
   reference: string
@@ -458,6 +460,7 @@ export interface Order {
   customerName?: string
   customerEmail?: string
   fulfillment?: OrderFulfillment
+  channel?: OrderChannel
   totalCents: number
   createdAt: string
   lines?: OrderLine[]
