@@ -397,7 +397,12 @@ export default function PlatformAdminPage() {
             </THead>
             <TBody>
               {stores.map((store) => (
-                <TR key={store.id}>
+                <TR
+                  key={store.id}
+                  onClick={() => navigate(`/s/${store.slug}/admin`)}
+                  title={`Open ${store.name}'s admin`}
+                  className="cursor-pointer"
+                >
                   <TD className="font-medium">{store.name}</TD>
                   <TD className="text-fg-muted">/{store.slug}</TD>
                   <TD>
@@ -411,7 +416,9 @@ export default function PlatformAdminPage() {
                       <Badge tone="success">Active</Badge>
                     )}
                   </TD>
-                  <TD>
+                  {/* Action cells swallow their clicks so the row navigation
+                      only fires from the informational cells. */}
+                  <TD onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant={store.featured ? 'primary' : 'secondary'}
                       size="sm"
@@ -423,7 +430,13 @@ export default function PlatformAdminPage() {
                       {store.featured ? 'Featured' : 'Feature'}
                     </Button>
                   </TD>
-                  <TD className="text-right">
+                  <TD className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <Link
+                      to={`/s/${store.slug}/admin`}
+                      className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                    >
+                      Manage
+                    </Link>
                     <Link
                       to={`/platform/admin/stores/${store.slug}/imports`}
                       className={buttonVariants({ variant: 'ghost', size: 'sm' })}
