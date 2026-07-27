@@ -23,6 +23,13 @@ class SellSubmission
     public const STATUS_COMPLETED = 'completed';
     public const STATUSES = [self::STATUS_PENDING, self::STATUS_ACCEPTED, self::STATUS_DECLINED, self::STATUS_COMPLETED];
 
+    public const PAYOUT_CREDIT = 'credit';
+    public const PAYOUT_CASH = 'cash';
+    public const PAYOUT_METHODS = [self::PAYOUT_CREDIT, self::PAYOUT_CASH];
+
+    public const CHANNEL_ONLINE = 'online';
+    public const CHANNEL_KIOSK = 'kiosk';
+
     /** Statuses staff may move a submission to, from a given status. */
     public const TRANSITIONS = [
         self::STATUS_PENDING => [self::STATUS_ACCEPTED, self::STATUS_DECLINED],
@@ -47,9 +54,25 @@ class SellSubmission
     #[ORM\Column(length: 16, options: ['default' => self::STATUS_PENDING])]
     private string $status = self::STATUS_PENDING;
 
-    /** Total cash offer snapshot across all lines, in cents. */
+    /** Total payout offer snapshot across all lines, in cents. */
     #[ORM\Column]
     private int $totalOfferCents = 0;
+
+    /** Total market value snapshot across all lines, in cents. */
+    #[ORM\Column(options: ['default' => 0])]
+    private int $totalMarketCents = 0;
+
+    /** How the customer wants to be paid: store credit or cash. */
+    #[ORM\Column(length: 8, options: ['default' => self::PAYOUT_CASH])]
+    private string $payoutMethod = self::PAYOUT_CASH;
+
+    /** Where the submission was made: the storefront or an in-store kiosk. */
+    #[ORM\Column(length: 8, options: ['default' => self::CHANNEL_ONLINE])]
+    private string $channel = self::CHANNEL_ONLINE;
+
+    /** Walk-up customer's name for kiosk submissions (owner is the staff user). */
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $kioskCustomerName = null;
 
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
@@ -80,6 +103,18 @@ class SellSubmission
 
     public function getTotalOfferCents(): int { return $this->totalOfferCents; }
     public function setTotalOfferCents(int $totalOfferCents): static { $this->totalOfferCents = $totalOfferCents; return $this; }
+
+    public function getTotalMarketCents(): int { return $this->totalMarketCents; }
+    public function setTotalMarketCents(int $totalMarketCents): static { $this->totalMarketCents = $totalMarketCents; return $this; }
+
+    public function getPayoutMethod(): string { return $this->payoutMethod; }
+    public function setPayoutMethod(string $payoutMethod): static { $this->payoutMethod = $payoutMethod; return $this; }
+
+    public function getChannel(): string { return $this->channel; }
+    public function setChannel(string $channel): static { $this->channel = $channel; return $this; }
+
+    public function getKioskCustomerName(): ?string { return $this->kioskCustomerName; }
+    public function setKioskCustomerName(?string $kioskCustomerName): static { $this->kioskCustomerName = $kioskCustomerName; return $this; }
 
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
 

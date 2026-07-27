@@ -28,9 +28,16 @@ class BuylistEntry
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?Card $card = null;
 
-    /** What the store pays per copy (cash offer), in cents. */
-    #[ORM\Column]
-    private int $offerCents = 0;
+    /**
+     * Fixed per-copy offer override, in cents. When null the entry pays the
+     * store's premium buy-list rate applied to the card's market price.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $offerCents = null;
+
+    /** Inactive entries stay curated but disappear from the public portal. */
+    #[ORM\Column(options: ['default' => true])]
+    private bool $active = true;
 
     #[ORM\Column(name: 'wants_foil')]
     private bool $wantsFoil = false;
@@ -58,8 +65,11 @@ class BuylistEntry
     public function getCard(): ?Card { return $this->card; }
     public function setCard(?Card $card): static { $this->card = $card; return $this; }
 
-    public function getOfferCents(): int { return $this->offerCents; }
-    public function setOfferCents(int $offerCents): static { $this->offerCents = max(0, $offerCents); return $this; }
+    public function getOfferCents(): ?int { return $this->offerCents; }
+    public function setOfferCents(?int $offerCents): static { $this->offerCents = null === $offerCents ? null : max(0, $offerCents); return $this; }
+
+    public function isActive(): bool { return $this->active; }
+    public function setActive(bool $active): static { $this->active = $active; return $this; }
 
     public function wantsFoil(): bool { return $this->wantsFoil; }
     public function setWantsFoil(bool $wantsFoil): static { $this->wantsFoil = $wantsFoil; return $this; }

@@ -171,6 +171,19 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private ?array $darkColors = null;
 
+    /**
+     * Sell/trade payout rates as percentages of market price, plus an
+     * optional promo window and premium buy-list rates. Keys (all optional):
+     * creditRatePercent, cashRatePercent, buylistCreditRatePercent,
+     * buylistCashRatePercent, promoCreditRatePercent, promoCashRatePercent,
+     * promoStartsAt, promoEndsAt (ISO dates). Null = platform defaults.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?array $tradeRates = null;
+
     // --- Storefront footer: hours, contact, social links (owner-managed) ---
 
     /** Freeform opening hours, one line per range ("Mon–Fri 12–9pm"). */
@@ -542,6 +555,20 @@ class Store
     public function setDarkColors(?array $darkColors): static
     {
         $this->darkColors = $darkColors;
+
+        return $this;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getTradeRates(): ?array
+    {
+        return $this->tradeRates;
+    }
+
+    /** @param array<string, mixed>|null $tradeRates */
+    public function setTradeRates(?array $tradeRates): static
+    {
+        $this->tradeRates = $tradeRates;
 
         return $this;
     }
