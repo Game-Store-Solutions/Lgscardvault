@@ -75,6 +75,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:admin', 'user:admin_write', 'store:read'])]
     private ?string $displayName = null;
 
+    /** Hosted profile-image URL (https:// or a /path); null = initials avatar. */
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['user:read', 'user:admin'])]
+    private ?string $avatarUrl = null;
+
     /** @var Collection<int, Store> */
     #[ORM\OneToMany(mappedBy: 'owner', targetEntity: Store::class)]
     private Collection $ownedStores;
@@ -159,6 +164,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getDisplayName(): ?string
     {
         return $this->displayName;
+    }
+
+    public function getAvatarUrl(): ?string
+    {
+        return $this->avatarUrl;
+    }
+
+    public function setAvatarUrl(?string $avatarUrl): static
+    {
+        $this->avatarUrl = $avatarUrl;
+
+        return $this;
     }
 
     public function setDisplayName(string $displayName): static

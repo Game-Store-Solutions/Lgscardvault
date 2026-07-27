@@ -408,6 +408,7 @@ export interface UserProfile {
   id: number
   email: string
   displayName: string
+  avatarUrl?: string | null
   roles: string[]
   ownedStores: Pick<Store, 'id' | 'name' | 'slug'>[]
 }

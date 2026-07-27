@@ -160,7 +160,7 @@ export default function AppLayout() {
                   </Link>
                 )}
                 <span className="flex items-center gap-2 text-sm text-fg-muted">
-                  <Avatar name={user.displayName} size="sm" />
+                  <Avatar name={user.displayName} src={user.avatarUrl ?? undefined} size="sm" />
                   <span className="hidden lg:inline">{user.displayName}</span>
                 </span>
                 <Button variant="secondary" size="sm" onClick={logout}>
@@ -239,7 +239,7 @@ export default function AppLayout() {
             <div className="mx-auto max-w-7xl space-y-1">
               {user && (
                 <div className="flex items-center gap-2 px-3 py-2 text-sm text-fg-muted">
-                  <Avatar name={user.displayName} size="sm" />
+                  <Avatar name={user.displayName} src={user.avatarUrl ?? undefined} size="sm" />
                   <span className="truncate">{user.displayName}</span>
                 </div>
               )}
