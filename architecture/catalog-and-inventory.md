@@ -132,8 +132,8 @@ sequenceDiagram
 
     Trigger->>Ctl: (ROLE_SUPER_ADMIN; endpoint dispatches to worker, returns 202)
     Ctl->>SC: syncBulkCards(onProgress, type)
-    SC->>API: getBulkInfo(type) → stream JSON to temp file
-    loop JsonMachine streams one card at a time, batches of 200
+    SC->>API: getBulkInfo(type) → stream bulk file (gzipped JSONL) to temp file
+    loop ScryfallBulkFileReader streams one card at a time, batches of 200
         SC->>UP: upsertMany(batch)
         UP->>DB: multi-row INSERT … ON CONFLICT (id) DO UPDATE
     end
@@ -145,7 +145,9 @@ Two datasets (`ScryfallClient::BULK_TYPES`):
 - **`default_cards`** (CLI default) — **every printing** (~450k rows). This is the dataset that lets the catalog resolve store imports (which identify a printing by set + collector number) without any API fallback. Run via `php bin/console app:scryfall:sync` (streams, safe to run long; schedule via cron to keep prices fresh).
 - **`oracle_cards`** (HTTP endpoint default) — one representative printing per Oracle ID (~35k rows). Smaller/faster; enough for rules text and name search, **not** enough to resolve printings. The synchronous admin endpoint defaults to this so the request stays inside HTTP timeouts; it accepts `{"type": "default_cards"}` but the CLI is the recommended path for full syncs.
 
-The whole pipeline is **streaming + ORM-free**: the bulk body is streamed to a temp file, `JsonMachine` iterates the top-level array without materialising it, and `ScryfallCardUpserter` writes multi-row native `INSERT … ON CONFLICT (id) DO UPDATE` batches — no decoded card list, no entity hydration, no unit-of-work growth. Memory stays flat even for the multi-hundred-MB `default_cards` file, and `ON CONFLICT` makes concurrent writes (sync racing import workers) safe.
+The whole pipeline is **streaming + ORM-free**: the bulk body is streamed to a temp file, `ScryfallBulkFileReader` yields one card at a time, and `ScryfallCardUpserter` writes multi-row native `INSERT … ON CONFLICT (id) DO UPDATE` batches — no decoded card list, no entity hydration, no unit-of-work growth. Memory stays flat even for the multi-hundred-MB `default_cards` file, and `ON CONFLICT` makes concurrent writes (sync racing import workers) safe.
+
+**Bulk format:** Scryfall migrated bulk data from a single JSON array to **gzipped JSONL** (one card object per line); the legacy array format stopped being served on 2026-07-20. The sync prefers the bulk-data entry's `jsonl_download_uri` (falling back to `download_uri`), and `ScryfallBulkFileReader` sniffs the downloaded file itself — gzip magic bytes, then the first structural character — so plain/gzipped × JSONL/legacy-array all parse. A corrupt or truncated JSONL line aborts the sync loudly rather than silently ingesting a partial catalog.
 
 | Layer | Where |
 |-------|-------|

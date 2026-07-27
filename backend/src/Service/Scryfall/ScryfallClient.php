@@ -5,8 +5,6 @@ namespace App\Service\Scryfall;
 use App\Entity\Card;
 use App\Repository\CardRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use JsonMachine\Items;
-use JsonMachine\JsonDecoder\ExtJsonDecoder;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -30,16 +28,26 @@ class ScryfallClient
 
     private const SYNC_BATCH_SIZE = 200;
 
+    /**
+     * Scryfall requires an identifying User-Agent AND an Accept header on
+     * every API request (requests without them are rejected).
+     */
+    private const DEFAULT_HEADERS = [
+        'User-Agent' => 'MTGStore/1.0',
+        'Accept' => 'application/json;q=0.9,*/*;q=0.8',
+    ];
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly EntityManagerInterface $entityManager,
         private readonly CardRepository $cardRepository,
         private readonly ScryfallCardUpserter $cardUpserter,
         private readonly ScryfallRateLimiter $rateLimiter,
+        private readonly ScryfallBulkFileReader $bulkFileReader,
     ) {
     }
 
-    /** @return array{download_uri: string, updated_at: string} */
+    /** @return array{download_uri: string, jsonl_download_uri: ?string, updated_at: string} */
     public function getBulkInfo(string $type): array
     {
         if (!in_array($type, self::BULK_TYPES, true)) {
@@ -47,7 +55,7 @@ class ScryfallClient
         }
 
         $response = $this->httpClient->request('GET', self::BULK_DATA_URL, [
-            'headers' => ['User-Agent' => 'MTGStore/1.0'],
+            'headers' => self::DEFAULT_HEADERS,
         ]);
 
         if (200 !== $response->getStatusCode()) {
@@ -71,8 +79,11 @@ class ScryfallClient
                 throw new \RuntimeException(sprintf('%s bulk data entry is missing download_uri or updated_at.', $type));
             }
 
+            $jsonlDownloadUri = $item['jsonl_download_uri'] ?? null;
+
             return [
                 'download_uri' => $downloadUri,
+                'jsonl_download_uri' => is_string($jsonlDownloadUri) && '' !== $jsonlDownloadUri ? $jsonlDownloadUri : null,
                 'updated_at' => $updatedAt,
             ];
         }
@@ -83,11 +94,15 @@ class ScryfallClient
     /**
      * Sync a Scryfall bulk dataset into the local catalog.
      *
-     * The bulk JSON is streamed to a temp file, then parsed incrementally
-     * (JsonMachine) and written in multi-row ON CONFLICT batches — neither
-     * the raw body, the decoded card list, nor ORM entities are ever held
-     * in memory, so the multi-hundred-MB `default_cards` file syncs with
+     * The bulk file is streamed to a temp file, then parsed incrementally
+     * (ScryfallBulkFileReader) and written in multi-row ON CONFLICT batches —
+     * neither the raw body, the decoded card list, nor ORM entities are ever
+     * held in memory, so the multi-hundred-MB `default_cards` file syncs with
      * flat memory usage.
+     *
+     * Prefers the gzipped-JSONL download (`jsonl_download_uri`) — the only
+     * format Scryfall serves after 2026-07-20 — and falls back to the legacy
+     * `download_uri`; the reader handles both formats either way.
      *
      * @param callable(int, int): void|null $onProgress receives (processed, changed);
      *                                                  the dataset size is unknown while streaming
@@ -97,8 +112,8 @@ class ScryfallClient
     public function syncBulkCards(?callable $onProgress = null, string $type = self::BULK_TYPE_DEFAULT): array
     {
         $info = $this->getBulkInfo($type);
-        $response = $this->httpClient->request('GET', $info['download_uri'], [
-            'headers' => ['User-Agent' => 'MTGStore/1.0'],
+        $response = $this->httpClient->request('GET', $info['jsonl_download_uri'] ?? $info['download_uri'], [
+            'headers' => ['User-Agent' => 'MTGStore/1.0', 'Accept' => '*/*'],
         ]);
 
         if (200 !== $response->getStatusCode()) {
@@ -132,16 +147,11 @@ class ScryfallClient
             $handle = null;
             unset($response);
 
-            // Iterate the top-level array one card at a time; only one decoded
-            // card (plus the current batch) is ever resident.
-            $cards = Items::fromFile($tmpPath, ['decoder' => new ExtJsonDecoder(true)]);
-
+            // Iterate the file one card at a time (JSONL line or legacy array
+            // element); only one decoded card (plus the current batch) is
+            // ever resident.
             $batch = [];
-            foreach ($cards as $cardData) {
-                if (!is_array($cardData)) {
-                    continue;
-                }
-
+            foreach ($this->bulkFileReader->cards($tmpPath) as $cardData) {
                 $batch[] = $cardData;
                 if (count($batch) < self::SYNC_BATCH_SIZE) {
                     continue;
@@ -192,7 +202,7 @@ class ScryfallClient
         }
 
         $response = $this->requestWithRateLimit('GET', self::SEARCH_URL, [
-            'headers' => ['User-Agent' => 'MTGStore/1.0'],
+            'headers' => self::DEFAULT_HEADERS,
             'query' => ['q' => $scryfallQuery, 'unique' => 'prints'],
         ]);
 
@@ -261,7 +271,7 @@ class ScryfallClient
         $matchedIds = [];
         foreach (array_chunk($unique, 75, true) as $chunk) {
             $response = $this->requestWithRateLimit('POST', self::COLLECTION_URL, [
-                'headers' => ['User-Agent' => 'MTGStore/1.0'],
+                'headers' => self::DEFAULT_HEADERS,
                 'json' => ['identifiers' => array_values($chunk)],
             ]);
 
@@ -318,7 +328,7 @@ class ScryfallClient
     public function fetchCardById(Uuid $id): ?Card
     {
         $response = $this->requestWithRateLimit('GET', self::CARD_URL.$id->toRfc4122(), [
-            'headers' => ['User-Agent' => 'MTGStore/1.0'],
+            'headers' => self::DEFAULT_HEADERS,
         ]);
 
         if (200 !== $response->getStatusCode()) {
