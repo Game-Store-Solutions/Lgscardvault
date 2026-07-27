@@ -129,6 +129,28 @@ final readonly class StoreSettingsUpdater
             $store->$setter('' === $value ? null : mb_substr($value, 0, $max));
         }
 
+        if (array_key_exists('darkColors', $payload)) {
+            $raw = $payload['darkColors'];
+            if (null === $raw || [] === $raw) {
+                $store->setDarkColors(null);
+            } elseif (!is_array($raw)) {
+                throw new \InvalidArgumentException('darkColors must be an object of color fields.');
+            } else {
+                $clean = [];
+                foreach (array_keys(self::COLOR_FIELDS) as $colorKey) {
+                    $value = $this->stringValue($raw[$colorKey] ?? '');
+                    if ('' === $value) {
+                        continue;
+                    }
+                    if (1 !== preg_match(self::HEX, $value)) {
+                        throw new \InvalidArgumentException(sprintf('darkColors.%s must be a 6-digit hex color like #10131c.', $colorKey));
+                    }
+                    $clean[$colorKey] = strtolower($value);
+                }
+                $store->setDarkColors([] === $clean ? null : $clean);
+            }
+        }
+
         if (array_key_exists('contactEmail', $payload)) {
             $value = $this->stringValue($payload['contactEmail']);
             if ('' === $value) {
@@ -162,6 +184,7 @@ final readonly class StoreSettingsUpdater
             'heroSubheading' => $store->getHeroSubheading(),
             'tagline' => $store->getTagline(),
             'cardDisplayStyle' => $store->getCardDisplayStyle(),
+            'darkColors' => $store->getDarkColors(),
             'hoursText' => $store->getHoursText(),
             'contactEmail' => $store->getContactEmail(),
             'websiteUrl' => $store->getWebsiteUrl(),

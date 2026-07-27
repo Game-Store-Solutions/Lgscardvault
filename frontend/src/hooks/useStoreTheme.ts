@@ -1,6 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { Store } from '../api/types'
 import { storeThemeVars } from '../lib/storeTheme'
+
+/** Tracks the shopper's light/dark toggle by observing the `.dark` class on <html>. */
+function useIsDarkTheme(): boolean {
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
+  )
+
+  useEffect(() => {
+    const root = document.documentElement
+    const observer = new MutationObserver(() => setIsDark(root.classList.contains('dark')))
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
+  return isDark
+}
 
 /**
  * useStoreTheme — applies a store's branding palette site-wide while a
@@ -9,8 +25,15 @@ import { storeThemeVars } from '../lib/storeTheme'
  * storeThemeVars (deriving unset neutrals and flipping the brand ramp for dark
  * themes), so the whole UI retones coherently. Previous values are restored on
  * unmount, so the theme never leaks to other pages.
+ *
+ * When the shopper's theme toggle is dark and the owner configured a dark
+ * palette (store.darkColors), those colors override the base branding — the
+ * storefront follows the toggle with the owner's own dark look instead of a
+ * derived one.
  */
 export function useStoreTheme(store?: Store) {
+  const isDark = useIsDarkTheme()
+
   // Serialize the inputs so the effect only re-runs when a branding value changes.
   const key = store
     ? [
@@ -21,12 +44,16 @@ export function useStoreTheme(store?: Store) {
         store.textColor,
         store.mutedColor,
         store.borderColor,
+        isDark ? JSON.stringify(store.darkColors ?? null) : '',
+        isDark ? 'dark' : 'light',
       ].join('|')
     : ''
 
   useEffect(() => {
     if (!store) return
-    const vars = storeThemeVars(store)
+    const dark = store.darkColors ?? {}
+    const palette = isDark && Object.keys(dark).length > 0 ? { ...store, ...dark } : store
+    const vars = storeThemeVars(palette)
     const root = document.documentElement
     const previous: Record<string, string> = {}
 

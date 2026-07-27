@@ -35,6 +35,27 @@ interface BrandingForm {
   instagramUrl: string
   twitterUrl: string
   discordUrl: string
+  darkColors: DarkColorsForm
+}
+
+interface DarkColorsForm {
+  primaryColor: string
+  accentColor: string
+  backgroundColor: string
+  surfaceColor: string
+  textColor: string
+  mutedColor: string
+  borderColor: string
+}
+
+const EMPTY_DARK: DarkColorsForm = {
+  primaryColor: '',
+  accentColor: '',
+  backgroundColor: '',
+  surfaceColor: '',
+  textColor: '',
+  mutedColor: '',
+  borderColor: '',
 }
 
 const EMPTY: BrandingForm = {
@@ -58,6 +79,7 @@ const EMPTY: BrandingForm = {
   instagramUrl: '',
   twitterUrl: '',
   discordUrl: '',
+  darkColors: EMPTY_DARK,
 }
 
 function fromStore(store: Store): BrandingForm {
@@ -82,6 +104,7 @@ function fromStore(store: Store): BrandingForm {
     instagramUrl: store.instagramUrl ?? '',
     twitterUrl: store.twitterUrl ?? '',
     discordUrl: store.discordUrl ?? '',
+    darkColors: { ...EMPTY_DARK, ...(store.darkColors ?? {}) },
   }
 }
 
@@ -100,6 +123,9 @@ export default function BrandingTab({ slug }: { slug: string }) {
 
   const set = <K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
+
+  const setDark = (key: keyof DarkColorsForm, value: string) =>
+    setForm((current) => ({ ...current, darkColors: { ...current.darkColors, [key]: value } }))
 
   const applyPreset = (preset: ThemePreset) => setForm((current) => ({ ...current, ...preset.palette }))
 
@@ -209,6 +235,22 @@ export default function BrandingTab({ slug }: { slug: string }) {
             <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
             <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
             <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Dark mode palette"
+            subtitle="Optional: shown when shoppers use the dark theme toggle. Leave blank to auto-derive a dark look from your main colors."
+          />
+          <CardBody className="grid gap-5 sm:grid-cols-2">
+            <ColorField label="Primary / button color" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
+            <ColorField label="Accent color" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
+            <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
+            <ColorField label="Card / surface" value={form.darkColors.surfaceColor} fallback="#171b2e" onChange={(v) => setDark('surfaceColor', v)} />
+            <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
+            <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
+            <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
           </CardBody>
         </Card>
 

@@ -28,6 +28,8 @@ export interface Store {
   heroSubheading?: string | null
   tagline?: string | null
   cardDisplayStyle?: CardDisplayStyle
+  /** Optional dark-mode palette (same keys as the base colors); used when the shopper's theme is dark. */
+  darkColors?: Partial<Record<'primaryColor' | 'accentColor' | 'backgroundColor' | 'surfaceColor' | 'textColor' | 'mutedColor' | 'borderColor', string>> | null
   // Storefront footer (owner-managed via /settings)
   hoursText?: string | null
   contactEmail?: string | null
