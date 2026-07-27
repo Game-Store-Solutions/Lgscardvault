@@ -461,7 +461,8 @@ final class StoreCustomerController extends AbstractController
                 ->setInventoryItem($inventoryItem)
                 ->setCardName($inventoryItem->getCard()?->getName() ?? 'Unknown card')
                 ->setQuantity($quantity)
-                ->setPriceCents($inventoryItem->getPriceCents());
+                ->setPriceCents($inventoryItem->getPriceCents())
+                ->setAcquisitionCostCents($inventoryItem->getAcquisitionCostCents());
 
             // The sale consumes real stock at placement. The line's quantity is
             // clamped to available stock above, so this can never go negative;

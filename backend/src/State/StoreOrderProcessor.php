@@ -142,7 +142,8 @@ final readonly class StoreOrderProcessor implements ProcessorInterface
             ->setInventoryItem($item)
             ->setCardName($item->getCard()?->getName() ?? 'Unknown card')
             ->setQuantity($quantity)
-            ->setPriceCents($priceCents);
+            ->setPriceCents($priceCents)
+            ->setAcquisitionCostCents($item->getAcquisitionCostCents());
 
         // Same stock rules as customer checkout: consume at placement (the
         // status processor restores on cancel/refund) and deplete case pools.

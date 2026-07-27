@@ -110,6 +110,16 @@ class InventoryItem
     #[Groups(['inventory:read', 'inventory:write'])]
     private int $priceCents = 0;
 
+    /**
+     * What the store paid per copy (COGS basis). Null = cost not tracked for
+     * this listing; reports count those units at zero cost and surface the
+     * coverage gap instead of guessing.
+     */
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    #[Groups(['inventory:read', 'inventory:write'])]
+    private ?int $acquisitionCostCents = null;
+
     #[ORM\Column(enumType: CardCondition::class)]
     #[Groups(['inventory:read', 'inventory:write'])]
     private CardCondition $condition = CardCondition::NM;
@@ -195,6 +205,18 @@ class InventoryItem
     public function setPriceCents(int $priceCents): static
     {
         $this->priceCents = $priceCents;
+
+        return $this;
+    }
+
+    public function getAcquisitionCostCents(): ?int
+    {
+        return $this->acquisitionCostCents;
+    }
+
+    public function setAcquisitionCostCents(?int $acquisitionCostCents): static
+    {
+        $this->acquisitionCostCents = $acquisitionCostCents;
 
         return $this;
     }

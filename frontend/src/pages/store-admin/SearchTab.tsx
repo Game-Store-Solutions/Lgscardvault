@@ -39,6 +39,7 @@ export default function SearchTab({ slug }: { slug: string }) {
   const [priceCents, setPriceCents] = useState<number | null>(null)
   const [condition, setCondition] = useState<Condition>('NM')
   const [isFoil, setIsFoil] = useState(false)
+  const [costText, setCostText] = useState('')
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
 
@@ -97,6 +98,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         priceCents: priceCents ?? 0,
         condition,
         isFoil,
+        acquisitionCostCents: parsePriceInput(costText),
       })
     },
     onMutate: () => setMutationError(null),
@@ -104,6 +106,7 @@ export default function SearchTab({ slug }: { slug: string }) {
       await queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
       setSelectedCard(null)
       setCatalogSearch('')
+      setCostText('')
     },
     onError: (err) => setMutationError(extractErrorMessage(err, 'Could not add inventory item.')),
   })
@@ -114,6 +117,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         cardId: payload.cardId,
         quantity: payload.quantity,
         priceCents: parsePriceInput(payload.priceText) ?? 0,
+        acquisitionCostCents: parsePriceInput(payload.costText),
         condition: payload.condition,
         isFoil: payload.isFoil,
       })
@@ -248,6 +252,8 @@ export default function SearchTab({ slug }: { slug: string }) {
               condition={condition}
               isFoil={isFoil}
               pending={addMutation.isPending}
+              costText={costText}
+              onCostChange={setCostText}
               onQuantityChange={setQuantity}
               onConditionChange={setCondition}
               onFinishChange={handleFinishChange}

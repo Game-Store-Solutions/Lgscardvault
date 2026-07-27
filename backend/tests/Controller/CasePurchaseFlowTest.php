@@ -236,6 +236,35 @@ final class CasePurchaseFlowTest extends WebTestCase
         self::assertSame(2, $pool->getSoldQuantity(), 'case pool depletes like an online sale');
     }
 
+    /**
+     * COGS: the listing's acquisition cost is snapshotted per-unit onto the
+     * order line at sale time, and store staff can read it back from the
+     * orders endpoint for profit reporting.
+     */
+    public function testAcquisitionCostSnapshotsOntoOrderLines(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 5, pool: 1);
+        $item->setAcquisitionCostCents(900);
+        $this->em->flush();
+
+        $this->placeOrder($store, $this->fixtures->user(['ROLE_USER']), $item->getId(), 2);
+
+        $this->authenticate($store->getOwner());
+        $orders = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/orders");
+        $lines = $orders['member'][0]['lines'] ?? $orders[0]['lines'] ?? [];
+        self::assertSame(900, $lines[0]['acquisitionCostCents']);
+
+        // Repricing the listing later must not rewrite historical COGS.
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        $fresh->setAcquisitionCostCents(5000);
+        $this->em->flush();
+
+        $orders = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/orders");
+        $lines = $orders['member'][0]['lines'] ?? $orders[0]['lines'] ?? [];
+        self::assertSame(900, $lines[0]['acquisitionCostCents'], 'the snapshot survives listing cost changes');
+    }
+
     public function testKioskOrderRejectsUnknownCustomerId(): void
     {
         [$store, , $item] = $this->storeWithCasedListing(stock: 2, pool: 1);

@@ -200,6 +200,8 @@ export interface InventoryItem {
   id: number
   quantity: number
   priceCents: number
+  /** What the store paid per copy; null = cost not tracked. */
+  acquisitionCostCents?: number | null
   condition: 'NM' | 'LP' | 'MP' | 'HP' | 'DMG'
   isFoil: boolean
   notes?: string | null
@@ -431,6 +433,8 @@ export interface OrderLine {
   cardName: string
   quantity: number
   priceCents: number
+  /** Per-unit cost snapshotted at sale time (store-staff endpoints only). */
+  acquisitionCostCents?: number | null
   /** Set when (part of) the line sold out of a display-case section. */
   caseName?: string | null
   sectionTitle?: string | null

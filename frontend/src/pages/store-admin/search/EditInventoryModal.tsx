@@ -14,6 +14,7 @@ export interface InventoryEditPayload {
   cardId: string
   quantity: number
   priceText: string
+  costText: string
   condition: Condition
   isFoil: boolean
 }
@@ -45,6 +46,9 @@ function EditInventoryModalBody({
   const [editSelectedCard, setEditSelectedCard] = useState<CardSummary>(item.card)
   const [editQuantity, setEditQuantity] = useState(item.quantity)
   const [editPriceText, setEditPriceText] = useState(formatPrice(item.priceCents))
+  const [editCostText, setEditCostText] = useState(
+    item.acquisitionCostCents != null ? formatPrice(item.acquisitionCostCents) : '',
+  )
   const [editCondition, setEditCondition] = useState<Condition>(item.condition)
   const [editIsFoil, setEditIsFoil] = useState(item.isFoil)
   const [variantSearchActive, setVariantSearchActive] = useState(false)
@@ -107,6 +111,7 @@ function EditInventoryModalBody({
                 cardId: editSelectedCard.id,
                 quantity: editQuantity,
                 priceText: editPriceText,
+                costText: editCostText,
                 condition: editCondition,
                 isFoil: editIsFoil,
               })
@@ -184,6 +189,16 @@ function EditInventoryModalBody({
                 />
               </div>
               {priceInvalid && <p className="mt-1 text-xs font-medium text-danger-700">Enter a valid price.</p>}
+            </div>
+
+            <div>
+              <Input
+                label="Your cost per copy ($, optional)"
+                value={editCostText}
+                onChange={(e) => setEditCostText(e.target.value)}
+                inputMode="decimal"
+                placeholder="What you paid — powers profit reports"
+              />
             </div>
 
             {mergeTarget && (

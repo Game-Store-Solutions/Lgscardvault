@@ -97,6 +97,9 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
                 // then removed since it has been folded into the conflict.
                 $conflict->setQuantity($conflict->getQuantity() + $data->getQuantity());
                 $conflict->setPriceCents($data->getPriceCents());
+                if (null !== $data->getAcquisitionCostCents()) {
+                    $conflict->setAcquisitionCostCents($data->getAcquisitionCostCents());
+                }
 
                 $notes = $data->getNotes();
                 if (null !== $notes && '' !== trim($notes)) {
@@ -112,6 +115,7 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
             $existing->setCard($targetCard);
             $existing->setQuantity($data->getQuantity());
             $existing->setPriceCents($data->getPriceCents());
+            $existing->setAcquisitionCostCents($data->getAcquisitionCostCents());
             $existing->setCondition($data->getCondition());
             $existing->setIsFoil($data->isFoil());
             $existing->setNotes($data->getNotes());
@@ -132,6 +136,7 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
             $data->getCondition(),
             $data->isFoil(),
             $data->getNotes(),
+            acquisitionCostCents: $data->getAcquisitionCostCents(),
         );
     }
 }

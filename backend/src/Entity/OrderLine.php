@@ -72,6 +72,17 @@ class OrderLine
     #[Groups(['order:read'])]
     private int $priceCents = 0;
 
+    /**
+     * Per-unit acquisition cost snapshotted from the listing at sale time,
+     * so COGS reporting survives later repricing and listing deletion. Null
+     * when the listing had no cost tracked (or the line was off-catalog).
+     * order:read is store-staff only — customer endpoints serialize orders
+     * by hand and never expose cost.
+     */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['order:read'])]
+    private ?int $acquisitionCostCents = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -193,6 +204,18 @@ class OrderLine
     public function setPriceCents(int $priceCents): static
     {
         $this->priceCents = $priceCents;
+
+        return $this;
+    }
+
+    public function getAcquisitionCostCents(): ?int
+    {
+        return $this->acquisitionCostCents;
+    }
+
+    public function setAcquisitionCostCents(?int $acquisitionCostCents): static
+    {
+        $this->acquisitionCostCents = $acquisitionCostCents;
 
         return $this;
     }
