@@ -4,7 +4,8 @@ import { ArrowLeft, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, S
 import { cardImage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import { useInventory, useStore, useStoreTheme } from '../hooks'
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, LoadingPanel, Textarea } from '../components/ui'
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Textarea } from '../components/ui'
+import { StorePageLoader } from '../components/store/StorePageLoader'
 
 /** One parsed request line: how many copies of which card name. */
 interface RequestLine {
@@ -184,7 +185,7 @@ export default function MassSearchPage() {
         {/* Results */}
         <div className="min-w-0 space-y-4">
           {isLoading ? (
-            <LoadingPanel label="Loading inventory…" />
+            <StorePageLoader label="Loading inventory…" />
           ) : !results ? (
             <Card>
               <CardBody>

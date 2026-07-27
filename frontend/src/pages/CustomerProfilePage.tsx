@@ -38,6 +38,7 @@ import {
 import { Heart, ImageOff, ListPlus, Plus, ReceiptText, Save, Search, Trash2, User, WalletCards, X } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
 import { NotificationList } from '../components/notifications/NotificationList'
+import { StorePageLoader } from '../components/store/StorePageLoader'
 
 type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade'
 const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade']
@@ -457,7 +458,7 @@ function ProfilePanel({ slug }: { slug: string }) {
     },
   })
 
-  if (profileQuery.isLoading) return <LoadingPanel label="Loading your profile…" />
+  if (profileQuery.isLoading) return <StorePageLoader label="Loading your profile…" />
   if (profileQuery.isError) {
     return <ErrorState title="Could not load your profile." onRetry={() => void profileQuery.refetch()} />
   }

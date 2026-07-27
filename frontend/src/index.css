@@ -219,6 +219,24 @@ body {
   }
 }
 
+/* Store-branded page loader: the store logo breathes in and out while a
+   screen's data is still loading (see StorePageLoader). */
+@keyframes logo-breathe {
+  0%,
+  100% {
+    transform: scale(0.88);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+.animate-logo-breathe {
+  animation: logo-breathe 1.6s ease-in-out infinite;
+}
+
 @keyframes foil-sweep {
   0% {
     background-position: 0% 50%;

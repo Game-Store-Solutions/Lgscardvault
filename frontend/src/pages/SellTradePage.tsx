@@ -32,6 +32,7 @@ import {
 } from '../components/ui'
 import { formatDate } from '../lib/format'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
+import { StorePageLoader } from '../components/store/StorePageLoader'
 
 const buylistKey = (slug: string) => ['buylist', slug] as const
 const tradeRatesKey = (slug: string) => ['trade-rates', slug] as const
@@ -115,7 +116,7 @@ export default function SellTradePage() {
   const { slug = '' } = useParams()
   const { user } = useAuth()
   const { kioskMode } = useKioskMode()
-  const { data: store } = useStore(slug)
+  const { data: store, isLoading: storeLoading } = useStore(slug)
   useStoreTheme(store)
   const queryClient = useQueryClient()
 
@@ -309,6 +310,12 @@ export default function SellTradePage() {
       submit={submit}
     />
   )
+
+  // Full-screen branded loader only while the screen isn't completely
+  // loaded — cached revisits render instantly.
+  if (storeLoading || buylistLoading) {
+    return <StorePageLoader label="Loading sell & trade…" />
+  }
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
