@@ -278,6 +278,49 @@ final class CasePurchaseFlowTest extends WebTestCase
         self::assertSame(400, $this->client->getResponse()->getStatusCode());
     }
 
+    /**
+     * Kiosk-mode cart checkout: the terminal is signed in as staff, the
+     * walk-up customer types their name, and the order lands as
+     * channel=kiosk under that name with no email attribution.
+     */
+    public function testKioskModeCheckoutAttributesTypedName(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 3, pool: 1);
+        $owner = $store->getOwner();
+
+        $this->authenticate($owner);
+        $this->jsonRequest('PUT', "/api/stores/{$store->getSlug()}/customer/cart/{$item->getId()}", ['quantity' => 1]);
+        self::assertResponseIsSuccessful();
+
+        // Name is required at the kiosk.
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/test-order", ['channel' => 'kiosk']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+
+        $this->jsonRequest('PUT', "/api/stores/{$store->getSlug()}/customer/cart/{$item->getId()}", ['quantity' => 1]);
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/test-order", [
+            'channel' => 'kiosk',
+            'customerName' => 'Walk-in Wanda',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertSame('kiosk', $order['channel']);
+        self::assertSame('Walk-in Wanda', $order['customerName']);
+        self::assertNull($order['customerEmail']);
+    }
+
+    public function testKioskModeCheckoutRequiresStaff(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 3, pool: 1);
+        $customer = $this->fixtures->user(['ROLE_USER']);
+
+        $this->authenticate($customer);
+        $this->jsonRequest('PUT', "/api/stores/{$store->getSlug()}/customer/cart/{$item->getId()}", ['quantity' => 1]);
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/test-order", [
+            'channel' => 'kiosk',
+            'customerName' => 'Sneaky Sam',
+        ]);
+        self::assertSame(403, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testCancellationRestoresThePool(): void
     {
         [$store, $section, $item] = $this->storeWithCasedListing(stock: 5, pool: 1);

@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
-import { useCustomerCart, useTheme } from '../../hooks'
+import { useCustomerCart, useKioskMode, useTheme } from '../../hooks'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants } from '../ui'
-import { ChevronDown, LogIn, LogOut, Menu, Moon, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
+import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
 
 export default function AppLayout() {
   const { user, logout, isSuperAdmin } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { kioskMode, enterKioskMode, exitKioskMode } = useKioskMode()
   const ownedStores = user?.ownedStores ?? []
   // The customer profile + cart are per-store, so only surface those links when
   // the current route is within a store (e.g. /s/:slug, /s/:slug/cards/:id).
@@ -84,6 +85,44 @@ export default function AppLayout() {
     </Link>
   )
 
+  // Kiosk mode: locked-down storefront chrome. No navigation, no account
+  // controls — just the store pages and the cart. Only a platform admin can
+  // leave it (the terminal stays signed in as that admin).
+  if (kioskMode) {
+    return (
+      <div className="min-h-screen bg-bg text-fg">
+        <header className="sticky top-0 z-40 border-b border-border bg-surface/80 shadow-sm backdrop-blur-xl">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+            <span className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
+              <span className="grid size-9 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">
+                MTG
+              </span>
+              <span className="hidden sm:inline">MTG Marketplace</span>
+              <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-700">
+                Kiosk
+              </span>
+            </span>
+            <div className="flex items-center gap-2">
+              {cartLink}
+              {isSuperAdmin && (
+                <Button variant="secondary" size="sm" onClick={exitKioskMode}>
+                  <Monitor aria-hidden className="size-4" />
+                  Exit kiosk
+                </Button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-7xl px-4 py-8">
+          <Outlet />
+        </main>
+
+        {storeSlug && <StoreFooter slug={storeSlug} />}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-bg text-fg">
       <header className="sticky top-0 z-40 border-b border-border bg-surface/80 shadow-sm backdrop-blur-xl">
@@ -103,9 +142,15 @@ export default function AppLayout() {
             </NavLink>
 
             {isSuperAdmin && (
-              <Link to="/platform/admin" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                Admin
-              </Link>
+              <>
+                <Link to="/platform/admin" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  Admin
+                </Link>
+                <Button variant="secondary" size="sm" onClick={enterKioskMode}>
+                  <Monitor aria-hidden className="size-4" />
+                  Kiosk mode
+                </Button>
+              </>
             )}
 
             {ownedStores.length === 1 && (
@@ -249,9 +294,21 @@ export default function AppLayout() {
               </NavLink>
 
               {isSuperAdmin && (
-                <Link to="/platform/admin" onClick={closeMobile} className={mobileLinkClass}>
-                  Admin
-                </Link>
+                <>
+                  <Link to="/platform/admin" onClick={closeMobile} className={mobileLinkClass}>
+                    Admin
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMobile()
+                      enterKioskMode()
+                    }}
+                    className={`${mobileLinkClass} w-full text-left`}
+                  >
+                    Kiosk mode
+                  </button>
+                </>
               )}
 
               {ownedStores.map((store) => (

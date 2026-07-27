@@ -411,13 +411,26 @@ final class StoreCustomerController extends AbstractController
     #[Route('/test-order', name: 'api_store_customer_test_order', methods: ['POST'])]
     public function createTestOrder(Request $request, string $slug): JsonResponse
     {
-        if (!in_array($this->kernel->getEnvironment(), ['dev', 'test'], true)) {
-            return $this->json(['detail' => 'Test orders are only available locally.'], 404);
-        }
-
         $store = $this->resolveStore($slug);
         if (!$store instanceof Store) {
             return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        $channel = is_array($payload) ? ($payload['channel'] ?? Order::CHANNEL_ONLINE) : Order::CHANNEL_ONLINE;
+        if (!in_array($channel, Order::CHANNELS, true)) {
+            return $this->json(['detail' => sprintf('Unknown order channel. Valid: %s.', implode(', ', Order::CHANNELS))], 422);
+        }
+
+        if (Order::CHANNEL_KIOSK === $channel) {
+            // Kiosk checkout works in every environment, but only from a
+            // terminal signed in as store staff or a platform admin —
+            // otherwise any customer could ring up unpaid orders remotely.
+            if (!$this->isGranted('ROLE_SUPER_ADMIN') && !$this->isGranted('STORE_MANAGE', $store)) {
+                return $this->json(['detail' => 'Kiosk checkout is only available on staff kiosk terminals.'], 403);
+            }
+        } elseif (!in_array($this->kernel->getEnvironment(), ['dev', 'test'], true)) {
+            return $this->json(['detail' => 'Test orders are only available locally.'], 404);
         }
 
         $customer = $this->findCustomer($store);
@@ -435,17 +448,31 @@ final class StoreCustomerController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        $payload = json_decode($request->getContent(), true);
         $fulfillment = is_array($payload) ? ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP) : Order::FULFILLMENT_PICKUP;
         if (!in_array($fulfillment, Order::FULFILLMENTS, true)) {
             return $this->json(['detail' => sprintf('Unknown fulfillment method. Valid: %s.', implode(', ', Order::FULFILLMENTS))], 422);
         }
 
+        // Kiosk checkout: the terminal is signed in as a staff/admin account,
+        // so the order must NOT be attributed to that account. The walk-up
+        // customer types their name instead, and no email is recorded.
+        $customerName = $user->getDisplayName();
+        $customerEmail = $user->getEmail();
+        if (Order::CHANNEL_KIOSK === $channel) {
+            $enteredName = is_array($payload) ? trim((string) ($payload['customerName'] ?? '')) : '';
+            if ('' === $enteredName) {
+                return $this->json(['detail' => 'Please enter the customer name for this kiosk order.'], 422);
+            }
+            $customerName = mb_substr($enteredName, 0, 255);
+            $customerEmail = null;
+        }
+
         $order = (new Order())
             ->setStore($store)
             ->setReference($this->generateOrderReference())
-            ->setCustomerName($user->getDisplayName())
-            ->setCustomerEmail($user->getEmail())
+            ->setCustomerName($customerName)
+            ->setCustomerEmail($customerEmail)
+            ->setChannel($channel)
             ->setFulfillment($fulfillment);
 
         $total = 0;
