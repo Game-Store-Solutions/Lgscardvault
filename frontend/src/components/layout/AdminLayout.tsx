@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   GalleryHorizontalEnd,
   LayoutDashboard,
+  Megaphone,
   LogOut,
   Menu,
   Palette,
@@ -38,6 +39,7 @@ function useAdminNav(): { context: string; items: NavItem[] } {
       context: 'Platform administration',
       items: [
         { to: '/platform/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+        { to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone },
       ],
     }
   }
@@ -55,6 +57,7 @@ function useAdminNav(): { context: string; items: NavItem[] } {
       { to: `${base}/orders`, label: 'Orders', icon: ReceiptText },
       { to: `${base}/reports`, label: 'Reports', icon: TrendingUp },
       { to: `${base}/csv`, label: 'CSV import', icon: FileSpreadsheet },
+      { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
     ],
   }
 }

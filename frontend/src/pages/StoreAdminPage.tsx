@@ -9,8 +9,9 @@ import SpotlightTab from './store-admin/SpotlightTab'
 import CaseCardsTab from './store-admin/CaseCardsTab'
 import BrandingTab from './store-admin/BrandingTab'
 import PaymentsTab from './store-admin/PaymentsTab'
+import PatchNotesTab from './store-admin/PatchNotesTab'
 
-type Section = 'inventory' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv'
+type Section = 'inventory' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes'
 
 const SECTIONS: Record<Section, { label: string; render: (slug: string) => React.ReactNode }> = {
   inventory: { label: 'Inventory', render: (slug) => <SearchTab slug={slug} /> },
@@ -21,6 +22,7 @@ const SECTIONS: Record<Section, { label: string; render: (slug: string) => React
   orders: { label: 'Orders', render: (slug) => <OrdersTab slug={slug} /> },
   reports: { label: 'Reports', render: (slug) => <ReportsTab slug={slug} /> },
   csv: { label: 'CSV import', render: (slug) => <CsvTab slug={slug} /> },
+  'patch-notes': { label: 'Patch notes', render: () => <PatchNotesTab /> },
 }
 
 function resolveSection(value?: string): Section {

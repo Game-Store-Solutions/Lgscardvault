@@ -19,6 +19,7 @@ import CustomerProfilePage from './pages/CustomerProfilePage'
 import StoreAdminPage from './pages/StoreAdminPage'
 import ImportRunDetailsPage from './pages/store-admin/ImportRunDetailsPage'
 import PlatformAdminPage from './pages/PlatformAdminPage'
+import PatchNotesTab from './pages/store-admin/PatchNotesTab'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 
 const queryClient = new QueryClient()
@@ -77,6 +78,7 @@ export default function App() {
               }
             >
               <Route index element={<PlatformAdminPage />} />
+              <Route path="patch-notes" element={<PatchNotesTab />} />
               <Route path="stores/:slug/imports" element={<PlatformStoreImportsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
