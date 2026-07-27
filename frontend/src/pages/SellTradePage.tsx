@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -8,7 +8,6 @@ import {
   Repeat,
   Search,
   Sparkles,
-  Timer,
   Trash2,
   WalletCards,
   X,
@@ -32,6 +31,7 @@ import {
   Textarea,
 } from '../components/ui'
 import { formatDate } from '../lib/format'
+import { TradePromoBanner } from '../components/store/TradePromoBanner'
 
 const buylistKey = (slug: string) => ['buylist', slug] as const
 const tradeRatesKey = (slug: string) => ['trade-rates', slug] as const
@@ -104,33 +104,6 @@ function matchesName(card: CardSummary, wanted: string): boolean {
   return full === wanted || full.split(' // ')[0].trim() === wanted
 }
 
-/** Live "ends in 2d 3h 4m 5s" countdown for the promo banner. */
-function usePromoCountdown(endsAt: string | null): string {
-  const [label, setLabel] = useState('')
-  useEffect(() => {
-    if (!endsAt) {
-      setLabel('')
-      return
-    }
-    const tick = () => {
-      const distance = new Date(endsAt).getTime() - Date.now()
-      if (distance <= 0) {
-        setLabel('ending now')
-        return
-      }
-      const days = Math.floor(distance / 86_400_000)
-      const hours = Math.floor((distance % 86_400_000) / 3_600_000)
-      const minutes = Math.floor((distance % 3_600_000) / 60_000)
-      const seconds = Math.floor((distance % 60_000) / 1000)
-      setLabel(`${days > 0 ? `${days}d ` : ''}${hours}h ${minutes}m ${seconds}s`)
-    }
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [endsAt])
-  return label
-}
-
 /**
  * Sell/Trade portal: sell any card at a percentage of market price (store
  * credit or cash), with premium rates on the store's buy list. Build the
@@ -199,8 +172,6 @@ export default function SellTradePage() {
 
   // "Change printing" target line
   const [printingLine, setPrintingLine] = useState<SellLine | null>(null)
-
-  const promoCountdown = usePromoCountdown(rates?.promoActive ? rates.promoEndsAt : null)
 
   const effectiveRates = useMemo<TradeRates>(
     () =>
@@ -362,13 +333,7 @@ export default function SellTradePage() {
         </p>
       </div>
 
-      {rates?.promoActive && (
-        <div className="flex flex-wrap items-center gap-3 rounded-card border border-brand-500/40 bg-brand-50 px-4 py-3 shadow-card">
-          <Timer aria-hidden className="size-5 text-brand-600" />
-          <p className="font-bold text-brand-700">Boosted trade-in rates are live!</p>
-          {promoCountdown && <p className="text-sm font-medium text-brand-700">Ends in {promoCountdown}</p>}
-        </div>
-      )}
+      <TradePromoBanner slug={slug} />
 
       {submitted && (
         <Card className="border-success-500/40">

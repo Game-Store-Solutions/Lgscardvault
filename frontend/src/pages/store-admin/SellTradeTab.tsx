@@ -155,6 +155,29 @@ export default function SellTradeTab({ slug }: { slug: string }) {
   )
 }
 
+/** Half-hour time-of-day choices for the promo window, plus end-of-day. */
+const TIME_OPTIONS: { value: string; label: string }[] = [
+  ...Array.from({ length: 48 }, (_, i) => {
+    const hours = Math.floor(i / 2)
+    const minutes = i % 2 === 0 ? '00' : '30'
+    const hour12 = hours % 12 === 0 ? 12 : hours % 12
+    return { value: `${String(hours).padStart(2, '0')}:${minutes}`, label: `${hour12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}` }
+  }),
+  { value: '23:59', label: '11:59 PM' },
+]
+
+/** Snap an ISO timestamp's local time to the nearest listed option. */
+function timeOptionOf(iso: string): string {
+  const date = new Date(iso)
+  const value = `${String(date.getHours()).padStart(2, '0')}:${date.getMinutes() < 30 ? '00' : '30'}`
+  return date.getHours() === 23 && date.getMinutes() === 59 ? '23:59' : value
+}
+
+function localDateOf(iso: string): string {
+  const date = new Date(iso)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 /** Payout rate settings: base + buy-list premium + promo window. */
 function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | undefined }) {
   const queryClient = useQueryClient()
@@ -172,8 +195,10 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
         buylistCashRatePercent: settings.buylistCashRatePercent?.toString() ?? '',
         promoCreditRatePercent: settings.promoCreditRatePercent?.toString() ?? '',
         promoCashRatePercent: settings.promoCashRatePercent?.toString() ?? '',
-        promoStartsAt: settings.promoStartsAt?.slice(0, 16) ?? '',
-        promoEndsAt: settings.promoEndsAt?.slice(0, 16) ?? '',
+        promoStartDate: settings.promoStartsAt ? localDateOf(settings.promoStartsAt) : '',
+        promoStartTime: settings.promoStartsAt ? timeOptionOf(settings.promoStartsAt) : '00:00',
+        promoEndDate: settings.promoEndsAt ? localDateOf(settings.promoEndsAt) : '',
+        promoEndTime: settings.promoEndsAt ? timeOptionOf(settings.promoEndsAt) : '23:59',
       })
       setLoaded(true)
     }
@@ -194,8 +219,13 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
       ]) {
         if (form[key]?.trim()) tradeRates[key] = Number(form[key])
       }
-      for (const key of ['promoStartsAt', 'promoEndsAt']) {
-        if (form[key]?.trim()) tradeRates[key] = new Date(form[key]).toISOString()
+      // Date + time dropdowns combine into one local timestamp per boundary;
+      // clearing the date clears that boundary.
+      if (form.promoStartDate?.trim()) {
+        tradeRates.promoStartsAt = new Date(`${form.promoStartDate}T${form.promoStartTime || '00:00'}`).toISOString()
+      }
+      if (form.promoEndDate?.trim()) {
+        tradeRates.promoEndsAt = new Date(`${form.promoEndDate}T${form.promoEndTime || '23:59'}`).toISOString()
       }
       const { data } = await api.patch<Store>(`/stores/${slug}/settings`, { tradeRates })
       return data
@@ -253,8 +283,38 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Promo window</p>
             {percentField('promoCreditRatePercent', 'Promo credit %', 'off')}
             {percentField('promoCashRatePercent', 'Promo cash %', 'off')}
-            <Input label="Starts" type="datetime-local" value={form.promoStartsAt ?? ''} onChange={(e) => set('promoStartsAt', e.target.value)} />
-            <Input label="Ends" type="datetime-local" value={form.promoEndsAt ?? ''} onChange={(e) => set('promoEndsAt', e.target.value)} />
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <Input label="Starts on" type="date" value={form.promoStartDate ?? ''} onChange={(e) => set('promoStartDate', e.target.value)} />
+              <Select label="At" value={form.promoStartTime ?? '00:00'} onChange={(e) => set('promoStartTime', e.target.value)} className="w-28">
+                {TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <Input label="Ends on" type="date" value={form.promoEndDate ?? ''} onChange={(e) => set('promoEndDate', e.target.value)} />
+              <Select label="At" value={form.promoEndTime ?? '23:59'} onChange={(e) => set('promoEndTime', e.target.value)} className="w-28">
+                {TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            {(form.promoStartDate || form.promoEndDate) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  set('promoStartDate', '')
+                  set('promoEndDate', '')
+                }}
+              >
+                Clear promo window
+              </Button>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">

@@ -20,6 +20,7 @@ import { useCanManageStore, useCart, useInventory, useStore, useStoreTheme } fro
 import { Button, buttonVariants, EmptyState, Input, LoadingPanel, Pagination, Select } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
 import { StoreHero } from '../components/store/StoreHero'
+import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { cx } from '../lib/cx'
 import { MANA_COLORS } from '../lib/mtg'
 import {
@@ -359,6 +360,8 @@ export default function StorePage() {
           </>
         }
       />
+
+      <TradePromoBanner slug={slug} showSellLink />
 
       {/* Slim stat line */}
       <p className="text-sm text-fg-muted">

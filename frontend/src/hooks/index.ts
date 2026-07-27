@@ -7,6 +7,7 @@ export { useDebouncedValue } from './useDebouncedValue'
 export { useTheme } from './useTheme'
 export type { Theme } from './useTheme'
 export { useKioskMode } from './useKioskMode'
+export { usePromoCountdown } from './usePromoCountdown'
 export { useTilt } from './useTilt'
 export { useStoreTheme } from './useStoreTheme'
 export {
