@@ -191,6 +191,56 @@ final class StoreSectionControllerTest extends WebTestCase
         self::assertSame(401, $this->client->getResponse()->getStatusCode());
     }
 
+    /**
+     * cardLimit is the section's physical capacity: auto-fill never pulls
+     * more than it, manual adds beyond it are rejected, and out-of-range
+     * limits 422.
+     */
+    public function testCardLimitCapsAutoFillAndManualAdds(): void
+    {
+        $store = $this->fixtures->store();
+        $case = $this->fixtures->storeCase($store);
+        $items = [];
+        foreach ([401, 402, 403] as $i => $n) {
+            $items[] = $this->fixtures->inventoryItem($store, $this->fixtures->card($n), 2, priceCents: 1000 + $i);
+        }
+        $this->authenticate($store->getOwner());
+
+        // Auto-fill pulls at most cardLimit cards even with 3 matches.
+        $auto = $this->createSection($store, $case, 'Capped auto', StoreSection::MODE_AUTO);
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/sections/{$auto->getId()}/auto-fill", [
+            'cardLimit' => 2,
+        ]);
+        self::assertResponseIsSuccessful();
+        self::assertSame(2, $body['cardLimit']);
+        self::assertCount(2, $body['cards']);
+
+        // Manual adds stop at the limit with a clear error.
+        $manual = $this->createSection($store, $case, 'Capped manual');
+        $this->jsonRequest('PATCH', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}", ['cardLimit' => 1]);
+        self::assertResponseIsSuccessful();
+
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}/items", [
+            'inventoryItemId' => $items[0]->getId(),
+        ]);
+        self::assertResponseIsSuccessful();
+
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}/items", [
+            'inventoryItemId' => $items[1]->getId(),
+        ]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('limited to 1', $body['detail']);
+
+        // Out-of-range limits are rejected; clearing works.
+        $this->jsonRequest('PATCH', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}", ['cardLimit' => 0]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $this->jsonRequest('PATCH', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}", ['cardLimit' => 999]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $body = $this->jsonRequest('PATCH', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}", ['cardLimit' => null]);
+        self::assertResponseIsSuccessful();
+        self::assertNull($body['cardLimit']);
+    }
+
     public function testAutoFillByColorIdentityTerm(): void
     {
         $store = $this->fixtures->store();

@@ -79,6 +79,14 @@ class StoreSection
     #[ORM\Column(length: 40, nullable: true)]
     private ?string $autoCardType = null;
 
+    /**
+     * Maximum distinct cards this section holds — the physical capacity of
+     * its area in the case. Caps auto-fill pulls and manual adds. Null = the
+     * platform default (StoreSectionController::AUTO_FILL_MAX).
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $cardLimit = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -127,6 +135,9 @@ class StoreSection
 
     public function getAutoCardType(): ?string { return $this->autoCardType; }
     public function setAutoCardType(?string $cardType): static { $this->autoCardType = $cardType; return $this; }
+
+    public function getCardLimit(): ?int { return $this->cardLimit; }
+    public function setCardLimit(?int $cardLimit): static { $this->cardLimit = $cardLimit; return $this; }
 
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
 
