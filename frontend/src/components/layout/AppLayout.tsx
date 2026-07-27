@@ -8,7 +8,7 @@ import { Avatar, Button, buttonVariants } from '../ui'
 import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
 
 export default function AppLayout() {
-  const { user, logout, isSuperAdmin } = useAuth()
+  const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { kioskMode, enterKioskMode, exitKioskMode } = useKioskMode()
   const ownedStores = user?.ownedStores ?? []
@@ -104,7 +104,7 @@ export default function AppLayout() {
             </span>
             <div className="flex items-center gap-2">
               {cartLink}
-              {isSuperAdmin && (
+              {(isStoreOwner || isSuperAdmin) && (
                 <Button variant="secondary" size="sm" onClick={exitKioskMode}>
                   <Monitor aria-hidden className="size-4" />
                   Exit kiosk
@@ -142,15 +142,17 @@ export default function AppLayout() {
             </NavLink>
 
             {isSuperAdmin && (
-              <>
-                <Link to="/platform/admin" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                  Admin
-                </Link>
-                <Button variant="secondary" size="sm" onClick={enterKioskMode}>
-                  <Monitor aria-hidden className="size-4" />
-                  Kiosk mode
-                </Button>
-              </>
+              <Link to="/platform/admin" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Admin
+              </Link>
+            )}
+
+            {/* Kiosk terminals belong to stores: their owners flip the mode. */}
+            {isStoreOwner && (
+              <Button variant="secondary" size="sm" onClick={enterKioskMode}>
+                <Monitor aria-hidden className="size-4" />
+                Kiosk mode
+              </Button>
             )}
 
             {ownedStores.length === 1 && (
@@ -294,21 +296,22 @@ export default function AppLayout() {
               </NavLink>
 
               {isSuperAdmin && (
-                <>
-                  <Link to="/platform/admin" onClick={closeMobile} className={mobileLinkClass}>
-                    Admin
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeMobile()
-                      enterKioskMode()
-                    }}
-                    className={`${mobileLinkClass} w-full text-left`}
-                  >
-                    Kiosk mode
-                  </button>
-                </>
+                <Link to="/platform/admin" onClick={closeMobile} className={mobileLinkClass}>
+                  Admin
+                </Link>
+              )}
+
+              {isStoreOwner && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobile()
+                    enterKioskMode()
+                  }}
+                  className={`${mobileLinkClass} w-full text-left`}
+                >
+                  Kiosk mode
+                </button>
               )}
 
               {ownedStores.map((store) => (

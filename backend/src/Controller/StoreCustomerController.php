@@ -424,10 +424,11 @@ final class StoreCustomerController extends AbstractController
 
         if (Order::CHANNEL_KIOSK === $channel) {
             // Kiosk checkout works in every environment, but only from a
-            // terminal signed in as store staff or a platform admin —
+            // terminal signed in as someone who manages THIS store (the
+            // STORE_MANAGE voter covers owners and platform admins) —
             // otherwise any customer could ring up unpaid orders remotely.
-            if (!$this->isGranted('ROLE_SUPER_ADMIN') && !$this->isGranted('STORE_MANAGE', $store)) {
-                return $this->json(['detail' => 'Kiosk checkout is only available on staff kiosk terminals.'], 403);
+            if (!$this->isGranted('STORE_MANAGE', $store)) {
+                return $this->json(['detail' => 'Kiosk checkout is only available on the store\'s kiosk terminal.'], 403);
             }
         } elseif (!in_array($this->kernel->getEnvironment(), ['dev', 'test'], true)) {
             return $this->json(['detail' => 'Test orders are only available locally.'], 404);
