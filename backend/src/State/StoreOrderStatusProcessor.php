@@ -46,10 +46,11 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
     }
 
     /**
-     * Entering CANCELLED/REFUNDED returns each line's case copies to its
-     * section pool, so the case's available quantity (and future auto-fills)
-     * reflect reality. Both states are terminal in the status state machine,
-     * so a pool can never be double-released.
+     * Entering CANCELLED/REFUNDED returns each line's stock: the purchased
+     * copies go back onto the inventory listing (checkout consumed them at
+     * placement), and case copies go back to their section pool. Both states
+     * are terminal in the status state machine, so stock can never be
+     * double-restored.
      */
     private function releaseCasePoolsIfNeeded(Order $order, mixed $originalStatus): void
     {
@@ -61,6 +62,10 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         }
 
         foreach ($order->getLines() as $line) {
+            $item = $line->getInventoryItem();
+            if (null !== $item) {
+                $item->setQuantity($item->getQuantity() + $line->getQuantity());
+            }
             $this->sectionSaleAllocator->releaseLine($line);
         }
     }

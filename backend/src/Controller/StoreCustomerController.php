@@ -463,6 +463,11 @@ final class StoreCustomerController extends AbstractController
                 ->setQuantity($quantity)
                 ->setPriceCents($inventoryItem->getPriceCents());
 
+            // The sale consumes real stock at placement. The line's quantity is
+            // clamped to available stock above, so this can never go negative;
+            // cancelling/refunding the order adds it back (StoreOrderStatusProcessor).
+            $inventoryItem->setQuantity($inventoryItem->getQuantity() - $quantity);
+
             // If this listing sits in a display-case section with pool copies
             // left, the sale comes from the case: deplete the section pool and
             // stamp the line with its case/section for pull + print sheets.
