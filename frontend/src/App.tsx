@@ -20,6 +20,7 @@ import StoreAdminPage from './pages/StoreAdminPage'
 import ImportRunDetailsPage from './pages/store-admin/ImportRunDetailsPage'
 import PlatformAdminPage from './pages/PlatformAdminPage'
 import PatchNotesTab from './pages/store-admin/PatchNotesTab'
+import SellTradePage from './pages/SellTradePage'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 
 const queryClient = new QueryClient()
@@ -43,6 +44,7 @@ export default function App() {
               <Route index element={<HomePage />} />
               <Route path="s/:slug" element={<StorePage />} />
               <Route path="s/:slug/mass-search" element={<MassSearchPage />} />
+              <Route path="s/:slug/sell" element={<SellTradePage />} />
               <Route path="s/:slug/cart" element={<CartPage />} />
               <Route path="s/:slug/cards/:id" element={<CardDetailsPage />} />
               <Route path="s/:slug/case-cards" element={<CaseCardsPage />} />

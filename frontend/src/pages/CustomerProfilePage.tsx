@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { cardImage, formatScryfallPrice, httpStatus } from '../api/client'
-import type { CardSummary, StoreCustomer } from '../api/types'
+import type { CardSummary, SellSubmission, StoreCustomer } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import {
   customerKeys,
@@ -35,12 +35,12 @@ import {
   TabPanel,
   Textarea,
 } from '../components/ui'
-import { Heart, ImageOff, ListPlus, Plus, ReceiptText, Save, Search, Trash2, User, X } from 'lucide-react'
+import { Heart, ImageOff, ListPlus, Plus, ReceiptText, Save, Search, Trash2, User, WalletCards, X } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
 import { NotificationList } from '../components/notifications/NotificationList'
 
-type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist'
-const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist']
+type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade'
+const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade']
 
 export default function CustomerProfilePage() {
   const { slug = '' } = useParams()
@@ -98,6 +98,7 @@ export default function CustomerProfilePage() {
           { id: 'orders', label: `Orders (${ordersCount})`, icon: ReceiptText },
           { id: 'favorites', label: `Favorites (${favoritesCount})`, icon: Heart },
           { id: 'wantlist', label: `Want list (${wantListCount})`, icon: ListPlus },
+          { id: 'selltrade', label: 'Sell / Trade', icon: WalletCards },
         ]}
       />
 
@@ -114,8 +115,84 @@ export default function CustomerProfilePage() {
       <TabPanel when="wantlist" value={tab}>
         <WantListPanel slug={slug} query={wantListQuery} />
       </TabPanel>
+      <TabPanel when="selltrade" value={tab}>
+        <SellTradeHistoryPanel slug={slug} />
+      </TabPanel>
     </div>
   )
+}
+
+/* --------------------------- Sell/Trade history --------------------------- */
+
+const SELL_STATUS_TONE: Record<SellSubmission['status'], 'brand' | 'success' | 'danger' | 'neutral'> = {
+  pending: 'brand',
+  accepted: 'success',
+  completed: 'success',
+  declined: 'danger',
+}
+
+function SellTradeHistoryPanel({ slug }: { slug: string }) {
+  const query = useQuery({
+    queryKey: ['my-sell-submissions', slug] as const,
+    queryFn: async () => {
+      const { data } = await api.get<SellSubmission[]>(`/stores/${slug}/customer/sell-submissions`)
+      return data
+    },
+  })
+
+  if (query.isLoading) return <LoadingPanel label="Loading your sell/trade history…" />
+  if (query.isError) return <ErrorState title="Could not load your sell/trade history." onRetry={() => void query.refetch()} />
+
+  const submissions = query.data ?? []
+  if (submissions.length === 0) {
+    return (
+      <Card>
+        <CardBody>
+          <EmptyState
+            icon={WalletCards}
+            title="No sell/trade submissions yet"
+            description="Cards you offer to sell to this store will show up here."
+            action={
+              <Link to={`/s/${slug}/sell`} className="text-sm font-bold text-brand-600 hover:underline">
+                Browse the buy list →
+              </Link>
+            }
+          />
+        </CardBody>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {submissions.map((submission) => (
+        <Card key={submission.id}>
+          <CardHeader
+            title={`${submission.items.reduce((n, item) => n + item.quantity, 0)} cards · store pays ${formatPriceCents(submission.totalOfferCents)}`}
+            subtitle={new Date(submission.createdAt).toLocaleString()}
+            actions={<Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">{submission.status}</Badge>}
+          />
+          <CardBody>
+            <ul className="space-y-1 text-sm">
+              {submission.items.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate text-fg">
+                    {item.quantity}× {item.cardName}
+                    {item.isFoil ? ' (Foil)' : ''}
+                  </span>
+                  <span className="shrink-0 text-fg-muted">{formatPriceCents(item.offerCentsEach)} each</span>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function formatPriceCents(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`
 }
 
 function NotificationsPanel({

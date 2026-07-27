@@ -475,6 +475,40 @@ export interface Order {
 
 export type OrderStatus = 'pending' | 'received' | 'fulfilled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
 
+/** One card a store wants to buy, with its cash offer. */
+export interface BuylistEntry {
+  id: number
+  offerCents: number
+  wantsFoil: boolean
+  maxQuantity: number | null
+  notes: string | null
+  createdAt: string
+  card: CardSummary | null
+}
+
+export type SellSubmissionStatus = 'pending' | 'accepted' | 'declined' | 'completed'
+
+export interface SellSubmissionItem {
+  id: number
+  cardName: string
+  isFoil: boolean
+  quantity: number
+  offerCentsEach: number
+  imageUris?: { normal?: string; small?: string } | null
+  setCode?: string | null
+}
+
+export interface SellSubmission {
+  id: number
+  status: SellSubmissionStatus
+  totalOfferCents: number
+  createdAt: string
+  decidedAt: string | null
+  customerName?: string | null
+  customerEmail?: string | null
+  items: SellSubmissionItem[]
+}
+
 export interface CustomerNotification {
   id: number
   type: string
