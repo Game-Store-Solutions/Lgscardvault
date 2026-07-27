@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router'
 import { ArrowLeft, ChevronDown, GalleryHorizontalEnd } from 'lucide-react'
 import { cardImage, formatPrice } from '../api/client'
 import { useStore, useStoreCases, useStoreTheme } from '../hooks'
-import { Card, CardBody, EmptyState, LoadingPanel, buttonVariants } from '../components/ui'
+import { Card, CardBody, EmptyState, buttonVariants } from '../components/ui'
 import type { StoreSectionCard } from '../api/types'
+import { StorePageLoader } from '../components/store/StorePageLoader'
 
 /**
  * Storefront Case Cards page (/s/:slug/case-cards). Deliberately restrained:
@@ -51,7 +52,7 @@ export default function CaseCardsPage() {
       </div>
 
       {isLoading ? (
-        <LoadingPanel />
+        <StorePageLoader label="Loading case cards…" />
       ) : isError ? (
         <EmptyState
           icon={GalleryHorizontalEnd}

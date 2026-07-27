@@ -21,6 +21,7 @@ import { Button, buttonVariants, EmptyState, Input, LoadingPanel, Pagination, Se
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
 import { StoreHero } from '../components/store/StoreHero'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
+import { StorePageLoader } from '../components/store/StorePageLoader'
 import { cx } from '../lib/cx'
 import { MANA_COLORS } from '../lib/mtg'
 import {
@@ -68,7 +69,7 @@ export default function StorePage() {
   const railRef = useRef<HTMLDivElement>(null)
   const searchSectionRef = useRef<HTMLDivElement>(null)
 
-  const { data: store } = useStore(slug)
+  const { data: store, isLoading: storeLoading } = useStore(slug)
   useStoreTheme(store)
   const cardDisplayStyle = store?.cardDisplayStyle ?? 'gallery'
 
@@ -327,6 +328,12 @@ export default function StorePage() {
         </div>
       </div>
     )
+  }
+
+  // Full-screen branded loader only while the screen isn't completely
+  // loaded — cached revisits render instantly.
+  if (storeLoading || isLoading) {
+    return <StorePageLoader label="Loading store…" />
   }
 
   return (

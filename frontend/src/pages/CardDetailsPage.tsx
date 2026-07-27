@@ -26,10 +26,11 @@ import {
   useStore,
   useStoreTheme,
 } from '../hooks'
-import { Badge, Button, buttonVariants, ErrorState, LoadingPanel } from '../components/ui'
+import { Badge, Button, buttonVariants, ErrorState } from '../components/ui'
 import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../lib/mtg'
+import { StorePageLoader } from '../components/store/StorePageLoader'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -146,7 +147,7 @@ export default function CardDetailsPage() {
   })
 
   if (isLoading) {
-    return <LoadingPanel label="Loading card details…" />
+    return <StorePageLoader label="Loading card details…" />
   }
 
   if (error || !item) {

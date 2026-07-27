@@ -22,10 +22,11 @@ import type { CartItem, InventoryItem, Order, OrderFulfillment } from '../api/ty
 import { useAuth } from '../context/AuthContext'
 import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
-import { Badge, Button, buttonVariants, EmptyState, Input, LoadingPanel } from '../components/ui'
+import { Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
 import { SpotlightCard } from '../components/cards'
 import { cx } from '../lib/cx'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
+import { StorePageLoader } from '../components/store/StorePageLoader'
 
 const TEST_CHECKOUT_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_CHECKOUT === 'true'
 
@@ -160,7 +161,7 @@ export default function CartPage() {
       />
 
       {isLoading ? (
-        <LoadingPanel label="Loading your cart..." />
+        <StorePageLoader label="Loading your cart…" />
       ) : cart.length === 0 ? (
         <EmptyCart slug={slug} storeName={store?.name ?? 'the store'} picks={picks} />
       ) : (
