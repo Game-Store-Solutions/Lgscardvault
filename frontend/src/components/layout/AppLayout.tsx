@@ -86,8 +86,8 @@ export default function AppLayout() {
   )
 
   // Kiosk mode: locked-down storefront chrome. No navigation, no account
-  // controls — just the store pages and the cart. Only a platform admin can
-  // leave it (the terminal stays signed in as that admin).
+  // controls — just the store pages and the cart. Only the store owner (or a
+  // platform admin) can leave it; the terminal stays signed in as the owner.
   if (kioskMode) {
     return (
       <div className="min-h-screen bg-bg text-fg">

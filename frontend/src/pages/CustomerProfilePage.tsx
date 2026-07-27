@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import api, { cardImage, formatScryfallPrice, httpStatus } from '../api/client'
+import api, { cardImage, formatPrice, formatScryfallPrice, httpStatus } from '../api/client'
 import type { CardSummary, SellSubmission, StoreCustomer } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -168,7 +168,7 @@ function SellTradeHistoryPanel({ slug }: { slug: string }) {
       {submissions.map((submission) => (
         <Card key={submission.id}>
           <CardHeader
-            title={`${submission.items.reduce((n, item) => n + item.quantity, 0)} cards · store pays ${formatPriceCents(submission.totalOfferCents)}`}
+            title={`${submission.items.reduce((n, item) => n + item.quantity, 0)} cards · store pays ${formatPrice(submission.totalOfferCents)}`}
             subtitle={new Date(submission.createdAt).toLocaleString()}
             actions={<Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">{submission.status}</Badge>}
           />
@@ -180,7 +180,7 @@ function SellTradeHistoryPanel({ slug }: { slug: string }) {
                     {item.quantity}× {item.cardName}
                     {item.isFoil ? ' (Foil)' : ''}
                   </span>
-                  <span className="shrink-0 text-fg-muted">{formatPriceCents(item.offerCentsEach)} each</span>
+                  <span className="shrink-0 text-fg-muted">{formatPrice(item.offerCentsEach)} each</span>
                 </li>
               ))}
             </ul>
@@ -189,10 +189,6 @@ function SellTradeHistoryPanel({ slug }: { slug: string }) {
       ))}
     </div>
   )
-}
-
-function formatPriceCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`
 }
 
 function NotificationsPanel({

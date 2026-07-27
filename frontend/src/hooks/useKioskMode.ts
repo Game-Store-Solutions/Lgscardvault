@@ -12,10 +12,10 @@ function read(): boolean {
 }
 
 /**
- * Kiosk mode: a platform admin flips the terminal into a locked-down
+ * Kiosk mode: a store owner flips the terminal into a locked-down
  * storefront (no nav, just browsing + cart) so customers can ring up their
  * own purchases in-store. Persisted in localStorage so a page refresh at
- * the kiosk doesn't fall back into the admin chrome; a custom event keeps
+ * the kiosk doesn't fall back into the owner's chrome; a custom event keeps
  * every subscribed component in sync within the tab.
  */
 export function useKioskMode() {

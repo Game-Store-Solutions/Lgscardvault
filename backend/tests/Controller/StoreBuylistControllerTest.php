@@ -75,12 +75,17 @@ final class StoreBuylistControllerTest extends WebTestCase
         $this->jsonRequest('POST', "$base/buylist", ['cardId' => (string) $card->getId(), 'offerCents' => 1]);
         self::assertSame(403, $this->client->getResponse()->getStatusCode());
 
-        // Customer submits 5 copies — clamped to the entry's cap of 2.
+        // Customer submits 5 copies split across two lines — merged and
+        // clamped to the entry's cap of 2 (split lines can't dodge the cap).
         $submission = $this->jsonRequest('POST', "$base/sell-submissions", [
-            'items' => [['buylistEntryId' => $entry['id'], 'quantity' => 5]],
+            'items' => [
+                ['buylistEntryId' => $entry['id'], 'quantity' => 3],
+                ['buylistEntryId' => $entry['id'], 'quantity' => 2],
+            ],
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
         self::assertSame('pending', $submission['status']);
+        self::assertCount(1, $submission['items']);
         self::assertSame(2, $submission['items'][0]['quantity']);
         self::assertSame(1500, $submission['totalOfferCents']);
 

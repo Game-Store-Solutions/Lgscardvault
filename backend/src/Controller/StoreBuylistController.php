@@ -175,23 +175,31 @@ final class StoreBuylistController extends AbstractController
             return $this->json(['detail' => sprintf('Too many lines: maximum %d per submission.', self::MAX_SUBMISSION_ITEMS)], 422);
         }
 
-        $submission = (new SellSubmission())->setStore($store)->setUser($user);
-        $total = 0;
-
+        // Merge duplicate lines per buy-list entry BEFORE clamping, so
+        // splitting one card across several lines can't exceed the entry's
+        // max-quantity cap.
+        $quantityByEntryId = [];
         foreach ($items as $i => $itemData) {
             if (!is_array($itemData)) {
                 return $this->json(['detail' => sprintf('Line %d is invalid.', $i)], 422);
             }
-
-            $entry = $this->buylistEntries->findOneForStore($store, (int) ($itemData['buylistEntryId'] ?? 0));
-            if (!$entry instanceof BuylistEntry) {
-                return $this->json(['detail' => sprintf('Line %d does not reference this store\'s buy list.', $i)], 422);
-            }
-
             $quantity = (int) ($itemData['quantity'] ?? 0);
             if ($quantity < 1) {
                 return $this->json(['detail' => sprintf('Line %d must have a quantity of at least 1.', $i)], 422);
             }
+            $entryId = (int) ($itemData['buylistEntryId'] ?? 0);
+            $quantityByEntryId[$entryId] = ($quantityByEntryId[$entryId] ?? 0) + $quantity;
+        }
+
+        $submission = (new SellSubmission())->setStore($store)->setUser($user);
+        $total = 0;
+
+        foreach ($quantityByEntryId as $entryId => $quantity) {
+            $entry = $this->buylistEntries->findOneForStore($store, $entryId);
+            if (!$entry instanceof BuylistEntry) {
+                return $this->json(['detail' => 'One of the lines does not reference this store\'s buy list.'], 422);
+            }
+
             if (null !== $entry->getMaxQuantity()) {
                 $quantity = min($quantity, $entry->getMaxQuantity());
             }
