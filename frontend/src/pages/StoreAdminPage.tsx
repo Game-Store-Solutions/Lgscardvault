@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { buttonVariants, PageHeader } from '../components/ui'
 import { useStore } from '../hooks'
 import SearchTab from './store-admin/SearchTab'

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Check, ShoppingCart } from 'lucide-react'
 import { cardImage, formatPrice, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'

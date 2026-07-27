@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import { Bell } from 'lucide-react'
 import api from '../../api/client'
 import { customerKeys, useCustomerNotifications } from '../../hooks'

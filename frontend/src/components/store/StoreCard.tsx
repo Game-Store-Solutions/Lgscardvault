@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { ArrowRight, BadgeCheck, CalendarDays, Store as StoreIcon, UserRound } from 'lucide-react'
 import type { Store } from '../../api/types'
 import { cx } from '../../lib/cx'

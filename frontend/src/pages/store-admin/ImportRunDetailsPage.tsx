@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { ArrowLeft, Search } from 'lucide-react'
 import api, { cardImage, formatScryfallPrice } from '../../api/client'
 import { inventoryKey } from '../../hooks'

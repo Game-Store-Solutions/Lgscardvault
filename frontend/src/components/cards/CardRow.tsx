@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { ImageOff, Sparkles } from 'lucide-react'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'

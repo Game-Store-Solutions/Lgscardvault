@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { ArrowRight, Search, Store as StoreIcon } from 'lucide-react'
 import api, { unwrapCollection } from '../api/client'
 import type { Store } from '../api/types'

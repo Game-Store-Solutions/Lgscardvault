@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useOrders, useStore, useStoreTheme } from '../../hooks'

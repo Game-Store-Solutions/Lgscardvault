@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
 import { useCustomerCart, useTheme } from '../../hooks'
 import { NotificationBell } from '../notifications/NotificationBell'

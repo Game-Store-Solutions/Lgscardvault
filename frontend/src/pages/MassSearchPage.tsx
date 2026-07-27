@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { ArrowLeft, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, Search, XCircle } from 'lucide-react'
 import { cardImage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
