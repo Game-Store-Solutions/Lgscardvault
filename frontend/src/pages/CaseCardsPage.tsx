@@ -1,5 +1,6 @@
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, GalleryHorizontalEnd } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useParams } from 'react-router'
+import { ArrowLeft, ChevronDown, GalleryHorizontalEnd } from 'lucide-react'
 import { cardImage, formatPrice } from '../api/client'
 import { useStore, useStoreCases, useStoreTheme } from '../hooks'
 import { Card, CardBody, EmptyState, LoadingPanel, buttonVariants } from '../components/ui'
@@ -76,16 +77,7 @@ export default function CaseCardsPage() {
                 </div>
 
                 {storeCase.sections.map((section) => (
-                  <section key={section.id}>
-                    <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
-                      {section.title}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-                      {section.cards.map((entry) => (
-                        <CaseCardTile key={entry.id} slug={slug} entry={entry} />
-                      ))}
-                    </div>
-                  </section>
+                  <CaseSection key={section.id} slug={slug} section={section} />
                 ))}
               </CardBody>
             </Card>
@@ -93,6 +85,48 @@ export default function CaseCardsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * One collapsible section inside a case. The whole header row is the toggle
+ * so it's an easy touch target; the card count stays visible while collapsed
+ * so shoppers know what they're skipping.
+ */
+function CaseSection({
+  slug,
+  section,
+}: {
+  slug: string
+  section: { id: number; title: string; cards: RenderableCard[] }
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={() => setCollapsed((value) => !value)}
+        aria-expanded={!collapsed}
+        className="mb-3 flex w-full items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-btn"
+      >
+        <ChevronDown
+          aria-hidden
+          className={`size-4 text-brand-600 transition-transform duration-150 ${collapsed ? '-rotate-90' : ''}`}
+        />
+        <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">{section.title}</h3>
+        <span className="text-xs text-fg-muted">
+          {section.cards.length} card{section.cards.length === 1 ? '' : 's'}
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+          {section.cards.map((entry) => (
+            <CaseCardTile key={entry.id} slug={slug} entry={entry} />
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -117,6 +151,7 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
   return (
     <Link
       to={`/s/${slug}/cards/${inventoryItem.id}`}
+      state={{ from: 'case-cards' }}
       className="group relative rounded-card transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
       {lastOne && (

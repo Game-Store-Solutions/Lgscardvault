@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { LogIn } from 'lucide-react'
 import { useStore } from '../hooks'
 import { Button, Input } from '../components/ui'

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import {
   ChevronLeft,
   ChevronRight,
@@ -25,6 +25,7 @@ import { MANA_COLORS } from '../lib/mtg'
 import {
     QUICK_ACTIONS,
     SORTS,
+    CARD_TYPES,
     FINISH_OPTIONS,
     COLORS,
     DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,
@@ -54,7 +55,7 @@ export default function StorePage() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [setFilter, setSetFilter] = useState('')
-  const [oracleFilter, setOracleFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [finishFilter, setFinishFilter] = useState<FinishFilter>('all')
   const [selectedColors, setSelectedColors] = useState<string[]>([])
   const [minPrice, setMinPrice] = useState('')
@@ -80,10 +81,16 @@ export default function StorePage() {
     return map
   }, [cartQuery.data])
 
-  const availableSets = useMemo(
-    () => Array.from(new Set(inventory.map((item) => item.card.setCode).filter(Boolean))).sort(),
-    [inventory],
-  )
+  // code → display name; the option value stays the code (stable, matches the
+  // filter) while the label shows the human-readable set name.
+  const availableSets = useMemo(() => {
+    const bySet = new Map<string, string>()
+    for (const item of inventory) {
+      const code = item.card.setCode
+      if (code && !bySet.has(code)) bySet.set(code, item.card.setName || code.toUpperCase())
+    }
+    return Array.from(bySet, ([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [inventory])
 
   const colorCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -94,7 +101,7 @@ export default function StorePage() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     const setTerm = setFilter.trim().toLowerCase()
-    const oracleTerm = oracleFilter.trim().toLowerCase()
+    const typeTerm = typeFilter.trim().toLowerCase()
     const minPriceCents = parsePriceInput(minPrice)
     const maxPriceCents = parsePriceInput(maxPrice)
 
@@ -112,7 +119,7 @@ export default function StorePage() {
         !setTerm ||
         (item.card.setCode ?? '').toLowerCase() === setTerm ||
         (item.card.setName ?? '').toLowerCase().includes(setTerm)
-      const matchesOracle = !oracleTerm || (item.card.oracleText ?? '').toLowerCase().includes(oracleTerm)
+      const matchesType = !typeTerm || (item.card.typeLine ?? '').toLowerCase().includes(typeTerm)
       const matchesFinish =
         finishFilter === 'all' ||
         (finishFilter === 'foil' && item.isFoil) ||
@@ -123,10 +130,10 @@ export default function StorePage() {
       const matchesMaxPrice = maxPriceCents === null || (priceCents !== null && priceCents <= maxPriceCents)
 
       return (
-        matchesTerm && matchesSet && matchesOracle && matchesFinish && matchesColors && matchesMinPrice && matchesMaxPrice
+        matchesTerm && matchesSet && matchesType && matchesFinish && matchesColors && matchesMinPrice && matchesMaxPrice
       )
     })
-  }, [inventory, search, setFilter, oracleFilter, finishFilter, selectedColors, minPrice, maxPrice])
+  }, [inventory, search, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice])
 
   const sorted = useMemo(() => {
     const list = [...filtered]
@@ -161,7 +168,7 @@ export default function StorePage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, setFilter, oracleFilter, finishFilter, selectedColors, minPrice, maxPrice, sort])
+  }, [search, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice, sort])
 
   const resultsPageCount = Math.max(1, Math.ceil(sorted.length / RESULTS_PAGE_SIZE))
   const currentResultsPage = Math.min(page, resultsPageCount)
@@ -176,7 +183,7 @@ export default function StorePage() {
   function clearFilters() {
     setSearch('')
     setSetFilter('')
-    setOracleFilter('')
+    setTypeFilter('')
     setFinishFilter('all')
     setSelectedColors([])
     setMinPrice('')
@@ -201,15 +208,19 @@ export default function StorePage() {
     window.setTimeout(focusVisibleSearchInput, 350)
   }
 
-  const advancedCount = (setFilter ? 1 : 0) + (oracleFilter.trim() ? 1 : 0) + (minPrice.trim() ? 1 : 0) + (maxPrice.trim() ? 1 : 0)
+  const advancedCount = (setFilter ? 1 : 0) + (typeFilter.trim() ? 1 : 0) + (minPrice.trim() ? 1 : 0) + (maxPrice.trim() ? 1 : 0)
 
   const chips: { label: string; onClear: () => void }[] = []
 
   if (search.trim()) chips.push({ label: `“${search.trim()}”`, onClear: () => setSearch('') })
 
-  if (setFilter) chips.push({ label: `Set: ${setFilter.toUpperCase()}`, onClear: () => setSetFilter('') })
+  if (setFilter)
+    chips.push({
+      label: `Set: ${availableSets.find((s) => s.code === setFilter)?.name ?? setFilter.toUpperCase()}`,
+      onClear: () => setSetFilter(''),
+    })
 
-  if (oracleFilter.trim()) chips.push({ label: `Text: ${oracleFilter.trim()}`, onClear: () => setOracleFilter('') })
+  if (typeFilter.trim()) chips.push({ label: `Type: ${typeFilter.trim()}`, onClear: () => setTypeFilter('') })
 
   if (finishFilter !== 'all')
     chips.push({ label: FINISH_OPTIONS.find((f) => f.key === finishFilter)!.label, onClear: () => setFinishFilter('all') })
@@ -295,12 +306,19 @@ export default function StorePage() {
           <Select label="Set" value={setFilter} onChange={(e) => setSetFilter(e.target.value)}>
             <option value="">All sets</option>
             {availableSets.map((set) => (
-              <option key={set} value={set}>
-                {set?.toUpperCase()}
+              <option key={set.code} value={set.code}>
+                {set.name}
               </option>
             ))}
           </Select>
-          <Input label="Oracle text" value={oracleFilter} onChange={(e) => setOracleFilter(e.target.value)} placeholder="Flying, draw…" />
+          <Select label="Card type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">All types</option>
+            {CARD_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </Select>
           <div className="grid grid-cols-2 gap-3">
             <Input label="Min market" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" />
             <Input label="Max market" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="50" />

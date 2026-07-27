@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
 import {
   Badge,

@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet } from 'react-router'
 import { ArrowLeft, Moon, Sun } from 'lucide-react'
 import { useTheme } from '../../hooks'
 

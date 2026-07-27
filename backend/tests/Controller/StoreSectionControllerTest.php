@@ -142,6 +142,55 @@ final class StoreSectionControllerTest extends WebTestCase
         self::assertSame(3, $body['cards'][0]['quantity']);
     }
 
+    /**
+     * Stocking sheet lifecycle: freshly added pool cards need physical
+     * placement, the sheet lists them with their copy counts, marking stocked
+     * clears the sheet, and a later pool top-up flags the card again.
+     */
+    public function testStockingSheetLifecycle(): void
+    {
+        $store = $this->fixtures->store();
+        $case = $this->fixtures->storeCase($store);
+        $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(301), 5);
+        $this->authenticate($store->getOwner());
+        $section = $this->createSection($store, $case, 'Restock me');
+        $base = "/api/stores/{$store->getSlug()}/sections/{$section->getId()}";
+
+        // A newly added card awaits stocking.
+        $body = $this->jsonRequest('POST', "$base/items", ['inventoryItemId' => $item->getId(), 'quantity' => 2]);
+        self::assertTrue($body['cards'][0]['needsStocking']);
+        self::assertNull($body['cards'][0]['stockedAt']);
+
+        $sheet = $this->jsonRequest('GET', "$base/stocking-sheet");
+        self::assertCount(1, $sheet['rows']);
+        self::assertSame(2, $sheet['rows'][0]['copies']);
+        self::assertSame(2, $sheet['totalCards']);
+
+        // Marking stocked clears the sheet and stamps the card.
+        $body = $this->jsonRequest('POST', "$base/stocking-sheet/mark-stocked", []);
+        self::assertFalse($body['cards'][0]['needsStocking']);
+        self::assertNotNull($body['cards'][0]['stockedAt']);
+
+        $sheet = $this->jsonRequest('GET', "$base/stocking-sheet");
+        self::assertSame([], $sheet['rows']);
+        self::assertSame(0, $sheet['totalCards']);
+
+        // Topping up the pool means more copies belong in the case.
+        $cardId = $body['cards'][0]['id'];
+        $body = $this->jsonRequest('PATCH', "$base/items/{$cardId}", ['quantity' => 4]);
+        self::assertTrue($body['cards'][0]['needsStocking']);
+
+        // Shrinking the pool never re-flags an already handled card.
+        $this->jsonRequest('POST', "$base/stocking-sheet/mark-stocked", ['cardIds' => [$cardId]]);
+        $body = $this->jsonRequest('PATCH', "$base/items/{$cardId}", ['quantity' => 3]);
+        self::assertFalse($body['cards'][0]['needsStocking']);
+
+        // The sheet is owner-only.
+        $this->anonymous();
+        $this->jsonRequest('GET', "$base/stocking-sheet");
+        self::assertSame(401, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testAutoFillByColorIdentityTerm(): void
     {
         $store = $this->fixtures->store();

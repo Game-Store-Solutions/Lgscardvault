@@ -17,6 +17,18 @@ const COLORS = [
     { key: 'C', label: 'Colorless', dark: true },
 ] as const
 
+// Primary card types offered by the storefront type-line filter.
+const CARD_TYPES = [
+    'Creature',
+    'Planeswalker',
+    'Instant',
+    'Sorcery',
+    'Artifact',
+    'Enchantment',
+    'Battle',
+    'Land',
+] as const
+
 const FINISH_OPTIONS: { key: FinishFilter; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'nonfoil', label: 'Nonfoil' },
@@ -44,5 +56,5 @@ const QUICK_ACTIONS: QuickAction[] = [
     { label: 'Sell/Trade', icon: WalletCards },
 ]
 
-export {QUICK_ACTIONS, SORTS, FINISH_OPTIONS, COLORS, DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,SPOTLIGHT_MAX_ITEMS, RESULTS_PAGE_SIZE};
+export {QUICK_ACTIONS, SORTS, CARD_TYPES, FINISH_OPTIONS, COLORS, DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,SPOTLIGHT_MAX_ITEMS, RESULTS_PAGE_SIZE};
 export type { ViewMode,SortKey,FinishFilter };

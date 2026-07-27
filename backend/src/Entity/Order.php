@@ -71,6 +71,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 class Order
 {
+    public const FULFILLMENT_PICKUP = 'pickup';
+    public const FULFILLMENT_SHIPPING = 'shipping';
+    public const FULFILLMENTS = [self::FULFILLMENT_PICKUP, self::FULFILLMENT_SHIPPING];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -97,6 +101,15 @@ class Order
     #[Assert\Email]
     #[Groups(['order:read', 'order:write'])]
     private ?string $customerEmail = null;
+
+    /**
+     * How the customer receives the order. In-store pickup is the default —
+     * most LGS singles sales walk out the door — and shipping is the opt-in.
+     */
+    #[ORM\Column(length: 16, options: ['default' => self::FULFILLMENT_PICKUP])]
+    #[Assert\Choice(choices: self::FULFILLMENTS)]
+    #[Groups(['order:read', 'order:write'])]
+    private string $fulfillment = self::FULFILLMENT_PICKUP;
 
     #[ORM\Column]
     #[Groups(['order:read'])]
@@ -193,6 +206,18 @@ class Order
     public function setCustomerEmail(?string $customerEmail): static
     {
         $this->customerEmail = $customerEmail;
+
+        return $this;
+    }
+
+    public function getFulfillment(): string
+    {
+        return $this->fulfillment;
+    }
+
+    public function setFulfillment(string $fulfillment): static
+    {
+        $this->fulfillment = $fulfillment;
 
         return $this;
     }

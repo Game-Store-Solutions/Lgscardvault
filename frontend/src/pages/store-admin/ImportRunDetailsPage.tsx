@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { ArrowLeft, Search } from 'lucide-react'
 import api, { cardImage, formatScryfallPrice } from '../../api/client'
 import { inventoryKey } from '../../hooks'
@@ -459,7 +459,7 @@ function ManualImportModal({
 
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <Input
-            label="Scryfall search"
+            label="Card search (catalog · Scryfall · MTGJSON)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void refetch()}
@@ -503,7 +503,12 @@ function ManualImportModal({
           ))}
         </div>
 
-        {!isFetching && results.length === 0 && <p className="text-sm text-fg-muted">No Scryfall matches found.</p>}
+        {!isFetching && results.length === 0 && (
+          <p className="text-sm text-fg-muted">
+            No matches found in the catalog, Scryfall, or MTGJSON. Try loosening the search — the set and printing
+            filters from the row still apply.
+          </p>
+        )}
       </div>
     </Modal>
   )

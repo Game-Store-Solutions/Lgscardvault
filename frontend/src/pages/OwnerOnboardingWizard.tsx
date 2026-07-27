@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { ArrowLeft, ArrowRight, Send, Sparkles } from 'lucide-react'
 import { Button, Card, CardBody, CardHeader } from '../components/ui'
 import { STEP_SUBTITLE, STEPS } from './onboarding/config'

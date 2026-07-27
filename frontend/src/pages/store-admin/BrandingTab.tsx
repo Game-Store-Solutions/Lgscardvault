@@ -28,6 +28,13 @@ interface BrandingForm {
   heroSubheading: string
   tagline: string
   cardDisplayStyle: CardDisplayStyle
+  hoursText: string
+  contactEmail: string
+  websiteUrl: string
+  facebookUrl: string
+  instagramUrl: string
+  twitterUrl: string
+  discordUrl: string
 }
 
 const EMPTY: BrandingForm = {
@@ -44,6 +51,13 @@ const EMPTY: BrandingForm = {
   heroSubheading: '',
   tagline: '',
   cardDisplayStyle: 'gallery',
+  hoursText: '',
+  contactEmail: '',
+  websiteUrl: '',
+  facebookUrl: '',
+  instagramUrl: '',
+  twitterUrl: '',
+  discordUrl: '',
 }
 
 function fromStore(store: Store): BrandingForm {
@@ -61,6 +75,13 @@ function fromStore(store: Store): BrandingForm {
     heroSubheading: store.heroSubheading ?? '',
     tagline: store.tagline ?? '',
     cardDisplayStyle: store.cardDisplayStyle ?? 'gallery',
+    hoursText: store.hoursText ?? '',
+    contactEmail: store.contactEmail ?? '',
+    websiteUrl: store.websiteUrl ?? '',
+    facebookUrl: store.facebookUrl ?? '',
+    instagramUrl: store.instagramUrl ?? '',
+    twitterUrl: store.twitterUrl ?? '',
+    discordUrl: store.discordUrl ?? '',
   }
 }
 
@@ -205,6 +226,30 @@ export default function BrandingTab({ slug }: { slug: string }) {
             <Input label="Tagline" placeholder="Your local Magic singles shop" maxLength={160} value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
             <Input label="Hero heading" placeholder="Defaults to your store name" maxLength={160} value={form.heroHeading} onChange={(e) => set('heroHeading', e.target.value)} />
             <Textarea label="Hero subheading" rows={3} placeholder="A sentence or two about your store, shipping, or specialties." value={form.heroSubheading} onChange={(e) => set('heroSubheading', e.target.value)} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Store info & footer"
+            subtitle="Hours, contact, and social links shown in your storefront footer. Your business address from onboarding appears there automatically."
+          />
+          <CardBody className="space-y-4">
+            <Textarea
+              label="Store hours"
+              rows={3}
+              placeholder={'Mon–Fri 12–9pm\nSat 10am–10pm\nSun 11am–6pm'}
+              value={form.hoursText}
+              onChange={(e) => set('hoursText', e.target.value)}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input label="Contact email" type="email" placeholder="hello@yourstore.com" value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
+              <Input label="Website" placeholder="https://yourstore.com" value={form.websiteUrl} onChange={(e) => set('websiteUrl', e.target.value)} />
+              <Input label="Facebook URL" placeholder="https://facebook.com/yourstore" value={form.facebookUrl} onChange={(e) => set('facebookUrl', e.target.value)} />
+              <Input label="Instagram URL" placeholder="https://instagram.com/yourstore" value={form.instagramUrl} onChange={(e) => set('instagramUrl', e.target.value)} />
+              <Input label="Twitter / X URL" placeholder="https://x.com/yourstore" value={form.twitterUrl} onChange={(e) => set('twitterUrl', e.target.value)} />
+              <Input label="Discord invite URL" placeholder="https://discord.gg/yourstore" value={form.discordUrl} onChange={(e) => set('discordUrl', e.target.value)} />
+            </div>
           </CardBody>
         </Card>
 

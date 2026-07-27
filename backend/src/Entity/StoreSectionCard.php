@@ -48,6 +48,15 @@ class StoreSectionCard
     #[ORM\Column(options: ['default' => 0])]
     private int $soldQuantity = 0;
 
+    /**
+     * When staff confirmed this card's copies are physically placed in the
+     * display case. Null = just added (or topped up) by auto-fill/manual add
+     * and still waiting to be pulled from stock — the section's stocking
+     * sheet lists exactly these rows.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $stockedAt = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getSection(): ?StoreSection { return $this->section; }
@@ -65,9 +74,21 @@ class StoreSectionCard
     public function getSoldQuantity(): int { return $this->soldQuantity; }
     public function setSoldQuantity(int $soldQuantity): static { $this->soldQuantity = max(0, $soldQuantity); return $this; }
 
+    public function getStockedAt(): ?\DateTimeImmutable { return $this->stockedAt; }
+    public function setStockedAt(?\DateTimeImmutable $stockedAt): static { $this->stockedAt = $stockedAt; return $this; }
+
     /** Copies still available to sell from this section's pool. */
     public function remaining(): int
     {
         return max(0, $this->quantity - $this->soldQuantity);
+    }
+
+    /**
+     * True when staff still need to place this card in the physical case.
+     * Frozen rows (pool fully sold) never need stocking regardless of state.
+     */
+    public function needsStocking(): bool
+    {
+        return null === $this->stockedAt && $this->remaining() > 0;
     }
 }

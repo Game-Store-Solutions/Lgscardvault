@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { ShieldCheck, Sparkles, Store as StoreIcon, User } from 'lucide-react'
 
 export interface AuthMarketingAsideProps {
