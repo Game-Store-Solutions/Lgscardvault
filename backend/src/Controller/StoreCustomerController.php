@@ -409,7 +409,7 @@ final class StoreCustomerController extends AbstractController
     }
 
     #[Route('/test-order', name: 'api_store_customer_test_order', methods: ['POST'])]
-    public function createTestOrder(string $slug): JsonResponse
+    public function createTestOrder(Request $request, string $slug): JsonResponse
     {
         if (!in_array($this->kernel->getEnvironment(), ['dev', 'test'], true)) {
             return $this->json(['detail' => 'Test orders are only available locally.'], 404);
@@ -435,11 +435,18 @@ final class StoreCustomerController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
+        $payload = json_decode($request->getContent(), true);
+        $fulfillment = is_array($payload) ? ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP) : Order::FULFILLMENT_PICKUP;
+        if (!in_array($fulfillment, Order::FULFILLMENTS, true)) {
+            return $this->json(['detail' => sprintf('Unknown fulfillment method. Valid: %s.', implode(', ', Order::FULFILLMENTS))], 422);
+        }
+
         $order = (new Order())
             ->setStore($store)
             ->setReference($this->generateOrderReference())
             ->setCustomerName($user->getDisplayName())
-            ->setCustomerEmail($user->getEmail());
+            ->setCustomerEmail($user->getEmail())
+            ->setFulfillment($fulfillment);
 
         $total = 0;
         foreach ($cartItems as $cartItem) {
@@ -662,6 +669,7 @@ final class StoreCustomerController extends AbstractController
             'storeSlug' => $order->getStore()?->getSlug(),
             'customerName' => $order->getCustomerName(),
             'customerEmail' => $order->getCustomerEmail(),
+            'fulfillment' => $order->getFulfillment(),
             'totalCents' => $order->getTotalCents(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),

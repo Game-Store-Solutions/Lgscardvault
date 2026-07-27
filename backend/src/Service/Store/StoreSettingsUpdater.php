@@ -29,10 +29,15 @@ final readonly class StoreSettingsUpdater
         'borderColor' => 'setBorderColor',
     ];
 
-    /** Image-URL fields → entity setter. */
+    /** Image/link-URL fields → entity setter. */
     private const URL_FIELDS = [
         'logoUrl' => 'setLogoUrl',
         'heroImageUrl' => 'setHeroImageUrl',
+        'websiteUrl' => 'setWebsiteUrl',
+        'facebookUrl' => 'setFacebookUrl',
+        'instagramUrl' => 'setInstagramUrl',
+        'twitterUrl' => 'setTwitterUrl',
+        'discordUrl' => 'setDiscordUrl',
     ];
 
     /** Free-text fields → [entity setter, max length]. */
@@ -40,6 +45,7 @@ final readonly class StoreSettingsUpdater
         'heroHeading' => ['setHeroHeading', 160],
         'heroSubheading' => ['setHeroSubheading', 2000],
         'tagline' => ['setTagline', 160],
+        'hoursText' => ['setHoursText', 1000],
     ];
 
     private const URL_MAX = 1024;
@@ -122,6 +128,17 @@ final readonly class StoreSettingsUpdater
             $value = $this->stringValue($payload[$key]);
             $store->$setter('' === $value ? null : mb_substr($value, 0, $max));
         }
+
+        if (array_key_exists('contactEmail', $payload)) {
+            $value = $this->stringValue($payload['contactEmail']);
+            if ('' === $value) {
+                $store->setContactEmail(null);
+            } elseif (false !== filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                $store->setContactEmail(mb_substr($value, 0, 255));
+            } else {
+                throw new \InvalidArgumentException('contactEmail must be a valid email address.');
+            }
+        }
     }
 
     /** @return array<string, mixed> */
@@ -145,6 +162,13 @@ final readonly class StoreSettingsUpdater
             'heroSubheading' => $store->getHeroSubheading(),
             'tagline' => $store->getTagline(),
             'cardDisplayStyle' => $store->getCardDisplayStyle(),
+            'hoursText' => $store->getHoursText(),
+            'contactEmail' => $store->getContactEmail(),
+            'websiteUrl' => $store->getWebsiteUrl(),
+            'facebookUrl' => $store->getFacebookUrl(),
+            'instagramUrl' => $store->getInstagramUrl(),
+            'twitterUrl' => $store->getTwitterUrl(),
+            'discordUrl' => $store->getDiscordUrl(),
         ];
     }
 

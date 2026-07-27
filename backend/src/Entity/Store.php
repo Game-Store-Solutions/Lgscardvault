@@ -159,6 +159,38 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private string $cardDisplayStyle = 'gallery';
 
+    // --- Storefront footer: hours, contact, social links (owner-managed) ---
+
+    /** Freeform opening hours, one line per range ("Mon–Fri 12–9pm"). */
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $hoursText = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Email]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $contactEmail = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $websiteUrl = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $facebookUrl = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $instagramUrl = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $twitterUrl = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $discordUrl = null;
+
     // --- Enterprise onboarding: application status ---
 
     public const STATUS_PENDING = 'pending';
@@ -182,31 +214,31 @@ class Store
     // --- Business address (collected during onboarding) ---
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['store:admin'])]
+    #[Groups(['store:read', 'store:admin'])]
     private ?string $addressLine1 = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['store:admin'])]
+    #[Groups(['store:read', 'store:admin'])]
     private ?string $addressLine2 = null;
 
     #[ORM\Column(length: 128, nullable: true)]
-    #[Groups(['store:admin'])]
+    #[Groups(['store:read', 'store:admin'])]
     private ?string $city = null;
 
     #[ORM\Column(length: 128, nullable: true)]
-    #[Groups(['store:admin'])]
+    #[Groups(['store:read', 'store:admin'])]
     private ?string $region = null;
 
     #[ORM\Column(length: 32, nullable: true)]
-    #[Groups(['store:admin'])]
+    #[Groups(['store:read', 'store:admin'])]
     private ?string $postalCode = null;
 
     #[ORM\Column(length: 2, nullable: true)]
-    #[Groups(['store:admin'])]
+    #[Groups(['store:read', 'store:admin'])]
     private ?string $country = null;
 
     #[ORM\Column(length: 32, nullable: true)]
-    #[Groups(['store:admin'])]
+    #[Groups(['store:read', 'store:admin'])]
     private ?string $phone = null;
 
     #[ORM\Column(type: 'float', nullable: true)]
@@ -484,6 +516,90 @@ class Store
     public function setCardDisplayStyle(string $cardDisplayStyle): static
     {
         $this->cardDisplayStyle = $cardDisplayStyle;
+
+        return $this;
+    }
+
+    public function getHoursText(): ?string
+    {
+        return $this->hoursText;
+    }
+
+    public function setHoursText(?string $hoursText): static
+    {
+        $this->hoursText = $hoursText;
+
+        return $this;
+    }
+
+    public function getContactEmail(): ?string
+    {
+        return $this->contactEmail;
+    }
+
+    public function setContactEmail(?string $contactEmail): static
+    {
+        $this->contactEmail = $contactEmail;
+
+        return $this;
+    }
+
+    public function getWebsiteUrl(): ?string
+    {
+        return $this->websiteUrl;
+    }
+
+    public function setWebsiteUrl(?string $websiteUrl): static
+    {
+        $this->websiteUrl = $websiteUrl;
+
+        return $this;
+    }
+
+    public function getFacebookUrl(): ?string
+    {
+        return $this->facebookUrl;
+    }
+
+    public function setFacebookUrl(?string $facebookUrl): static
+    {
+        $this->facebookUrl = $facebookUrl;
+
+        return $this;
+    }
+
+    public function getInstagramUrl(): ?string
+    {
+        return $this->instagramUrl;
+    }
+
+    public function setInstagramUrl(?string $instagramUrl): static
+    {
+        $this->instagramUrl = $instagramUrl;
+
+        return $this;
+    }
+
+    public function getTwitterUrl(): ?string
+    {
+        return $this->twitterUrl;
+    }
+
+    public function setTwitterUrl(?string $twitterUrl): static
+    {
+        $this->twitterUrl = $twitterUrl;
+
+        return $this;
+    }
+
+    public function getDiscordUrl(): ?string
+    {
+        return $this->discordUrl;
+    }
+
+    public function setDiscordUrl(?string $discordUrl): static
+    {
+        $this->discordUrl = $discordUrl;
 
         return $this;
     }

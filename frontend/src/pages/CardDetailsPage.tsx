@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ExternalLink,
@@ -56,6 +56,13 @@ function legalities(card: InventoryItem['card']) {
 
 export default function CardDetailsPage() {
   const { slug = '', id = '' } = useParams()
+  const location = useLocation()
+  // Pages that link here can pass `state.from` so "back" returns to where the
+  // shopper actually came from (e.g. the case cards page) instead of always
+  // landing on the storefront.
+  const cameFromCaseCards = (location.state as { from?: string } | null)?.from === 'case-cards'
+  const backTo = cameFromCaseCards ? `/s/${slug}/case-cards` : `/s/${slug}`
+  const backLabel = cameFromCaseCards ? 'case cards' : null
   const { user } = useAuth()
   const canManage = useCanManageStore(slug)
   const queryClient = useQueryClient()
@@ -221,9 +228,9 @@ export default function CardDetailsPage() {
         <div aria-hidden className="absolute inset-0 bg-linear-to-t from-surface via-surface/88 to-surface/55" />
         <div className="relative flex flex-col gap-4 p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link to={`/s/${slug}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline">
+            <Link to={backTo} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline">
               <ArrowLeft aria-hidden className="size-4" />
-              Back to {store?.name ?? 'store'}
+              Back to {backLabel ?? store?.name ?? 'store'}
             </Link>
             <div className="flex flex-wrap items-center gap-2">
               {user && (

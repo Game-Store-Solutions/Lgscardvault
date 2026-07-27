@@ -53,7 +53,14 @@ class CardSearchController extends AbstractController
             return $this->json([]);
         }
 
-        $setCode = strtolower(trim((string) $request->query->get('set', '')));
+        // CSVs (and humans) often supply a full set NAME ("Modern Horizons 2")
+        // instead of the code ("mh2"). Every downstream leg — the local filter,
+        // the natural-key lookup, and Scryfall's collection/search endpoints —
+        // only understands codes, so an unnormalized name silently zeroes out
+        // the whole search. Same normalization the CSV recovery preview uses.
+        $setCode = strtolower($this->catalogCardResolver->normalizeSetCode(
+            (string) $request->query->get('set', ''),
+        ));
         $collectorNumber = strtolower(trim((string) $request->query->get('collectorNumber', '')));
         $rarity = strtolower(trim((string) $request->query->get('rarity', '')));
         $finish = strtolower(trim((string) $request->query->get('finish', '')));
@@ -114,6 +121,23 @@ class CardSearchController extends AbstractController
                 }
             } catch (\Throwable) {
                 // Remote catalog is best-effort; local results already stand.
+            }
+        }
+
+        // 4. Last resort for a zero-hit search with a set in hand: run the full
+        //    CSV-recovery resolution cascade (tolerant local match → Scryfall
+        //    search → MTGJSON), so the failed-row modal can find printings
+        //    that plain name search can't (typos, promo variants, foreign
+        //    names). Only on empty results — the cascade can cost remote
+        //    lookups, and a populated result set doesn't need it.
+        if ([] === $merged && '' !== $setCode) {
+            try {
+                $resolution = $this->catalogCardResolver->resolve($query, $setCode, $collectorNumber, $rarity, $finish);
+                if ($resolution->card instanceof \App\Entity\Card) {
+                    $merged[(string) $resolution->card->getId()] = $resolution->card;
+                }
+            } catch (\Throwable) {
+                // Best-effort as well; an empty result is still a valid answer.
             }
         }
 

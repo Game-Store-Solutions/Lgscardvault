@@ -28,6 +28,14 @@ export interface Store {
   heroSubheading?: string | null
   tagline?: string | null
   cardDisplayStyle?: CardDisplayStyle
+  // Storefront footer (owner-managed via /settings)
+  hoursText?: string | null
+  contactEmail?: string | null
+  websiteUrl?: string | null
+  facebookUrl?: string | null
+  instagramUrl?: string | null
+  twitterUrl?: string | null
+  discordUrl?: string | null
   // Enterprise onboarding (status/planKey in store:read; rest in store:admin)
   status?: 'pending' | 'approved' | 'rejected'
   rejectionReason?: string | null
@@ -413,6 +421,8 @@ export interface OrderLine {
   collectorNumber?: string | null
 }
 
+export type OrderFulfillment = 'pickup' | 'shipping'
+
 export interface Order {
   id: number
   reference: string
@@ -421,6 +431,7 @@ export interface Order {
   storeSlug?: string | null
   customerName?: string
   customerEmail?: string
+  fulfillment?: OrderFulfillment
   totalCents: number
   createdAt: string
   lines?: OrderLine[]

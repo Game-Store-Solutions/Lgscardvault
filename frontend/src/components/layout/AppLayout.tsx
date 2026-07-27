@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCustomerCart, useTheme } from '../../hooks'
 import { NotificationBell } from '../notifications/NotificationBell'
+import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants } from '../ui'
 import { ChevronDown, LogIn, LogOut, Menu, Moon, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
 
@@ -299,6 +300,8 @@ export default function AppLayout() {
       <main className="mx-auto max-w-7xl px-4 py-8">
         <Outlet />
       </main>
+
+      {storeSlug && <StoreFooter slug={storeSlug} />}
     </div>
   )
 }

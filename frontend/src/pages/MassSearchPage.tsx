@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, ClipboardList, HelpCircle, Search, XCircle } from 'lucide-react'
-import { formatPrice, scryfallPriceCents } from '../api/client'
+import { ArrowLeft, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, Search, XCircle } from 'lucide-react'
+import { cardImage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import { useInventory, useStore, useStoreTheme } from '../hooks'
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, LoadingPanel, Textarea } from '../components/ui'
@@ -87,6 +87,9 @@ const STATUS_META: Record<LineStatus, { label: string; tone: 'success' | 'warnin
   missing: { label: 'Not in stock', tone: 'danger', icon: XCircle },
 }
 
+/** In-stock lines surface first so shoppers see what they can buy right away. */
+const STATUS_ORDER: Record<LineStatus, number> = { found: 0, partial: 1, missing: 2 }
+
 const PLACEHOLDER = ['4 Lightning Bolt', '2x Counterspell', 'Sol Ring', '# lines starting with # are ignored'].join('\n')
 
 export default function MassSearchPage() {
@@ -98,11 +101,14 @@ export default function MassSearchPage() {
 
   const [text, setText] = useState('')
   const [submitted, setSubmitted] = useState<RequestLine[] | null>(null)
+  const [view, setView] = useState<'list' | 'grid'>('list')
 
-  const results = useMemo(
-    () => (submitted ? submitted.map((line) => matchLine(line, inventory)) : null),
-    [submitted, inventory],
-  )
+  const results = useMemo(() => {
+    if (!submitted) return null
+    return submitted
+      .map((line) => matchLine(line, inventory))
+      .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+  }, [submitted, inventory])
 
   const summary = useMemo(() => {
     if (!results) return null
@@ -205,21 +211,51 @@ export default function MassSearchPage() {
                     <Badge tone="warning">{summary.counts.partial} partial</Badge>
                     <Badge tone="danger">{summary.counts.missing} missing</Badge>
                   </div>
-                  <p className="text-sm text-fg-muted">
-                    Estimated total{' '}
-                    <span className="font-display text-xl font-bold text-fg">
-                      {formatPrice(summary.totalCents)}
-                      {summary.priced ? '' : '+'}
-                    </span>
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm text-fg-muted">
+                      Estimated total{' '}
+                      <span className="font-display text-xl font-bold text-fg">
+                        {formatPrice(summary.totalCents)}
+                        {summary.priced ? '' : '+'}
+                      </span>
+                    </p>
+                    <div className="inline-flex overflow-hidden rounded-btn border border-border" role="group" aria-label="Result layout">
+                      <button
+                        type="button"
+                        onClick={() => setView('list')}
+                        aria-pressed={view === 'list'}
+                        aria-label="List view"
+                        className={`grid size-9 place-items-center transition-colors ${view === 'list' ? 'bg-brand-50 text-brand-700' : 'bg-surface text-fg-muted hover:text-fg'}`}
+                      >
+                        <List aria-hidden className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setView('grid')}
+                        aria-pressed={view === 'grid'}
+                        aria-label="Grid view"
+                        className={`grid size-9 place-items-center border-l border-border transition-colors ${view === 'grid' ? 'bg-brand-50 text-brand-700' : 'bg-surface text-fg-muted hover:text-fg'}`}
+                      >
+                        <LayoutGrid aria-hidden className="size-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="space-y-3">
-                {results.map((result) => (
-                  <ResultRow key={result.name.toLowerCase()} result={result} slug={slug} />
-                ))}
-              </div>
+              {view === 'grid' ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+                  {results.map((result) => (
+                    <ResultTile key={result.name.toLowerCase()} result={result} slug={slug} />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {results.map((result) => (
+                    <ResultRow key={result.name.toLowerCase()} result={result} slug={slug} />
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -232,11 +268,27 @@ function ResultRow({ result, slug }: { result: LineResult; slug: string }) {
   const meta = STATUS_META[result.status]
   const Icon = meta.icon
   const best = result.listings[0]
+  const image = best ? cardImage(best.card) : null
 
   return (
     <div className="rounded-card border border-border bg-surface p-4 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-3">
+          {best && (
+            <Link to={`/s/${slug}/cards/${best.id}`} className="shrink-0">
+              {image ? (
+                <img
+                  src={image}
+                  alt={best.card.name}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-16 w-12 rounded object-cover shadow-sm"
+                />
+              ) : (
+                <span className="grid h-16 w-12 place-items-center rounded bg-bg text-[0.6rem] text-fg-muted">—</span>
+              )}
+            </Link>
+          )}
           <Icon
             aria-hidden
             className={`size-5 flex-shrink-0 ${
@@ -280,5 +332,46 @@ function ResultRow({ result, slug }: { result: LineResult; slug: string }) {
         </div>
       )}
     </div>
+  )
+}
+
+/** Grid view: an image-first tile per requested line, status badge on the art. */
+function ResultTile({ result, slug }: { result: LineResult; slug: string }) {
+  const meta = STATUS_META[result.status]
+  const best = result.listings[0]
+  const image = best ? cardImage(best.card) : null
+  const body = (
+    <>
+      <div className="relative aspect-[5/7] overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-card">
+        <span className="absolute left-1.5 top-1.5 z-10">
+          <Badge tone={meta.tone}>{meta.label}</Badge>
+        </span>
+        {image ? (
+          <img src={image} alt={best!.card.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        ) : (
+          <div className="grid h-full place-items-center px-2 text-center text-xs text-fg-muted">{result.name}</div>
+        )}
+      </div>
+      <div className="mt-2 px-0.5">
+        <h4 className="truncate text-sm font-bold text-fg group-hover:text-brand-600">{best?.card.name ?? result.name}</h4>
+        <p className="mt-0.5 text-xs text-fg-muted">
+          {result.quantity} requested · {result.fillable} available
+          {result.fillCents !== null ? ` · ${formatPrice(result.fillCents)}` : ''}
+        </p>
+      </div>
+    </>
+  )
+
+  if (!best) {
+    return <div className="opacity-75">{body}</div>
+  }
+
+  return (
+    <Link
+      to={`/s/${slug}/cards/${best.id}`}
+      className="group rounded-card transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    >
+      {body}
+    </Link>
   )
 }

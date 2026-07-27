@@ -18,7 +18,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
-import type { CartItem, InventoryItem, Order } from '../api/types'
+import type { CartItem, InventoryItem, Order, OrderFulfillment } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import { ordersKey, useCart, useDebouncedValue, useInventory, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
@@ -49,10 +49,11 @@ export default function CartPage() {
   const { data: cart = [], isLoading } = query
   const [removed, setRemoved] = useState<RemovedLine | null>(null)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
+  const [fulfillment, setFulfillment] = useState<OrderFulfillment>('pickup')
 
   const testOrder = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`)
+      const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, { fulfillment })
       return data
     },
     onSuccess: async (order) => {
@@ -173,6 +174,8 @@ export default function CartPage() {
             storeName={store?.name ?? 'the store'}
             itemCount={itemCount}
             subtotalLabel={subtotalLabel}
+            fulfillment={fulfillment}
+            onFulfillmentChange={setFulfillment}
             testCheckoutEnabled={TEST_CHECKOUT_ENABLED}
             testOrderPending={testOrder.isPending}
             testOrderError={testOrder.error}
@@ -348,6 +351,8 @@ function OrderSummary({
   storeName,
   itemCount,
   subtotalLabel,
+  fulfillment,
+  onFulfillmentChange,
   testCheckoutEnabled,
   testOrderPending,
   testOrderError,
@@ -358,6 +363,8 @@ function OrderSummary({
   storeName: string
   itemCount: number
   subtotalLabel: string
+  fulfillment: OrderFulfillment
+  onFulfillmentChange: (value: OrderFulfillment) => void
   testCheckoutEnabled: boolean
   testOrderPending: boolean
   testOrderError: unknown
@@ -376,9 +383,25 @@ function OrderSummary({
         </span>
       </div>
 
+      <fieldset className="mt-5 space-y-2">
+        <legend className="text-xs font-bold uppercase tracking-wide text-fg-muted">How would you like to get it?</legend>
+        <FulfillmentOption
+          checked={fulfillment === 'pickup'}
+          onSelect={() => onFulfillmentChange('pickup')}
+          title="Pick up in store"
+          text={`Free — grab it at ${storeName}.`}
+        />
+        <FulfillmentOption
+          checked={fulfillment === 'shipping'}
+          onSelect={() => onFulfillmentChange('shipping')}
+          title="Ship to me"
+          text="Shipping calculated at checkout."
+        />
+      </fieldset>
+
       <dl className="mt-5 space-y-3 text-sm">
         <SummaryRow label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={subtotalLabel} strong />
-        <SummaryRow label="Shipping" value="Calculated at checkout" />
+        <SummaryRow label="Shipping" value={fulfillment === 'pickup' ? 'Free — in-store pickup' : 'Calculated at checkout'} />
         <SummaryRow label="Taxes" value="Calculated at checkout" />
         <div className="flex items-baseline justify-between border-t border-border pt-4">
           <dt className="font-bold text-fg">Estimated total</dt>
@@ -421,6 +444,39 @@ function OrderSummary({
         <TrustNote icon={CreditCard} title="No charge yet" text="Checkout is not enabled, so this is only a saved cart." />
       </div>
     </aside>
+  )
+}
+
+function FulfillmentOption({
+  checked,
+  onSelect,
+  title,
+  text,
+}: {
+  checked: boolean
+  onSelect: () => void
+  title: string
+  text: string
+}) {
+  return (
+    <label
+      className={cx(
+        'flex cursor-pointer items-start gap-3 rounded-btn border p-3 transition-colors',
+        checked ? 'border-brand-500 bg-brand-50/60' : 'border-border bg-surface hover:bg-bg',
+      )}
+    >
+      <input
+        type="radio"
+        name="fulfillment"
+        checked={checked}
+        onChange={onSelect}
+        className="mt-0.5 size-4 accent-[var(--color-brand-600,currentColor)]"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-bold text-fg">{title}</span>
+        <span className="block text-xs leading-5 text-fg-muted">{text}</span>
+      </span>
+    </label>
   )
 }
 

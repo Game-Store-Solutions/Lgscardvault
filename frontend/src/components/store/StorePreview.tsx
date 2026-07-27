@@ -76,17 +76,30 @@ export function StorePreview({
         {[1, 2].map((n) =>
           marketplace ? (
             <div key={n} className="flex gap-3 rounded-card border border-border bg-surface p-3 shadow-card">
-              <div className="grid h-24 w-16 shrink-0 place-items-center rounded-btn bg-bg text-fg-muted">
+              <div
+                className="grid h-28 w-20 shrink-0 place-items-center self-center rounded-btn border-2 bg-bg text-fg-muted"
+                style={{ borderColor: n === 1 ? '#f59e0b' : '#94a3b8' }}
+              >
                 <ImageOff aria-hidden className="size-5" />
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-fg">Sample Card {n}</p>
-                <p className="mt-1 text-xs text-fg-muted">Preview Set</p>
-                <p className="mt-2 text-xs text-fg">3 copies from</p>
-                <p className="font-display text-lg font-bold text-fg">${(n * 1.53).toFixed(2)}</p>
-                <p className="text-xs font-bold text-fg">
+              <div className="flex min-w-0 flex-1 flex-col justify-center">
+                <p className="truncate font-display text-sm font-extrabold tracking-tight text-fg">Sample Card {n}</p>
+                <p className="mt-0.5 text-xs leading-5 text-fg-muted">
+                  Preview Set
+                  <br />
+                  {n === 1 ? 'Mythic' : 'Rare'}, #{n}42
+                </p>
+                <p className="mt-2 text-xs font-medium text-fg">3 listings from</p>
+                <p className="font-display text-xl font-extrabold leading-none text-fg">${(n * 1.53).toFixed(2)}</p>
+                <p className="mt-1 text-xs font-bold text-fg">
                   Market Price: <span className="text-success-700">${(n * 1.86).toFixed(2)}</span>
                 </p>
+                <div className="mt-2 max-w-32">
+                  <Button size="sm" className="w-full">
+                    <ShoppingCart aria-hidden className="size-3.5" />
+                    Add to cart
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (

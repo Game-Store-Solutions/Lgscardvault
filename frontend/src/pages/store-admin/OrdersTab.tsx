@@ -5,6 +5,7 @@ import api, { formatPrice, httpStatus } from '../../api/client'
 import type { Order, OrderStatus } from '../../api/types'
 import { ordersKey, useOrders } from '../../hooks'
 import {
+  Badge,
   Button,
   Card,
   CardBody,
@@ -173,7 +174,11 @@ export default function OrdersTab({ slug }: { slug: string }) {
                     </div>
                   </TD>
                   <TD>
-                    <OrderStatusBadge status={order.status} />
+                    <div className="flex items-center gap-1.5">
+                      <OrderStatusBadge status={order.status} />
+                      {order.fulfillment === 'pickup' && <Badge tone="neutral">Pickup</Badge>}
+                      {order.fulfillment === 'shipping' && <Badge tone="neutral">Ship</Badge>}
+                    </div>
                   </TD>
                   <TD className="font-bold">{formatPrice(order.totalCents)}</TD>
                   <TD className="text-fg-muted">{formatOrderDate(order.createdAt)}</TD>
@@ -234,6 +239,11 @@ function OrderDetails({
             <p className="text-sm font-bold text-fg">{order.customerName ?? 'Customer'}</p>
             <p className="text-sm text-fg-muted">{order.customerEmail ?? '-'}</p>
           </div>
+          {order.fulfillment && (
+            <p className="mt-2 text-xs font-bold uppercase tracking-wide text-fg-muted">
+              {order.fulfillment === 'pickup' ? 'In-store pickup' : 'Ship to customer'}
+            </p>
+          )}
         </div>
 
         <div>

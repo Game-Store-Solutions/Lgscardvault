@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Archive, ClipboardList, GalleryHorizontalEnd, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
 import { storeCasesKey, useInventory, usePullSheet, useStoreCases } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
@@ -202,6 +202,7 @@ function SectionEditor({
   section: StoreSection
   onChanged: () => void
 }) {
+  const [collapsed, setCollapsed] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pullSheetOpen, setPullSheetOpen] = useState(false)
   const [min, setMin] = useState(section.autoMinPriceCents != null ? (section.autoMinPriceCents / 100).toFixed(2) : '')
@@ -258,6 +259,18 @@ function SectionEditor({
         }
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCollapsed((value) => !value)}
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? `Expand section ${section.title}` : `Collapse section ${section.title}`}
+            >
+              <ChevronDown
+                aria-hidden
+                className={`size-4 transition-transform duration-150 ${collapsed ? '-rotate-90' : ''}`}
+              />
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setPullSheetOpen(true)}>
               <ClipboardList className="size-4" aria-hidden />
               Pull sheet
@@ -275,6 +288,7 @@ function SectionEditor({
           </div>
         }
       />
+      {!collapsed && (
       <CardBody className="space-y-5">
         {section.mode === 'auto' ? (
           <div className="space-y-3">
@@ -392,6 +406,7 @@ function SectionEditor({
           </ul>
         )}
       </CardBody>
+      )}
 
       {pickerOpen && (
         <InventoryPicker slug={slug} section={section} onClose={() => setPickerOpen(false)} onChanged={onChanged} />
