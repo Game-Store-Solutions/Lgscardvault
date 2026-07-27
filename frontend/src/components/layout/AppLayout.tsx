@@ -90,7 +90,7 @@ export default function AppLayout() {
   // platform admin) can leave it; the terminal stays signed in as the owner.
   if (kioskMode) {
     return (
-      <div className="min-h-screen bg-bg text-fg">
+      <div className="flex min-h-screen flex-col bg-bg text-fg">
         <header className="sticky top-0 z-40 border-b border-border bg-surface/80 shadow-sm backdrop-blur-xl">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
             <span className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
@@ -114,7 +114,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-8">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
           <Outlet />
         </main>
 
@@ -124,7 +124,7 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
+    <div className="flex min-h-screen flex-col bg-bg text-fg">
       <header className="sticky top-0 z-40 border-b border-border bg-surface/80 shadow-sm backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
@@ -357,7 +357,7 @@ export default function AppLayout() {
         )}
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
         <Outlet />
       </main>
 

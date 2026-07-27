@@ -15,15 +15,18 @@ export function StorePageLoader({ label = 'Loading…' }: { label?: string }) {
 
   return (
     <div role="status" aria-live="polite" className="grid min-h-[55vh] place-items-center">
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-5">
         {store?.logoUrl ? (
           <img
             src={store.logoUrl}
             alt=""
-            className="animate-logo-breathe size-20 rounded-2xl object-contain drop-shadow-md"
+            className="animate-logo-breathe size-36 rounded-3xl object-contain drop-shadow-lg sm:size-44"
           />
         ) : (
-          <Loader2 aria-hidden className="size-10 animate-spin text-brand-500" />
+          <Loader2 aria-hidden className="size-16 animate-spin text-brand-500 sm:size-20" />
+        )}
+        {store?.name && (
+          <p className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">{store.name}</p>
         )}
         <p className="text-sm font-medium text-fg-muted">{label}</p>
       </div>
