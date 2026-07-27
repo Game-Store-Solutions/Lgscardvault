@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '../api/client'
-import type { PullSheet, StoreCaseSummary, StoreSection } from '../api/types'
+import type { PullSheet, StockingSheet, StoreCaseSummary, StoreSection } from '../api/types'
 
 /** React Query key for a store's display cases (nested sections + cards). */
 export const storeCasesKey = (slug: string) => ['store-cases', slug] as const
@@ -45,6 +45,18 @@ export function usePullSheet(slug: string, sectionId: number | null) {
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data } = await api.get<PullSheet>(`/stores/${slug}/sections/${sectionId}/pull-sheet`)
+      return data
+    },
+  })
+}
+
+/** useStockingSheet — cards awaiting physical placement in the case (owner-only). */
+export function useStockingSheet(slug: string, sectionId: number | null) {
+  return useQuery({
+    queryKey: ['stocking-sheet', slug, sectionId] as const,
+    enabled: Boolean(slug) && null !== sectionId,
+    queryFn: async () => {
+      const { data } = await api.get<StockingSheet>(`/stores/${slug}/sections/${sectionId}/stocking-sheet`)
       return data
     },
   })

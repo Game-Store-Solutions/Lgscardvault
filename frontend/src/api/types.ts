@@ -218,6 +218,10 @@ export interface StoreSectionCard {
   soldQuantity: number
   /** Copies the section can still sell (quantity - sold). */
   remaining: number
+  /** When staff confirmed the card is physically in the case; null = awaiting stocking. */
+  stockedAt?: string | null
+  /** True when the card still needs to be placed in the physical case. */
+  needsStocking?: boolean
   inventoryItem: {
     id: number
     priceCents: number
@@ -279,6 +283,26 @@ export interface PullSheet {
   generatedAt: string
   totalCards: number
   rows: PullSheetRow[]
+}
+
+/** One row of a section's stocking sheet: a card staff must place INTO the case. */
+export interface StockingSheetRow {
+  sectionCardId: number
+  cardName: string
+  setCode: string | null
+  collectorNumber: string | null
+  condition: string | null
+  isFoil: boolean
+  priceCents: number | null
+  copies: number
+}
+
+export interface StockingSheet {
+  caseName: string | null
+  sectionTitle: string
+  generatedAt: string
+  totalCards: number
+  rows: StockingSheetRow[]
 }
 
 export interface StoreCustomer {

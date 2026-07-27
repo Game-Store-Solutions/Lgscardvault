@@ -247,7 +247,12 @@ final class StoreSectionController extends AbstractController
         foreach ($section->getCards() as $card) {
             if ($card->getId() === $cardId) {
                 // Never shrink below what's already sold — history must stay consistent.
+                $previous = $card->getQuantity();
                 $card->setQuantity(max($card->getSoldQuantity(), (int) $payload['quantity']));
+                if ($card->getQuantity() > $previous) {
+                    // A top-up means more physical copies belong in the case.
+                    $card->setStockedAt(null);
+                }
                 $this->entityManager->flush();
                 break;
             }
@@ -401,6 +406,94 @@ final class StoreSectionController extends AbstractController
             'totalCards' => $totalCards,
             'rows' => $rows,
         ]);
+    }
+
+    /**
+     * Stocking sheet: every card added (or topped up) to this section's pool
+     * that staff have not yet physically placed in the display case. This is
+     * the restock counterpart of the pull sheet — pull answers "what leaves
+     * the case for orders", stocking answers "what goes INTO the case after
+     * a backfill".
+     */
+    #[Route('/{id}/stocking-sheet', name: 'api_store_sections_stocking_sheet', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function stockingSheet(string $slug, int $id): JsonResponse
+    {
+        $section = $this->findManagedSection($slug, $id);
+        if (!$section instanceof StoreSection) {
+            return $this->json(['detail' => 'Section not found.'], 404);
+        }
+
+        $rows = [];
+        $totalCards = 0;
+        foreach ($section->getCards() as $sectionCard) {
+            if (!$sectionCard->needsStocking()) {
+                continue;
+            }
+
+            $item = $sectionCard->getInventoryItem();
+            $card = $item?->getCard();
+            $copies = $sectionCard->remaining();
+            $totalCards += $copies;
+            $rows[] = [
+                'sectionCardId' => $sectionCard->getId(),
+                'cardName' => $card?->getName() ?? 'Unknown card',
+                'setCode' => $card?->getSetCode(),
+                'collectorNumber' => $card?->getCollectorNumber(),
+                'condition' => $item?->getCondition()->value,
+                'isFoil' => $item?->isFoil() ?? false,
+                'priceCents' => $item?->getPriceCents(),
+                'copies' => $copies,
+            ];
+        }
+
+        return $this->json([
+            'caseName' => $section->getStoreCase()?->getName(),
+            'sectionTitle' => $section->getTitle(),
+            'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+            'totalCards' => $totalCards,
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * Confirm cards are physically in the case. Body may carry
+     * {"cardIds": [...]} (section-card ids) to confirm a subset; an empty or
+     * absent list confirms every row currently needing stocking.
+     */
+    #[Route('/{id}/stocking-sheet/mark-stocked', name: 'api_store_sections_mark_stocked', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function markStocked(Request $request, string $slug, int $id): JsonResponse
+    {
+        $section = $this->findManagedSection($slug, $id);
+        if (!$section instanceof StoreSection) {
+            return $this->json(['detail' => 'Section not found.'], 404);
+        }
+
+        $payload = $this->decodeBody($request);
+        $onlyIds = null;
+        if (is_array($payload) && isset($payload['cardIds']) && is_array($payload['cardIds']) && [] !== $payload['cardIds']) {
+            $onlyIds = array_flip(array_map(intval(...), $payload['cardIds']));
+        }
+
+        $now = new \DateTimeImmutable();
+        $marked = 0;
+        foreach ($section->getCards() as $card) {
+            if (null !== $card->getStockedAt()) {
+                continue;
+            }
+            if (null !== $onlyIds && !isset($onlyIds[(int) $card->getId()])) {
+                continue;
+            }
+            $card->setStockedAt($now);
+            ++$marked;
+        }
+
+        if ($marked > 0) {
+            $this->entityManager->flush();
+        }
+
+        return $this->json($this->serializer->serializeSection($section));
     }
 
     /**

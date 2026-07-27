@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
-import { storeCasesKey, useInventory, usePullSheet, useStoreCases } from '../../hooks'
+import { storeCasesKey, useInventory, usePullSheet, useStockingSheet, useStoreCases } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
-import type { InventoryItem, PullSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
+import type { InventoryItem, PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
 import {
+  Badge,
   Button,
   Card,
   CardBody,
@@ -205,6 +206,8 @@ function SectionEditor({
   const [collapsed, setCollapsed] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pullSheetOpen, setPullSheetOpen] = useState(false)
+  const [stockingSheetOpen, setStockingSheetOpen] = useState(false)
+  const toStockCount = section.cards.filter((entry) => entry.needsStocking).length
   const [min, setMin] = useState(section.autoMinPriceCents != null ? (section.autoMinPriceCents / 100).toFixed(2) : '')
   const [max, setMax] = useState(section.autoMaxPriceCents != null ? (section.autoMaxPriceCents / 100).toFixed(2) : '')
   const [rarity, setRarity] = useState(section.autoRarity ?? '')
@@ -270,6 +273,15 @@ function SectionEditor({
                 aria-hidden
                 className={`size-4 transition-transform duration-150 ${collapsed ? '-rotate-90' : ''}`}
               />
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setStockingSheetOpen(true)}>
+              <PackagePlus className="size-4" aria-hidden />
+              Stocking sheet
+              {toStockCount > 0 && (
+                <span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-warning-500 px-1 text-[0.65rem] font-bold leading-none text-white">
+                  {toStockCount}
+                </span>
+              )}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setPullSheetOpen(true)}>
               <ClipboardList className="size-4" aria-hidden />
@@ -390,6 +402,7 @@ function SectionEditor({
                         {soldOut ? 'Sold out' : `${entry.remaining} left`}
                         {entry.soldQuantity > 0 ? ` · ${entry.soldQuantity} sold` : ''}
                       </span>
+                      {entry.needsStocking && <Badge tone="warning">To stock</Badge>}
                     </div>
                   </div>
                   <button
@@ -413,6 +426,14 @@ function SectionEditor({
       )}
       {pullSheetOpen && (
         <PullSheetModal slug={slug} section={section} onClose={() => setPullSheetOpen(false)} />
+      )}
+      {stockingSheetOpen && (
+        <StockingSheetModal
+          slug={slug}
+          section={section}
+          onClose={() => setStockingSheetOpen(false)}
+          onChanged={onChanged}
+        />
       )}
     </Card>
   )
@@ -483,6 +504,196 @@ function PullSheetModal({ slug, section, onClose }: { slug: string; section: Sto
       )}
     </Modal>
   )
+}
+
+/**
+ * Stocking sheet: the restock counterpart of the pull sheet. Lists every card
+ * added or topped up by auto-fill/manual adds that staff have not yet placed
+ * in the physical case, printable, with a one-click "mark all stocked" once
+ * the copies are in the display.
+ */
+function StockingSheetModal({
+  slug,
+  section,
+  onClose,
+  onChanged,
+}: {
+  slug: string
+  section: StoreSection
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const queryClient = useQueryClient()
+  const { data: sheet, isLoading } = useStockingSheet(slug, section.id)
+
+  const markStocked = useMutation({
+    mutationFn: async () => {
+      await api.post(`/stores/${slug}/sections/${section.id}/stocking-sheet/mark-stocked`, {})
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['stocking-sheet', slug, section.id] })
+      onChanged()
+    },
+  })
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Stocking sheet — ${sheet?.caseName ?? ''} / ${section.title}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => sheet && printStockingSheet(sheet)}
+            disabled={!sheet || sheet.rows.length === 0}
+          >
+            <Printer className="size-4" aria-hidden />
+            Print
+          </Button>
+          <Button
+            onClick={() => markStocked.mutate()}
+            loading={markStocked.isPending}
+            disabled={!sheet || sheet.rows.length === 0}
+          >
+            <PackagePlus className="size-4" aria-hidden />
+            Mark all stocked
+          </Button>
+        </>
+      }
+    >
+      {isLoading || !sheet ? (
+        <LoadingPanel />
+      ) : sheet.rows.length === 0 ? (
+        <EmptyState
+          icon={PackagePlus}
+          title="Nothing to stock"
+          description="Every card in this section is already placed in the case. New auto-fill pulls and top-ups will appear here."
+        />
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-fg-muted">
+            <span className="font-bold text-fg">{sheet.totalCards}</span> cop{sheet.totalCards === 1 ? 'y' : 'ies'} to
+            pull from stock and place in this section. Print it, place the cards, then mark them stocked.
+          </p>
+          {markStocked.isError && (
+            <p className="text-sm font-medium text-danger-700" role="alert">
+              {extractErrorMessage(markStocked.error, 'Could not mark the cards as stocked.')}
+            </p>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-fg-muted">
+                  <th className="py-2 pr-3">Card</th>
+                  <th className="py-2 pr-3">Set</th>
+                  <th className="py-2 pr-3">Finish / Cond.</th>
+                  <th className="py-2 pr-3 text-right">Copies</th>
+                  <th className="py-2 text-right">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sheet.rows.map((row) => (
+                  <tr key={row.sectionCardId} className="border-b border-border/60">
+                    <td className="py-2 pr-3 font-bold text-fg">{row.cardName}</td>
+                    <td className="py-2 pr-3 text-fg-muted">
+                      {row.setCode?.toUpperCase() ?? '—'}
+                      {row.collectorNumber ? ` #${row.collectorNumber}` : ''}
+                    </td>
+                    <td className="py-2 pr-3 text-fg-muted">
+                      {row.isFoil ? 'Foil' : 'Nonfoil'}
+                      {row.condition ? ` · ${row.condition}` : ''}
+                    </td>
+                    <td className="py-2 pr-3 text-right font-bold text-fg">{row.copies}</td>
+                    <td className="py-2 text-right text-fg-muted">
+                      {row.priceCents != null ? formatPrice(row.priceCents) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+/** Print the stocking sheet through a transient iframe (same pattern as the pull sheet). */
+function printStockingSheet(sheet: StockingSheet) {
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('title', `Print stocking sheet ${sheet.sectionTitle}`)
+  iframe.style.position = 'fixed'
+  iframe.style.right = '0'
+  iframe.style.bottom = '0'
+  iframe.style.width = '0'
+  iframe.style.height = '0'
+  iframe.style.border = '0'
+  document.body.appendChild(iframe)
+
+  const frameWindow = iframe.contentWindow
+  const frameDocument = frameWindow?.document
+  if (!frameWindow || !frameDocument) {
+    iframe.remove()
+    return
+  }
+  frameWindow.addEventListener('afterprint', () => iframe.remove(), { once: true })
+
+  const rows = sheet.rows
+    .map(
+      (row) => `
+        <tr>
+          <td>${escapeHtml(row.cardName)}</td>
+          <td>${escapeHtml(row.setCode?.toUpperCase() ?? '-')}${row.collectorNumber ? ' #' + escapeHtml(row.collectorNumber) : ''}</td>
+          <td>${row.isFoil ? 'Foil' : 'Nonfoil'}${row.condition ? ' · ' + escapeHtml(row.condition) : ''}</td>
+          <td>${row.copies}</td>
+          <td>[&nbsp;&nbsp;]</td>
+        </tr>`,
+    )
+    .join('')
+
+  frameDocument.open()
+  frameDocument.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Stocking sheet — ${escapeHtml(sheet.caseName ?? '')} / ${escapeHtml(sheet.sectionTitle)}</title>
+        <style>
+          body { color: #111827; font-family: Arial, sans-serif; margin: 32px; }
+          header { border-bottom: 2px solid #111827; margin-bottom: 20px; padding-bottom: 12px; }
+          h1 { font-size: 24px; margin: 0 0 4px; }
+          .muted { color: #4b5563; font-size: 13px; }
+          table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+          th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 6px; text-align: left; }
+          th { color: #4b5563; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+          td:nth-child(4), th:nth-child(4) { text-align: right; }
+          @media print { body { margin: 14mm; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>Stocking Sheet — ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
+          <div class="muted">${sheet.totalCards} cop${sheet.totalCards === 1 ? 'y' : 'ies'} to place in the case · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
+        </header>
+        <table>
+          <thead>
+            <tr><th>Card</th><th>Set</th><th>Finish / Cond.</th><th>Copies</th><th>Placed</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  frameDocument.close()
+
+  window.setTimeout(() => {
+    frameWindow.focus()
+    frameWindow.print()
+    window.setTimeout(() => iframe.remove(), 1000)
+  }, 100)
 }
 
 /** Print the pull sheet through a transient iframe (same pattern as the order sheet). */
