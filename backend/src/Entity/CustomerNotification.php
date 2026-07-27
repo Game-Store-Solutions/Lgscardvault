@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 class CustomerNotification
 {
     public const TYPE_ORDER_FULFILLED = 'order_fulfilled';
+    public const TYPE_WANT_LIST_MATCH = 'want_list_match';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

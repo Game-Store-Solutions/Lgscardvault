@@ -7,6 +7,7 @@ use App\Entity\InventoryItem;
 use App\Entity\Store;
 use App\Enum\CardCondition;
 use App\Repository\InventoryItemRepository;
+use App\Service\Notification\WantListNotifier;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -18,6 +19,7 @@ final readonly class StoreInventoryWriter
         private InventoryItemRepository $inventoryItemRepository,
         private ScryfallClient $scryfallClient,
         private LoggerInterface $logger,
+        private WantListNotifier $wantListNotifier,
     ) {
     }
 
@@ -120,6 +122,14 @@ final readonly class StoreInventoryWriter
         // copy reflects the committed quantity/version.
         $this->entityManager->refresh($item);
 
+        // Cross-store want-list alerts: this card just became (or stayed)
+        // available here. The native upsert path doesn't flush the unit of
+        // work, so flush the persisted notifications explicitly.
+        if ($item->getQuantity() > 0) {
+            $this->wantListNotifier->notifyAvailability($store, $card);
+            $this->entityManager->flush();
+        }
+
         return $item;
     }
 
@@ -165,6 +175,12 @@ final readonly class StoreInventoryWriter
 
         if (null !== $notes && '' !== trim($notes)) {
             $item->setNotes($notes);
+        }
+
+        // Batch path: notifications join the caller's unit of work and flush
+        // with the batch (the CSV handler owns the transaction boundary).
+        if ($item->getQuantity() > 0) {
+            $this->wantListNotifier->notifyAvailability($store, $card);
         }
 
         return $item;

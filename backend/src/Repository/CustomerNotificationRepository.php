@@ -47,4 +47,15 @@ class CustomerNotificationRepository extends ServiceEntityRepository
             'type' => $type,
         ]);
     }
+
+    /** Dedupe lookup for repeatable notifications (e.g. want-list matches). */
+    public function findOneByTitle(User $user, Store $store, string $type, string $title): ?CustomerNotification
+    {
+        return $this->findOneBy([
+            'user' => $user,
+            'store' => $store,
+            'type' => $type,
+            'title' => $title,
+        ]);
+    }
 }
