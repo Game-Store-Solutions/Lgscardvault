@@ -127,9 +127,20 @@ export function StoreFooter({ slug }: { slug: string }) {
           </div>
         )}
 
-        <div className={`flex flex-wrap items-center justify-between gap-2 text-xs text-fg-muted ${hasAnything ? 'mt-8 border-t border-border pt-6' : ''}`}>
-          <p className="font-bold text-fg">{store.name}</p>
+        <div className={`flex flex-wrap items-center justify-between gap-3 text-xs text-fg-muted ${hasAnything ? 'mt-8 border-t border-border pt-6' : ''}`}>
           <p>Powered by MTG Marketplace</p>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-fg">{store.name}</span>
+            {store.logoUrl && (
+              <img
+                src={store.logoUrl}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                className="size-8 rounded-btn border border-border object-cover"
+              />
+            )}
+          </div>
         </div>
       </div>
     </footer>
