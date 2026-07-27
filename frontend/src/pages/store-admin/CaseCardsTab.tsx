@@ -214,6 +214,16 @@ function SectionEditor({
   const [color, setColor] = useState(section.autoColorIdentityLabel ?? '')
   const [setCode, setSetCode] = useState(section.autoSetCode ?? '')
   const [cardType, setCardType] = useState(section.autoCardType ?? '')
+  const [cardLimit, setCardLimit] = useState(section.cardLimit != null ? String(section.cardLimit) : '')
+
+  const parsedCardLimit = cardLimit.trim() === '' ? null : Number(cardLimit)
+
+  const saveLimit = useMutation({
+    mutationFn: async () => {
+      await api.patch(`/stores/${slug}/sections/${section.id}`, { cardLimit: parsedCardLimit })
+    },
+    onSuccess: onChanged,
+  })
 
   const deleteSection = useMutation({
     mutationFn: async () => {
@@ -245,6 +255,7 @@ function SectionEditor({
         autoColorIdentity: color.trim() || null,
         autoSetCode: setCode.trim() || null,
         autoCardType: cardType.trim() || null,
+        cardLimit: parsedCardLimit,
       })
     },
     onSuccess: onChanged,
@@ -329,6 +340,13 @@ function SectionEditor({
               <Input label="Card type" value={cardType} onChange={(e) => setCardType(e.target.value)} placeholder="Creature, Instant…" />
               <Input label="Min price ($)" value={min} onChange={(e) => setMin(e.target.value)} inputMode="decimal" placeholder="0" />
               <Input label="Max price ($)" value={max} onChange={(e) => setMax(e.target.value)} inputMode="decimal" placeholder="Any" />
+              <Input
+                label="# of cards"
+                value={cardLimit}
+                onChange={(e) => setCardLimit(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric"
+                placeholder="60 (max)"
+              />
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={() => autoFill.mutate()} loading={autoFill.isPending}>
@@ -346,10 +364,33 @@ function SectionEditor({
             </div>
           </div>
         ) : (
-          <Button variant="secondary" onClick={() => setPickerOpen(true)}>
-            <Plus className="size-4" aria-hidden />
-            Add cards from inventory
-          </Button>
+          <div className="flex flex-wrap items-end gap-3">
+            <Button variant="secondary" onClick={() => setPickerOpen(true)}>
+              <Plus className="size-4" aria-hidden />
+              Add cards from inventory
+            </Button>
+            <div className="w-32">
+              <Input
+                label="# of cards"
+                value={cardLimit}
+                onChange={(e) => setCardLimit(e.target.value.replace(/\D/g, ''))}
+                onBlur={() => {
+                  if (parsedCardLimit !== section.cardLimit) saveLimit.mutate()
+                }}
+                inputMode="numeric"
+                placeholder="No limit"
+              />
+            </div>
+            <span className="pb-2 text-xs text-fg-muted">
+              {section.cards.length} in section{section.cardLimit != null ? ` · limit ${section.cardLimit}` : ''}
+            </span>
+          </div>
+        )}
+
+        {saveLimit.isError && (
+          <p className="text-sm font-medium text-danger-700" role="alert">
+            {extractErrorMessage(saveLimit.error, 'Could not save the card limit.')}
+          </p>
         )}
 
         {autoFill.isError && (

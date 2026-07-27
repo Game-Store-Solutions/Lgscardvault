@@ -20,7 +20,7 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { CartItem, InventoryItem, Order, OrderFulfillment } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { ordersKey, useCart, useDebouncedValue, useInventory, useStore, useStoreTheme } from '../hooks'
+import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
 import { Badge, Button, buttonVariants, EmptyState, LoadingPanel } from '../components/ui'
 import { SpotlightCard } from '../components/cards'
@@ -63,6 +63,8 @@ export default function CartPage() {
         queryClient.invalidateQueries({ queryKey: customerKeys.cart(slug) }),
         queryClient.invalidateQueries({ queryKey: customerKeys.orders(slug) }),
         queryClient.invalidateQueries({ queryKey: ordersKey(slug) }),
+        // Checkout consumes stock — refresh listings so counts are current.
+        queryClient.invalidateQueries({ queryKey: inventoryKey(slug) }),
       ])
     },
   })

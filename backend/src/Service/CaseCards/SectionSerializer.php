@@ -71,6 +71,7 @@ final class SectionSerializer
             'autoColorIdentityLabel' => null !== $colorCode ? $this->colorIdentityParser->label($colorCode) : null,
             'autoSetCode' => $section->getAutoSetCode(),
             'autoCardType' => $section->getAutoCardType(),
+            'cardLimit' => $section->getCardLimit(),
             'availableQuantity' => $available,
             'createdAt' => $section->getCreatedAt()->format(DATE_ATOM),
             'cards' => $cards,

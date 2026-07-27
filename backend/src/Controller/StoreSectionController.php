@@ -204,11 +204,15 @@ final class StoreSectionController extends AbstractController
 
         $existing = $this->existingInventoryItemIds($section);
         $position = $this->sectionCardRepository->nextPosition($section);
+        $limit = $section->getCardLimit();
         $added = 0;
 
         foreach ($ids as $itemId) {
             if (isset($existing[$itemId])) {
                 continue;
+            }
+            if (null !== $limit && count($existing) >= $limit) {
+                return $this->json(['detail' => sprintf('This section is limited to %d cards. Remove a card or raise the limit first.', $limit)], 422);
             }
 
             $item = $this->inventoryItemRepository->findOneByStoreAndId($store, $itemId);
@@ -320,7 +324,9 @@ final class StoreSectionController extends AbstractController
             return $this->json(['detail' => 'Minimum price cannot exceed maximum price.'], 422);
         }
 
-        $picked = $this->autoFiller->pickListings($section, self::AUTO_FILL_MAX);
+        // The section's own capacity wins over the platform ceiling, so a
+        // 12-slot case area pulls exactly 12 cards.
+        $picked = $this->autoFiller->pickListings($section, min($section->getCardLimit() ?? self::AUTO_FILL_MAX, self::AUTO_FILL_MAX));
 
         /** @var array<int, StoreSectionCard> $existingByItem */
         $existingByItem = [];
@@ -570,6 +576,14 @@ final class StoreSectionController extends AbstractController
         if (array_key_exists('autoCardType', $payload)) {
             $raw = trim((string) ($payload['autoCardType'] ?? ''));
             $section->setAutoCardType('' === $raw ? null : mb_substr($raw, 0, 40));
+        }
+
+        if (array_key_exists('cardLimit', $payload)) {
+            $limit = $this->readNullableNonNegativeInt($payload['cardLimit']);
+            if (false === $limit || 0 === $limit || (null !== $limit && $limit > self::AUTO_FILL_MAX)) {
+                return sprintf('cardLimit must be between 1 and %d, or null for the default.', self::AUTO_FILL_MAX);
+            }
+            $section->setCardLimit($limit);
         }
 
         return null;

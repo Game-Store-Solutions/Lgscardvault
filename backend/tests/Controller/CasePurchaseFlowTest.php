@@ -158,6 +158,54 @@ final class CasePurchaseFlowTest extends WebTestCase
         self::assertCount(0, $sheet['rows']);
     }
 
+    /**
+     * A sale consumes real inventory at placement, and cancelling or
+     * refunding the order puts exactly the purchased copies back.
+     */
+    public function testPurchaseReducesInventoryAndCancelRestoresIt(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 5, pool: 1);
+        $order = $this->placeOrder($store, $this->fixtures->user(['ROLE_USER']), $item->getId(), 3);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        self::assertSame(2, $fresh->getQuantity(), 'placing the order consumes 3 of 5 copies');
+
+        $this->authenticate($store->getOwner());
+        $this->jsonRequest(
+            'PATCH',
+            "/api/stores/{$store->getSlug()}/orders/{$order['id']}",
+            ['status' => 'cancelled'],
+            'application/merge-patch+json',
+        );
+        self::assertResponseIsSuccessful();
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        self::assertSame(5, $fresh->getQuantity(), 'cancelling restores the purchased copies');
+    }
+
+    public function testRefundAfterReceivingRestoresInventory(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 4, pool: 1);
+        $order = $this->placeOrder($store, $this->fixtures->user(['ROLE_USER']), $item->getId(), 2);
+
+        $this->authenticate($store->getOwner());
+        foreach (['received', 'refunded'] as $status) {
+            $this->jsonRequest(
+                'PATCH',
+                "/api/stores/{$store->getSlug()}/orders/{$order['id']}",
+                ['status' => $status],
+                'application/merge-patch+json',
+            );
+            self::assertResponseIsSuccessful();
+        }
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        self::assertSame(4, $fresh->getQuantity(), 'refunding restores the purchased copies');
+    }
+
     public function testCancellationRestoresThePool(): void
     {
         [$store, $section, $item] = $this->storeWithCasedListing(stock: 5, pool: 1);

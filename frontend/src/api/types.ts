@@ -248,6 +248,8 @@ export interface StoreSection {
   autoColorIdentityLabel: string | null
   autoSetCode: string | null
   autoCardType: string | null
+  /** Max distinct cards this section holds (its physical capacity); null = platform default (60). */
+  cardLimit: number | null
   /** Total copies still sellable across the section's pool. */
   availableQuantity: number
   createdAt: string
