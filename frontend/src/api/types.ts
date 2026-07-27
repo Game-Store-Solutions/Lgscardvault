@@ -28,6 +28,8 @@ export interface Store {
   heroSubheading?: string | null
   tagline?: string | null
   cardDisplayStyle?: CardDisplayStyle
+  /** Optional dark-mode palette (same keys as the base colors); used when the shopper's theme is dark. */
+  darkColors?: Partial<Record<'primaryColor' | 'accentColor' | 'backgroundColor' | 'surfaceColor' | 'textColor' | 'mutedColor' | 'borderColor', string>> | null
   // Storefront footer (owner-managed via /settings)
   hoursText?: string | null
   contactEmail?: string | null
@@ -200,6 +202,8 @@ export interface InventoryItem {
   id: number
   quantity: number
   priceCents: number
+  /** What the store paid per copy; null = cost not tracked. */
+  acquisitionCostCents?: number | null
   condition: 'NM' | 'LP' | 'MP' | 'HP' | 'DMG'
   isFoil: boolean
   notes?: string | null
@@ -406,6 +410,7 @@ export interface UserProfile {
   id: number
   email: string
   displayName: string
+  avatarUrl?: string | null
   roles: string[]
   ownedStores: Pick<Store, 'id' | 'name' | 'slug'>[]
 }
@@ -431,6 +436,8 @@ export interface OrderLine {
   cardName: string
   quantity: number
   priceCents: number
+  /** Per-unit cost snapshotted at sale time (store-staff endpoints only). */
+  acquisitionCostCents?: number | null
   /** Set when (part of) the line sold out of a display-case section. */
   caseName?: string | null
   sectionTitle?: string | null
@@ -449,6 +456,8 @@ export interface OrderLine {
 
 export type OrderFulfillment = 'pickup' | 'shipping'
 
+export type OrderChannel = 'online' | 'kiosk'
+
 export interface Order {
   id: number
   reference: string
@@ -458,12 +467,47 @@ export interface Order {
   customerName?: string
   customerEmail?: string
   fulfillment?: OrderFulfillment
+  channel?: OrderChannel
   totalCents: number
   createdAt: string
   lines?: OrderLine[]
 }
 
 export type OrderStatus = 'pending' | 'received' | 'fulfilled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
+
+/** One card a store wants to buy, with its cash offer. */
+export interface BuylistEntry {
+  id: number
+  offerCents: number
+  wantsFoil: boolean
+  maxQuantity: number | null
+  notes: string | null
+  createdAt: string
+  card: CardSummary | null
+}
+
+export type SellSubmissionStatus = 'pending' | 'accepted' | 'declined' | 'completed'
+
+export interface SellSubmissionItem {
+  id: number
+  cardName: string
+  isFoil: boolean
+  quantity: number
+  offerCentsEach: number
+  imageUris?: { normal?: string; small?: string } | null
+  setCode?: string | null
+}
+
+export interface SellSubmission {
+  id: number
+  status: SellSubmissionStatus
+  totalOfferCents: number
+  createdAt: string
+  decidedAt: string | null
+  customerName?: string | null
+  customerEmail?: string | null
+  items: SellSubmissionItem[]
+}
 
 export interface CustomerNotification {
   id: number

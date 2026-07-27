@@ -206,6 +206,121 @@ final class CasePurchaseFlowTest extends WebTestCase
         self::assertSame(4, $fresh->getQuantity(), 'refunding restores the purchased copies');
     }
 
+    /**
+     * Kiosk orders (staff-entered, channel=kiosk) behave like checkout when
+     * lines reference real listings: stock is consumed, case pools deplete,
+     * and a typed customer user id attributes the order to that account.
+     */
+    public function testKioskOrderConsumesStockAndAttributesCustomer(): void
+    {
+        [$store, $section, $item] = $this->storeWithCasedListing(stock: 5, pool: 2);
+        $customer = $this->fixtures->user(['ROLE_USER'], 'kiosk-shopper@test.local');
+        $this->authenticate($store->getOwner());
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders", [
+            'channel' => 'kiosk',
+            'fulfillment' => 'pickup',
+            'kioskUserId' => $customer->getId(),
+            'inputLines' => [['inventoryItemId' => $item->getId(), 'quantity' => 2]],
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertSame('kiosk', $order['channel']);
+        self::assertSame('kiosk-shopper@test.local', $order['customerEmail']);
+        self::assertSame(2 * 2500, $order['totalCents']);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        self::assertSame(3, $fresh->getQuantity(), 'the kiosk sale consumes real stock');
+
+        $pool = $this->em->getRepository(StoreSectionCard::class)->findOneBy(['section' => $section->getId()]);
+        self::assertSame(2, $pool->getSoldQuantity(), 'case pool depletes like an online sale');
+    }
+
+    /**
+     * COGS: the listing's acquisition cost is snapshotted per-unit onto the
+     * order line at sale time, and store staff can read it back from the
+     * orders endpoint for profit reporting.
+     */
+    public function testAcquisitionCostSnapshotsOntoOrderLines(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 5, pool: 1);
+        $item->setAcquisitionCostCents(900);
+        $this->em->flush();
+
+        $this->placeOrder($store, $this->fixtures->user(['ROLE_USER']), $item->getId(), 2);
+
+        $this->authenticate($store->getOwner());
+        $orders = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/orders");
+        $lines = $orders['member'][0]['lines'] ?? $orders[0]['lines'] ?? [];
+        self::assertSame(900, $lines[0]['acquisitionCostCents']);
+
+        // Repricing the listing later must not rewrite historical COGS.
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        $fresh->setAcquisitionCostCents(5000);
+        $this->em->flush();
+
+        $orders = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/orders");
+        $lines = $orders['member'][0]['lines'] ?? $orders[0]['lines'] ?? [];
+        self::assertSame(900, $lines[0]['acquisitionCostCents'], 'the snapshot survives listing cost changes');
+    }
+
+    public function testKioskOrderRejectsUnknownCustomerId(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 2, pool: 1);
+        $this->authenticate($store->getOwner());
+
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders", [
+            'channel' => 'kiosk',
+            'kioskUserId' => 999999,
+            'inputLines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * Kiosk-mode cart checkout: the terminal is signed in as staff, the
+     * walk-up customer types their name, and the order lands as
+     * channel=kiosk under that name with no email attribution.
+     */
+    public function testKioskModeCheckoutAttributesTypedName(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 3, pool: 1);
+        $owner = $store->getOwner();
+
+        $this->authenticate($owner);
+        $this->jsonRequest('PUT', "/api/stores/{$store->getSlug()}/customer/cart/{$item->getId()}", ['quantity' => 1]);
+        self::assertResponseIsSuccessful();
+
+        // Name is required at the kiosk.
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/test-order", ['channel' => 'kiosk']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+
+        $this->jsonRequest('PUT', "/api/stores/{$store->getSlug()}/customer/cart/{$item->getId()}", ['quantity' => 1]);
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/test-order", [
+            'channel' => 'kiosk',
+            'customerName' => 'Walk-in Wanda',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertSame('kiosk', $order['channel']);
+        self::assertSame('Walk-in Wanda', $order['customerName']);
+        self::assertNull($order['customerEmail']);
+    }
+
+    public function testKioskModeCheckoutRequiresStaff(): void
+    {
+        [$store, , $item] = $this->storeWithCasedListing(stock: 3, pool: 1);
+        $customer = $this->fixtures->user(['ROLE_USER']);
+
+        $this->authenticate($customer);
+        $this->jsonRequest('PUT', "/api/stores/{$store->getSlug()}/customer/cart/{$item->getId()}", ['quantity' => 1]);
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/test-order", [
+            'channel' => 'kiosk',
+            'customerName' => 'Sneaky Sam',
+        ]);
+        self::assertSame(403, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testCancellationRestoresThePool(): void
     {
         [$store, $section, $item] = $this->storeWithCasedListing(stock: 5, pool: 1);

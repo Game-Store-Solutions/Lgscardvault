@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   GalleryHorizontalEnd,
   LayoutDashboard,
+  Megaphone,
   LogOut,
   Menu,
   Palette,
@@ -18,6 +19,7 @@ import {
   Sparkles,
   Store,
   TrendingUp,
+  WalletCards,
   X,
 } from 'lucide-react'
 
@@ -38,6 +40,7 @@ function useAdminNav(): { context: string; items: NavItem[] } {
       context: 'Platform administration',
       items: [
         { to: '/platform/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+        { to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone },
       ],
     }
   }
@@ -53,8 +56,10 @@ function useAdminNav(): { context: string; items: NavItem[] } {
       { to: `${base}/case-cards`, label: 'Case cards', icon: GalleryHorizontalEnd },
       { to: `${base}/payments`, label: 'Payments', icon: CreditCard },
       { to: `${base}/orders`, label: 'Orders', icon: ReceiptText },
+      { to: `${base}/sell-trade`, label: 'Sell / Trade', icon: WalletCards },
       { to: `${base}/reports`, label: 'Reports', icon: TrendingUp },
       { to: `${base}/csv`, label: 'CSV import', icon: FileSpreadsheet },
+      { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
     ],
   }
 }

@@ -411,13 +411,27 @@ final class StoreCustomerController extends AbstractController
     #[Route('/test-order', name: 'api_store_customer_test_order', methods: ['POST'])]
     public function createTestOrder(Request $request, string $slug): JsonResponse
     {
-        if (!in_array($this->kernel->getEnvironment(), ['dev', 'test'], true)) {
-            return $this->json(['detail' => 'Test orders are only available locally.'], 404);
-        }
-
         $store = $this->resolveStore($slug);
         if (!$store instanceof Store) {
             return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        $channel = is_array($payload) ? ($payload['channel'] ?? Order::CHANNEL_ONLINE) : Order::CHANNEL_ONLINE;
+        if (!in_array($channel, Order::CHANNELS, true)) {
+            return $this->json(['detail' => sprintf('Unknown order channel. Valid: %s.', implode(', ', Order::CHANNELS))], 422);
+        }
+
+        if (Order::CHANNEL_KIOSK === $channel) {
+            // Kiosk checkout works in every environment, but only from a
+            // terminal signed in as someone who manages THIS store (the
+            // STORE_MANAGE voter covers owners and platform admins) —
+            // otherwise any customer could ring up unpaid orders remotely.
+            if (!$this->isGranted('STORE_MANAGE', $store)) {
+                return $this->json(['detail' => 'Kiosk checkout is only available on the store\'s kiosk terminal.'], 403);
+            }
+        } elseif (!in_array($this->kernel->getEnvironment(), ['dev', 'test'], true)) {
+            return $this->json(['detail' => 'Test orders are only available locally.'], 404);
         }
 
         $customer = $this->findCustomer($store);
@@ -435,17 +449,31 @@ final class StoreCustomerController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        $payload = json_decode($request->getContent(), true);
         $fulfillment = is_array($payload) ? ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP) : Order::FULFILLMENT_PICKUP;
         if (!in_array($fulfillment, Order::FULFILLMENTS, true)) {
             return $this->json(['detail' => sprintf('Unknown fulfillment method. Valid: %s.', implode(', ', Order::FULFILLMENTS))], 422);
         }
 
+        // Kiosk checkout: the terminal is signed in as a staff/admin account,
+        // so the order must NOT be attributed to that account. The walk-up
+        // customer types their name instead, and no email is recorded.
+        $customerName = $user->getDisplayName();
+        $customerEmail = $user->getEmail();
+        if (Order::CHANNEL_KIOSK === $channel) {
+            $enteredName = is_array($payload) ? trim((string) ($payload['customerName'] ?? '')) : '';
+            if ('' === $enteredName) {
+                return $this->json(['detail' => 'Please enter the customer name for this kiosk order.'], 422);
+            }
+            $customerName = mb_substr($enteredName, 0, 255);
+            $customerEmail = null;
+        }
+
         $order = (new Order())
             ->setStore($store)
             ->setReference($this->generateOrderReference())
-            ->setCustomerName($user->getDisplayName())
-            ->setCustomerEmail($user->getEmail())
+            ->setCustomerName($customerName)
+            ->setCustomerEmail($customerEmail)
+            ->setChannel($channel)
             ->setFulfillment($fulfillment);
 
         $total = 0;
@@ -461,7 +489,8 @@ final class StoreCustomerController extends AbstractController
                 ->setInventoryItem($inventoryItem)
                 ->setCardName($inventoryItem->getCard()?->getName() ?? 'Unknown card')
                 ->setQuantity($quantity)
-                ->setPriceCents($inventoryItem->getPriceCents());
+                ->setPriceCents($inventoryItem->getPriceCents())
+                ->setAcquisitionCostCents($inventoryItem->getAcquisitionCostCents());
 
             // The sale consumes real stock at placement. The line's quantity is
             // clamped to available stock above, so this can never go negative;
@@ -675,6 +704,7 @@ final class StoreCustomerController extends AbstractController
             'customerName' => $order->getCustomerName(),
             'customerEmail' => $order->getCustomerEmail(),
             'fulfillment' => $order->getFulfillment(),
+            'channel' => $order->getChannel(),
             'totalCents' => $order->getTotalCents(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),

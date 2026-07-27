@@ -75,6 +75,10 @@ class Order
     public const FULFILLMENT_SHIPPING = 'shipping';
     public const FULFILLMENTS = [self::FULFILLMENT_PICKUP, self::FULFILLMENT_SHIPPING];
 
+    public const CHANNEL_ONLINE = 'online';
+    public const CHANNEL_KIOSK = 'kiosk';
+    public const CHANNELS = [self::CHANNEL_ONLINE, self::CHANNEL_KIOSK];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -110,6 +114,23 @@ class Order
     #[Assert\Choice(choices: self::FULFILLMENTS)]
     #[Groups(['order:read', 'order:write'])]
     private string $fulfillment = self::FULFILLMENT_PICKUP;
+
+    /**
+     * Where the order originated: the online storefront (customer checkout)
+     * or an in-store kiosk terminal operated by staff.
+     */
+    #[ORM\Column(length: 16, options: ['default' => self::CHANNEL_ONLINE])]
+    #[Assert\Choice(choices: self::CHANNELS)]
+    #[Groups(['order:read', 'order:write'])]
+    private string $channel = self::CHANNEL_ONLINE;
+
+    /**
+     * Write-only kiosk convenience: a customer user id typed at the kiosk.
+     * StoreOrderProcessor resolves it to the customer's name/email so kiosk
+     * orders are attributed to the right account. Never persisted itself.
+     */
+    #[Groups(['order:write'])]
+    private ?int $kioskUserId = null;
 
     #[ORM\Column]
     #[Groups(['order:read'])]
@@ -206,6 +227,30 @@ class Order
     public function setCustomerEmail(?string $customerEmail): static
     {
         $this->customerEmail = $customerEmail;
+
+        return $this;
+    }
+
+    public function getChannel(): string
+    {
+        return $this->channel;
+    }
+
+    public function setChannel(string $channel): static
+    {
+        $this->channel = $channel;
+
+        return $this;
+    }
+
+    public function getKioskUserId(): ?int
+    {
+        return $this->kioskUserId;
+    }
+
+    public function setKioskUserId(?int $kioskUserId): static
+    {
+        $this->kioskUserId = $kioskUserId;
 
         return $this;
     }

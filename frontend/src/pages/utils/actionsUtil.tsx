@@ -53,7 +53,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     { label: 'Case cards', icon: GalleryHorizontalEnd, path: 'case-cards' },
     { label: 'Mass Search', icon: ClipboardList, path: 'mass-search' },
     { label: 'Deck Builder', icon: Package },
-    { label: 'Sell/Trade', icon: WalletCards },
+    { label: 'Sell/Trade', icon: WalletCards, path: 'sell' },
 ]
 
 export {QUICK_ACTIONS, SORTS, CARD_TYPES, FINISH_OPTIONS, COLORS, DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,SPOTLIGHT_MAX_ITEMS, RESULTS_PAGE_SIZE};

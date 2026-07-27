@@ -18,6 +18,23 @@ class CustomerWantListEntryRepository extends ServiceEntityRepository
     }
 
     /** @return list<CustomerWantListEntry> */
+    /**
+     * Want-list entries matching a card name, across EVERY store's customers
+     * — a want can be filled by any store that stocks the card.
+     *
+     * @return list<CustomerWantListEntry>
+     */
+    public function findMatchingCardName(string $cardName): array
+    {
+        return $this->createQueryBuilder('w')
+            ->join('w.customer', 'c')->addSelect('c')
+            ->join('c.user', 'u')->addSelect('u')
+            ->andWhere('LOWER(w.cardName) = LOWER(:name)')
+            ->setParameter('name', $cardName)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findForCustomer(StoreCustomer $customer): array
     {
         return $this->createQueryBuilder('entry')

@@ -6,6 +6,7 @@ export { useCanManageStore } from './useCanManageStore'
 export { useDebouncedValue } from './useDebouncedValue'
 export { useTheme } from './useTheme'
 export type { Theme } from './useTheme'
+export { useKioskMode } from './useKioskMode'
 export { useTilt } from './useTilt'
 export { useStoreTheme } from './useStoreTheme'
 export {

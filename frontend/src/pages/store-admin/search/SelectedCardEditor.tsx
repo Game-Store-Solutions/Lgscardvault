@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react'
 import { formatScryfallPrice } from '../../../api/client'
 import type { CardSummary } from '../../../api/types'
-import { Button } from '../../../components/ui'
+import { Button, Input } from '../../../components/ui'
 import { ConditionSegmented, FoilToggle, QuantityStepper, type Condition } from '../../../components/inventory'
 
 export interface SelectedCardEditorProps {
@@ -10,6 +10,8 @@ export interface SelectedCardEditorProps {
   condition: Condition
   isFoil: boolean
   pending: boolean
+  costText: string
+  onCostChange: (value: string) => void
   onQuantityChange: (value: number) => void
   onConditionChange: (value: Condition) => void
   onFinishChange: (value: 'nonfoil' | 'foil') => void
@@ -23,6 +25,8 @@ export function SelectedCardEditor({
   condition,
   isFoil,
   pending,
+  costText,
+  onCostChange,
   onQuantityChange,
   onConditionChange,
   onFinishChange,
@@ -69,6 +73,15 @@ export function SelectedCardEditor({
         <div className="sm:col-span-2">
           <p className="mb-1.5 text-sm font-bold text-fg">Condition</p>
           <ConditionSegmented value={condition} onChange={onConditionChange} />
+        </div>
+        <div className="sm:col-span-2">
+          <Input
+            label="Your cost per copy ($, optional)"
+            value={costText}
+            onChange={(e) => onCostChange(e.target.value)}
+            inputMode="decimal"
+            placeholder="What you paid — powers profit reports"
+          />
         </div>
         <div className="flex items-center justify-between rounded-card border border-border bg-surface px-4 py-3 sm:col-span-2">
           <span className="text-sm text-fg-muted">Market price — applied automatically on add</span>

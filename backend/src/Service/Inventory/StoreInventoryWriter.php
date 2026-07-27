@@ -7,6 +7,7 @@ use App\Entity\InventoryItem;
 use App\Entity\Store;
 use App\Enum\CardCondition;
 use App\Repository\InventoryItemRepository;
+use App\Service\Notification\WantListNotifier;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -18,6 +19,7 @@ final readonly class StoreInventoryWriter
         private InventoryItemRepository $inventoryItemRepository,
         private ScryfallClient $scryfallClient,
         private LoggerInterface $logger,
+        private WantListNotifier $wantListNotifier,
     ) {
     }
 
@@ -29,6 +31,7 @@ final readonly class StoreInventoryWriter
         bool $isFoil,
         ?string $notes = null,
         bool $flush = true,
+        ?int $acquisitionCostCents = null,
     ): InventoryItem {
         // Enrich based on missing price/Scryfall data regardless of flush mode.
         // The import path calls write(flush: false); without this it would never enrich.
@@ -47,7 +50,7 @@ final readonly class StoreInventoryWriter
         // the CSV handler flush + recover the whole batch on conflict (it owns
         // the transaction boundary and requeues contended rows).
         if (!$flush) {
-            return $this->applyWrite($store, $card, $quantity, $condition, $isFoil, $notes);
+            return $this->applyWrite($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents);
         }
 
         // Immediate path (flush=true, web add/edit/manual-import): a native
@@ -55,7 +58,7 @@ final readonly class StoreInventoryWriter
         // (store, card, condition, foil) tuple can neither 500 on the unique
         // constraint (the old check-then-insert race) nor lose an increment
         // (the old read-modify-write) — the quantity is summed in-database.
-        return $this->upsertLine($store, $card, $quantity, $condition, $isFoil, $notes);
+        return $this->upsertLine($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents);
     }
 
     /**
@@ -74,18 +77,20 @@ final readonly class StoreInventoryWriter
         CardCondition $condition,
         bool $isFoil,
         ?string $notes,
+        ?int $acquisitionCostCents = null,
     ): InventoryItem {
         $priceCents = $this->resolvePriceCents($card, $isFoil);
         $connection = $this->entityManager->getConnection();
 
         $id = $connection->fetchOne(
             <<<'SQL'
-            INSERT INTO inventory_items (store_id, card_id, quantity, price_cents, condition, is_foil, notes, version)
-            VALUES (:store, :card, :quantity, :price, :condition, :foil, :notes, 1)
+            INSERT INTO inventory_items (store_id, card_id, quantity, price_cents, acquisition_cost_cents, condition, is_foil, notes, version)
+            VALUES (:store, :card, :quantity, :price, :cost, :condition, :foil, :notes, 1)
             ON CONFLICT (store_id, card_id, condition, is_foil)
             DO UPDATE SET
                 quantity = inventory_items.quantity + EXCLUDED.quantity,
                 price_cents = EXCLUDED.price_cents,
+                acquisition_cost_cents = COALESCE(EXCLUDED.acquisition_cost_cents, inventory_items.acquisition_cost_cents),
                 notes = COALESCE(NULLIF(EXCLUDED.notes, ''), inventory_items.notes),
                 version = inventory_items.version + 1
             RETURNING id
@@ -95,6 +100,7 @@ final readonly class StoreInventoryWriter
                 'card' => $card->getId()->toRfc4122(),
                 'quantity' => $quantity,
                 'price' => $priceCents,
+                'cost' => $acquisitionCostCents,
                 'condition' => $condition->value,
                 'foil' => $isFoil ? 'true' : 'false',
                 'notes' => null !== $notes && '' !== trim($notes) ? $notes : '',
@@ -103,6 +109,7 @@ final readonly class StoreInventoryWriter
                 'store' => \Doctrine\DBAL\ParameterType::INTEGER,
                 'quantity' => \Doctrine\DBAL\ParameterType::INTEGER,
                 'price' => \Doctrine\DBAL\ParameterType::INTEGER,
+                'cost' => \Doctrine\DBAL\ParameterType::INTEGER,
             ],
         );
 
@@ -114,6 +121,14 @@ final readonly class StoreInventoryWriter
         // The row was written outside the ORM; refresh so a stale identity-map
         // copy reflects the committed quantity/version.
         $this->entityManager->refresh($item);
+
+        // Cross-store want-list alerts: this card just became (or stayed)
+        // available here. The native upsert path doesn't flush the unit of
+        // work, so flush the persisted notifications explicitly.
+        if ($item->getQuantity() > 0) {
+            $this->wantListNotifier->notifyAvailability($store, $card);
+            $this->entityManager->flush();
+        }
 
         return $item;
     }
@@ -129,6 +144,7 @@ final readonly class StoreInventoryWriter
         CardCondition $condition,
         bool $isFoil,
         ?string $notes,
+        ?int $acquisitionCostCents = null,
     ): InventoryItem {
         $item = $this->inventoryItemRepository->findOneBy([
             'store' => $store,
@@ -153,9 +169,18 @@ final readonly class StoreInventoryWriter
 
         $item->setQuantity($item->getQuantity() + $quantity);
         $item->setPriceCents($this->resolvePriceCents($card, $isFoil));
+        if (null !== $acquisitionCostCents) {
+            $item->setAcquisitionCostCents($acquisitionCostCents);
+        }
 
         if (null !== $notes && '' !== trim($notes)) {
             $item->setNotes($notes);
+        }
+
+        // Batch path: notifications join the caller's unit of work and flush
+        // with the batch (the CSV handler owns the transaction boundary).
+        if ($item->getQuantity() > 0) {
+            $this->wantListNotifier->notifyAvailability($store, $card);
         }
 
         return $item;

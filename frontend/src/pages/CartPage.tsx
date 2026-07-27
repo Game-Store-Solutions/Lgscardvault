@@ -20,9 +20,9 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { CartItem, InventoryItem, Order, OrderFulfillment } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useStore, useStoreTheme } from '../hooks'
+import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
-import { Badge, Button, buttonVariants, EmptyState, LoadingPanel } from '../components/ui'
+import { Badge, Button, buttonVariants, EmptyState, Input, LoadingPanel } from '../components/ui'
 import { SpotlightCard } from '../components/cards'
 import { cx } from '../lib/cx'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
@@ -50,14 +50,20 @@ export default function CartPage() {
   const [removed, setRemoved] = useState<RemovedLine | null>(null)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>('pickup')
+  const { kioskMode } = useKioskMode()
+  const [kioskCustomerName, setKioskCustomerName] = useState('')
 
   const testOrder = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, { fulfillment })
+      const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, {
+        fulfillment: kioskMode ? 'pickup' : fulfillment,
+        ...(kioskMode ? { channel: 'kiosk', customerName: kioskCustomerName.trim() } : {}),
+      })
       return data
     },
     onSuccess: async (order) => {
       setCreatedOrder(order)
+      setKioskCustomerName('')
       queryClient.setQueryData(customerKeys.cart(slug), [])
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: customerKeys.cart(slug) }),
@@ -178,6 +184,9 @@ export default function CartPage() {
             subtotalLabel={subtotalLabel}
             fulfillment={fulfillment}
             onFulfillmentChange={setFulfillment}
+            kioskMode={kioskMode}
+            kioskCustomerName={kioskCustomerName}
+            onKioskCustomerNameChange={setKioskCustomerName}
             testCheckoutEnabled={TEST_CHECKOUT_ENABLED}
             testOrderPending={testOrder.isPending}
             testOrderError={testOrder.error}
@@ -355,6 +364,9 @@ function OrderSummary({
   subtotalLabel,
   fulfillment,
   onFulfillmentChange,
+  kioskMode = false,
+  kioskCustomerName = '',
+  onKioskCustomerNameChange,
   testCheckoutEnabled,
   testOrderPending,
   testOrderError,
@@ -367,6 +379,9 @@ function OrderSummary({
   subtotalLabel: string
   fulfillment: OrderFulfillment
   onFulfillmentChange: (value: OrderFulfillment) => void
+  kioskMode?: boolean
+  kioskCustomerName?: string
+  onKioskCustomerNameChange?: (value: string) => void
   testCheckoutEnabled: boolean
   testOrderPending: boolean
   testOrderError: unknown
@@ -385,21 +400,33 @@ function OrderSummary({
         </span>
       </div>
 
-      <fieldset className="mt-5 space-y-2">
-        <legend className="text-xs font-bold uppercase tracking-wide text-fg-muted">How would you like to get it?</legend>
-        <FulfillmentOption
-          checked={fulfillment === 'pickup'}
-          onSelect={() => onFulfillmentChange('pickup')}
-          title="Pick up in store"
-          text={`Free — grab it at ${storeName}.`}
-        />
-        <FulfillmentOption
-          checked={fulfillment === 'shipping'}
-          onSelect={() => onFulfillmentChange('shipping')}
-          title="Ship to me"
-          text="Shipping calculated at checkout."
-        />
-      </fieldset>
+      {kioskMode ? (
+        <div className="mt-5">
+          <Input
+            label="Your name"
+            value={kioskCustomerName}
+            onChange={(e) => onKioskCustomerNameChange?.(e.target.value)}
+            placeholder="So staff know whose order this is"
+            maxLength={255}
+          />
+        </div>
+      ) : (
+        <fieldset className="mt-5 space-y-2">
+          <legend className="text-xs font-bold uppercase tracking-wide text-fg-muted">How would you like to get it?</legend>
+          <FulfillmentOption
+            checked={fulfillment === 'pickup'}
+            onSelect={() => onFulfillmentChange('pickup')}
+            title="Pick up in store"
+            text={`Free — grab it at ${storeName}.`}
+          />
+          <FulfillmentOption
+            checked={fulfillment === 'shipping'}
+            onSelect={() => onFulfillmentChange('shipping')}
+            title="Ship to me"
+            text="Shipping calculated at checkout."
+          />
+        </fieldset>
+      )}
 
       <dl className="mt-5 space-y-3 text-sm">
         <SummaryRow label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={subtotalLabel} strong />
@@ -411,11 +438,17 @@ function OrderSummary({
         </div>
       </dl>
 
-      {testCheckoutEnabled ? (
+      {testCheckoutEnabled || kioskMode ? (
         <div className="mt-5 space-y-3">
-          <Button className="w-full" size="lg" loading={testOrderPending} onClick={onCreateTestOrder}>
+          <Button
+            className="w-full"
+            size="lg"
+            loading={testOrderPending}
+            disabled={kioskMode && !kioskCustomerName.trim()}
+            onClick={onCreateTestOrder}
+          >
             <PackageCheck aria-hidden className="size-4" />
-            Create test order
+            {kioskMode ? 'Place kiosk order' : 'Create test order'}
           </Button>
           <p className="rounded-btn border border-warning-500/30 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700">
             Local testing only. This creates a pending order from the cart without charging Square.

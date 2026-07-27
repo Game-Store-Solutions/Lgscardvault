@@ -159,6 +159,18 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private string $cardDisplayStyle = 'gallery';
 
+    /**
+     * Optional dark-mode palette: the same seven branding color keys
+     * (primaryColor … borderColor), applied INSTEAD of the base palette when
+     * the shopper's theme toggle is dark. Null = derive dark styling from
+     * the base palette as before.
+     *
+     * @var array<string, string>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?array $darkColors = null;
+
     // --- Storefront footer: hours, contact, social links (owner-managed) ---
 
     /** Freeform opening hours, one line per range ("Mon–Fri 12–9pm"). */
@@ -516,6 +528,20 @@ class Store
     public function setCardDisplayStyle(string $cardDisplayStyle): static
     {
         $this->cardDisplayStyle = $cardDisplayStyle;
+
+        return $this;
+    }
+
+    /** @return array<string, string>|null */
+    public function getDarkColors(): ?array
+    {
+        return $this->darkColors;
+    }
+
+    /** @param array<string, string>|null $darkColors */
+    public function setDarkColors(?array $darkColors): static
+    {
+        $this->darkColors = $darkColors;
 
         return $this;
     }
