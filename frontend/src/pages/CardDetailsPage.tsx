@@ -31,7 +31,7 @@ import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
-import { ManaCost } from '../components/mtg/ManaSymbol'
+import { CardText, ManaCost } from '../components/mtg/ManaSymbol'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -431,7 +431,9 @@ export default function CardDetailsPage() {
                 <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">Card text</h2>
                 {activeFace?.name && <span className="text-xs font-bold text-brand-600">{activeFace.name}</span>}
               </div>
-              <p className="mt-3 whitespace-pre-line text-lg leading-8 text-fg">{oracleText}</p>
+              <p className="mt-3 whitespace-pre-line text-lg leading-8 text-fg">
+                <CardText text={oracleText} symbolClassName="size-[1.15em]" />
+              </p>
               {flavorText && (
                 <p className="mt-4 whitespace-pre-line border-t border-border pt-4 font-display italic leading-7 text-fg-muted">
                   {flavorText}
