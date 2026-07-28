@@ -4,6 +4,7 @@ import { ArrowRight, Store as StoreIcon } from 'lucide-react'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { AccountSettingsPanel } from '../components/account/AccountSettingsPanel'
+import { DecksPanel } from '../components/account/DecksPanel'
 import { Avatar, Card, CardBody, CardHeader, EmptyState, LoadingPanel, PageHeader } from '../components/ui'
 import { formatDate } from '../lib/format'
 
@@ -105,6 +106,8 @@ export default function AccountPage() {
           )}
         </CardBody>
       </Card>
+
+      <DecksPanel stores={(storesQuery.data ?? []).map((store) => ({ slug: store.slug, name: store.name }))} />
 
       <AccountSettingsPanel />
     </div>

@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { cardImage, formatPrice, formatScryfallPrice, httpStatus } from '../api/client'
-import type { CardSummary, SellSubmission, StoreCustomer } from '../api/types'
+import type { CardSummary, SellSubmission, StoreCreditSummary, StoreCustomer } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import {
   customerKeys,
@@ -36,14 +36,14 @@ import {
   TabPanel,
   Textarea,
 } from '../components/ui'
-import { BellRing, HandCoins, Heart, ImageOff, ListPlus, PackageOpen, Plus, ReceiptText, Save, Search, Smile, Sparkles, Trash2, WalletCards, X } from 'lucide-react'
+import { BellRing, HandCoins, Heart, ImageOff, ListPlus, PackageOpen, PiggyBank, Plus, ReceiptText, Save, Search, Smile, Sparkles, Trash2, WalletCards, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
-type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade' | 'notifications'
-const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade', 'notifications']
+type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade' | 'credit' | 'notifications'
+const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade', 'credit', 'notifications']
 
 /** Wrap a lucide icon with a fixed playful tint (and fill, where it reads well). */
 function tinted(Icon: LucideIcon, tintClasses: string) {
@@ -58,6 +58,7 @@ const TAB_ICONS = {
   favorites: tinted(Heart, 'fill-pink-400 text-pink-500'),
   wantlist: tinted(Sparkles, 'fill-amber-300 text-amber-500'),
   selltrade: tinted(HandCoins, 'text-emerald-600'),
+  credit: tinted(PiggyBank, 'text-rose-500'),
   notifications: tinted(BellRing, 'fill-violet-200 text-violet-500'),
 }
 
@@ -78,6 +79,14 @@ export default function CustomerProfilePage() {
   const ordersQuery = useCustomerOrders(slug)
   const notificationsQuery = useCustomerNotifications(slug)
 
+  const creditQuery = useQuery({
+    queryKey: ['store-credit', slug],
+    enabled: Boolean(slug),
+    queryFn: async () => {
+      const { data } = await api.get<StoreCreditSummary>(`/stores/${slug}/customer/credit`)
+      return data
+    },
+  })
   const unreadCount = (notificationsQuery.data ?? []).filter((n) => !n.readAt).length
   const favoritesCount = favoritesQuery.data?.length ?? 0
   const wantListCount = wantListQuery.data?.length ?? 0
@@ -117,6 +126,7 @@ export default function CustomerProfilePage() {
           { id: 'favorites', label: `Favorites (${favoritesCount})`, icon: TAB_ICONS.favorites },
           { id: 'wantlist', label: `Want list (${wantListCount})`, icon: TAB_ICONS.wantlist },
           { id: 'selltrade', label: 'Sell / Trade', icon: TAB_ICONS.selltrade },
+          { id: 'credit', label: creditQuery.data && creditQuery.data.balanceCents > 0 ? `Store credit (${formatPrice(creditQuery.data.balanceCents)})` : 'Store credit', icon: TAB_ICONS.credit },
           { id: 'notifications', label: unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications', icon: TAB_ICONS.notifications },
         ]}
       />
@@ -145,6 +155,9 @@ export default function CustomerProfilePage() {
       </TabPanel>
       <TabPanel when="selltrade" value={tab}>
         <SellTradeHistoryPanel slug={slug} />
+      </TabPanel>
+      <TabPanel when="credit" value={tab}>
+        <StoreCreditPanel slug={slug} query={creditQuery} storeName={storeQuery.data?.name ?? 'this store'} />
       </TabPanel>
       <TabPanel when="notifications" value={tab}>
         <NotificationsTabPanel slug={slug} query={notificationsQuery} />
@@ -319,6 +332,84 @@ function NotificationsTabPanel({
           </CardBody>
         </Card>
       )}
+    </div>
+  )
+}
+
+/** Store credit: live balance plus the full ledger, newest first. */
+function StoreCreditPanel({
+  slug,
+  query,
+  storeName,
+}: {
+  slug: string
+  query: { data?: StoreCreditSummary; isLoading: boolean }
+  storeName: string
+}) {
+  if (query.isLoading) return <LoadingPanel label="Loading your store credit…" />
+  const balance = query.data?.balanceCents ?? 0
+  const transactions = query.data?.transactions ?? []
+
+  const kindLabel = (kind: string) =>
+    kind === 'sell_submission' ? 'Sell/trade payout' : kind === 'order' ? 'Order' : 'Store adjustment'
+
+  return (
+    <div className="mt-6 space-y-6">
+      <Card>
+        <CardBody className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="grid size-12 place-items-center rounded-full bg-rose-100 text-rose-500">
+              <PiggyBank aria-hidden className="size-6" />
+            </span>
+            <div>
+              <p className="text-sm text-fg-muted">Your credit at {storeName}</p>
+              <p className="font-display text-3xl font-extrabold text-fg">{formatPrice(balance)}</p>
+            </div>
+          </div>
+          <Link to={`/s/${slug}`} className="text-sm font-bold text-brand-600 hover:underline">
+            Spend it in the shop →
+          </Link>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="History" subtitle="Sell/trade payouts add credit; checkout spends it; refunds bring it back." />
+        <CardBody>
+          {transactions.length === 0 ? (
+            <EmptyState
+              icon={PiggyBank}
+              title="No credit yet"
+              description="Choose the store-credit payout when you sell cards and your balance will grow here."
+              action={
+                <Link to={`/s/${slug}/sell`} className="text-sm font-bold text-brand-600 hover:underline">
+                  Sell or trade cards →
+                </Link>
+              }
+            />
+          ) : (
+            <ul className="divide-y divide-border text-sm">
+              {transactions.map((transaction) => (
+                <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-fg">
+                      {kindLabel(transaction.kind)}
+                      {transaction.orderReference ? ` · ${transaction.orderReference}` : ''}
+                    </p>
+                    <p className="text-xs text-fg-muted">
+                      {new Date(transaction.createdAt).toLocaleString()}
+                      {transaction.note ? ` · ${transaction.note}` : ''}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 font-display text-base font-bold ${transaction.amountCents >= 0 ? 'text-success-700' : 'text-danger-700'}`}>
+                    {transaction.amountCents >= 0 ? '+' : '−'}
+                    {formatPrice(Math.abs(transaction.amountCents))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
     </div>
   )
 }

@@ -100,7 +100,19 @@ export default function MassSearchPage() {
 
   const { data: inventory = [], isLoading } = useInventory(slug)
 
-  const [text, setText] = useState('')
+  // A deck's "check availability" hand-off drops its list here (one-shot).
+  const [text, setText] = useState(() => {
+    try {
+      const prefill = sessionStorage.getItem('mass-search-prefill')
+      if (prefill) {
+        sessionStorage.removeItem('mass-search-prefill')
+        return prefill
+      }
+    } catch {
+      // Storage unavailable — start empty.
+    }
+    return ''
+  })
   const [submitted, setSubmitted] = useState<RequestLine[] | null>(null)
   const [view, setView] = useState<'list' | 'grid'>('list')
 
