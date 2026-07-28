@@ -17,6 +17,7 @@ use App\Entity\StoreCreditTransaction;
 use App\Service\Catalog\CatalogCardResolver;
 use App\Service\Credit\StoreCreditLedger;
 use App\Service\Inventory\StoreInventoryWriter;
+use App\Service\Pricing\MarketPriceResolver;
 use App\Service\Store\TradeRateResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -54,6 +55,7 @@ final class StoreBuylistController extends AbstractController
         private readonly TradeRateResolver $tradeRates,
         private readonly StoreInventoryWriter $inventoryWriter,
         private readonly StoreCreditLedger $creditLedger,
+        private readonly MarketPriceResolver $marketPrices,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -80,11 +82,24 @@ final class StoreBuylistController extends AbstractController
         }
 
         $includeInactive = $request->query->getBoolean('all') && $this->isGranted('STORE_MANAGE', $store);
+        $entries = $this->buylistEntries->findForStore($store, activeOnly: !$includeInactive);
 
-        return $this->json(array_map(
-            $this->serializeEntry(...),
-            $this->buylistEntries->findForStore($store, activeOnly: !$includeInactive),
-        ));
+        // Heal missing market prices for rate-based entries as the portal
+        // loads — capped per request so one page view never triggers a
+        // remote storm (the buy list is store-curated, so this converges).
+        $heals = 0;
+        foreach ($entries as $entry) {
+            if ($heals >= 3) {
+                break;
+            }
+            $card = $entry->getCard();
+            if (null === $entry->getOfferCents() && null !== $card && null === $card->getPrices()) {
+                $this->marketPrices->ensurePriced($card);
+                ++$heals;
+            }
+        }
+
+        return $this->json(array_map($this->serializeEntry(...), $entries));
     }
 
     #[Route('/buylist', name: 'api_store_buylist_create', methods: ['POST'])]
@@ -113,6 +128,12 @@ final class StoreBuylistController extends AbstractController
         $offerCents = $this->readNullableNonNegativeInt($payload['offerCents'] ?? null);
         if (false === $offerCents) {
             return $this->json(['detail' => 'offerCents must be zero or more.'], 422);
+        }
+
+        // Rate-based entries need a market anchor; heal a missing price now
+        // so the portal shows an offer immediately instead of a dash.
+        if (null === $offerCents) {
+            $card = $this->marketPrices->ensurePriced($card);
         }
 
         $wantsFoil = (bool) ($payload['wantsFoil'] ?? false);
@@ -261,7 +282,7 @@ final class StoreBuylistController extends AbstractController
                 }
                 $card = $entry->getCard();
                 $isFoil = $entry->wantsFoil();
-                $marketCents = null !== $card ? $this->marketPriceCents($card, $isFoil) : null;
+                $marketCents = null !== $card ? $this->marketPrices->marketPriceCents($card, $isFoil) : null;
                 $offerCents = $entry->getOfferCents()
                     ?? $this->tradeRates->offerCents((int) $marketCents, $buylistRatePercent);
                 if (null === $entry->getOfferCents() && null === $marketCents) {
@@ -286,7 +307,7 @@ final class StoreBuylistController extends AbstractController
                     return $this->json(['detail' => 'One of the lines references an unknown card.'], 422);
                 }
                 $isFoil = $line['isFoil'];
-                $marketCents = $this->marketPriceCents($card, $isFoil);
+                $marketCents = $this->marketPrices->marketPriceCents($card, $isFoil);
                 if (null === $marketCents) {
                     return $this->json(['detail' => sprintf('No market price for "%s"%s — ask the store at the counter.', $card->getName(), $isFoil ? ' (foil)' : '')], 422);
                 }
@@ -504,21 +525,6 @@ final class StoreBuylistController extends AbstractController
         }
 
         return array_values($merged);
-    }
-
-    /** Scryfall market price in cents for the requested finish, null when unpriced. */
-    private function marketPriceCents(Card $card, bool $isFoil): ?int
-    {
-        $prices = $card->getPrices() ?? [];
-        $raw = $prices[$isFoil ? 'usd_foil' : 'usd'] ?? null;
-        // Foil-only printings put their price under usd_foil; fall back so
-        // "the" price of such a card resolves either way.
-        $raw ??= $prices[$isFoil ? 'usd' : 'usd_foil'] ?? null;
-        if (!is_numeric($raw)) {
-            return null;
-        }
-
-        return (int) round(((float) $raw) * 100);
     }
 
     private function readNullablePositiveInt(mixed $value): ?int
