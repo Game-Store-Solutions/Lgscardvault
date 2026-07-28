@@ -33,6 +33,7 @@ import {
 } from '../../hooks'
 import { Package } from 'lucide-react'
 import { GameSelector } from '../../components/catalog'
+import { CardImage } from '../../components/cards'
 
 /**
  * Sealed tab: manage the store's sealed inventory (boxes, bundles, decks)
@@ -192,18 +193,12 @@ export default function SealedTab({ slug }: { slug: string }) {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {catalog.items.map((product) => (
                   <div key={product.id} className="flex flex-col rounded-card border border-border bg-surface p-3">
-                    {product.imageUrl ? (
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        loading="lazy"
-                        className="mx-auto mb-2 h-32 w-auto rounded object-contain"
-                      />
-                    ) : (
-                      <div className="mb-2 grid h-32 place-items-center rounded bg-bg text-fg-muted">
-                        <Package className="size-8" />
-                      </div>
-                    )}
+                    <CardImage
+                      src={product.imageUrl}
+                      alt={product.name}
+                      fit="contain"
+                      className="mx-auto mb-2 h-32 w-full rounded"
+                    />
                     <p className="line-clamp-2 text-sm font-semibold text-fg" title={product.name}>{product.name}</p>
                     <p className="mt-0.5 text-xs text-fg-muted">
                       {product.gameName ?? product.gameCode} {product.setName ? `· ${product.setName}` : ''}
@@ -252,9 +247,13 @@ function SealedLineRow({
     <TR>
       <TD>
         <div className="flex items-center gap-3">
-          {product?.imageUrl && (
-            <img src={product.imageUrl} alt="" loading="lazy" className="h-10 w-10 rounded object-contain" />
-          )}
+          <CardImage
+            src={product?.imageUrl}
+            alt={product?.name ?? 'Sealed product'}
+            fit="contain"
+            showLabel={false}
+            className="size-10 shrink-0 rounded"
+          />
           <div>
             <p className="font-medium text-fg">{product?.name ?? 'Unknown product'}</p>
             {line.quantity === 0 && <Badge tone="warning">Sold out</Badge>}

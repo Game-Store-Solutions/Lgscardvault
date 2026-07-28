@@ -19,6 +19,7 @@ import {
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
 import ImportWizard from './ImportWizard'
+import { CardImage } from '../../components/cards'
 import { GameSelector } from '../../components/catalog'
 
 export default function CsvTab({ slug }: { slug: string }) {
@@ -256,7 +257,7 @@ function MatchedCard({ row, sealed }: { row: CsvImportRow; sealed: boolean }) {
   const image = sealed ? row.card.imageUrl : cardImage(row.card)
   return (
     <div className="flex min-w-56 items-center gap-3">
-      {image && <img src={image} alt={row.card.name} className="h-14 rounded-btn object-contain" />}
+      <CardImage src={image} alt={row.card.name} fit="contain" showLabel={false} className="h-14 w-10 rounded-btn" />
       <div>
         <div className="font-bold text-fg">{row.card.name}</div>
         <div className="text-xs text-fg-muted">

@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
-import { ImageOff, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { cx } from '../../lib/cx'
+import { CardImage } from './CardImage'
 import { Badge } from '../ui'
 import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../../lib/mtg'
 
@@ -30,11 +31,7 @@ export function CardRow({ item, slug }: CardRowProps) {
       )}
     >
       <div className="relative grid h-24 w-[4.35rem] shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-black/90">
-        {image ? (
-          <img src={image} alt={item.card.name} loading="lazy" decoding="async" className="size-full object-contain" />
-        ) : (
-          <ImageOff aria-hidden className="size-4 text-fg-muted" />
-        )}
+        <CardImage src={image} alt={item.card.name} fit="contain" className="size-full" showLabel={false} />
       </div>
 
       <div className="min-w-0 flex-1">

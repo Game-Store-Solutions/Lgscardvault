@@ -3,6 +3,7 @@ import { ImageOff } from 'lucide-react'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { cx } from '../../lib/cx'
+import { CardImage } from './CardImage'
 import { useTilt } from '../../hooks'
 import { rarityAccent, rarityLabel } from '../../lib/mtg'
 
@@ -36,7 +37,7 @@ export function CardTile({ item, slug }: CardTileProps) {
       <div ref={ref} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} className="perspective-[900px]">
         <div className={cx('tilt-card relative aspect-5/7 overflow-hidden bg-black/90', item.isFoil && 'foil-card')}>
           {image ? (
-            <img src={image} alt={item.card.name} loading="lazy" decoding="async" className="size-full object-contain" />
+            <CardImage src={image} alt={item.card.name} fit="contain" className="size-full" />
           ) : (
             <div className="grid size-full place-items-center">
               <ImageOff aria-hidden className="size-7 text-fg-muted" />

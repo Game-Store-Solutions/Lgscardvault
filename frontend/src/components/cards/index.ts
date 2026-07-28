@@ -18,3 +18,5 @@ export type { SpotlightCardProps } from './SpotlightCard'
 
 export { Stat } from './Stat'
 export type { StatProps } from './Stat'
+export { CardImage } from './CardImage'
+export type { CardImageProps } from './CardImage'

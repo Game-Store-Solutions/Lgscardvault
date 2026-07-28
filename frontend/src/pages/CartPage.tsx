@@ -6,10 +6,8 @@ import {
   BadgeCheck,
   Boxes,
   CreditCard,
-  ImageOff,
   Lock,
   Minus,
-  Package,
   PackageCheck,
   Plus,
   RotateCcw,
@@ -24,7 +22,7 @@ import { useAuth } from '../context/AuthContext'
 import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
 import { Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
-import { SpotlightCard } from '../components/cards'
+import { CardImage, SpotlightCard } from '../components/cards'
 import { cx } from '../lib/cx'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
@@ -634,11 +632,12 @@ function SealedCartLine({
   return (
     <li className="grid gap-4 rounded-card border border-border bg-surface p-4 shadow-card sm:grid-cols-[6.75rem_minmax(0,1fr)] sm:p-5">
       <div className="grid h-40 w-28 place-items-center overflow-hidden rounded-btn border border-border bg-bg sm:h-36 sm:w-full">
-        {product?.imageUrl ? (
-          <img src={product.imageUrl} alt={product.name} className="size-full object-contain" />
-        ) : (
-          <Package aria-hidden className="size-6 text-fg-muted" />
-        )}
+        <CardImage
+          src={product?.imageUrl}
+          alt={product?.name ?? 'Sealed product'}
+          fit="contain"
+          className="size-full"
+        />
       </div>
 
       <div className="min-w-0 space-y-4">
@@ -741,13 +740,7 @@ function CartLine({
         className={cx('relative h-40 w-28 overflow-hidden rounded-btn border-2 bg-bg sm:h-36 sm:w-full', item.isFoil && 'foil-card')}
         style={{ borderColor: accent }}
       >
-        {image ? (
-          <img src={image} alt={item.card.name} className="size-full object-cover" />
-        ) : (
-          <div className="grid size-full place-items-center text-fg-muted">
-            <ImageOff aria-hidden className="size-6" />
-          </div>
-        )}
+        <CardImage src={image} alt={item.card.name} className="size-full" />
         {item.isFoil && (
           <span
             aria-hidden
