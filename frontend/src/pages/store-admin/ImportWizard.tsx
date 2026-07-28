@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { CheckCircle2, FileSpreadsheet, Layers, Package, Upload, XCircle } from 'lucide-react'
+import { CheckCircle2, Download, FileSpreadsheet, Layers, Package, Upload, XCircle } from 'lucide-react'
 import api, { extractErrorMessage, formatPrice } from '../../api/client'
 import type { CsvImportJob, ImportPreview, ImportPreviewRow } from '../../api/types'
 import {
@@ -9,7 +9,6 @@ import {
   Card,
   CardBody,
   CardHeader,
-  FilterPill,
   LoadingPanel,
   Table,
   TBody,
@@ -19,6 +18,7 @@ import {
   TR,
 } from '../../components/ui'
 import { useCatalogGames } from '../../hooks'
+import { GameSelector } from '../../components/catalog'
 import { cx } from '../../lib/cx'
 
 type ImportType = 'cards' | 'sealed'
@@ -138,20 +138,15 @@ export default function ImportWizard({
         {/* Step 1 — game */}
         <section className="space-y-2">
           <h3 className="text-sm font-bold text-fg">1. Which game?</h3>
-          <div className="flex flex-wrap gap-2">
-            {games.map((game) => (
-              <FilterPill
-                key={game.code}
-                active={gameCode === game.code}
-                onClick={() => {
-                  setGameCode(game.code)
-                  reset()
-                }}
-              >
-                {game.name}
-              </FilterPill>
-            ))}
-          </div>
+          <GameSelector
+            games={games.map((game) => ({ code: game.code, name: game.name }))}
+            value={gameCode}
+            onChange={(code) => {
+              setGameCode(code)
+              reset()
+            }}
+            label="Import for"
+          />
         </section>
 
         {/* Step 2 — type */}
@@ -187,9 +182,21 @@ export default function ImportWizard({
         {gameCode && importType && (
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-fg">3. Upload your CSV</h3>
-            <p className="text-xs text-fg-muted">
-              Columns: <code className="rounded-btn bg-bg px-1.5 py-0.5 text-brand-600">{sealed ? SEALED_HEADERS : CARD_HEADERS}</code>
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-fg-muted">
+                Columns: <code className="rounded-btn bg-bg px-1.5 py-0.5 text-brand-600">{sealed ? SEALED_HEADERS : CARD_HEADERS}</code>
+              </p>
+              {/* Matched to the chosen game and type, so the example rows are
+                  in that game's own conventions. */}
+              <a
+                href={`/api/catalog/games/${gameCode}/import-template?type=${sealed ? 'sealed' : 'cards'}`}
+                download
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-700 hover:underline"
+              >
+                <Download aria-hidden className="size-3.5" />
+                Download {games.find((game) => game.code === gameCode)?.name ?? ''} sample CSV
+              </a>
+            </div>
             <label
               className={cx(
                 'flex cursor-pointer items-center justify-center gap-2 rounded-btn border border-dashed border-border bg-bg px-4 py-6 text-sm font-bold text-fg-muted hover:text-fg',

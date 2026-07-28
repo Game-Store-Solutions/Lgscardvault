@@ -16,7 +16,8 @@ import {
 import { formatPrice, parsePriceInput, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { useCanManageStore, useCart, useInventory, useStore, useStoreTheme } from '../hooks'
+import { useCanManageStore, useCart, useInventory, useStore, useStoreGames, useStoreTheme } from '../hooks'
+import { GameSelector } from '../components/catalog'
 import { Button, buttonVariants, EmptyState, Input, LoadingPanel, Pagination, Select } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
 import { StoreHero } from '../components/store/StoreHero'
@@ -67,6 +68,7 @@ export default function StorePage() {
   const [view, setView] = useState<ViewMode>('grid')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [page, setPage] = useState(1)
+  const [gameFilter, setGameFilter] = useState('')
   const railRef = useRef<HTMLDivElement>(null)
   const searchSectionRef = useRef<HTMLDivElement>(null)
 
@@ -74,7 +76,15 @@ export default function StorePage() {
   useStoreTheme(store)
   const cardDisplayStyle = store?.cardDisplayStyle ?? 'gallery'
 
-  const { data: inventory = [], isLoading } = useInventory(slug)
+  const { data: allInventory = [], isLoading } = useInventory(slug)
+  const { data: storeGames = [] } = useStoreGames(slug)
+
+  // Every list below (search, filters, sets, colors, spotlight, counts) works
+  // off this, so picking a game scopes the whole page in one place.
+  const inventory = useMemo(
+    () => (gameFilter ? allInventory.filter((item) => (item.card.gameCode ?? 'mtg') === gameFilter) : allInventory),
+    [allInventory, gameFilter],
+  )
   const { query: cartQuery, setItem: cartSetItem } = useCart(slug, Boolean(user))
   const cartByItemId = useMemo(() => {
     const map = new Map<number, number>()
@@ -169,9 +179,29 @@ export default function StorePage() {
 
   const totalCards = inventory.reduce((sum, item) => sum + item.quantity, 0)
 
+  // Counts come from the unscoped list so a tab always shows its own size,
+  // not the size of whatever is currently selected.
+  const gameOptions = useMemo(
+    () =>
+      storeGames.map((game) => ({
+        code: game.code,
+        name: game.name,
+        count: allInventory.filter((item) => (item.card.gameCode ?? 'mtg') === game.code).length,
+      })),
+    [storeGames, allInventory],
+  )
+
   useEffect(() => {
     setPage(1)
-  }, [search, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice, sort])
+  }, [search, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice, sort, gameFilter])
+
+  // Filters describe one game's cards (sets, colors, types), so switching
+  // games clears them rather than silently returning nothing.
+  useEffect(() => {
+    setSetFilter('')
+    setTypeFilter('')
+    setSelectedColors([])
+  }, [gameFilter])
 
   const resultsPageCount = Math.max(1, Math.ceil(sorted.length / RESULTS_PAGE_SIZE))
   const currentResultsPage = Math.min(page, resultsPageCount)
@@ -407,6 +437,20 @@ export default function StorePage() {
         </div>
       </section>
 
+      {/* Game switcher — only when this store actually carries more than one */}
+      {gameOptions.length > 1 && (
+        <section aria-label="Choose a game">
+          <GameSelector
+            games={gameOptions}
+            value={gameFilter}
+            onChange={setGameFilter}
+            includeAll
+            allLabel="All games"
+            label="Browse by game"
+          />
+        </section>
+      )}
+
       {/* Spotlight — holographic cards in a lively persistent rail */}
       {spotlightItems.length > 0 && (
         <section>
@@ -416,7 +460,7 @@ export default function StorePage() {
                 <span className="grid size-8 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
                   <Sparkles aria-hidden className="size-4" />
                 </span>
-                Spotlight
+                Spotlight{gameFilter ? ` · ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''}` : ''}
               </h2>
               <p className="mt-1 text-sm text-fg-muted">
                 Premium singles over {formatPrice(store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS)} market
@@ -454,8 +498,8 @@ export default function StorePage() {
         </section>
       )}
 
-      {/* Sealed spotlight — boxes/bundles/decks across all games */}
-      <SealedSpotlightRow slug={slug} />
+      {/* Sealed spotlight — scoped to the same game as everything else */}
+      <SealedSpotlightRow slug={slug} gameCode={gameFilter} />
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">

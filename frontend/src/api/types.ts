@@ -704,3 +704,9 @@ export interface ImportPreview {
   sample: ImportPreviewRow[]
   warnings: string[]
 }
+
+/** A game a particular store carries, and what it stocks of it. */
+export interface StoreGame extends CatalogGame {
+  hasSingles: boolean
+  hasSealed: boolean
+}

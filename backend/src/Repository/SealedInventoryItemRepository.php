@@ -55,21 +55,46 @@ class SealedInventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * Game codes this store stocks sealed product for.
+     *
+     * @return list<string>
+     */
+    public function findStockedGameCodes(Store $store): array
+    {
+        $rows = $this->createQueryBuilder('i')
+            ->select('g.code AS code')
+            ->distinct()
+            ->join('i.sealedProduct', 'p')
+            ->join('p.game', 'g')
+            ->andWhere('i.store = :store')
+            ->andWhere('i.quantity > 0')
+            ->setParameter('store', $store)
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_values(array_map(static fn (array $row): string => (string) $row['code'], $rows));
+    }
+
+    /**
      * Storefront spotlight: the store's freshest in-stock sealed lines.
      *
      * @return list<SealedInventoryItem>
      */
-    public function findSpotlightForStore(Store $store, int $limit = 12): array
+    public function findSpotlightForStore(Store $store, int $limit = 12, ?string $gameCode = null): array
     {
-        return $this->createQueryBuilder('i')
+        $qb = $this->createQueryBuilder('i')
             ->join('i.sealedProduct', 'p')->addSelect('p')
             ->join('p.game', 'g')->addSelect('g')
             ->leftJoin('p.gameSet', 's')->addSelect('s')
             ->andWhere('i.store = :store')->setParameter('store', $store)
             ->andWhere('i.quantity > 0')
             ->orderBy('i.updatedAt', 'DESC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limit);
+
+        if (null !== $gameCode && '' !== $gameCode) {
+            $qb->andWhere('g.code = :gameCode')->setParameter('gameCode', strtolower($gameCode));
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }

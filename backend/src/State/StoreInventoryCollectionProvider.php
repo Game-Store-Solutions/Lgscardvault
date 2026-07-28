@@ -44,6 +44,11 @@ final readonly class StoreInventoryCollectionProvider implements ProviderInterfa
         $itemsPerPage = (int) ($filters['itemsPerPage'] ?? self::DEFAULT_ITEMS_PER_PAGE);
         $itemsPerPage = min(self::MAX_ITEMS_PER_PAGE, max(1, $itemsPerPage));
 
+        // ?game=pokemon scopes the whole collection to one game, so a store
+        // carrying five games never ships four of them to a client that is
+        // showing one. Omitted = every game (existing callers unchanged).
+        $gameCode = is_string($filters['game'] ?? null) ? trim($filters['game']) : null;
+
         // Keyset path (preferred; used by the frontend walk): ?afterId=N
         // returns the next id-ordered slice. O(page) via the (store_id, id)
         // index, no COUNT query, and immune to concurrent-write page drift
@@ -52,12 +57,12 @@ final readonly class StoreInventoryCollectionProvider implements ProviderInterfa
         if (isset($filters['afterId'])) {
             $afterId = max(0, (int) $filters['afterId']);
 
-            return $this->inventoryRepository->findByStoreAfterId($store, $afterId, $itemsPerPage);
+            return $this->inventoryRepository->findByStoreAfterId($store, $afterId, $itemsPerPage, $gameCode);
         }
 
         $page = max(1, (int) ($filters['page'] ?? 1));
-        $items = $this->inventoryRepository->findPageByStore($store, ($page - 1) * $itemsPerPage, $itemsPerPage);
-        $total = $this->inventoryRepository->countByStore($store);
+        $items = $this->inventoryRepository->findPageByStore($store, ($page - 1) * $itemsPerPage, $itemsPerPage, $gameCode);
+        $total = $this->inventoryRepository->countByStore($store, $gameCode);
 
         return new TraversablePaginator(new \ArrayIterator($items), $page, $itemsPerPage, $total);
     }

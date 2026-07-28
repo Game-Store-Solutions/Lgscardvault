@@ -7,8 +7,11 @@ use App\Repository\GameSetRepository;
 use App\Repository\SealedProductRepository;
 use App\Service\Catalog\GameCatalogSerializer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use App\Entity\CsvImportJob;
+use App\Service\CsvImport\ImportTemplateBuilder;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -24,6 +27,7 @@ final class CatalogController extends AbstractController
         private readonly GameSetRepository $gameSets,
         private readonly SealedProductRepository $sealedProducts,
         private readonly GameCatalogSerializer $serializer,
+        private readonly ImportTemplateBuilder $templateBuilder,
     ) {
     }
 
@@ -42,6 +46,29 @@ final class CatalogController extends AbstractController
         }
 
         return $this->json(array_map($this->serializer->gameSet(...), $this->gameSets->findForGame($game)));
+    }
+
+    /**
+     * Downloadable sample sheet for a game, in the columns the importer
+     * expects and with examples written in that game's own conventions
+     * (Magic set codes vs "OP01-003"). ?type=sealed for a sealed template.
+     */
+    #[Route('/games/{code}/import-template', name: 'api_catalog_import_template', methods: ['GET'])]
+    public function importTemplate(Request $request, string $code): Response
+    {
+        $game = $this->games->findOneByCode($code);
+        if (null === $game) {
+            return $this->json(['detail' => 'Unknown game.'], 404);
+        }
+
+        $type = CsvImportJob::TYPE_SEALED === $request->query->get('type')
+            ? CsvImportJob::TYPE_SEALED
+            : CsvImportJob::TYPE_CARDS;
+
+        return new Response($this->templateBuilder->build($game, $type), 200, [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => sprintf('attachment; filename="%s"', $this->templateBuilder->filename($game, $type)),
+        ]);
     }
 
     #[Route('/sealed', name: 'api_catalog_sealed', methods: ['GET'])]

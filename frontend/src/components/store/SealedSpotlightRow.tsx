@@ -9,9 +9,9 @@ import { Button } from '../ui'
  * (booster boxes, bundles, decks) across every game. Renders nothing when
  * the store carries no sealed stock, so single-focus stores stay clean.
  */
-export function SealedSpotlightRow({ slug }: { slug: string }) {
+export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?: string }) {
   const { user } = useAuth()
-  const { data: lines = [] } = useSealedSpotlight(slug)
+  const { data: lines = [] } = useSealedSpotlight(slug, gameCode)
   const { query: cartQuery, setSealedItem } = useCart(slug, Boolean(user))
 
   if (lines.length === 0) return null
