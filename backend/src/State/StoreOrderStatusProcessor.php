@@ -25,6 +25,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         private UserRepository $userRepository,
         private CustomerNotificationRepository $notificationRepository,
         private SectionSaleAllocator $sectionSaleAllocator,
+        private \App\Service\Credit\StoreCreditLedger $creditLedger,
         private MailerInterface $mailer,
     ) {
     }
@@ -67,6 +68,25 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
                 $item->setQuantity($item->getQuantity() + $line->getQuantity());
             }
             $this->sectionSaleAllocator->releaseLine($line);
+        }
+
+        // Store credit spent on the order comes back with the stock. The
+        // terminal-state guard above makes this a one-shot refund.
+        $store = $order->getStore();
+        if ($order->getCreditAppliedCents() > 0 && $store instanceof Store) {
+            $customer = null !== $order->getCustomerEmail()
+                ? $this->userRepository->findOneBy(['email' => $order->getCustomerEmail()])
+                : null;
+            if ($customer instanceof User) {
+                $this->creditLedger->grant(
+                    $store,
+                    $customer,
+                    $order->getCreditAppliedCents(),
+                    \App\Entity\StoreCreditTransaction::KIND_ORDER,
+                    order: $order,
+                    note: sprintf('Refund for order %s', $order->getReference()),
+                );
+            }
         }
     }
 

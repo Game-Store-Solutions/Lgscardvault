@@ -45,6 +45,7 @@ final class StoreCustomerController extends AbstractController
         private readonly CardRepository $cardRepository,
         private readonly OrderRepository $orderRepository,
         private readonly \App\Service\CaseCards\SectionSaleAllocator $sectionSaleAllocator,
+        private readonly \App\Service\Credit\StoreCreditLedger $creditLedger,
         private readonly EntityManagerInterface $entityManager,
         private readonly KernelInterface $kernel,
     ) {
@@ -507,6 +508,18 @@ final class StoreCustomerController extends AbstractController
         }
 
         $order->setTotalCents($total);
+
+        // Store credit: signed-in (non-kiosk) customers can put their balance
+        // toward the order. The ledger entry joins this flush, so the spend
+        // lands atomically with the order or not at all.
+        if (is_array($payload) && ($payload['useStoreCredit'] ?? false) && Order::CHANNEL_KIOSK !== $channel) {
+            $applied = min($this->creditLedger->balance($user, $store), $total);
+            if ($applied > 0) {
+                $this->creditLedger->spend($store, $user, $applied, $order);
+                $order->setCreditAppliedCents($applied);
+            }
+        }
+
         $this->entityManager->persist($order);
 
         foreach ($cartItems as $cartItem) {
@@ -706,6 +719,7 @@ final class StoreCustomerController extends AbstractController
             'fulfillment' => $order->getFulfillment(),
             'channel' => $order->getChannel(),
             'totalCents' => $order->getTotalCents(),
+            'creditAppliedCents' => $order->getCreditAppliedCents(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),
         ];
