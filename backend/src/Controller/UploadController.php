@@ -41,8 +41,12 @@ final class UploadController extends AbstractController
         #[Autowire('%kernel.project_dir%')] string $projectDir,
     ): JsonResponse {
         $file = $request->files->get('file');
-        if (!$file instanceof UploadedFile || !$file->isValid()) {
+        if (!$file instanceof UploadedFile) {
             return $this->json(['detail' => 'Attach an image as the "file" form field.'], 400);
+        }
+        if (!$file->isValid()) {
+            // Most commonly the file tripped php.ini's upload_max_filesize.
+            return $this->json(['detail' => 'Upload failed: '.$file->getErrorMessage()], 422);
         }
         if ($file->getSize() > self::MAX_BYTES) {
             return $this->json(['detail' => 'Images can be at most 4 MB.'], 422);
