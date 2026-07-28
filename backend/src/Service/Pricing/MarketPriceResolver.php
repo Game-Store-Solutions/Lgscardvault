@@ -3,27 +3,18 @@
 namespace App\Service\Pricing;
 
 use App\Entity\Card;
-use App\Repository\CardRepository;
 use App\Service\Scryfall\ScryfallClient;
 use Psr\Log\LoggerInterface;
 
 /**
  * Resolves a card's market price in cents, healing missing data instead of
- * giving up. The chain:
- *
- *   1. the prices already stored on the printing (Scryfall bulk sync);
- *   2. a live Scryfall refresh of that printing (persisted, so every later
- *      read — storefront tiles included — sees the healed price);
- *   3. any priced printing of the same card name in the catalog.
- *
- * MTGJSON's per-set files carry identifiers but no market prices, so the
- * cross-printing step is how the MTGJSON-matched catalog contributes a
- * price when Scryfall has none for the exact printing.
+ * giving up: the prices already stored on the printing (Scryfall bulk
+ * sync), then a live Scryfall refresh of that printing — persisted, so
+ * every later read (storefront tiles included) sees the healed price.
  */
 final class MarketPriceResolver
 {
     public function __construct(
-        private readonly CardRepository $cards,
         private readonly ScryfallClient $scryfall,
         private readonly LoggerInterface $logger,
     ) {
@@ -37,21 +28,8 @@ final class MarketPriceResolver
         }
 
         $refreshed = $this->refresh($card);
-        if (null !== $refreshed) {
-            $cents = $this->fromPrices($refreshed->getPrices(), $isFoil);
-            if (null !== $cents) {
-                return $cents;
-            }
-        }
 
-        foreach ($this->cards->findPricedPrintingsByName($card->getName()) as $printing) {
-            $cents = $this->fromPrices($printing->getPrices(), $isFoil);
-            if (null !== $cents) {
-                return $cents;
-            }
-        }
-
-        return null;
+        return null !== $refreshed ? $this->fromPrices($refreshed->getPrices(), $isFoil) : null;
     }
 
     /**

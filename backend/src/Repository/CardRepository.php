@@ -57,30 +57,6 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
-     * Priced printings sharing a card name (front face included), newest
-     * first — the cross-printing price fallback for unpriced printings.
-     *
-     * @return list<\App\Entity\Card>
-     */
-    public function findPricedPrintingsByName(string $name, int $limit = 5): array
-    {
-        $lower = mb_strtolower(trim($name));
-        if ('' === $lower) {
-            return [];
-        }
-
-        return $this->createQueryBuilder('c')
-            ->andWhere('LOWER(c.name) = :name OR LOWER(c.name) LIKE :front')
-            ->andWhere('c.prices IS NOT NULL')
-            ->setParameter('name', $lower)
-            ->setParameter('front', $lower.' //%')
-            ->orderBy('c.releasedAt', 'DESC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
      * Printing lookup by natural key. A printing is uniquely identified by
      * set code + collector number, and every import row carries both — this
      * is the primary (indexed, exact) match path for imports; name search is

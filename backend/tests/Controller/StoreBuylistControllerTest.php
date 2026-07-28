@@ -300,26 +300,4 @@ final class StoreBuylistControllerTest extends WebTestCase
         ]);
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
     }
-
-    public function testUnpricedPrintingFallsBackToAPricedSiblingPrinting(): void
-    {
-        $store = $this->fixtures->store();
-        $store->setTradeRates(['cashRatePercent' => 50]);
-        // Same card name, two printings: the one being sold has no price
-        // data, its sibling printing does — the sibling anchors the offer.
-        $unpriced = $this->fixtures->card(981, ['prices' => null]);
-        $this->fixtures->card(982, ['name' => 'Test Card 981', 'set' => 'oth', 'collector_number' => '982', 'prices' => ['usd' => '12.00']]);
-        $customer = $this->fixtures->user(['ROLE_USER']);
-        $this->em->flush();
-        $base = "/api/stores/{$store->getSlug()}";
-
-        $this->authenticate($customer);
-        $submission = $this->jsonRequest('POST', "$base/sell-submissions", [
-            'payoutMethod' => 'cash',
-            'items' => [['cardId' => (string) $unpriced->getId(), 'quantity' => 1]],
-        ]);
-        self::assertSame(201, $this->client->getResponse()->getStatusCode());
-        self::assertSame(1200, $submission['items'][0]['marketPriceCents'], 'market anchored by the priced sibling printing');
-        self::assertSame(600, $submission['items'][0]['offerCentsEach']);
-    }
 }
