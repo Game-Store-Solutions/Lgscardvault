@@ -48,6 +48,14 @@ final class MarketPriceResolver
 
     private function refresh(Card $card): ?Card
     {
+        // Scryfall can only heal Magic printings. For TCGCSV-sourced games a
+        // refresh is a guaranteed-miss remote call — their prices arrive with
+        // the daily catalog sync instead, so an unpriced card stays unpriced.
+        $game = $card->getGame();
+        if (null !== $game && !$game->isMtg()) {
+            return null;
+        }
+
         $id = $card->getId();
         if (null === $id) {
             return null;

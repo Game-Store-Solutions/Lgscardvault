@@ -30,7 +30,7 @@ class CardRepository extends ServiceEntityRepository
      */
     public function searchByName(string $query, int $limit = 20): array
     {
-        return $this->createQueryBuilder('c')
+        return $this->magicScoped()
             ->andWhere('LOWER(c.name) LIKE :query')
             ->setParameter('query', '%'.strtolower($query).'%')
             ->orderBy('c.name', 'ASC')
@@ -80,7 +80,7 @@ class CardRepository extends ServiceEntityRepository
             return null;
         }
 
-        return $this->createQueryBuilder('c')
+        return $this->magicScoped()
             ->andWhere('LOWER(c.name) = :name OR LOWER(c.name) LIKE :front')
             ->setParameter('name', $lower)
             ->setParameter('front', $lower.' //%')
@@ -104,7 +104,7 @@ class CardRepository extends ServiceEntityRepository
      */
     public function findByNaturalKey(string $setCode, string $collectorNumber, int $limit = 10): array
     {
-        return $this->createQueryBuilder('c')
+        return $this->magicScoped()
             ->andWhere('LOWER(c.setCode) = :setCode')
             ->andWhere('LOWER(c.collectorNumber) = :collectorNumber')
             ->setParameter('setCode', strtolower(trim($setCode)))
@@ -302,7 +302,7 @@ class CardRepository extends ServiceEntityRepository
     /** Is this a set code the local catalog knows? (case-insensitive) */
     public function setCodeExists(string $setCode): bool
     {
-        return null !== $this->createQueryBuilder('c')
+        return null !== $this->magicScoped()
             ->select('1')
             ->andWhere('LOWER(c.setCode) = :setCode')
             ->setParameter('setCode', strtolower(trim($setCode)))
@@ -318,7 +318,7 @@ class CardRepository extends ServiceEntityRepository
      */
     public function findSetCodeByName(string $setName): ?string
     {
-        $row = $this->createQueryBuilder('c')
+        $row = $this->magicScoped()
             ->select('c.setCode')
             ->andWhere('LOWER(c.setName) = :setName')
             ->setParameter('setName', strtolower(trim($setName)))
@@ -327,5 +327,22 @@ class CardRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
 
         return is_array($row) ? (string) $row['setCode'] : null;
+    }
+
+    /**
+     * Base query for the LEGACY helpers above (name search, exact name,
+     * natural key, set-code lookups). Those all predate the multi-game
+     * catalog and back Magic-only surfaces — deck imports, CSV resolution,
+     * the buy list, Scryfall-backed search — so they must never see another
+     * game's rows. Without this, a One Piece "OP13" set code or a shared
+     * card name leaks into Magic flows and gets added from a Magic context.
+     * Game-aware callers use the explicit *ForGame variants instead.
+     */
+    private function magicScoped(): QueryBuilder
+    {
+        return $this->createQueryBuilder('c')
+            ->leftJoin('c.game', 'legacyGame')
+            ->andWhere('legacyGame.code = :legacyMtg OR c.game IS NULL')
+            ->setParameter('legacyMtg', Game::CODE_MTG);
     }
 }

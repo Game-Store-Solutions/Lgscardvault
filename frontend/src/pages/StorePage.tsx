@@ -191,6 +191,16 @@ export default function StorePage() {
     [storeGames, allInventory],
   )
 
+  // One game at a time, always. An "All games" view interleaved every game
+  // alphabetically — a One Piece card wedged between two Magic cards — which
+  // reads as data corruption, not browsing. Default to the store's first
+  // stocked game (platform order puts Magic first) once the list arrives.
+  useEffect(() => {
+    if (!gameFilter && gameOptions.length > 0) {
+      setGameFilter(gameOptions[0].code)
+    }
+  }, [gameFilter, gameOptions])
+
   useEffect(() => {
     setPage(1)
   }, [search, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice, sort, gameFilter])
@@ -440,14 +450,7 @@ export default function StorePage() {
       {/* Game switcher — only when this store actually carries more than one */}
       {gameOptions.length > 1 && (
         <section aria-label="Choose a game">
-          <GameSelector
-            games={gameOptions}
-            value={gameFilter}
-            onChange={setGameFilter}
-            includeAll
-            allLabel="All games"
-            label="Browse by game"
-          />
+          <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Browse by game" />
         </section>
       )}
 

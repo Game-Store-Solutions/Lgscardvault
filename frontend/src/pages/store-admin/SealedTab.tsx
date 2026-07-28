@@ -41,7 +41,9 @@ import { CardImage } from '../../components/cards'
  */
 export default function SealedTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
-  const [gameFilter, setGameFilter] = useState('')
+  // Sealed management is per game from the start; Magic is the platform's
+  // first game and the safest default.
+  const [gameFilter, setGameFilter] = useState('mtg')
   const [setFilter, setSetFilter] = useState(0)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -106,8 +108,6 @@ export default function SealedTab({ slug }: { slug: string }) {
           setSetFilter(0)
           setPage(1)
         }}
-        includeAll
-        allLabel="All games"
         label="Manage sealed for"
       />
 

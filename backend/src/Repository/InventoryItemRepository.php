@@ -163,6 +163,11 @@ class InventoryItemRepository extends ServiceEntityRepository
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
+        // Display-case auto-fill speaks Magic (rarity tiers, color identity,
+        // Magic type lines), so only Magic listings may be auto-placed — a
+        // One Piece card must never be swept into a Magic case section.
+        $this->scopeToGame($qb, Game::CODE_MTG);
+
         if (null !== $minPriceCents) {
             $qb->andWhere('i.priceCents >= :minPrice')->setParameter('minPrice', $minPriceCents);
         }

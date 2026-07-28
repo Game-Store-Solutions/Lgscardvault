@@ -175,6 +175,15 @@ export default function SearchTab({ slug }: { slug: string }) {
     return games.map((game) => ({ code: game.code, name: game.name, count: counts.get(game.code) ?? 0 }))
   }, [games, inventory])
 
+  // Always manage exactly one game — a mixed table is how a One Piece card
+  // hides among thousands of Magic rows. Default to the first game the
+  // store actually stocks (platform order), falling back to Magic.
+  useEffect(() => {
+    if (!gameFilter && gameOptions.length > 0) {
+      setGameFilter(gameOptions.find((game) => game.count > 0)?.code ?? gameOptions[0].code)
+    }
+  }, [gameFilter, gameOptions])
+
   const filteredInventory = useMemo(() => {
     const term = filter.trim().toLowerCase()
     return inventory.filter((item) => {
@@ -207,14 +216,7 @@ export default function SearchTab({ slug }: { slug: string }) {
       {gameOptions.length > 1 && (
         <Card>
           <CardBody className="py-4">
-            <GameSelector
-              games={gameOptions}
-              value={gameFilter}
-              onChange={setGameFilter}
-              includeAll
-              allLabel="All games"
-              label="Manage inventory for"
-            />
+            <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Manage inventory for" />
           </CardBody>
         </Card>
       )}

@@ -39,6 +39,17 @@ final class WantListNotifier
         }
 
         $entries = $this->wantListEntries->findMatchingCardName($cardName);
+
+        // Names are only unique within a game: stocking a One Piece card must
+        // not fire "your card is in stock" at someone wanting the same-named
+        // Magic card. Entries linked to a card compare games; text-only
+        // entries came from Magic surfaces and only match Magic stock.
+        $stockedGame = $card->resolvedGameCode();
+        $entries = array_filter($entries, static function ($entry) use ($stockedGame): bool {
+            $wantedGame = $entry->getCard()?->resolvedGameCode() ?? \App\Entity\Game::CODE_MTG;
+
+            return $wantedGame === $stockedGame;
+        });
         if ([] === $entries) {
             return;
         }
