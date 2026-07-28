@@ -67,6 +67,15 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
             if (null !== $item) {
                 $item->setQuantity($item->getQuantity() + $line->getQuantity());
             }
+
+            // Sealed lines restock their own listing; they never sit in a
+            // display-case section, so there is no pool to release.
+            $sealedItem = $line->getSealedInventoryItem();
+            if (null !== $sealedItem) {
+                $sealedItem->setQuantity($sealedItem->getQuantity() + $line->getQuantity());
+                $sealedItem->touch();
+            }
+
             $this->sectionSaleAllocator->releaseLine($line);
         }
 

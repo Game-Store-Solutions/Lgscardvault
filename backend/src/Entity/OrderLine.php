@@ -36,6 +36,24 @@ class OrderLine
     private ?InventoryItem $inventoryItem = null;
 
     /**
+     * Sealed product sold on this line (null on singles lines). cardName
+     * carries the product name either way, so print sheets and history read
+     * uniformly without branching.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['order:read'])]
+    private ?SealedProduct $sealedProduct = null;
+
+    /**
+     * The store's sealed listing this line was sold from — the restock
+     * target when an order is cancelled or refunded.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?SealedInventoryItem $sealedInventoryItem = null;
+
+    /**
      * When (part of) this line was sold out of a display-case section, the
      * section pool it depleted. SET NULL keeps history when a section is
      * dismantled; the caseName/sectionTitle snapshots below preserve what
@@ -122,6 +140,36 @@ class OrderLine
         $this->inventoryItem = $inventoryItem;
 
         return $this;
+    }
+
+    public function getSealedProduct(): ?SealedProduct
+    {
+        return $this->sealedProduct;
+    }
+
+    public function setSealedProduct(?SealedProduct $sealedProduct): static
+    {
+        $this->sealedProduct = $sealedProduct;
+
+        return $this;
+    }
+
+    public function getSealedInventoryItem(): ?SealedInventoryItem
+    {
+        return $this->sealedInventoryItem;
+    }
+
+    public function setSealedInventoryItem(?SealedInventoryItem $sealedInventoryItem): static
+    {
+        $this->sealedInventoryItem = $sealedInventoryItem;
+
+        return $this;
+    }
+
+    #[Groups(['order:read'])]
+    public function isSealed(): bool
+    {
+        return null !== $this->sealedProduct || null !== $this->sealedInventoryItem;
     }
 
     public function getSectionCard(): ?StoreSectionCard
@@ -224,6 +272,11 @@ class OrderLine
     #[Groups(['order:read'])]
     public function getImageUris(): ?array
     {
+        $sealedImage = $this->sealedProduct?->getImageUrl();
+        if (null !== $sealedImage) {
+            return ['small' => $sealedImage, 'normal' => $sealedImage];
+        }
+
         return $this->card?->getImageUris();
     }
 

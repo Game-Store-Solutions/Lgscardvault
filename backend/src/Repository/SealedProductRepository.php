@@ -23,6 +23,33 @@ class SealedProductRepository extends ServiceEntityRepository
     }
 
     /**
+     * Import-time resolution for a sealed sheet row: the TCGplayer product
+     * id is authoritative when present, otherwise an exact name match within
+     * the game, optionally disambiguated by set name.
+     */
+    public function findOneForImport(Game $game, string $name, ?int $tcgcsvProductId = null, string $setName = ''): ?SealedProduct
+    {
+        if (null !== $tcgcsvProductId && $tcgcsvProductId > 0) {
+            $byId = $this->findOneByTcgcsvProductId($tcgcsvProductId);
+            if ($byId instanceof SealedProduct && $byId->getGame() === $game) {
+                return $byId;
+            }
+        }
+
+        $qb = $this->createQueryBuilder('p')
+            ->leftJoin('p.gameSet', 's')
+            ->andWhere('p.game = :game')->setParameter('game', $game)
+            ->andWhere('LOWER(p.name) = :name')->setParameter('name', mb_strtolower(trim($name)))
+            ->setMaxResults(1);
+
+        if ('' !== trim($setName)) {
+            $qb->andWhere('LOWER(s.name) = :setName')->setParameter('setName', mb_strtolower(trim($setName)));
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
+    }
+
+    /**
      * Paginated catalog search: optional game, set, and name filters.
      *
      * @return array{items: list<SealedProduct>, total: int}

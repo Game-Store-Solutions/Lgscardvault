@@ -9,7 +9,9 @@ use App\Enum\CardCondition;
 use App\Message\ProcessCsvImportMessage;
 use App\Repository\CsvImportJobRepository;
 use App\Repository\CsvImportRowRepository;
+use App\Repository\CardRepository;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\CsvImport\SealedImportProcessor;
 use App\Service\Inventory\StoreInventoryWriter;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -38,6 +40,8 @@ final readonly class ProcessCsvImportMessageHandler
         private CsvImportJobRepository $jobRepository,
         private CsvImportRowRepository $rowRepository,
         private CatalogCardResolver $catalogCardResolver,
+        private CardRepository $cardRepository,
+        private SealedImportProcessor $sealedImportProcessor,
         private ScryfallClient $scryfallClient,
         private StoreInventoryWriter $inventoryWriter,
         private \App\Service\Import\ImportLogger $importLogger,
@@ -92,10 +96,24 @@ final readonly class ProcessCsvImportMessageHandler
             $imported = 0;
             $failed = 0;
 
+            // Sealed sheets resolve against the local sealed catalog and write
+            // to the store's sealed inventory — a different pipeline entirely
+            // from singles, so it short-circuits the card path below.
+            if ($job->isSealedImport()) {
+                $result = $this->sealedImportProcessor->processBatch($job, $store, $rows);
+                $this->importLogger->log($job, 'batch_processed', $result);
+                $this->flushBatchAndQueueNext($job);
+
+                return;
+            }
+
             // Resolve the whole batch up front: local natural-key matches first,
             // then ONE Scryfall collection call (75 identifiers per request) for
             // the misses — instead of a rate-limited search round-trip per row.
-            $preResolved = $this->preResolveRows($rows);
+            // Magic only: other games resolve per row against their local
+            // catalog below, and their ids mean nothing to Scryfall.
+            $isMagicJob = null === $job->getGame() || $job->getGame()->isMtg();
+            $preResolved = $isMagicJob ? $this->preResolveRows($rows) : [];
 
             /** @var list<array{CsvImportRow, \App\Entity\InventoryItem}> $pendingItemLinks */
             $pendingItemLinks = [];
@@ -104,6 +122,29 @@ final readonly class ProcessCsvImportMessageHandler
                 // Rows are already marked PROCESSING by claimNextQueued().
                 $row->setError(null);
                 $card = $preResolved[spl_object_id($row)] ?? null;
+
+                $jobGame = $job->getGame();
+                if (!$card instanceof Card && null !== $jobGame && !$jobGame->isMtg()) {
+                    // Non-Magic games have a purely local catalog (TCGCSV), so
+                    // resolution stays local — Scryfall knows nothing here.
+                    $card = $this->cardRepository->findOneForGame(
+                        $jobGame,
+                        $row->getName(),
+                        $row->getSetCode(),
+                        $row->getCollectorNumber(),
+                    );
+
+                    if (!$card instanceof Card) {
+                        $row->setStatus(CsvImportRow::STATUS_ERROR);
+                        $row->setError(sprintf(
+                            'No %s card named "%s" in the catalog. Run a catalog sync for this game, or check the name and set.',
+                            $jobGame->getName(),
+                            $row->getName(),
+                        ));
+                        ++$failed;
+                        continue;
+                    }
+                }
 
                 if (!$card instanceof Card) {
                     // Slow path for rows the batch couldn't place: full resolver

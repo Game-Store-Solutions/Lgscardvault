@@ -9,6 +9,7 @@ use App\Entity\CustomerFavorite;
 use App\Entity\CustomerWantListEntry;
 use App\Entity\InventoryItem;
 use App\Entity\Order;
+use App\Entity\SealedInventoryItem;
 use App\Entity\OrderLine;
 use App\Entity\Store;
 use App\Entity\StoreCustomer;
@@ -41,6 +42,8 @@ final class StoreCustomerController extends AbstractController
         private readonly CustomerFavoriteRepository $favoriteRepository,
         private readonly CustomerWantListEntryRepository $wantListRepository,
         private readonly CartItemRepository $cartRepository,
+        private readonly \App\Repository\SealedInventoryItemRepository $sealedInventoryItems,
+        private readonly \App\Service\Catalog\GameCatalogSerializer $catalogSerializer,
         private readonly InventoryItemRepository $inventoryRepository,
         private readonly CardRepository $cardRepository,
         private readonly OrderRepository $orderRepository,
@@ -306,6 +309,75 @@ final class StoreCustomerController extends AbstractController
         return $this->json($this->serializeCartItem($entry), $isNew ? 201 : 200);
     }
 
+    /**
+     * Upsert a sealed cart line. Body: {"quantity": n}; 0 removes it.
+     * Mirrors the singles route but addresses a sealed listing id.
+     */
+    #[Route('/cart/sealed/{itemId}', name: 'api_store_customer_cart_sealed_set', methods: ['PUT'], requirements: ['itemId' => '\\d+'])]
+    public function setSealedCartItem(Request $request, string $slug, int $itemId): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $customer = $this->getOrCreateCustomer($store);
+
+        $item = $this->sealedInventoryItems->findOneForStore($store, $itemId);
+        if (!$item instanceof SealedInventoryItem) {
+            return $this->json(['detail' => 'Sealed listing not found.'], 404);
+        }
+
+        $payload = $this->jsonPayload($request);
+        $requested = (int) ($payload['quantity'] ?? 1);
+        $entry = $this->cartRepository->findOneForCustomerAndSealedItem($customer, $item);
+
+        if ($requested <= 0) {
+            if ($entry instanceof CartItem) {
+                $this->entityManager->remove($entry);
+                $this->entityManager->flush();
+            }
+
+            return $this->json(null, 204);
+        }
+
+        if ($item->getQuantity() < 1) {
+            return $this->json(['detail' => 'This sealed product is out of stock.'], 422);
+        }
+
+        $isNew = !$entry instanceof CartItem;
+        if ($isNew) {
+            $entry = (new CartItem())->setCustomer($customer)->setSealedInventoryItem($item);
+            $this->entityManager->persist($entry);
+        }
+
+        $entry->setQuantity(min($requested, $item->getQuantity()));
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeCartItem($entry), $isNew ? 201 : 200);
+    }
+
+    #[Route('/cart/sealed/{itemId}', name: 'api_store_customer_cart_sealed_remove', methods: ['DELETE'], requirements: ['itemId' => '\\d+'])]
+    public function removeSealedCartItem(string $slug, int $itemId): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $customer = $this->findCustomer($store);
+        $item = $customer instanceof StoreCustomer ? $this->sealedInventoryItems->findOneForStore($store, $itemId) : null;
+        if ($customer instanceof StoreCustomer && $item instanceof SealedInventoryItem) {
+            $entry = $this->cartRepository->findOneForCustomerAndSealedItem($customer, $item);
+            if ($entry instanceof CartItem) {
+                $this->entityManager->remove($entry);
+                $this->entityManager->flush();
+            }
+        }
+
+        return $this->json(null, 204);
+    }
+
     #[Route('/cart/{itemId}', name: 'api_store_customer_cart_remove', methods: ['DELETE'])]
     public function removeCartItem(string $slug, int $itemId): JsonResponse
     {
@@ -479,6 +551,32 @@ final class StoreCustomerController extends AbstractController
 
         $total = 0;
         foreach ($cartItems as $cartItem) {
+            // Sealed lines sell a boxed product: no card, no case section, and
+            // stock comes off the store's sealed listing instead.
+            if ($cartItem->isSealed()) {
+                $sealedItem = $cartItem->getSealedInventoryItem();
+                $product = $sealedItem?->getSealedProduct();
+                if (!$sealedItem instanceof SealedInventoryItem || null === $product || $sealedItem->getQuantity() < 1) {
+                    return $this->json(['detail' => 'One or more cart items are no longer in stock.'], 422);
+                }
+
+                $quantity = min($cartItem->getQuantity(), $sealedItem->getQuantity());
+                $line = (new OrderLine())
+                    ->setSealedProduct($product)
+                    ->setSealedInventoryItem($sealedItem)
+                    ->setCardName($product->getName())
+                    ->setQuantity($quantity)
+                    ->setPriceCents($sealedItem->getPriceCents())
+                    ->setAcquisitionCostCents($sealedItem->getAcquisitionCostCents());
+
+                $sealedItem->setQuantity($sealedItem->getQuantity() - $quantity);
+                $sealedItem->touch();
+
+                $order->addLine($line);
+                $total += $quantity * $sealedItem->getPriceCents();
+                continue;
+            }
+
             $inventoryItem = $cartItem->getInventoryItem();
             if (!$inventoryItem instanceof InventoryItem || $inventoryItem->getQuantity() < 1) {
                 return $this->json(['detail' => 'One or more cart items are no longer in stock.'], 422);
@@ -696,10 +794,16 @@ final class StoreCustomerController extends AbstractController
     /** @return array<string, mixed> */
     private function serializeCartItem(CartItem $entry): array
     {
+        $sealedItem = $entry->getSealedInventoryItem();
+
         return [
             'id' => $entry->getId(),
             'quantity' => $entry->getQuantity(),
+            'isSealed' => $entry->isSealed(),
             'inventoryItem' => $this->serializeInventoryItem($entry->getInventoryItem()),
+            'sealedItem' => $sealedItem instanceof SealedInventoryItem
+                ? $this->catalogSerializer->sealedInventoryItem($sealedItem)
+                : null,
             'createdAt' => $entry->getCreatedAt()->format(DATE_ATOM),
             'updatedAt' => $entry->getUpdatedAt()->format(DATE_ATOM),
         ];
