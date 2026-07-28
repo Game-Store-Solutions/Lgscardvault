@@ -214,8 +214,10 @@ export default function AppLayout() {
                       <p className="truncate text-sm font-bold text-fg">{user.displayName}</p>
                       <p className="truncate text-xs text-fg-muted">{user.email}</p>
                     </div>
+                    {/* In a store, "My account" means your activity AT that store;
+                        the global settings page gets its own entry below. */}
                     <Link
-                      to="/account"
+                      to={storeSlug ? `/s/${storeSlug}/account` : '/account'}
                       onClick={() => setUserMenuOpen(false)}
                       className="mt-1 flex items-center gap-2 rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
                     >
@@ -224,12 +226,12 @@ export default function AppLayout() {
                     </Link>
                     {storeSlug && (
                       <Link
-                        to={`/s/${storeSlug}/account`}
+                        to="/account"
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-2 rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
                       >
                         <Store aria-hidden className="size-4 text-fg-muted" />
-                        My activity at this store
+                        Account settings &amp; stores
                       </Link>
                     )}
                     {/* Kiosk terminals belong to stores: their owners flip the mode. */}
@@ -353,14 +355,14 @@ export default function AppLayout() {
               ))}
 
               {user && (
-                <Link to="/account" onClick={closeMobile} className={mobileLinkClass}>
+                <Link to={storeSlug ? `/s/${storeSlug}/account` : '/account'} onClick={closeMobile} className={mobileLinkClass}>
                   My account
                 </Link>
               )}
 
               {user && storeSlug && (
-                <Link to={`/s/${storeSlug}/account`} onClick={closeMobile} className={mobileLinkClass}>
-                  My activity at this store
+                <Link to="/account" onClick={closeMobile} className={mobileLinkClass}>
+                  Account settings &amp; stores
                 </Link>
               )}
 
