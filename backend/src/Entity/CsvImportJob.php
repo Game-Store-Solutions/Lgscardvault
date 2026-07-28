@@ -16,6 +16,14 @@ class CsvImportJob
     public const STATUS_PAUSED = 'paused';
     public const STATUS_CANCELLED = 'cancelled';
 
+    /** Singles: rows resolve against the card catalog into InventoryItems. */
+    public const TYPE_CARDS = 'cards';
+    /** Sealed: rows resolve against the sealed catalog into SealedInventoryItems. */
+    public const TYPE_SEALED = 'sealed';
+
+    /** @var list<string> */
+    public const TYPES = [self::TYPE_CARDS, self::TYPE_SEALED];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -24,6 +32,17 @@ class CsvImportJob
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
     private ?Store $store = null;
+
+    /**
+     * Which game this import targets. Null on jobs created before the
+     * multi-game catalog — those were Magic singles imports.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Game $game = null;
+
+    #[ORM\Column(length: 16, options: ['default' => self::TYPE_CARDS])]
+    private string $importType = self::TYPE_CARDS;
 
     #[ORM\Column(length: 255)]
     private string $originalFilename = '';
@@ -83,6 +102,41 @@ class CsvImportJob
         $this->store = $store;
 
         return $this;
+    }
+
+    public function getGame(): ?Game
+    {
+        return $this->game;
+    }
+
+    public function setGame(?Game $game): static
+    {
+        $this->game = $game;
+
+        return $this;
+    }
+
+    /** Game code for serialization; legacy jobs without a game were Magic. */
+    public function resolvedGameCode(): string
+    {
+        return $this->game?->getCode() ?? Game::CODE_MTG;
+    }
+
+    public function getImportType(): string
+    {
+        return $this->importType;
+    }
+
+    public function setImportType(string $importType): static
+    {
+        $this->importType = in_array($importType, self::TYPES, true) ? $importType : self::TYPE_CARDS;
+
+        return $this;
+    }
+
+    public function isSealedImport(): bool
+    {
+        return self::TYPE_SEALED === $this->importType;
     }
 
     public function getOriginalFilename(): string

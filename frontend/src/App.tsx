@@ -20,6 +20,7 @@ import CustomerProfilePage from './pages/CustomerProfilePage'
 import StoreAdminPage from './pages/StoreAdminPage'
 import ImportRunDetailsPage from './pages/store-admin/ImportRunDetailsPage'
 import PlatformAdminPage from './pages/PlatformAdminPage'
+import SyncJobsPage from './pages/platform-admin/SyncJobsPage'
 import PatchNotesTab from './pages/store-admin/PatchNotesTab'
 import SellTradePage from './pages/SellTradePage'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
@@ -91,6 +92,7 @@ export default function App() {
             >
               <Route index element={<PlatformAdminPage />} />
               <Route path="patch-notes" element={<PatchNotesTab />} />
+              <Route path="sync-jobs" element={<SyncJobsPage />} />
               <Route path="stores/:slug/imports" element={<PlatformStoreImportsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

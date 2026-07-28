@@ -1,0 +1,23 @@
+framework:
+    http_client:
+        # Retry is deliberately NOT enabled on the default client: Scryfall
+        # calls are already throttled by their own rate limiter, and blanket
+        # retries there would multiply that budget behind its back.
+        scoped_clients:
+            # TCGCSV — the free daily mirror of the TCGplayer catalog. A full
+            # game sync makes thousands of requests, so this client carries
+            # its own timeouts and an identifying User-Agent (TCGCSV asks
+            # integrators to be identifiable and unhurried).
+            tcgcsv.client:
+                base_uri: 'https://tcgcsv.com/tcgplayer/'
+                timeout: 15
+                max_duration: 120
+                headers:
+                    Accept: 'application/json'
+                    User-Agent: 'LGSCardVault/1.0 (+catalog-sync)'
+                retry_failed:
+                    enabled: true
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 10000

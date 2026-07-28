@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Repository;
+
+use App\Entity\SealedInventoryItem;
+use App\Entity\SealedProduct;
+use App\Entity\Store;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
+
+/**
+ * @extends ServiceEntityRepository<SealedInventoryItem>
+ */
+class SealedInventoryItemRepository extends ServiceEntityRepository
+{
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, SealedInventoryItem::class);
+    }
+
+    public function findLine(Store $store, SealedProduct $product): ?SealedInventoryItem
+    {
+        return $this->findOneBy(['store' => $store, 'sealedProduct' => $product]);
+    }
+
+    public function findOneForStore(Store $store, int $id): ?SealedInventoryItem
+    {
+        return $this->findOneBy(['id' => $id, 'store' => $store]);
+    }
+
+    /**
+     * Staff view: every line (including sold-out) with product/game/set
+     * joined, optionally narrowed to one game.
+     *
+     * @return list<SealedInventoryItem>
+     */
+    public function findForStore(Store $store, ?string $gameCode = null, bool $inStockOnly = false): array
+    {
+        $qb = $this->createQueryBuilder('i')
+            ->join('i.sealedProduct', 'p')->addSelect('p')
+            ->join('p.game', 'g')->addSelect('g')
+            ->leftJoin('p.gameSet', 's')->addSelect('s')
+            ->andWhere('i.store = :store')->setParameter('store', $store)
+            ->orderBy('g.position', 'ASC')
+            ->addOrderBy('p.name', 'ASC');
+
+        if (null !== $gameCode && '' !== $gameCode) {
+            $qb->andWhere('g.code = :gameCode')->setParameter('gameCode', strtolower($gameCode));
+        }
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Storefront spotlight: the store's freshest in-stock sealed lines.
+     *
+     * @return list<SealedInventoryItem>
+     */
+    public function findSpotlightForStore(Store $store, int $limit = 12): array
+    {
+        return $this->createQueryBuilder('i')
+            ->join('i.sealedProduct', 'p')->addSelect('p')
+            ->join('p.game', 'g')->addSelect('g')
+            ->leftJoin('p.gameSet', 's')->addSelect('s')
+            ->andWhere('i.store = :store')->setParameter('store', $store)
+            ->andWhere('i.quantity > 0')
+            ->orderBy('i.updatedAt', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+}

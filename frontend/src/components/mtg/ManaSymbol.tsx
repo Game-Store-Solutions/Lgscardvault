@@ -152,4 +152,26 @@ export function ManaCost({ cost, className = 'size-5' }: { cost?: string | null;
   )
 }
 
+/**
+ * Card (oracle) text with every {symbol} token rendered as an in-house
+ * mana icon inline — "{T}: Add {G}." shows the tap and green icons in
+ * place. Newlines are preserved by the caller's whitespace-pre-line.
+ */
+export function CardText({ text, symbolClassName = 'size-4' }: { text?: string | null; symbolClassName?: string }) {
+  if (!text) return null
+  const parts = text.split(/(\{[^}]+\})/g)
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        const token = /^\{([^}]+)\}$/.exec(part)
+        if (token) {
+          return <ManaSymbol key={index} symbol={token[1]} className={`${symbolClassName} -translate-y-px align-middle`} />
+        }
+        return <span key={index}>{part}</span>
+      })}
+    </>
+  )
+}
+
 export default ManaSymbol

@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Card;
+use App\Entity\Game;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -78,6 +79,31 @@ class CardRepository extends ServiceEntityRepository
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Game-scoped printing lookup for non-Magic imports. Magic singles come
+     * from Scryfall (see CatalogCardResolver); every other game's catalog is
+     * local (TCGCSV), so a row resolves by matching name within the game,
+     * narrowed by collector number and set when the sheet supplies them.
+     */
+    public function findOneForGame(Game $game, string $name, string $setCode = '', string $collectorNumber = ''): ?Card
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('c.game = :game')->setParameter('game', $game)
+            ->andWhere('LOWER(c.name) = :name')->setParameter('name', mb_strtolower(trim($name)))
+            ->setMaxResults(1);
+
+        if ('' !== trim($collectorNumber)) {
+            $qb->andWhere('LOWER(c.collectorNumber) = :collector')
+                ->setParameter('collector', mb_strtolower(trim($collectorNumber)));
+        }
+        if ('' !== trim($setCode)) {
+            $qb->andWhere('LOWER(c.setCode) = :setCode OR LOWER(c.setName) = :setCode')
+                ->setParameter('setCode', mb_strtolower(trim($setCode)));
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
     }
 
     /** Is this a set code the local catalog knows? (case-insensitive) */

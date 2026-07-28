@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
-import { Upload } from 'lucide-react'
-import api, { cardImage, extractErrorMessage } from '../../api/client'
-import { inventoryKey } from '../../hooks'
+import api, { cardImage } from '../../api/client'
+import { inventoryKey, sealedInventoryKey } from '../../hooks'
 import type { CsvImportJob, CsvImportJobSummary, CsvImportRow } from '../../api/types'
 import {
   Card,
@@ -19,23 +18,11 @@ import {
   Badge,
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
-
-const REQUIRED_HEADERS = [
-  'name',
-  'game',
-  'set',
-  'condition',
-  'foil',
-  'rarity',
-  'quantity',
-  'variant',
-  'collectorNumber',
-]
+import ImportWizard from './ImportWizard'
 
 export default function CsvTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [error, setError] = useState<string | null>(null)
 
   const { data: job = null } = useQuery({
     queryKey: ['csv-import-current', slug],
@@ -57,28 +44,15 @@ export default function CsvTab({ slug }: { slug: string }) {
     refetchInterval: (query) => (query.state.data?.some((run) => isActive(run.status)) ? 5000 : false),
   })
 
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const body = new FormData()
-      body.append('file', file)
-      const { data } = await api.post<CsvImportJob>(`/stores/${slug}/csv-imports`, body, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      return data
-    },
-    onMutate: () => {
-      setError(null)
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['csv-import-current', slug] })
-      await queryClient.invalidateQueries({ queryKey: ['csv-import-runs', slug] })
-    },
-    onError: (err) => setError(extractErrorMessage(err, 'Upload failed')),
-  })
+  const refreshImports = () => {
+    void queryClient.invalidateQueries({ queryKey: ['csv-import-current', slug] })
+    void queryClient.invalidateQueries({ queryKey: ['csv-import-runs', slug] })
+  }
 
   useEffect(() => {
     if (job?.status === 'completed') {
       void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+      void queryClient.invalidateQueries({ queryKey: sealedInventoryKey(slug) })
     }
   }, [job?.status, queryClient, slug])
 
@@ -88,87 +62,59 @@ export default function CsvTab({ slug }: { slug: string }) {
   const totalRows = job?.totalRows ?? 0
   const processedRows = job?.processedRows ?? 0
   const progress = totalRows === 0 ? 0 : Math.min(processedRows / totalRows, 1)
-  const canUpload = !uploadMutation.isPending && !isActive(job?.status)
+  const sealedJob = job?.importType === 'sealed'
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader
-          title="Import inventory from CSV"
-          subtitle={
-            <>
-              Upload a CSV with the columns:{' '}
-              <code className="rounded-btn bg-bg px-1.5 py-0.5 text-brand-600">{REQUIRED_HEADERS.join(', ')}</code>. The
-              server resolves cards, prices, and inventory updates.
-            </>
-          }
-          actions={job ? <RunStatusBadge status={job.status} /> : undefined}
-        />
-        <CardBody className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-4">
-            <ImportStat label="Rows" value={String(totalRows)} />
-            <ImportStat label="Processed" value={`${processedRows}/${totalRows || 0}`} />
-            <ImportStat label="Imported" value={`${importedCount}/${totalRows || 0}`} tone="success" />
-            <ImportStat label="Failed" value={String(failedCount)} tone="danger" />
-          </div>
+      <ImportWizard slug={slug} busy={isActive(job?.status)} onImported={refreshImports} />
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-fg-muted">
-              <span>Server import progress</span>
-              <span>{Math.round(progress * 100)}%</span>
+      {job && (
+        <Card>
+          <CardHeader
+            title="Latest import"
+            subtitle={
+              <>
+                {job.originalFilename} · {job.gameCode?.toUpperCase() ?? 'MTG'} ·{' '}
+                {sealedJob ? 'sealed products' : 'singles'}
+              </>
+            }
+            actions={<RunStatusBadge status={job.status} />}
+          />
+          <CardBody className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-4">
+              <ImportStat label="Rows" value={String(totalRows)} />
+              <ImportStat label="Processed" value={`${processedRows}/${totalRows || 0}`} />
+              <ImportStat label="Imported" value={`${importedCount}/${totalRows || 0}`} tone="success" />
+              <ImportStat label="Failed" value={String(failedCount)} tone="danger" />
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-bg">
-              <div
-                className="h-full rounded-full bg-brand-500 transition-all"
-                style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }}
-              />
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-fg-muted">
+                <span>Server import progress</span>
+                <span>{Math.round(progress * 100)}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-bg">
+                <div
+                  className="h-full rounded-full bg-brand-500 transition-all"
+                  style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }}
+                />
+              </div>
             </div>
-          </div>
 
-          {job?.originalFilename && (
-            <p className="text-sm text-fg-muted">
-              File: <span className="font-medium text-fg">{job.originalFilename}</span>
-            </p>
-          )}
-
-          <label
-            className={`flex cursor-pointer items-center justify-center gap-2 rounded-btn border border-dashed border-border bg-bg px-4 py-6 text-sm font-bold text-fg-muted hover:text-fg ${
-              canUpload ? '' : 'pointer-events-none opacity-50'
-            }`}
-          >
-            <Upload className="size-4" aria-hidden />
-            {uploadMutation.isPending ? 'Uploading CSV…' : 'Choose a CSV file to import'}
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              disabled={!canUpload}
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) uploadMutation.mutate(file)
-                event.target.value = ''
-              }}
-              className="sr-only"
-            />
-          </label>
-
-          {isActive(job?.status) && (
-            <p className="text-sm text-fg-muted">
-              Import is running on the server. You can leave this page and come back to this tab to see the current job
-              state.
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="text-sm font-medium text-danger-700">
-              {error}
-            </p>
-          )}
-          {job?.errorMessage && (
-            <p role="alert" className="text-sm font-medium text-danger-700">
-              {job.errorMessage}
-            </p>
-          )}
-        </CardBody>
-      </Card>
+            {isActive(job.status) && (
+              <p className="text-sm text-fg-muted">
+                Import is running on the server. You can leave this page and come back to this tab to see the current
+                job state.
+              </p>
+            )}
+            {job.errorMessage && (
+              <p role="alert" className="text-sm font-medium text-danger-700">
+                {job.errorMessage}
+              </p>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
       {rows.length > 0 && (
         <Card>
@@ -181,15 +127,15 @@ export default function CsvTab({ slug }: { slug: string }) {
               <Table>
                 <THead>
                   <TR className="hover:bg-transparent">
-                    <TH>Matched card</TH>
+                    <TH>{sealedJob ? 'Matched product' : 'Matched card'}</TH>
                     <TH>Name</TH>
                     <TH>Set</TH>
-                    <TH>Collector</TH>
-                    <TH>Rarity</TH>
+                    {!sealedJob && <TH>Collector</TH>}
+                    {!sealedJob && <TH>Rarity</TH>}
                     <TH>Qty</TH>
-                    <TH>Market price</TH>
-                    <TH>Condition</TH>
-                    <TH>Foil</TH>
+                    {!sealedJob && <TH>Market price</TH>}
+                    {!sealedJob && <TH>Condition</TH>}
+                    {!sealedJob && <TH>Foil</TH>}
                     <TH>Status</TH>
                   </TR>
                 </THead>
@@ -197,18 +143,18 @@ export default function CsvTab({ slug }: { slug: string }) {
                   {rows.map((row, index) => (
                     <TR key={`${row.name}-${row.collectorNumber}-${index}`}>
                       <TD>
-                        <MatchedCard row={row} />
+                        <MatchedCard row={row} sealed={sealedJob} />
                       </TD>
                       <TD>{row.name}</TD>
-                      <TD className="uppercase">{row.set}</TD>
-                      <TD>{row.collectorNumber}</TD>
-                      <TD>{row.rarity}</TD>
+                      <TD className={sealedJob ? undefined : 'uppercase'}>{row.set}</TD>
+                      {!sealedJob && <TD>{row.collectorNumber}</TD>}
+                      {!sealedJob && <TD>{row.rarity}</TD>}
                       <TD>{row.quantity}</TD>
-                      <TD>{rowMarketPrice(row)}</TD>
-                      <TD>{row.condition}</TD>
-                      <TD>{row.isFoil ? 'Yes' : 'No'}</TD>
+                      {!sealedJob && <TD>{rowMarketPrice(row)}</TD>}
+                      {!sealedJob && <TD>{row.condition}</TD>}
+                      {!sealedJob && <TD>{row.isFoil ? 'Yes' : 'No'}</TD>}
                       <TD>
-                        <RowStatus row={row} />
+                        <RowStatus row={row} sealed={sealedJob} />
                       </TD>
                     </TR>
                   ))}
@@ -229,6 +175,7 @@ export default function CsvTab({ slug }: { slug: string }) {
             <THead>
               <TR className="hover:bg-transparent">
                 <TH>Run</TH>
+                <TH>Game</TH>
                 <TH>Status</TH>
                 <TH>Progress</TH>
                 <TH>Imported</TH>
@@ -253,6 +200,9 @@ export default function CsvTab({ slug }: { slug: string }) {
                     </Link>
                     <span className="text-xs text-fg-muted">{new Date(run.createdAt).toLocaleString()}</span>
                   </TD>
+                  <TD className="text-sm text-fg-muted">
+                    {(run.gameCode ?? 'mtg').toUpperCase()} · {run.importType === 'sealed' ? 'Sealed' : 'Singles'}
+                  </TD>
                   <TD>
                     <RunStatusBadge status={run.status} />
                   </TD>
@@ -264,7 +214,7 @@ export default function CsvTab({ slug }: { slug: string }) {
                   <TD className="text-fg-muted">{new Date(run.updatedAt).toLocaleTimeString()}</TD>
                 </TR>
               ))}
-              {importRuns.length === 0 && <EmptyRow colSpan={6}>No import runs yet.</EmptyRow>}
+              {importRuns.length === 0 && <EmptyRow colSpan={7}>No import runs yet.</EmptyRow>}
             </TBody>
           </Table>
         </CardBody>
@@ -273,26 +223,32 @@ export default function CsvTab({ slug }: { slug: string }) {
   )
 }
 
-function MatchedCard({ row }: { row: CsvImportRow }) {
+function MatchedCard({ row, sealed }: { row: CsvImportRow; sealed: boolean }) {
   if (!row.card) return <span className="text-fg-muted">Pending match</span>
+
+  // Sealed rows carry a product payload (name/setName/imageUrl) instead of a
+  // card printing, so they have no set code or collector number to show.
+  const image = sealed ? row.card.imageUrl : cardImage(row.card)
   return (
     <div className="flex min-w-56 items-center gap-3">
-      {cardImage(row.card) && <img src={cardImage(row.card)} alt={row.card.name} className="h-14 rounded-btn" />}
+      {image && <img src={image} alt={row.card.name} className="h-14 rounded-btn object-contain" />}
       <div>
         <div className="font-bold text-fg">{row.card.name}</div>
         <div className="text-xs text-fg-muted">
-          {(row.card.setCode ?? '-').toUpperCase()} #{row.card.collectorNumber ?? '-'}
+          {sealed
+            ? (row.card.setName ?? 'Sealed product')
+            : `${(row.card.setCode ?? '-').toUpperCase()} #${row.card.collectorNumber ?? '-'}`}
         </div>
       </div>
     </div>
   )
 }
 
-function RowStatus({ row }: { row: CsvImportRow }) {
+function RowStatus({ row, sealed }: { row: CsvImportRow; sealed: boolean }) {
   if (row.status === 'imported') {
     return (
       <Badge tone="success">
-        Added {row.card?.setCode?.toUpperCase()} #{row.card?.collectorNumber}
+        {sealed ? 'Stocked' : `Added ${row.card?.setCode?.toUpperCase()} #${row.card?.collectorNumber}`}
       </Badge>
     )
   }

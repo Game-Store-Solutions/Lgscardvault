@@ -227,6 +227,47 @@ Full API docs: **http://127.0.0.1:8000/api/docs**
 
 ---
 
+## Multi-game catalog (TCGCSV)
+
+The card catalog is multi-game: Magic, Pokémon, One Piece, Flesh and Blood, and
+Riftbound. Sets, sealed products (booster boxes, bundles, decks), and non-Magic
+singles are mirrored from [TCGCSV](https://tcgcsv.com), a free daily copy of the
+TCGplayer catalog. **Magic singles stay Scryfall-sourced** — TCGCSV supplies
+Magic's sealed products only.
+
+```bash
+php bin/console app:catalog:sync onepiece --max-groups=5 -v   # smoke test: first 5 sets, verbose
+php bin/console app:catalog:sync onepiece                     # one game, full catalog
+php bin/console app:catalog:sync --all                        # every active game
+```
+
+A full game is thousands of requests (products + prices per set), paced to
+~10/s. Start with `--max-groups` to confirm a game looks right before running
+the whole thing. Progress is written per set with `-v`; each run is recorded in
+`catalog_sync_runs` and visible under **Platform admin → Sync jobs**, where
+super-admins can also trigger a sync (`POST /api/admin/catalog/sync/{code}`,
+queued on the worker). One failing set is counted and skipped rather than
+aborting the run.
+
+### Staying current automatically
+
+TCGCSV republishes at 20:00 UTC daily. A Symfony Scheduler schedule queues a
+sync per active game starting 20:30 UTC, staggered 20 minutes apart, so the
+catalog keeps itself current with no cron entry:
+
+```bash
+php bin/console debug:scheduler                        # what runs, and when next
+php bin/console messenger:consume scheduler_catalog    # the schedule ticker
+php bin/console messenger:consume async                # runs the syncs themselves
+```
+
+Both workers must be running. The schedule is stateful (cache-backed), so a
+worker that was down at 20:30 still runs the missed sync when it comes back
+instead of skipping a day. Games are read from the database — enabling a game
+puts it on the schedule with no code change.
+
+---
+
 ## Scryfall sync
 
 ```bash
@@ -352,7 +393,9 @@ served by nginx with SPA fallback, long-cached fingerprinted assets, and an
 ### Workers
 
 CSV imports and catalog syncs run on Symfony Messenger workers — **if none is
-running, uploads queue forever.** Supervise them (systemd/supervisor/compose —
+running, uploads queue forever.** Run `messenger:consume async` for the work
+itself and `messenger:consume scheduler_catalog` for the daily catalog
+schedule. Supervise them (systemd/supervisor/compose —
 see the runbook) so crashes auto-restart and memory growth is bounded
 (`--time-limit`/`--memory-limit`). Messages that exhaust their retries land in a
 `failed` dead-letter transport (`messenger:failed:show|retry`) rather than being

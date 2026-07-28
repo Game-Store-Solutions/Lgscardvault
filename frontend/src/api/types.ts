@@ -157,6 +157,8 @@ export interface CardFace {
 export interface CardSummary {
   id: string
   oracleId?: string
+  /** Game this card belongs to (mtg, pokemon, onepiece, fab, riftbound); absent = mtg. */
+  gameCode?: string
   name: string
   setCode?: string
   setName?: string
@@ -335,7 +337,12 @@ export interface CustomerFavorite {
 export interface CartItem {
   id: number
   quantity: number
-  inventoryItem: InventoryItem
+  /** True when this line is a sealed product rather than a single. */
+  isSealed?: boolean
+  /** Singles listing; null on sealed lines. */
+  inventoryItem: InventoryItem | null
+  /** Sealed listing; null on singles lines. */
+  sealedItem?: SealedInventoryLine | null
   createdAt: string
   updatedAt: string
 }
@@ -375,6 +382,10 @@ export interface CsvImportRow {
 export interface CsvImportJob {
   id: number
   status: CsvImportJobStatus
+  /** Game this import targets; legacy jobs report 'mtg'. */
+  gameCode: string
+  /** Whether rows are singles or sealed products. */
+  importType: 'cards' | 'sealed'
   originalFilename: string
   storagePath: string
   totalRows: number
@@ -396,6 +407,8 @@ export interface CsvImportJob {
 export interface CsvImportJobSummary {
   id: number
   status: CsvImportJobStatus
+  gameCode: string
+  importType: 'cards' | 'sealed'
   originalFilename: string
   totalRows: number
   processedRows: number
@@ -593,4 +606,101 @@ export interface CustomerNotification {
   orderReference?: string | null
   createdAt: string
   readAt?: string | null
+}
+
+/* ---------- Multi-game catalog (TCGCSV-sourced) ---------- */
+
+export interface CatalogGame {
+  id: number
+  code: string
+  name: string
+  tcgcsvCategoryId: number | null
+  position: number
+  active: boolean
+}
+
+export interface CatalogGameSet {
+  id: number
+  gameCode: string | null
+  tcgcsvGroupId: number
+  name: string
+  code: string | null
+  releaseDate: string | null
+}
+
+/** A sealed product (booster box, bundle, deck, …) from the shared catalog. */
+export interface SealedProduct {
+  id: number
+  tcgcsvProductId: number
+  gameCode: string | null
+  gameName: string | null
+  setId: number | null
+  setName: string | null
+  name: string
+  imageUrl: string | null
+  url: string | null
+  marketPriceCents: number | null
+  lowPriceCents: number | null
+  updatedAt: string
+}
+
+export interface SealedSearchResult {
+  items: SealedProduct[]
+  total: number
+  page: number
+  perPage: number
+}
+
+/** One store's stock line for a sealed product. */
+export interface SealedInventoryLine {
+  id: number
+  quantity: number
+  priceCents: number
+  acquisitionCostCents: number | null
+  updatedAt: string
+  product: SealedProduct | null
+}
+
+export interface CatalogSyncRun {
+  id: number
+  gameCode: string | null
+  gameName: string | null
+  status: 'running' | 'succeeded' | 'failed'
+  startedAt: string
+  finishedAt: string | null
+  summary: Record<string, number> | null
+  error: string | null
+}
+
+/** One dry-run row from the import wizard's preview step. */
+export interface ImportPreviewRow {
+  rowIndex: number
+  name: string
+  set: string
+  collectorNumber?: string
+  quantity: number
+  condition?: string
+  isFoil?: boolean
+  priceCents?: number | null
+  marketPriceCents?: number | null
+  /** How the row resolved against the chosen game's catalog. */
+  match: 'matched' | 'unmatched' | 'invalid'
+  matchedName?: string | null
+  matchedSet?: string | null
+  imageUrl?: string | null
+  error?: string | null
+}
+
+/** Validation report for an uploaded sheet — no rows are written. */
+export interface ImportPreview {
+  importType: 'cards' | 'sealed'
+  gameCode: string
+  totalRows: number
+  invalidRows: number
+  matchedRows: number
+  unmatchedRows: number
+  sampleSize: number
+  totalQuantity: number
+  sample: ImportPreviewRow[]
+  warnings: string[]
 }

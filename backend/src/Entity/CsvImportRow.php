@@ -89,6 +89,17 @@ class CsvImportRow
     #[ORM\Column(nullable: true)]
     private ?int $importedItemId = null;
 
+    /**
+     * Sell price carried by the row, in cents. Sealed imports price each
+     * product from the sheet (falling back to the market snapshot); card
+     * imports leave this null and price from the catalog as before.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $priceCents = null;
+
+    public function getPriceCents(): ?int { return $this->priceCents; }
+    public function setPriceCents(?int $priceCents): static { $this->priceCents = $priceCents; return $this; }
+
     public function getId(): ?int { return $this->id; }
     public function getJob(): ?CsvImportJob { return $this->job; }
     public function setJob(CsvImportJob $job): static { $this->job = $job; return $this; }

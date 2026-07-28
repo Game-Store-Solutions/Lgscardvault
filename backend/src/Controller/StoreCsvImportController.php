@@ -8,13 +8,17 @@ use App\Entity\Card;
 use App\Entity\Store;
 use App\Enum\CardCondition;
 use App\Message\ProcessCsvImportMessage;
+use App\Entity\Game;
 use App\Repository\CardRepository;
 use App\Repository\CsvImportJobRepository;
 use App\Repository\CsvImportRowRepository;
+use App\Repository\GameRepository;
 use App\Repository\StoreRepository;
 use App\Security\ApiRateLimit;
 use App\Service\Catalog\CatalogCardResolver;
 use App\Service\CsvImport\CsvImportParser;
+use App\Service\CsvImport\ImportPreviewer;
+use App\Service\CsvImport\SealedCsvImportParser;
 use App\Service\Inventory\StoreInventoryWriter;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
@@ -51,6 +55,9 @@ final class StoreCsvImportController extends AbstractController
         private readonly CsvImportRowRepository $rowRepository,
         private readonly CatalogCardResolver $catalogCardResolver,
         private readonly CsvImportParser $parser,
+        private readonly SealedCsvImportParser $sealedParser,
+        private readonly ImportPreviewer $previewer,
+        private readonly GameRepository $gameRepository,
         private readonly StoreInventoryWriter $inventoryWriter,
         private readonly ScryfallClient $scryfallClient,
         private readonly EntityManagerInterface $entityManager,
@@ -110,14 +117,24 @@ final class StoreCsvImportController extends AbstractController
             return $this->json(['detail' => 'Could not read the uploaded CSV.'], 400);
         }
 
+        $game = $this->resolveGame($request);
+        if (!$game instanceof Game) {
+            return $this->json(['detail' => 'Unknown game. Pick a game before uploading.'], 422);
+        }
+        $importType = $this->resolveImportType($request);
+
         try {
-            $parsed = $this->parser->parse($content);
+            $parsed = CsvImportJob::TYPE_SEALED === $importType
+                ? $this->sealedParser->parse($content)
+                : $this->parser->parse($content);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
         $job = new CsvImportJob();
         $job->setStore($store);
+        $job->setGame($game);
+        $job->setImportType($importType);
         $job->setOriginalFilename($file->getClientOriginalName() ?: 'import.csv');
         // The pipeline processes persisted DB rows, not an on-disk copy, so we no
         // longer write the file to disk (avoids orphaned-file risk). The column is
@@ -137,6 +154,58 @@ final class StoreCsvImportController extends AbstractController
         $this->messageBus->dispatch(new ProcessCsvImportMessage((int) $job->getId()));
 
         return $this->json($this->serializeJob($job, $request), 201);
+    }
+
+    /**
+     * Wizard "Validate + Preview" step: parse the sheet and dry-run a sample
+     * of its rows against the chosen game's catalog without persisting
+     * anything, so staff can confirm the mapping before importing.
+     */
+    #[Route('/preview', name: 'api_store_csv_import_preview', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function preview(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (null === $store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $this->denyAccessUnlessGranted('STORE_MANAGE', $store);
+
+        $file = $request->files->get('file');
+        if (!$file instanceof UploadedFile) {
+            return $this->json(['detail' => 'A CSV file is required.'], 400);
+        }
+        if (!$file->isValid()) {
+            return $this->json(['detail' => 'The uploaded file is invalid or incomplete.'], 400);
+        }
+
+        $size = $file->getSize();
+        if (null === $size || $size > self::MAX_UPLOAD_BYTES) {
+            return $this->json(
+                ['detail' => sprintf('CSV exceeds the maximum allowed size of %d MB.', self::MAX_UPLOAD_BYTES >> 20)],
+                422,
+            );
+        }
+        if (!$this->looksLikeCsv($file)) {
+            return $this->json(['detail' => 'Only CSV files are accepted.'], 422);
+        }
+
+        $game = $this->resolveGame($request);
+        if (!$game instanceof Game) {
+            return $this->json(['detail' => 'Unknown game. Pick a game before uploading.'], 422);
+        }
+
+        $content = file_get_contents($file->getPathname());
+        if (false === $content) {
+            return $this->json(['detail' => 'Could not read the uploaded CSV.'], 400);
+        }
+
+        try {
+            return $this->json($this->previewer->preview($content, $game, $this->resolveImportType($request)));
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
     }
 
     #[Route('', name: 'api_store_csv_import_list', methods: ['GET'])]
@@ -560,6 +629,8 @@ final class StoreCsvImportController extends AbstractController
         return [
             'id' => $job->getId(),
             'status' => $job->getStatus(),
+            'gameCode' => $job->resolvedGameCode(),
+            'importType' => $job->getImportType(),
             'originalFilename' => $job->getOriginalFilename(),
             'totalRows' => $job->getTotalRows(),
             'processedRows' => $job->getProcessedRows(),
@@ -659,6 +730,8 @@ final class StoreCsvImportController extends AbstractController
         return [
             'id' => $job->getId(),
             'status' => $job->getStatus(),
+            'gameCode' => $job->resolvedGameCode(),
+            'importType' => $job->getImportType(),
             'originalFilename' => $job->getOriginalFilename(),
             'storagePath' => $job->getStoragePath(),
             'totalRows' => $job->getTotalRows(),
@@ -679,6 +752,24 @@ final class StoreCsvImportController extends AbstractController
     }
 
     /** @param array<string, mixed> $rowData */
+    /**
+     * Resolves the target game from the request (form field or query),
+     * defaulting to Magic so existing single-game clients keep working.
+     */
+    private function resolveGame(Request $request): ?Game
+    {
+        $code = trim((string) ($request->request->get('game') ?? $request->query->get('game') ?? ''));
+
+        return $this->gameRepository->findOneByCode('' !== $code ? $code : Game::CODE_MTG);
+    }
+
+    private function resolveImportType(Request $request): string
+    {
+        $type = trim((string) ($request->request->get('type') ?? $request->query->get('type') ?? ''));
+
+        return in_array($type, CsvImportJob::TYPES, true) ? $type : CsvImportJob::TYPE_CARDS;
+    }
+
     private function createImportRow(CsvImportJob $job, array $rowData): CsvImportRow
     {
         return (new CsvImportRow())
@@ -693,6 +784,7 @@ final class StoreCsvImportController extends AbstractController
             ->setQuantity((int) ($rowData['quantity'] ?? 0))
             ->setVariant($this->truncate((string) ($rowData['variant'] ?? ''), 255))
             ->setCollectorNumber($this->truncate((string) ($rowData['collectorNumber'] ?? ''), 80))
+            ->setPriceCents(isset($rowData['priceCents']) ? (int) $rowData['priceCents'] : null)
             ->setStatus((string) ($rowData['status'] ?? CsvImportRow::STATUS_QUEUED))
             ->setCard(isset($rowData['card']) && is_array($rowData['card']) ? $rowData['card'] : null)
             ->setError(isset($rowData['error']) ? (string) $rowData['error'] : null)

@@ -11,18 +11,20 @@ import BrandingTab from './store-admin/BrandingTab'
 import PaymentsTab from './store-admin/PaymentsTab'
 import PatchNotesTab from './store-admin/PatchNotesTab'
 import SellTradeTab from './store-admin/SellTradeTab'
+import SealedTab from './store-admin/SealedTab'
 
-type Section = 'inventory' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade'
+type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade'
 
 const SECTIONS: Record<Section, { label: string; render: (slug: string) => React.ReactNode }> = {
-  inventory: { label: 'Inventory', render: (slug) => <SearchTab slug={slug} /> },
+  inventory: { label: 'Singles', render: (slug) => <SearchTab slug={slug} /> },
+  sealed: { label: 'Sealed', render: (slug) => <SealedTab slug={slug} /> },
   branding: { label: 'Branding', render: (slug) => <BrandingTab slug={slug} /> },
   spotlight: { label: 'Spotlight', render: (slug) => <SpotlightTab slug={slug} /> },
   'case-cards': { label: 'Case cards', render: (slug) => <CaseCardsTab slug={slug} /> },
   payments: { label: 'Payments', render: (slug) => <PaymentsTab slug={slug} /> },
   orders: { label: 'Orders', render: (slug) => <OrdersTab slug={slug} /> },
   reports: { label: 'Reports', render: (slug) => <ReportsTab slug={slug} /> },
-  csv: { label: 'CSV import', render: (slug) => <CsvTab slug={slug} /> },
+  csv: { label: 'Imports', render: (slug) => <CsvTab slug={slug} /> },
   'sell-trade': { label: 'Sell / Trade', render: (slug) => <SellTradeTab slug={slug} /> },
   'patch-notes': { label: 'Patch notes', render: () => <PatchNotesTab /> },
 }

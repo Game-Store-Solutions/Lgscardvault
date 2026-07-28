@@ -26,3 +26,4 @@ framework:
         routing:
             App\Message\ProcessCsvImportMessage: async
             App\Message\SyncScryfallCatalogMessage: async
+            App\Message\SyncGameCatalogMessage: async

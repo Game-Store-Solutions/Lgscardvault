@@ -20,3 +20,16 @@ export {
   useCustomerNotifications,
 } from './useCustomer'
 export { useCart } from './useCart'
+export {
+  useCatalogGames,
+  useGameSets,
+  useSealedCatalogSearch,
+  useStoreSealedInventory,
+  useSealedSpotlight,
+  useCatalogSyncRuns,
+  catalogGamesKey,
+  gameSetsKey,
+  sealedInventoryKey,
+  sealedSpotlightKey,
+  syncRunsKey,
+} from './useCatalog'
