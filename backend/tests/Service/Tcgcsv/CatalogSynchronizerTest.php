@@ -5,9 +5,11 @@ namespace App\Tests\Service\Tcgcsv;
 use App\Entity\CatalogSyncRun;
 use App\Entity\SealedProduct;
 use App\Repository\CardRepository;
+use App\Repository\CatalogSyncRunRepository;
 use App\Repository\GameRepository;
 use App\Repository\GameSetRepository;
 use App\Repository\SealedProductRepository;
+use App\Service\Doctrine\SqlDebugLogPruner;
 use App\Service\Tcgcsv\CatalogSynchronizer;
 use App\Service\Tcgcsv\CatalogSyncRunner;
 use App\Service\Tcgcsv\TcgcsvClient;
@@ -65,6 +67,7 @@ final class CatalogSynchronizerTest extends KernelTestCase
             $c->get(GameSetRepository::class),
             $c->get(SealedProductRepository::class),
             $c->get(CardRepository::class),
+            new SqlDebugLogPruner(),
             new NullLogger(),
         );
     }
@@ -271,6 +274,7 @@ final class CatalogSynchronizerTest extends KernelTestCase
             $c->get(GameSetRepository::class),
             $c->get(SealedProductRepository::class),
             $c->get(CardRepository::class),
+            new SqlDebugLogPruner(),
             new NullLogger(),
         );
 
@@ -295,9 +299,16 @@ final class CatalogSynchronizerTest extends KernelTestCase
             $c->get(GameSetRepository::class),
             $c->get(SealedProductRepository::class),
             $c->get(CardRepository::class),
+            new SqlDebugLogPruner(),
             new NullLogger(),
         );
-        $runner = new CatalogSyncRunner($synchronizer, $this->games, $this->em, new NullLogger());
+        $runner = new CatalogSyncRunner(
+            $synchronizer,
+            $this->games,
+            $c->get(CatalogSyncRunRepository::class),
+            $this->em,
+            new NullLogger(),
+        );
 
         $run = $runner->run('pokemon');
 

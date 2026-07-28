@@ -50,4 +50,24 @@ class CsvImportJobRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Jobs left mid-flight by a worker that died (out of memory, restart,
+     * deploy). Every batch touches updatedAt, so a job that has not moved
+     * since $threshold has nobody working on it.
+     *
+     * @return list<CsvImportJob>
+     */
+    public function findStalledForStore(Store $store, \DateTimeImmutable $threshold): array
+    {
+        return $this->createQueryBuilder('job')
+            ->andWhere('job.store = :store')
+            ->andWhere('job.status = :processing')
+            ->andWhere('job.updatedAt < :threshold')
+            ->setParameter('store', $store)
+            ->setParameter('processing', CsvImportJob::STATUS_PROCESSING)
+            ->setParameter('threshold', $threshold)
+            ->getQuery()
+            ->getResult();
+    }
 }

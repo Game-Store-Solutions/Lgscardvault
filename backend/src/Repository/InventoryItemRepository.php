@@ -3,8 +3,10 @@
 namespace App\Repository;
 
 use App\Entity\InventoryItem;
+use App\Entity\Game;
 use App\Entity\Store;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -24,9 +26,9 @@ class InventoryItemRepository extends ServiceEntityRepository
      *
      * @return list<InventoryItem>
      */
-    public function findPageByStore(Store $store, int $offset, int $limit): array
+    public function findPageByStore(Store $store, int $offset, int $limit, ?string $gameCode = null): array
     {
-        return $this->createQueryBuilder('i')
+        $qb = $this->createQueryBuilder('i')
             ->andWhere('i.store = :store')
             ->setParameter('store', $store)
             ->join('i.card', 'c')
@@ -34,19 +36,51 @@ class InventoryItemRepository extends ServiceEntityRepository
             ->orderBy('c.name', 'ASC')
             ->addOrderBy('i.id', 'ASC')
             ->setFirstResult($offset)
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limit);
+
+        if (null !== $gameCode && '' !== $gameCode) {
+            $this->scopeToGame($qb, $gameCode);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
-    public function countByStore(Store $store): int
+    public function countByStore(Store $store, ?string $gameCode = null): int
     {
-        return (int) $this->createQueryBuilder('i')
+        $qb = $this->createQueryBuilder('i')
             ->select('COUNT(i.id)')
             ->andWhere('i.store = :store')
+            ->setParameter('store', $store);
+
+        if (null !== $gameCode && '' !== $gameCode) {
+            $qb->join('i.card', 'c');
+            $this->scopeToGame($qb, $gameCode);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Game codes a store actually stocks, so the storefront only offers game
+     * tabs that lead somewhere. Legacy NULL-game listings report as Magic.
+     *
+     * @return list<string>
+     */
+    public function findStockedGameCodes(Store $store): array
+    {
+        $rows = $this->createQueryBuilder('i')
+            ->select('COALESCE(g.code, :mtg) AS code')
+            ->distinct()
+            ->join('i.card', 'c')
+            ->leftJoin('c.game', 'g')
+            ->andWhere('i.store = :store')
+            ->andWhere('i.quantity > 0')
             ->setParameter('store', $store)
+            ->setParameter('mtg', Game::CODE_MTG)
             ->getQuery()
-            ->getSingleScalarResult();
+            ->getScalarResult();
+
+        return array_values(array_filter(array_map(static fn (array $row): string => (string) $row['code'], $rows)));
     }
 
     /**
@@ -58,9 +92,9 @@ class InventoryItemRepository extends ServiceEntityRepository
      *
      * @return list<InventoryItem>
      */
-    public function findByStoreAfterId(Store $store, int $afterId, int $limit): array
+    public function findByStoreAfterId(Store $store, int $afterId, int $limit, ?string $gameCode = null): array
     {
-        return $this->createQueryBuilder('i')
+        $qb = $this->createQueryBuilder('i')
             ->andWhere('i.store = :store')
             ->andWhere('i.id > :afterId')
             ->setParameter('store', $store)
@@ -68,10 +102,36 @@ class InventoryItemRepository extends ServiceEntityRepository
             ->join('i.card', 'c')
             ->addSelect('c')
             ->orderBy('i.id', 'ASC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limit);
+
+        if (null !== $gameCode && '' !== $gameCode) {
+            $this->scopeToGame($qb, $gameCode);
+        }
+
+        return $qb->getQuery()->getResult();
     }
+
+    /**
+     * Restricts a listing query to one game.
+     *
+     * Cards predating the multi-game catalog have no game row and are Magic
+     * by definition, so a Magic filter must include those NULLs — otherwise
+     * every legacy listing disappears the moment a store picks "Magic".
+     */
+    private function scopeToGame(QueryBuilder $qb, string $gameCode): void
+    {
+        $code = strtolower(trim($gameCode));
+        $qb->leftJoin('c.game', 'g');
+
+        if (Game::CODE_MTG === $code) {
+            $qb->andWhere('g.code = :gameCode OR c.game IS NULL');
+        } else {
+            $qb->andWhere('g.code = :gameCode');
+        }
+
+        $qb->setParameter('gameCode', $code);
+    }
+
 
     /**
      * One page of candidate listings for a case section's auto-fill — in

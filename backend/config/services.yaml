@@ -37,6 +37,13 @@ services:
         arguments:
             $lockFilePath: '%kernel.project_dir%/var/scryfall_rate.lock'
 
+    # The Doctrine profiler's query buffer is only registered in debug mode,
+    # so this dependency is optional: '@?' yields null in prod where the
+    # service does not exist.
+    App\Service\Doctrine\SqlDebugLogPruner:
+        arguments:
+            $debugDataHolder: '@?doctrine.debug_data_holder'
+
     # Per-import run logs live under the logs dir (var/log/imports/*.log).
     App\Service\Import\ImportLogger:
         arguments:

@@ -1,0 +1,79 @@
+import type { CatalogGame } from '../../api/types'
+import { FilterPill, Select } from '../ui'
+import { cx } from '../../lib/cx'
+
+export interface GameOption extends Pick<CatalogGame, 'code' | 'name'> {
+  /** Optional count shown next to the name (listings, products, …). */
+  count?: number
+}
+
+export interface GameSelectorProps {
+  games: GameOption[]
+  /** Selected game code; '' means the All option (when allowed). */
+  value: string
+  onChange: (code: string) => void
+  /** Show an "All games" choice. Off for surfaces that must pick one game. */
+  includeAll?: boolean
+  allLabel?: string
+  /** Accessible name for the control (each instance needs its own). */
+  label?: string
+  className?: string
+}
+
+/**
+ * The one game switcher, shared by the storefront and the admin portal so
+ * both read the same way.
+ *
+ * Responsive by construction rather than by breakpoint guesswork: pills on
+ * a wide screen (fast, everything visible at once) collapse to a native
+ * select on small screens, where a row of five-plus pills would either wrap
+ * into a wall or scroll sideways. Both render the same options and emit the
+ * same value.
+ */
+export function GameSelector({
+  games,
+  value,
+  onChange,
+  includeAll = false,
+  allLabel = 'All games',
+  label = 'Game',
+  className,
+}: GameSelectorProps) {
+  if (games.length === 0) return null
+
+  const optionLabel = (game: GameOption) =>
+    undefined === game.count ? game.name : `${game.name} (${game.count})`
+
+  return (
+    <div className={cx('w-full', className)}>
+      {/* Mobile: a native picker — reliable, no horizontal scrolling. */}
+      <label className="block sm:hidden">
+        <span className="sr-only">{label}</span>
+        <Select value={value} onChange={(event) => onChange(event.target.value)}>
+          {includeAll && <option value="">{allLabel}</option>}
+          {games.map((game) => (
+            <option key={game.code} value={game.code}>
+              {optionLabel(game)}
+            </option>
+          ))}
+        </Select>
+      </label>
+
+      {/* Desktop: pills, so switching games is one click. */}
+      <div role="group" aria-label={label} className="hidden flex-wrap gap-2 sm:flex">
+        {includeAll && (
+          <FilterPill active={'' === value} onClick={() => onChange('')}>
+            {allLabel}
+          </FilterPill>
+        )}
+        {games.map((game) => (
+          <FilterPill key={game.code} active={value === game.code} onClick={() => onChange(game.code)}>
+            {optionLabel(game)}
+          </FilterPill>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default GameSelector

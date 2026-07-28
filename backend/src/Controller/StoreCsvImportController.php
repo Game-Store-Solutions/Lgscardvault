@@ -57,6 +57,7 @@ final class StoreCsvImportController extends AbstractController
         private readonly CsvImportParser $parser,
         private readonly SealedCsvImportParser $sealedParser,
         private readonly ImportPreviewer $previewer,
+        private readonly \App\Service\CsvImport\StalledImportRecoverer $stalledImportRecoverer,
         private readonly GameRepository $gameRepository,
         private readonly StoreInventoryWriter $inventoryWriter,
         private readonly ScryfallClient $scryfallClient,
@@ -219,6 +220,10 @@ final class StoreCsvImportController extends AbstractController
 
         $this->denyAccessUnlessGranted('STORE_MANAGE', $store);
 
+        // Jobs abandoned by a crashed worker are requeued here, so the list
+        // never shows an import frozen at "processing" with nobody on it.
+        $this->stalledImportRecoverer->recoverForStore($store);
+
         return $this->json(array_map(
             $this->serializeJobSummary(...),
             $this->jobRepository->findRecentByStore($store),
@@ -235,6 +240,8 @@ final class StoreCsvImportController extends AbstractController
         }
 
         $this->denyAccessUnlessGranted('STORE_MANAGE', $store);
+
+        $this->stalledImportRecoverer->recoverForStore($store);
 
         $job = $this->jobRepository->findLatestByStore($store);
         if (null === $job) {

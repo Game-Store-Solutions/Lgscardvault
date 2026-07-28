@@ -10,7 +10,6 @@ import {
   CardHeader,
   EmptyState,
   Field,
-  FilterPill,
   Input,
   LoadingPanel,
   Modal,
@@ -33,6 +32,7 @@ import {
   useStoreSealedInventory,
 } from '../../hooks'
 import { Package } from 'lucide-react'
+import { GameSelector } from '../../components/catalog'
 
 /**
  * Sealed tab: manage the store's sealed inventory (boxes, bundles, decks)
@@ -96,21 +96,19 @@ export default function SealedTab({ slug }: { slug: string }) {
         </div>
       )}
 
-      {/* Game separation: one pill per supported game. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterPill active={!gameFilter} onClick={() => { setGameFilter(''); setSetFilter(0); setPage(1) }}>
-          All games
-        </FilterPill>
-        {games.map((game) => (
-          <FilterPill
-            key={game.code}
-            active={gameFilter === game.code}
-            onClick={() => { setGameFilter(game.code); setSetFilter(0); setPage(1) }}
-          >
-            {game.name}
-          </FilterPill>
-        ))}
-      </div>
+      {/* Same switcher as the singles tab and the storefront. */}
+      <GameSelector
+        games={games.map((game) => ({ code: game.code, name: game.name }))}
+        value={gameFilter}
+        onChange={(code) => {
+          setGameFilter(code)
+          setSetFilter(0)
+          setPage(1)
+        }}
+        includeAll
+        allLabel="All games"
+        label="Manage sealed for"
+      />
 
       {/* The store's sealed stock */}
       <Card>

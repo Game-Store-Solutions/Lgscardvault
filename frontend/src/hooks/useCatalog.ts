@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '../api/client'
 import type {
+  StoreGame,
   CatalogGame,
   CatalogGameSet,
   CatalogSyncRun,
@@ -18,6 +19,7 @@ export const sealedSearchKey = (params: SealedSearchParams) =>
 export const sealedInventoryKey = (slug: string, game?: string) => ['sealed-inventory', slug, game ?? ''] as const
 export const sealedSpotlightKey = (slug: string) => ['sealed-spotlight', slug] as const
 export const syncRunsKey = ['catalog', 'sync-runs'] as const
+export const storeGamesKey = (slug: string) => ['store-games', slug] as const
 
 export interface SealedSearchParams {
   game?: string
@@ -33,6 +35,23 @@ export function useCatalogGames() {
     staleTime: 60 * 60 * 1000, // the game list changes ~never within a session
     queryFn: async () => {
       const { data } = await api.get<CatalogGame[]>('/catalog/games')
+      return data
+    },
+  })
+}
+
+/**
+ * Games this store actually stocks. The storefront switcher is built from
+ * this rather than the platform game list, so shoppers are never offered a
+ * tab that leads to an empty shelf.
+ */
+export function useStoreGames(slug: string) {
+  return useQuery({
+    queryKey: storeGamesKey(slug),
+    enabled: Boolean(slug),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<StoreGame[]>(`/stores/${slug}/games`)
       return data
     },
   })
@@ -85,13 +104,15 @@ export function useStoreSealedInventory(slug: string, game?: string) {
 }
 
 /** Storefront: freshest in-stock sealed lines for the spotlight row. */
-export function useSealedSpotlight(slug: string) {
+export function useSealedSpotlight(slug: string, gameCode?: string) {
   return useQuery({
-    queryKey: sealedSpotlightKey(slug),
+    queryKey: [...sealedSpotlightKey(slug), gameCode ?? ''],
     enabled: Boolean(slug),
     staleTime: 60 * 1000,
     queryFn: async () => {
-      const { data } = await api.get<SealedInventoryLine[]>(`/stores/${slug}/sealed/spotlight`)
+      const { data } = await api.get<SealedInventoryLine[]>(`/stores/${slug}/sealed/spotlight`, {
+        params: { game: gameCode || undefined },
+      })
       return data
     },
   })

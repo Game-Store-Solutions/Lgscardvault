@@ -36,6 +36,35 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Name search within one game. Non-Magic catalogs are local-only
+     * (TCGCSV), so this is the whole search for them — there is no remote
+     * leg to fall back to.
+     *
+     * @return list<Card>
+     */
+    public function searchByNameForGame(Game $game, string $query, int $limit = 40): array
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('LOWER(c.name) LIKE :query')
+            ->setParameter('query', '%'.mb_strtolower(trim($query)).'%')
+            ->orderBy('c.name', 'ASC')
+            ->setMaxResults($limit);
+
+        // Cards predating the multi-game catalog carry no game and are Magic.
+        if ($game->isMtg()) {
+            $qb->leftJoin('c.game', 'g')
+                ->andWhere('g.code = :code OR c.game IS NULL')
+                ->setParameter('code', Game::CODE_MTG);
+        } else {
+            $qb->join('c.game', 'g')
+                ->andWhere('g.code = :code')
+                ->setParameter('code', $game->getCode());
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Exact-name lookup for decklist lines: full name or the front face of a
      * double-faced card ("Fable of the Mirror-Breaker // ..."). Any printing
      * satisfies a deck line, so the first match wins.

@@ -26,6 +26,7 @@ final class CatalogSyncController extends AbstractController
         private readonly CatalogSyncRunRepository $syncRuns,
         private readonly GameCatalogSerializer $serializer,
         private readonly MessageBusInterface $messageBus,
+        private readonly \App\Service\Tcgcsv\CatalogSyncRunner $syncRunner,
     ) {
     }
 
@@ -60,6 +61,10 @@ final class CatalogSyncController extends AbstractController
     #[IsGranted('ROLE_SUPER_ADMIN')]
     public function syncRuns(): JsonResponse
     {
+        // A run whose worker was killed can never close itself out; reaping
+        // on read keeps the view honest instead of showing it running forever.
+        $this->syncRunner->failStaleRuns();
+
         return $this->json(array_map($this->serializer->syncRun(...), $this->syncRuns->findRecent()));
     }
 }

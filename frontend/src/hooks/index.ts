@@ -22,6 +22,7 @@ export {
 export { useCart } from './useCart'
 export {
   useCatalogGames,
+  useStoreGames,
   useGameSets,
   useSealedCatalogSearch,
   useStoreSealedInventory,
@@ -32,4 +33,5 @@ export {
   sealedInventoryKey,
   sealedSpotlightKey,
   syncRunsKey,
+  storeGamesKey,
 } from './useCatalog'

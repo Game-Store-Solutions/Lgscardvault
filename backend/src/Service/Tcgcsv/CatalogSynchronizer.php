@@ -9,6 +9,7 @@ use App\Entity\SealedProduct;
 use App\Repository\CardRepository;
 use App\Repository\GameSetRepository;
 use App\Repository\SealedProductRepository;
+use App\Service\Doctrine\SqlDebugLogPruner;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Uid\Uuid;
@@ -42,6 +43,7 @@ final readonly class CatalogSynchronizer
         private GameSetRepository $gameSetRepository,
         private SealedProductRepository $sealedProductRepository,
         private CardRepository $cardRepository,
+        private SqlDebugLogPruner $sqlDebugLogPruner,
         private LoggerInterface $logger,
     ) {
     }
@@ -63,8 +65,13 @@ final readonly class CatalogSynchronizer
      * the whole run: failures are counted, logged, and the sync moves on.
      * Only a failure to list the groups at all aborts.
      *
+     * Memory stays flat across a thousand-set run: after each set the
+     * managed-entity map and the profiler's query buffer are both dropped.
+     * Without that, a full sync exhausts the default 128M memory_limit long
+     * before it finishes.
+     *
      * @param int|null                    $maxGroups stop after this many groups (smoke runs); null = all
-     * @param (callable(string, int): void)|null $onProgress receives (group name, groups done so far)
+     * @param (callable(string, int, array<string, mixed>): void)|null $onProgress receives (group name, groups done, counters)
      *
      * @return array<string, int|list<string>> counters for the sync-run summary
      */
@@ -74,6 +81,12 @@ final readonly class CatalogSynchronizer
         if (null === $categoryId) {
             throw new \InvalidArgumentException(sprintf('Game "%s" has no TCGCSV category id; it cannot be synced.', $game->getCode()));
         }
+
+        // Re-resolved after every clear() so the game stays a managed entity.
+        // Also resolved up front: a caller may hand us a Game detached by an
+        // earlier sync, and every upsert below writes through this reference.
+        $gameId = (int) $game->getId();
+        $game = $this->requireManagedGame($gameId);
 
         $counters = [
             'groupsSeen' => 0,
@@ -107,10 +120,14 @@ final readonly class CatalogSynchronizer
 
                 $this->syncGroupProducts($game, $set, $products, $prices, $counters);
 
-                // Flush per group: bounds memory and makes partial progress
-                // durable if a later group's fetch fails mid-run.
+                // Flush per group: makes partial progress durable if a later
+                // group's fetch fails mid-run.
                 $this->entityManager->flush();
                 ++$counters['groupsSeen'];
+
+                // …then forget it all. Every card and sealed product would
+                // otherwise stay in the identity map for the whole run.
+                $game = $this->releaseMemory($gameId);
             } catch (\Throwable $e) {
                 ++$counters['groupsFailed'];
                 if (count($failures) < 20) {
@@ -123,10 +140,11 @@ final readonly class CatalogSynchronizer
                 ]);
 
                 $this->assertManagerUsable();
+                $game = $this->releaseMemory($gameId);
             }
 
             if (null !== $onProgress) {
-                $onProgress($groupName, $counters['groupsSeen'] + $counters['groupsFailed']);
+                $onProgress($groupName, $counters['groupsSeen'] + $counters['groupsFailed'], $counters);
             }
         }
 
@@ -137,6 +155,28 @@ final readonly class CatalogSynchronizer
         }
 
         return $counters;
+    }
+
+    /**
+     * Drops everything Doctrine is holding onto between sets and hands back
+     * a freshly managed Game (clear() detaches the one the caller passed in).
+     */
+    private function releaseMemory(int $gameId): Game
+    {
+        $this->entityManager->clear();
+        $this->sqlDebugLogPruner->prune();
+
+        return $this->requireManagedGame($gameId);
+    }
+
+    private function requireManagedGame(int $gameId): Game
+    {
+        $game = $this->entityManager->find(Game::class, $gameId);
+        if (!$game instanceof Game) {
+            throw new \RuntimeException(sprintf('Game %d disappeared mid-sync.', $gameId));
+        }
+
+        return $game;
     }
 
     /**

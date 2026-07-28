@@ -4,11 +4,11 @@ import { Search } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
 import { inventoryKey, useCatalogGames, useInventory } from '../../hooks'
+import { GameSelector } from '../../components/catalog'
 import {
   Card,
   CardHeader,
   CardBody,
-  FilterPill,
   Input,
   Select,
   Field,
@@ -52,12 +52,15 @@ export default function SearchTab({ slug }: { slug: string }) {
   const { data: inventory = [] } = useInventory(slug)
 
   const { data: catalogResults = [], refetch: runCatalogSearch } = useQuery({
-    queryKey: ['card-search', catalogSearch, catalogSetFilter, catalogFinishFilter],
+    queryKey: ['card-search', catalogSearch, catalogSetFilter, catalogFinishFilter, gameFilter],
     queryFn: async () => {
       if (!catalogSearch.trim()) return []
       const { data } = await api.get<CardSummary[]>('/catalog/search', {
         params: {
           q: catalogSearch,
+          // Scoped to the game being managed, so a Pokémon search never
+          // returns Magic printings (and never hits Scryfall for them).
+          ...(gameFilter ? { game: gameFilter } : {}),
           ...(catalogSetFilter.trim() ? { set: catalogSetFilter.trim() } : {}),
           ...(catalogFinishFilter !== 'all' ? { finish: catalogFinishFilter } : {}),
         },
@@ -156,10 +159,17 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   // Games present in this store's inventory; pills only render for 2+.
   const { data: games = [] } = useCatalogGames()
-  const inventoryGameCodes = useMemo(
-    () => new Set(inventory.map((item) => item.card.gameCode ?? 'mtg')),
-    [inventory],
-  )
+  const gameOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const item of inventory) {
+      const code = item.card.gameCode ?? 'mtg'
+      counts.set(code, (counts.get(code) ?? 0) + 1)
+    }
+
+    // Every platform game is offered (a store has to be able to start
+    // stocking a new one), with its current listing count for context.
+    return games.map((game) => ({ code: game.code, name: game.name, count: counts.get(game.code) ?? 0 }))
+  }, [games, inventory])
 
   const filteredInventory = useMemo(() => {
     const term = filter.trim().toLowerCase()
@@ -190,8 +200,30 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
+      {gameOptions.length > 1 && (
+        <Card>
+          <CardBody className="py-4">
+            <GameSelector
+              games={gameOptions}
+              value={gameFilter}
+              onChange={setGameFilter}
+              includeAll
+              allLabel="All games"
+              label="Manage inventory for"
+            />
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
-        <CardHeader title="Add inventory" subtitle="Search the catalog, then add a printing to this store." />
+        <CardHeader
+          title="Add inventory"
+          subtitle={
+            gameFilter
+              ? `Searching the ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''} catalog.`
+              : 'Search the catalog, then add a printing to this store.'
+          }
+        />
         <CardBody className="space-y-5">
           {mutationError && (
             <p role="alert" className="text-sm font-medium text-danger-700">
@@ -287,24 +319,6 @@ export default function SearchTab({ slug }: { slug: string }) {
           }
         />
         <CardBody>
-          {inventoryGameCodes.size > 1 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              <FilterPill active={!gameFilter} onClick={() => setGameFilter('')}>
-                All games
-              </FilterPill>
-              {games
-                .filter((game) => inventoryGameCodes.has(game.code))
-                .map((game) => (
-                  <FilterPill
-                    key={game.code}
-                    active={gameFilter === game.code}
-                    onClick={() => setGameFilter(game.code)}
-                  >
-                    {game.name}
-                  </FilterPill>
-                ))}
-            </div>
-          )}
           {filteredInventory.length === 0 ? (
             <EmptyState
               icon={Search}

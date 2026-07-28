@@ -33,6 +33,7 @@ class CardSearchController extends AbstractController
 
     public function __construct(
         private readonly CardRepository $cardRepository,
+        private readonly \App\Repository\GameRepository $gameRepository,
         private readonly ScryfallClient $scryfallClient,
         private readonly CatalogCardResolver $catalogCardResolver,
         #[Autowire(service: 'limiter.catalog_search')]
@@ -66,6 +67,23 @@ class CardSearchController extends AbstractController
         $finish = strtolower(trim((string) $request->query->get('finish', '')));
         if (!in_array($finish, ['foil', 'nonfoil'], true)) {
             $finish = '';
+        }
+
+        // Game scoping. Every game except Magic has a purely local catalog
+        // (TCGCSV), and Scryfall knows nothing about them — so for those the
+        // local search below IS the search, and the remote legs are skipped
+        // rather than run and discarded.
+        $gameCode = trim((string) $request->query->get('game', ''));
+        $game = '' !== $gameCode ? $this->gameRepository->findOneByCode($gameCode) : null;
+        if ('' !== $gameCode && null === $game) {
+            return $this->json(['detail' => 'Unknown game.'], 404);
+        }
+
+        if (null !== $game && !$game->isMtg()) {
+            return $this->json(array_map(
+                $this->catalogCardResolver->serializeCard(...),
+                $this->cardRepository->searchByNameForGame($game, $query, 40),
+            ));
         }
 
         /** @var array<string, \App\Entity\Card> $merged */
@@ -141,9 +159,17 @@ class CardSearchController extends AbstractController
             }
         }
 
+        $results = array_values($merged);
+        if (null !== $game) {
+            $results = array_values(array_filter(
+                $results,
+                static fn (\App\Entity\Card $card): bool => $card->resolvedGameCode() === $game->getCode(),
+            ));
+        }
+
         return $this->json(array_map(
             $this->catalogCardResolver->serializeCard(...),
-            array_slice(array_values($merged), 0, 40),
+            array_slice($results, 0, 40),
         ));
     }
 

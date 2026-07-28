@@ -78,7 +78,10 @@ class CatalogSyncCommand extends Command
             // A full catalog is thousands of paced requests; print each set as
             // it lands so a long first run is visibly making progress.
             $run = $this->runner->run($code, $maxGroups, static function (string $group, int $done) use ($io): void {
-                $io->writeln(sprintf('  <fg=gray>%4d</> %s', $done, $group), OutputInterface::VERBOSITY_VERBOSE);
+                $io->writeln(
+                    sprintf('  <fg=gray>%4d</> %s <fg=gray>(%.0f MB)</>', $done, $group, memory_get_usage(true) / 1048576),
+                    OutputInterface::VERBOSITY_VERBOSE,
+                );
             });
 
             if (CatalogSyncRun::STATUS_SUCCEEDED === $run->getStatus()) {
