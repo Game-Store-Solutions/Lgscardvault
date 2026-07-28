@@ -249,6 +249,30 @@ super-admins can also trigger a sync (`POST /api/admin/catalog/sync/{code}`,
 queued on the worker). One failing set is counted and skipped rather than
 aborting the run.
 
+### Memory and interrupted runs
+
+Syncs and CSV imports are designed to run in flat memory: entities are
+released after every set/batch, and the Doctrine profiler's query buffer
+(which retains every statement, with a backtrace, whenever `APP_DEBUG=1`) is
+pruned as it goes. Run `-v` to watch the resident size per set. If you still
+see
+
+```
+PHP Fatal error: Allowed memory size of 134217728 bytes exhausted
+  in .../Middleware/BacktraceDebugDataHolder.php
+```
+
+you are on a build predating that fix — pull and retry, or run the sync with
+`APP_ENV=prod` to keep the profiler out of the process entirely.
+
+A worker that is killed outright (OOM, container restart, Ctrl-C) cannot
+write its own terminal status. Runs carry a heartbeat, so anything with no
+sign of life for 15 minutes is closed out as **interrupted** the next time
+the Sync Jobs view is opened or a sync starts. CSV imports recover the same
+way: a job left at *processing* by a dead worker is requeued — with its
+abandoned rows released — as soon as the Imports tab is loaded, so it
+finishes instead of hanging.
+
 ### Staying current automatically
 
 TCGCSV republishes at 20:00 UTC daily. A Symfony Scheduler schedule queues a

@@ -12,6 +12,7 @@ use App\Repository\CsvImportRowRepository;
 use App\Repository\CardRepository;
 use App\Service\Catalog\CatalogCardResolver;
 use App\Service\CsvImport\SealedImportProcessor;
+use App\Service\Doctrine\SqlDebugLogPruner;
 use App\Service\Inventory\StoreInventoryWriter;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -45,6 +46,7 @@ final readonly class ProcessCsvImportMessageHandler
         private ScryfallClient $scryfallClient,
         private StoreInventoryWriter $inventoryWriter,
         private \App\Service\Import\ImportLogger $importLogger,
+        private SqlDebugLogPruner $sqlDebugLogPruner,
         private EntityManagerInterface $entityManager,
         private ManagerRegistry $managerRegistry,
         private MessageBusInterface $messageBus,
@@ -53,6 +55,12 @@ final readonly class ProcessCsvImportMessageHandler
 
     public function __invoke(ProcessCsvImportMessage $message): void
     {
+        // One worker process handles batch after batch. In debug mode every
+        // query (with backtrace) is retained for the profiler, so without
+        // this a long import kills the worker with an out-of-memory fatal
+        // and leaves its job stuck in PROCESSING.
+        $this->sqlDebugLogPruner->prune();
+
         $job = $this->jobRepository->find($message->jobId);
         if (!$job instanceof CsvImportJob) {
             return;

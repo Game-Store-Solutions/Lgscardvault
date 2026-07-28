@@ -36,6 +36,15 @@ class CatalogSyncRun
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $finishedAt = null;
 
+    /**
+     * Last sign of life from the worker. A sync can legitimately run for
+     * many minutes, so "is this run still alive?" cannot be answered from
+     * startedAt alone — an OOM-killed process leaves the row RUNNING
+     * forever. A stale heartbeat is what marks it interrupted.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $heartbeatAt = null;
+
     /** Counters: setsUpserted, cardsUpserted, sealedUpserted, groupsSeen, … */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $summary = null;
@@ -57,6 +66,9 @@ class CatalogSyncRun
     public function setStatus(string $status): static { $this->status = $status; return $this; }
 
     public function getStartedAt(): \DateTimeImmutable { return $this->startedAt; }
+
+    public function getHeartbeatAt(): ?\DateTimeImmutable { return $this->heartbeatAt; }
+    public function beat(): static { $this->heartbeatAt = new \DateTimeImmutable(); return $this; }
 
     public function getFinishedAt(): ?\DateTimeImmutable { return $this->finishedAt; }
     public function setFinishedAt(?\DateTimeImmutable $finishedAt): static { $this->finishedAt = $finishedAt; return $this; }
