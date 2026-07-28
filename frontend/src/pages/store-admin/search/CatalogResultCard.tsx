@@ -20,7 +20,17 @@ export function CatalogResultCard({ card, selected, onSelect }: CatalogResultCar
       }`}
     >
       {cardImage(card) && (
-        <img src={cardImage(card)} alt={card.name} className="h-20 w-auto flex-shrink-0 rounded-btn" />
+        <img
+          src={cardImage(card)}
+          alt={card.name}
+          loading="lazy"
+          // Catalog art comes from TCGplayer and occasionally 404s; hide the
+          // element rather than showing a broken-image icon.
+          onError={(event) => {
+            event.currentTarget.style.display = 'none'
+          }}
+          className="h-20 w-auto flex-shrink-0 rounded-btn"
+        />
       )}
       <span className="min-w-0 space-y-1">
         <span className="block font-bold leading-snug text-fg">{card.name}</span>

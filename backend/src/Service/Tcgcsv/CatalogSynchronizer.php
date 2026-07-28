@@ -315,7 +315,7 @@ final readonly class CatalogSynchronizer
         }
         $text = $extended['cardtext'] ?? $extended['description'] ?? null;
         if (null !== $text) {
-            $card->setOracleText($text);
+            $card->setOracleText($this->plainText($text));
         }
         if (isset($extended['power'])) {
             $card->setPower(mb_substr($extended['power'], 0, 16));
@@ -388,6 +388,29 @@ final readonly class CatalogSynchronizer
 
         return $indexed;
     }
+
+    /**
+     * TCGCSV card text is HTML — rules text arrives with <br> between lines
+     * (and the odd <b>/<i>). Stored raw it renders as literal "<br>" in the
+     * UI, so it is flattened to plain text with real newlines here, at the
+     * one place the value enters the system.
+     */
+    private function plainText(string $html): string
+    {
+        // <br> and block ends become newlines before tags are stripped, so
+        // line structure survives instead of collapsing into one run-on line.
+        $withBreaks = preg_replace('#<\s*br\s*/?\s*>#i', "\n", $html) ?? $html;
+        $withBreaks = preg_replace('#</\s*(p|div|li)\s*>#i', "\n", $withBreaks) ?? $withBreaks;
+
+        $text = html_entity_decode(strip_tags($withBreaks), \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+
+        // Collapse the blank lines the substitutions can leave behind.
+        $text = preg_replace("/[ \t]+\n/", "\n", $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+
+        return trim($text);
+    }
+
 
     /**
      * Flattens extendedData ([{name, value}, …]) into a lowercase-keyed map.

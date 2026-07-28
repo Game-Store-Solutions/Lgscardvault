@@ -32,6 +32,7 @@ import { formatDate } from '../lib/format'
 import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { CardText, ManaCost } from '../components/mtg/ManaSymbol'
+import { plainCardText } from '../lib/cardText'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -178,7 +179,11 @@ export default function CardDetailsPage() {
   const nextFace = faces.length >= 2 ? faces[(faceIndex + 1) % faces.length] : undefined
 
   const image = (activeFace ? faceImage(activeFace) : undefined) ?? cardImage(card)
-  const oracleText = activeFace?.oracleText ?? card.oracleText
+  const rawOracleText = activeFace?.oracleText ?? card.oracleText
+  // TCGCSV rules text is HTML; flatten it so tags never render as literal
+  // text on cards synced before the sync-side fix.
+  const oracleText = rawOracleText ? plainCardText(rawOracleText) : rawOracleText
+  const isMagic = (card.gameCode ?? 'mtg') === 'mtg'
   const flavorText = activeFace?.flavorText ?? card.flavorText
   const typeLine = activeFace?.typeLine ?? card.typeLine
   const accent = rarityAccent(card.rarity)
@@ -463,7 +468,9 @@ export default function CardDetailsPage() {
 
           <div className="grid gap-6 sm:grid-cols-2">
             <section className="rounded-card border border-border bg-surface p-6 shadow-card">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">Scryfall prices</h2>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">
+                {isMagic ? 'Scryfall prices' : 'Market prices'}
+              </h2>
               <div className="mt-3 space-y-2">
                 {priceRows.map((row) => (
                   <PriceRow key={row.label} label={row.label} value={row.value} />
