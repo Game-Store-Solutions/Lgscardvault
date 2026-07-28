@@ -94,8 +94,8 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile brand mark (the image panel is hidden on small screens) */}
           <Link to="/" className="mb-8 inline-flex items-center gap-2 font-display text-lg font-bold tracking-tight text-brand-600 lg:hidden">
-            <span className="grid size-9 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">MTG</span>
-            MTG Marketplace
+            <span className="grid size-9 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">LGS</span>
+            LGS Card Vault
           </Link>
 
           <span className="grid size-12 place-items-center rounded-card bg-brand-50 text-brand-600">

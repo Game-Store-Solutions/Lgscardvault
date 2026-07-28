@@ -24,7 +24,7 @@ const FEATURES = [
  * headline, and glassy role feature chips. Hidden on small screens (the form
  * takes the full width there).
  */
-export default function AuthMarketingAside({ eyebrow = 'MTG Marketplace', storeName, description, imageUrl }: AuthMarketingAsideProps) {
+export default function AuthMarketingAside({ eyebrow = 'LGS Card Vault', storeName, description, imageUrl }: AuthMarketingAsideProps) {
   return (
     <aside className="relative hidden overflow-hidden lg:block">
       <img
@@ -46,9 +46,9 @@ export default function AuthMarketingAside({ eyebrow = 'MTG Marketplace', storeN
       <div className="relative flex h-full flex-col justify-between p-10 text-white xl:p-14">
         <Link to="/" className="inline-flex items-center gap-2 font-display text-lg font-bold tracking-tight">
           <span className="grid size-9 place-items-center rounded-btn bg-white/15 text-sm font-bold backdrop-blur">
-            MTG
+            LGS
           </span>
-          <span>MTG Marketplace</span>
+          <span>LGS Card Vault</span>
         </Link>
 
         <div className="max-w-md">

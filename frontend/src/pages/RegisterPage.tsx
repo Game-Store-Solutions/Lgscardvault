@@ -91,8 +91,8 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
       <section className="flex items-center justify-center px-6 py-16 sm:px-10">
         <div className="w-full max-w-sm">
           <Link to="/" className="mb-8 inline-flex items-center gap-2 font-display text-lg font-bold tracking-tight text-brand-600 lg:hidden">
-            <span className="grid size-9 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">MTG</span>
-            MTG Marketplace
+            <span className="grid size-9 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">LGS</span>
+            LGS Card Vault
           </Link>
 
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">{copy.eyebrow}</p>

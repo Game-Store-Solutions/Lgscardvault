@@ -98,7 +98,7 @@ export default function HomePage() {
         <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-surface via-surface/95 to-surface/40" />
         <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-surface/70 to-transparent sm:from-surface/20" />
         <div className="relative max-w-2xl px-6 py-12 sm:px-10 sm:py-16">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">MTG Marketplace</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">LGS Card Vault</p>
           <h1 className="mt-3 max-w-2xl font-display text-4xl font-bold tracking-tight text-fg sm:text-5xl">
             Find Magic singles from trusted local stores
           </h1>
@@ -128,7 +128,7 @@ export default function HomePage() {
       {/* Featured store — only when a platform admin has selected one */}
       {!searching && featured && (
         <section>
-          <PageHeader title="Featured store" subtitle="Hand-picked by the MTG Marketplace team." className="mb-4" />
+          <PageHeader title="Featured store" subtitle="Hand-picked by the LGS Card Vault team." className="mb-4" />
           <StoreHero
             name={featured.name}
             tagline={featured.tagline}
