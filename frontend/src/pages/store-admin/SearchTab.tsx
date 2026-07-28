@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
-import { inventoryKey, useInventory } from '../../hooks'
+import { inventoryKey, useCatalogGames, useInventory } from '../../hooks'
 import {
   Card,
   CardHeader,
   CardBody,
+  FilterPill,
   Input,
   Select,
   Field,
@@ -31,6 +32,7 @@ export default function SearchTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
 
   const [filter, setFilter] = useState('')
+  const [gameFilter, setGameFilter] = useState('')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogSetFilter, setCatalogSetFilter] = useState('')
   const [catalogFinishFilter, setCatalogFinishFilter] = useState<'all' | 'foil' | 'nonfoil'>('all')
@@ -152,11 +154,19 @@ export default function SearchTab({ slug }: { slug: string }) {
     onError: (err) => setMutationError(extractErrorMessage(err, 'Could not remove inventory item.')),
   })
 
+  // Games present in this store's inventory; pills only render for 2+.
+  const { data: games = [] } = useCatalogGames()
+  const inventoryGameCodes = useMemo(
+    () => new Set(inventory.map((item) => item.card.gameCode ?? 'mtg')),
+    [inventory],
+  )
+
   const filteredInventory = useMemo(() => {
     const term = filter.trim().toLowerCase()
-    if (!term) return inventory
     return inventory.filter((item) => {
       const card = item.card
+      if (gameFilter && (card.gameCode ?? 'mtg') !== gameFilter) return false
+      if (!term) return true
       return (
         card.name.toLowerCase().includes(term) ||
         (card.setCode ?? '').toLowerCase().includes(term) ||
@@ -164,13 +174,13 @@ export default function SearchTab({ slug }: { slug: string }) {
         (card.typeLine ?? '').toLowerCase().includes(term)
       )
     })
-  }, [inventory, filter])
+  }, [inventory, filter, gameFilter])
 
   // Paginate the inventory grid; reset to page 1 when the search filter changes.
   const [invPage, setInvPage] = useState(1)
   useEffect(() => {
     setInvPage(1)
-  }, [filter])
+  }, [filter, gameFilter])
   const invPageCount = Math.max(1, Math.ceil(filteredInventory.length / INVENTORY_PAGE_SIZE))
   const currentInvPage = Math.min(invPage, invPageCount)
   const visibleInventory = filteredInventory.slice(
@@ -277,6 +287,24 @@ export default function SearchTab({ slug }: { slug: string }) {
           }
         />
         <CardBody>
+          {inventoryGameCodes.size > 1 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              <FilterPill active={!gameFilter} onClick={() => setGameFilter('')}>
+                All games
+              </FilterPill>
+              {games
+                .filter((game) => inventoryGameCodes.has(game.code))
+                .map((game) => (
+                  <FilterPill
+                    key={game.code}
+                    active={gameFilter === game.code}
+                    onClick={() => setGameFilter(game.code)}
+                  >
+                    {game.name}
+                  </FilterPill>
+                ))}
+            </div>
+          )}
           {filteredInventory.length === 0 ? (
             <EmptyState
               icon={Search}

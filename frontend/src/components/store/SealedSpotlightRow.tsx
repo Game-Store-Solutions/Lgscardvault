@@ -1,0 +1,63 @@
+import { Package } from 'lucide-react'
+import { formatPrice } from '../../api/client'
+import { useSealedSpotlight } from '../../hooks'
+
+/**
+ * Storefront rail of the store's freshest in-stock sealed products
+ * (booster boxes, bundles, decks) across every game. Renders nothing when
+ * the store carries no sealed stock, so single-focus stores stay clean.
+ */
+export function SealedSpotlightRow({ slug }: { slug: string }) {
+  const { data: lines = [] } = useSealedSpotlight(slug)
+
+  if (lines.length === 0) return null
+
+  return (
+    <section>
+      <div className="mb-4">
+        <h2 className="inline-flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-fg">
+          <span className="grid size-8 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
+            <Package aria-hidden className="size-4" />
+          </span>
+          Sealed products
+        </h2>
+        <p className="mt-1 text-sm text-fg-muted">Booster boxes, bundles, and decks in stock — ask in store to purchase</p>
+      </div>
+      <div className="flex snap-x gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {lines.map((line) => {
+          const product = line.product
+          if (!product) return null
+          return (
+            <div
+              key={line.id}
+              className="w-48 shrink-0 snap-start rounded-card border border-border bg-surface p-3 shadow-card"
+            >
+              {product.imageUrl ? (
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  loading="lazy"
+                  className="mx-auto h-36 w-auto rounded object-contain"
+                />
+              ) : (
+                <div className="grid h-36 place-items-center rounded bg-bg text-fg-muted">
+                  <Package aria-hidden className="size-8" />
+                </div>
+              )}
+              <p className="mt-2 line-clamp-2 text-sm font-semibold text-fg" title={product.name}>
+                {product.name}
+              </p>
+              <p className="mt-0.5 text-xs text-fg-muted">
+                {product.gameName ?? product.gameCode}
+              </p>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="font-display text-base font-bold text-fg">{formatPrice(line.priceCents)}</span>
+                <span className="text-xs font-medium text-fg-muted">{line.quantity} in stock</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}

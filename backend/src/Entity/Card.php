@@ -195,6 +195,13 @@ class Card
         return $this->game?->getCode() ?? Game::CODE_MTG;
     }
 
+    /** Serializer-facing alias so API payloads expose the game as `gameCode`. */
+    #[Groups(['card:read', 'inventory:read'])]
+    public function getGameCode(): string
+    {
+        return $this->resolvedGameCode();
+    }
+
     public function getOracleId(): Uuid
     {
         return $this->oracleId;

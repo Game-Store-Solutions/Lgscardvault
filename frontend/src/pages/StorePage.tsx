@@ -22,6 +22,7 @@ import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components
 import { StoreHero } from '../components/store/StoreHero'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
+import { SealedSpotlightRow } from '../components/store/SealedSpotlightRow'
 import { cx } from '../lib/cx'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
 import {
@@ -452,6 +453,9 @@ export default function StorePage() {
           </div>
         </section>
       )}
+
+      {/* Sealed spotlight — boxes/bundles/decks across all games */}
+      <SealedSpotlightRow slug={slug} />
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">

@@ -13,9 +13,11 @@ import {
   Megaphone,
   LogOut,
   Menu,
+  Package,
   Palette,
   CreditCard,
   ReceiptText,
+  RefreshCw,
   Sparkles,
   Store,
   TrendingUp,
@@ -40,6 +42,7 @@ function useAdminNav(): { context: string; items: NavItem[] } {
       context: 'Platform administration',
       items: [
         { to: '/platform/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+        { to: '/platform/admin/sync-jobs', label: 'Sync jobs', icon: RefreshCw },
         { to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone },
       ],
     }
@@ -51,6 +54,7 @@ function useAdminNav(): { context: string; items: NavItem[] } {
     context: 'Store administration',
     items: [
       { to: base, label: 'Inventory', icon: Boxes, end: true },
+      { to: `${base}/sealed`, label: 'Sealed', icon: Package },
       { to: `${base}/branding`, label: 'Branding', icon: Palette },
       { to: `${base}/spotlight`, label: 'Spotlight', icon: Sparkles },
       { to: `${base}/case-cards`, label: 'Case cards', icon: GalleryHorizontalEnd },

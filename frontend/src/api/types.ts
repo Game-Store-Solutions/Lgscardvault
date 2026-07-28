@@ -157,6 +157,8 @@ export interface CardFace {
 export interface CardSummary {
   id: string
   oracleId?: string
+  /** Game this card belongs to (mtg, pokemon, onepiece, fab, riftbound); absent = mtg. */
+  gameCode?: string
   name: string
   setCode?: string
   setName?: string
@@ -593,4 +595,68 @@ export interface CustomerNotification {
   orderReference?: string | null
   createdAt: string
   readAt?: string | null
+}
+
+/* ---------- Multi-game catalog (TCGCSV-sourced) ---------- */
+
+export interface CatalogGame {
+  id: number
+  code: string
+  name: string
+  tcgcsvCategoryId: number | null
+  position: number
+  active: boolean
+}
+
+export interface CatalogGameSet {
+  id: number
+  gameCode: string | null
+  tcgcsvGroupId: number
+  name: string
+  code: string | null
+  releaseDate: string | null
+}
+
+/** A sealed product (booster box, bundle, deck, …) from the shared catalog. */
+export interface SealedProduct {
+  id: number
+  tcgcsvProductId: number
+  gameCode: string | null
+  gameName: string | null
+  setId: number | null
+  setName: string | null
+  name: string
+  imageUrl: string | null
+  url: string | null
+  marketPriceCents: number | null
+  lowPriceCents: number | null
+  updatedAt: string
+}
+
+export interface SealedSearchResult {
+  items: SealedProduct[]
+  total: number
+  page: number
+  perPage: number
+}
+
+/** One store's stock line for a sealed product. */
+export interface SealedInventoryLine {
+  id: number
+  quantity: number
+  priceCents: number
+  acquisitionCostCents: number | null
+  updatedAt: string
+  product: SealedProduct | null
+}
+
+export interface CatalogSyncRun {
+  id: number
+  gameCode: string | null
+  gameName: string | null
+  status: 'running' | 'succeeded' | 'failed'
+  startedAt: string
+  finishedAt: string | null
+  summary: Record<string, number> | null
+  error: string | null
 }

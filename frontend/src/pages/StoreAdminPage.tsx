@@ -11,11 +11,13 @@ import BrandingTab from './store-admin/BrandingTab'
 import PaymentsTab from './store-admin/PaymentsTab'
 import PatchNotesTab from './store-admin/PatchNotesTab'
 import SellTradeTab from './store-admin/SellTradeTab'
+import SealedTab from './store-admin/SealedTab'
 
-type Section = 'inventory' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade'
+type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade'
 
 const SECTIONS: Record<Section, { label: string; render: (slug: string) => React.ReactNode }> = {
   inventory: { label: 'Inventory', render: (slug) => <SearchTab slug={slug} /> },
+  sealed: { label: 'Sealed', render: (slug) => <SealedTab slug={slug} /> },
   branding: { label: 'Branding', render: (slug) => <BrandingTab slug={slug} /> },
   spotlight: { label: 'Spotlight', render: (slug) => <SpotlightTab slug={slug} /> },
   'case-cards': { label: 'Case cards', render: (slug) => <CaseCardsTab slug={slug} /> },
