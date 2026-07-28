@@ -5,6 +5,7 @@ import { cardImage, formatPrice } from '../api/client'
 import { useStore, useStoreCases, useStoreTheme } from '../hooks'
 import { Card, CardBody, EmptyState, buttonVariants } from '../components/ui'
 import type { StoreSectionCard } from '../api/types'
+import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
 /**
@@ -161,11 +162,7 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
         </span>
       )}
       <div className="aspect-[5/7] overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-card">
-        {image ? (
-          <img src={image} alt={card.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-        ) : (
-          <div className="grid h-full place-items-center px-2 text-center text-xs text-fg-muted">{card.name}</div>
-        )}
+        <CardImage src={image} alt={card.name} className="h-full w-full" label={card.name} />
       </div>
       <div className="mt-2 px-0.5">
         <h4 className="truncate text-sm font-bold text-fg group-hover:text-brand-600">{card.name}</h4>

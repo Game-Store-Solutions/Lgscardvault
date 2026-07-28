@@ -3,6 +3,7 @@ import { formatPrice } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { useCart, useSealedSpotlight } from '../../hooks'
 import { Button } from '../ui'
+import { CardImage } from '../cards'
 
 /**
  * Storefront rail of the store's freshest in-stock sealed products
@@ -38,18 +39,12 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
               key={line.id}
               className="w-48 shrink-0 snap-start rounded-card border border-border bg-surface p-3 shadow-card"
             >
-              {product.imageUrl ? (
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  loading="lazy"
-                  className="mx-auto h-36 w-auto rounded object-contain"
-                />
-              ) : (
-                <div className="grid h-36 place-items-center rounded bg-bg text-fg-muted">
-                  <Package aria-hidden className="size-8" />
-                </div>
-              )}
+              <CardImage
+                src={product.imageUrl}
+                alt={product.name}
+                fit="contain"
+                className="mx-auto h-36 w-full rounded"
+              />
               <p className="mt-2 line-clamp-2 text-sm font-semibold text-fg" title={product.name}>
                 {product.name}
               </p>

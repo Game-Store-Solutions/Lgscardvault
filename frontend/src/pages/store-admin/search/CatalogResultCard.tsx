@@ -1,6 +1,7 @@
 import { cardImage, formatScryfallPrice } from '../../../api/client'
 import type { CardSummary } from '../../../api/types'
 import { Badge } from '../../../components/ui'
+import { CardImage } from '../../../components/cards'
 
 export interface CatalogResultCardProps {
   card: CardSummary
@@ -19,9 +20,13 @@ export function CatalogResultCard({ card, selected, onSelect }: CatalogResultCar
         selected ? 'border-brand-500 bg-brand-50' : 'border-border bg-surface hover:bg-bg'
       }`}
     >
-      {cardImage(card) && (
-        <img src={cardImage(card)} alt={card.name} className="h-20 w-auto flex-shrink-0 rounded-btn" />
-      )}
+      <CardImage
+        src={cardImage(card)}
+        alt={card.name}
+        fit="contain"
+        showLabel={false}
+        className="h-20 w-14 flex-shrink-0 rounded-btn"
+      />
       <span className="min-w-0 space-y-1">
         <span className="block font-bold leading-snug text-fg">{card.name}</span>
         <span className="block text-xs uppercase text-fg-muted">

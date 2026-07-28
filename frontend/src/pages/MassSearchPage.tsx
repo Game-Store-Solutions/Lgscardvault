@@ -8,6 +8,7 @@ import { useCart, useInventory, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
 import { useAuth } from '../context/AuthContext'
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Textarea } from '../components/ui'
+import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
 /** One parsed request line: how many copies of which card name. */
@@ -469,11 +470,7 @@ function ResultTile({ result, slug, actions }: { result: LineResult; slug: strin
         <span className="absolute left-1.5 top-1.5 z-10">
           <Badge tone={meta.tone}>{meta.label}</Badge>
         </span>
-        {image ? (
-          <img src={image} alt={best!.card.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-        ) : (
-          <div className="grid h-full place-items-center px-2 text-center text-xs text-fg-muted">{result.name}</div>
-        )}
+        <CardImage src={image} alt={best?.card.name ?? result.name} className="h-full w-full" label={result.name} />
       </div>
       <div className="mt-2 px-0.5">
         <h4 className="truncate text-sm font-bold text-fg group-hover:text-brand-600">{best?.card.name ?? result.name}</h4>

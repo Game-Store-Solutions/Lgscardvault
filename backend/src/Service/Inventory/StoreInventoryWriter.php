@@ -23,6 +23,13 @@ final readonly class StoreInventoryWriter
     ) {
     }
 
+    /**
+     * @param int|null $priceCents explicit sell price; null falls back to the
+     *                             card's market price. Games outside Magic
+     *                             often have no market price at all, so the
+     *                             caller's price has to win — otherwise those
+     *                             listings are silently created at $0.
+     */
     public function write(
         Store $store,
         Card $card,
@@ -32,6 +39,7 @@ final readonly class StoreInventoryWriter
         ?string $notes = null,
         bool $flush = true,
         ?int $acquisitionCostCents = null,
+        ?int $priceCents = null,
     ): InventoryItem {
         // Enrich based on missing price/Scryfall data regardless of flush mode.
         // The import path calls write(flush: false); without this it would never enrich.
@@ -53,7 +61,7 @@ final readonly class StoreInventoryWriter
         // the CSV handler flush + recover the whole batch on conflict (it owns
         // the transaction boundary and requeues contended rows).
         if (!$flush) {
-            return $this->applyWrite($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents);
+            return $this->applyWrite($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents, $priceCents);
         }
 
         // Immediate path (flush=true, web add/edit/manual-import): a native
@@ -61,7 +69,7 @@ final readonly class StoreInventoryWriter
         // (store, card, condition, foil) tuple can neither 500 on the unique
         // constraint (the old check-then-insert race) nor lose an increment
         // (the old read-modify-write) — the quantity is summed in-database.
-        return $this->upsertLine($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents);
+        return $this->upsertLine($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents, $priceCents);
     }
 
     /**
@@ -81,8 +89,9 @@ final readonly class StoreInventoryWriter
         bool $isFoil,
         ?string $notes,
         ?int $acquisitionCostCents = null,
+        ?int $priceCents = null,
     ): InventoryItem {
-        $priceCents = $this->resolvePriceCents($card, $isFoil);
+        $priceCents ??= $this->resolvePriceCents($card, $isFoil);
         $connection = $this->entityManager->getConnection();
 
         $id = $connection->fetchOne(
@@ -148,6 +157,7 @@ final readonly class StoreInventoryWriter
         bool $isFoil,
         ?string $notes,
         ?int $acquisitionCostCents = null,
+        ?int $priceCents = null,
     ): InventoryItem {
         $item = $this->inventoryItemRepository->findOneBy([
             'store' => $store,
@@ -171,7 +181,7 @@ final readonly class StoreInventoryWriter
         }
 
         $item->setQuantity($item->getQuantity() + $quantity);
-        $item->setPriceCents($this->resolvePriceCents($card, $isFoil));
+        $item->setPriceCents($priceCents ?? $this->resolvePriceCents($card, $isFoil));
         if (null !== $acquisitionCostCents) {
             $item->setAcquisitionCostCents($acquisitionCostCents);
         }

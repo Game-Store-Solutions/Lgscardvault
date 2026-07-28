@@ -144,11 +144,7 @@ final readonly class ProcessCsvImportMessageHandler
 
                     if (!$card instanceof Card) {
                         $row->setStatus(CsvImportRow::STATUS_ERROR);
-                        $row->setError(sprintf(
-                            'No %s card named "%s" in the catalog. Run a catalog sync for this game, or check the name and set.',
-                            $jobGame->getName(),
-                            $row->getName(),
-                        ));
+                        $row->setError($this->describeMissingCard($jobGame, $row));
                         ++$failed;
                         continue;
                     }
@@ -228,6 +224,42 @@ final readonly class ProcessCsvImportMessageHandler
             $this->markJobFailed($message->jobId, $e);
         }
     }
+
+    /**
+     * Turns "not found" into something a store owner can act on. A bare "no
+     * card named X" is useless when the catalog holds a near-identical name
+     * or the same card in a different set — so say what is actually there.
+     */
+    private function describeMissingCard(\App\Entity\Game $game, CsvImportRow $row): string
+    {
+        $namesakes = $this->cardRepository->findNamesakesForGame($game, $row->getName());
+
+        if ([] !== $namesakes) {
+            $shown = array_map(
+                static fn (Card $card): string => sprintf(
+                    '%s (%s #%s)',
+                    $card->getName(),
+                    $card->getSetCode(),
+                    $card->getCollectorNumber(),
+                ),
+                $namesakes,
+            );
+
+            return sprintf(
+                'No exact match for "%s"%s. The catalog does have: %s. Check the name, set, or collector number on this row.',
+                $row->getName(),
+                '' !== $row->getSetCode() ? sprintf(' in "%s"', $row->getSetCode()) : '',
+                implode('; ', $shown),
+            );
+        }
+
+        return sprintf(
+            'No %s card named "%s" in the catalog. If this game was never synced, run a catalog sync; otherwise check the name and set.',
+            $game->getName(),
+            $row->getName(),
+        );
+    }
+
 
     /**
      * Atomic QUEUED/PROCESSING → PROCESSING transition. Returns false when a

@@ -71,7 +71,10 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
 
             // Enrich the printing from Scryfall if we've never fetched its data, so
             // market price becomes available for this card going forward.
-            if (null === $targetCard->getScryfallData()) {
+            // Magic only: Scryfall has no idea what a One Piece card id is, so
+            // for other games this would be a guaranteed-miss remote call.
+            $targetGame = $targetCard->getGame();
+            if (null === $targetCard->getScryfallData() && (null === $targetGame || $targetGame->isMtg())) {
                 try {
                     $this->scryfallClient->fetchCardById($targetCard->getId());
                 } catch (\Throwable $e) {
@@ -129,6 +132,10 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
         }
 
         $card = $data->getCard();
+
+        // The submitted price wins. Deriving it from the card instead meant a
+        // card with no market price — routine outside Magic — was listed at
+        // $0 no matter what the seller typed.
         return $this->inventoryWriter->write(
             $store,
             $card,
@@ -137,6 +144,7 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
             $data->isFoil(),
             $data->getNotes(),
             acquisitionCostCents: $data->getAcquisitionCostCents(),
+            priceCents: $data->getPriceCents() > 0 ? $data->getPriceCents() : null,
         );
     }
 }

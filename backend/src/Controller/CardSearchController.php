@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Game;
 use App\Repository\CardRepository;
 use App\Security\ApiRateLimit;
 use App\Service\Catalog\CatalogCardResolver;
@@ -73,13 +74,18 @@ class CardSearchController extends AbstractController
         // (TCGCSV), and Scryfall knows nothing about them — so for those the
         // local search below IS the search, and the remote legs are skipped
         // rather than run and discarded.
+        //
+        // No game param means MAGIC, not "everything": every caller that
+        // omits it (mass search, buy list, decks, CSV recovery) is a Magic
+        // surface, and an unscoped search is how a One Piece card ends up
+        // added from a Magic screen.
         $gameCode = trim((string) $request->query->get('game', ''));
-        $game = '' !== $gameCode ? $this->gameRepository->findOneByCode($gameCode) : null;
-        if ('' !== $gameCode && null === $game) {
+        $game = $this->gameRepository->findOneByCode('' !== $gameCode ? $gameCode : Game::CODE_MTG);
+        if (null === $game) {
             return $this->json(['detail' => 'Unknown game.'], 404);
         }
 
-        if (null !== $game && !$game->isMtg()) {
+        if (!$game->isMtg()) {
             return $this->json(array_map(
                 $this->catalogCardResolver->serializeCard(...),
                 $this->cardRepository->searchByNameForGame($game, $query, 40),
@@ -159,13 +165,12 @@ class CardSearchController extends AbstractController
             }
         }
 
-        $results = array_values($merged);
-        if (null !== $game) {
-            $results = array_values(array_filter(
-                $results,
-                static fn (\App\Entity\Card $card): bool => $card->resolvedGameCode() === $game->getCode(),
-            ));
-        }
+        // Belt and braces: the legacy helpers are Magic-scoped, but remote
+        // upserts join the merge too — nothing non-Magic may leave this path.
+        $results = array_values(array_filter(
+            array_values($merged),
+            static fn (\App\Entity\Card $card): bool => $card->resolvedGameCode() === $game->getCode(),
+        ));
 
         return $this->json(array_map(
             $this->catalogCardResolver->serializeCard(...),

@@ -38,15 +38,19 @@ export default function SearchTab({ slug }: { slug: string }) {
   const [catalogFinishFilter, setCatalogFinishFilter] = useState<'all' | 'foil' | 'nonfoil'>('all')
   const [selectedCard, setSelectedCard] = useState<CardSummary | null>(null)
   const [quantity, setQuantity] = useState(1)
-  const [priceCents, setPriceCents] = useState<number | null>(null)
+  const [priceText, setPriceText] = useState('')
   const [condition, setCondition] = useState<Condition>('NM')
   const [isFoil, setIsFoil] = useState(false)
   const [costText, setCostText] = useState('')
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
 
+  // Seed the sell price from the market price when there is one. Games
+  // outside Magic often have no price at all, and the old flow silently
+  // listed those at $0.00 with no way to say otherwise.
   function applyScryfallPrice(card: CardSummary, foil: boolean) {
-    setPriceCents(scryfallPriceCents(card, foil ? 'foil' : 'nonfoil'))
+    const market = scryfallPriceCents(card, foil ? 'foil' : 'nonfoil')
+    setPriceText(market == null ? '' : (market / 100).toFixed(2))
   }
 
   const { data: inventory = [] } = useInventory(slug)
@@ -100,7 +104,7 @@ export default function SearchTab({ slug }: { slug: string }) {
       await api.post(`/stores/${slug}/inventory`, {
         cardId: selectedCard.id,
         quantity,
-        priceCents: priceCents ?? 0,
+        priceCents: parsePriceInput(priceText) ?? 0,
         condition,
         isFoil,
         acquisitionCostCents: parsePriceInput(costText),
@@ -171,6 +175,15 @@ export default function SearchTab({ slug }: { slug: string }) {
     return games.map((game) => ({ code: game.code, name: game.name, count: counts.get(game.code) ?? 0 }))
   }, [games, inventory])
 
+  // Always manage exactly one game — a mixed table is how a One Piece card
+  // hides among thousands of Magic rows. Default to the first game the
+  // store actually stocks (platform order), falling back to Magic.
+  useEffect(() => {
+    if (!gameFilter && gameOptions.length > 0) {
+      setGameFilter(gameOptions.find((game) => game.count > 0)?.code ?? gameOptions[0].code)
+    }
+  }, [gameFilter, gameOptions])
+
   const filteredInventory = useMemo(() => {
     const term = filter.trim().toLowerCase()
     return inventory.filter((item) => {
@@ -203,14 +216,7 @@ export default function SearchTab({ slug }: { slug: string }) {
       {gameOptions.length > 1 && (
         <Card>
           <CardBody className="py-4">
-            <GameSelector
-              games={gameOptions}
-              value={gameFilter}
-              onChange={setGameFilter}
-              includeAll
-              allLabel="All games"
-              label="Manage inventory for"
-            />
+            <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Manage inventory for" />
           </CardBody>
         </Card>
       )}
@@ -296,6 +302,8 @@ export default function SearchTab({ slug }: { slug: string }) {
               pending={addMutation.isPending}
               costText={costText}
               onCostChange={setCostText}
+              priceText={priceText}
+              onPriceChange={setPriceText}
               onQuantityChange={setQuantity}
               onConditionChange={setCondition}
               onFinishChange={handleFinishChange}
