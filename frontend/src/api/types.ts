@@ -471,6 +471,8 @@ export interface Order {
   fulfillment?: OrderFulfillment
   channel?: OrderChannel
   totalCents: number
+  /** Store credit spent on this order, in cents (0 = none). */
+  creditAppliedCents?: number
   createdAt: string
   lines?: OrderLine[]
 }
@@ -545,6 +547,41 @@ export interface SellSubmission {
   customerName?: string | null
   customerEmail?: string | null
   items: SellSubmissionItem[]
+}
+
+export interface StoreCreditTransaction {
+  id: number
+  amountCents: number
+  kind: 'sell_submission' | 'order' | 'adjustment'
+  note: string | null
+  orderReference?: string | null
+  sellSubmissionId?: number | null
+  createdAt: string
+}
+
+export interface StoreCreditSummary {
+  balanceCents: number
+  transactions: StoreCreditTransaction[]
+}
+
+export interface Deck {
+  id: number
+  name: string
+  format: string | null
+  notes: string | null
+  cardCount: number
+  createdAt: string
+  updatedAt: string
+  cards?: DeckCard[]
+}
+
+export interface DeckCard {
+  id: number
+  cardId: string | null
+  cardName: string
+  quantity: number
+  imageUris?: { normal?: string; small?: string } | null
+  setCode?: string | null
 }
 
 export interface CustomerNotification {

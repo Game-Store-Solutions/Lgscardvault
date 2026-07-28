@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { cardImage, formatPrice, formatScryfallPrice, httpStatus } from '../api/client'
-import type { CardSummary, SellSubmission, StoreCustomer } from '../api/types'
+import type { CardSummary, SellSubmission, StoreCreditSummary, StoreCustomer } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import {
   customerKeys,
@@ -19,6 +19,7 @@ import {
   useStoreTheme,
 } from '../hooks'
 import {
+  Avatar,
   Badge,
   Button,
   Card,
@@ -35,14 +36,31 @@ import {
   TabPanel,
   Textarea,
 } from '../components/ui'
-import { Heart, ImageOff, ListPlus, Plus, ReceiptText, Save, Search, Trash2, User, WalletCards, X } from 'lucide-react'
+import { BellRing, HandCoins, Heart, ImageOff, ListPlus, PackageOpen, PiggyBank, Plus, ReceiptText, Save, Search, Smile, Sparkles, Trash2, WalletCards, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
-import { ImageUploadField } from '../components/ImageUploadField'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
-type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade'
-const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade']
+type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade' | 'credit' | 'notifications'
+const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade', 'credit', 'notifications']
+
+/** Wrap a lucide icon with a fixed playful tint (and fill, where it reads well). */
+function tinted(Icon: LucideIcon, tintClasses: string) {
+  return function TintedIcon({ className }: { className?: string }) {
+    return <Icon aria-hidden className={`${className ?? ''} ${tintClasses}`} />
+  }
+}
+
+const TAB_ICONS = {
+  profile: tinted(Smile, 'text-amber-500'),
+  orders: tinted(PackageOpen, 'text-sky-500'),
+  favorites: tinted(Heart, 'fill-pink-400 text-pink-500'),
+  wantlist: tinted(Sparkles, 'fill-amber-300 text-amber-500'),
+  selltrade: tinted(HandCoins, 'text-emerald-600'),
+  credit: tinted(PiggyBank, 'text-rose-500'),
+  notifications: tinted(BellRing, 'fill-violet-200 text-violet-500'),
+}
 
 export default function CustomerProfilePage() {
   const { slug = '' } = useParams()
@@ -61,6 +79,15 @@ export default function CustomerProfilePage() {
   const ordersQuery = useCustomerOrders(slug)
   const notificationsQuery = useCustomerNotifications(slug)
 
+  const creditQuery = useQuery({
+    queryKey: ['store-credit', slug],
+    enabled: Boolean(slug),
+    queryFn: async () => {
+      const { data } = await api.get<StoreCreditSummary>(`/stores/${slug}/customer/credit`)
+      return data
+    },
+  })
+  const unreadCount = (notificationsQuery.data ?? []).filter((n) => !n.readAt).length
   const favoritesCount = favoritesQuery.data?.length ?? 0
   const wantListCount = wantListQuery.data?.length ?? 0
   const ordersCount = ordersQuery.data?.length ?? 0
@@ -79,9 +106,7 @@ export default function CustomerProfilePage() {
 
       <Card>
         <CardBody className="flex items-center gap-4">
-          <span className="grid size-12 place-items-center rounded-full bg-brand-50 text-brand-600">
-            <User aria-hidden className="size-6" />
-          </span>
+          <Avatar name={user?.displayName ?? '?'} src={user?.avatarUrl ?? undefined} size="lg" />
           <div className="min-w-0">
             <p className="truncate font-bold text-fg">{user?.displayName ?? 'Signed-in customer'}</p>
             <p className="truncate text-sm text-fg-muted">{user?.email}</p>
@@ -96,17 +121,28 @@ export default function CustomerProfilePage() {
         value={tab}
         onChange={(id) => setTab(id as TabId)}
         tabs={[
-          { id: 'profile', label: 'Profile', icon: User },
-          { id: 'orders', label: `Orders (${ordersCount})`, icon: ReceiptText },
-          { id: 'favorites', label: `Favorites (${favoritesCount})`, icon: Heart },
-          { id: 'wantlist', label: `Want list (${wantListCount})`, icon: ListPlus },
-          { id: 'selltrade', label: 'Sell / Trade', icon: WalletCards },
+          { id: 'profile', label: 'Profile', icon: TAB_ICONS.profile },
+          { id: 'orders', label: `Orders (${ordersCount})`, icon: TAB_ICONS.orders },
+          { id: 'favorites', label: `Favorites (${favoritesCount})`, icon: TAB_ICONS.favorites },
+          { id: 'wantlist', label: `Want list (${wantListCount})`, icon: TAB_ICONS.wantlist },
+          { id: 'selltrade', label: 'Sell / Trade', icon: TAB_ICONS.selltrade },
+          { id: 'credit', label: creditQuery.data && creditQuery.data.balanceCents > 0 ? `Store credit (${formatPrice(creditQuery.data.balanceCents)})` : 'Store credit', icon: TAB_ICONS.credit },
+          { id: 'notifications', label: unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications', icon: TAB_ICONS.notifications },
         ]}
       />
 
       <TabPanel when="profile" value={tab}>
         <ProfilePanel slug={slug} />
-        <AccountSettingsPanel />
+        <Card className="mt-6">
+          <CardBody className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-fg-muted">
+              Your name, profile image, and password are platform-wide — manage them once for every store.
+            </p>
+            <Link to="/account" className="text-sm font-bold text-brand-600 hover:underline">
+              Account settings →
+            </Link>
+          </CardBody>
+        </Card>
       </TabPanel>
       <TabPanel when="orders" value={tab}>
         <OrdersPanel slug={slug} query={ordersQuery} />
@@ -119,6 +155,12 @@ export default function CustomerProfilePage() {
       </TabPanel>
       <TabPanel when="selltrade" value={tab}>
         <SellTradeHistoryPanel slug={slug} />
+      </TabPanel>
+      <TabPanel when="credit" value={tab}>
+        <StoreCreditPanel slug={slug} query={creditQuery} storeName={storeQuery.data?.name ?? 'this store'} />
+      </TabPanel>
+      <TabPanel when="notifications" value={tab}>
+        <NotificationsTabPanel slug={slug} query={notificationsQuery} />
       </TabPanel>
     </div>
   )
@@ -229,6 +271,149 @@ function NotificationsPanel({
   )
 }
 
+/** Full notification history: unread up top with mark-read, earlier ones dimmed. */
+function NotificationsTabPanel({
+  slug,
+  query,
+}: {
+  slug: string
+  query: ReturnType<typeof useCustomerNotifications>
+}) {
+  const queryClient = useQueryClient()
+  const markRead = useMutation({
+    mutationFn: async (id: number) => {
+      await api.patch(`/stores/${slug}/customer/notifications/${id}/read`)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.notifications(slug) }),
+  })
+
+  if (query.isLoading) return <LoadingPanel label="Loading notifications…" />
+  const all = query.data ?? []
+  if (all.length === 0) {
+    return (
+      <Card className="mt-6">
+        <CardBody>
+          <EmptyState
+            icon={BellRing}
+            title="No notifications yet"
+            description="Order updates and want-list matches from this store will show up here."
+          />
+        </CardBody>
+      </Card>
+    )
+  }
+
+  const unread = all.filter((n) => !n.readAt)
+  const read = all.filter((n) => n.readAt)
+
+  return (
+    <div className="mt-6 space-y-6">
+      {unread.length > 0 && (
+        <Card>
+          <CardHeader title={`Unread (${unread.length})`} />
+          <CardBody>
+            <NotificationList notifications={unread} pendingId={markRead.variables} onMarkRead={(id) => markRead.mutate(id)} />
+          </CardBody>
+        </Card>
+      )}
+      {read.length > 0 && (
+        <Card>
+          <CardHeader title="Earlier" />
+          <CardBody>
+            <ul className="space-y-2">
+              {read.map((notification) => (
+                <li key={notification.id} className="rounded-btn border border-border bg-bg px-3 py-2 opacity-80">
+                  <p className="truncate text-sm font-bold text-fg">{notification.title}</p>
+                  <p className="text-xs text-fg-muted">{notification.body}</p>
+                  <p className="mt-0.5 text-xs text-fg-muted">{new Date(notification.createdAt).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+/** Store credit: live balance plus the full ledger, newest first. */
+function StoreCreditPanel({
+  slug,
+  query,
+  storeName,
+}: {
+  slug: string
+  query: { data?: StoreCreditSummary; isLoading: boolean }
+  storeName: string
+}) {
+  if (query.isLoading) return <LoadingPanel label="Loading your store credit…" />
+  const balance = query.data?.balanceCents ?? 0
+  const transactions = query.data?.transactions ?? []
+
+  const kindLabel = (kind: string) =>
+    kind === 'sell_submission' ? 'Sell/trade payout' : kind === 'order' ? 'Order' : 'Store adjustment'
+
+  return (
+    <div className="mt-6 space-y-6">
+      <Card>
+        <CardBody className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="grid size-12 place-items-center rounded-full bg-rose-100 text-rose-500">
+              <PiggyBank aria-hidden className="size-6" />
+            </span>
+            <div>
+              <p className="text-sm text-fg-muted">Your credit at {storeName}</p>
+              <p className="font-display text-3xl font-extrabold text-fg">{formatPrice(balance)}</p>
+            </div>
+          </div>
+          <Link to={`/s/${slug}`} className="text-sm font-bold text-brand-600 hover:underline">
+            Spend it in the shop →
+          </Link>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="History" subtitle="Sell/trade payouts add credit; checkout spends it; refunds bring it back." />
+        <CardBody>
+          {transactions.length === 0 ? (
+            <EmptyState
+              icon={PiggyBank}
+              title="No credit yet"
+              description="Choose the store-credit payout when you sell cards and your balance will grow here."
+              action={
+                <Link to={`/s/${slug}/sell`} className="text-sm font-bold text-brand-600 hover:underline">
+                  Sell or trade cards →
+                </Link>
+              }
+            />
+          ) : (
+            <ul className="divide-y divide-border text-sm">
+              {transactions.map((transaction) => (
+                <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-fg">
+                      {kindLabel(transaction.kind)}
+                      {transaction.orderReference ? ` · ${transaction.orderReference}` : ''}
+                    </p>
+                    <p className="text-xs text-fg-muted">
+                      {new Date(transaction.createdAt).toLocaleString()}
+                      {transaction.note ? ` · ${transaction.note}` : ''}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 font-display text-base font-bold ${transaction.amountCents >= 0 ? 'text-success-700' : 'text-danger-700'}`}>
+                    {transaction.amountCents >= 0 ? '+' : '−'}
+                    {formatPrice(Math.abs(transaction.amountCents))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  )
+}
+
 /* ------------------------------ Profile ------------------------------ */
 
 const profileSchema = z.object({
@@ -258,161 +443,6 @@ const EMPTY_PROFILE: ProfileForm = {
  * change, and account deletion. Operates on /api/me (the signed-in user),
  * unlike the per-store contact/payment profile above it.
  */
-function AccountSettingsPanel() {
-  const { user, refreshUser, logout } = useAuth()
-  const [displayName, setDisplayName] = useState(user?.displayName ?? '')
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? '')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [deletePassword, setDeletePassword] = useState('')
-  const [deleteArmed, setDeleteArmed] = useState(false)
-
-  const saveProfile = useMutation({
-    mutationFn: async () => {
-      await api.patch('/me', { displayName: displayName.trim(), avatarUrl: avatarUrl.trim() })
-    },
-    onSuccess: () => void refreshUser(),
-  })
-
-  const changePassword = useMutation({
-    mutationFn: async () => {
-      if (newPassword !== confirmPassword) throw new Error('New passwords do not match.')
-      await api.post('/me/password', { currentPassword, newPassword })
-    },
-    onSuccess: () => {
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-    },
-  })
-
-  const deleteAccount = useMutation({
-    mutationFn: async () => {
-      await api.delete('/me', { data: { password: deletePassword } })
-    },
-    onSuccess: () => logout(),
-  })
-
-  return (
-    <div className="mt-6 grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader title="Account" subtitle="Your name and profile image, shown across every store." />
-        <CardBody className="space-y-4">
-          <div className="flex items-center gap-4">
-            <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-bg text-lg font-bold text-fg-muted">
-              {avatarUrl.trim() ? (
-                <img src={avatarUrl.trim()} alt="" className="size-full object-cover" />
-              ) : (
-                (user?.displayName ?? '?').slice(0, 2).toUpperCase()
-              )}
-            </span>
-            <div className="min-w-0 flex-1 space-y-3">
-              <Input label="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={255} />
-              <ImageUploadField
-                label="Profile image"
-                value={avatarUrl}
-                onChange={setAvatarUrl}
-                placeholder="https://…/me.jpg (blank = initials)"
-                hint="Upload a picture or paste an image URL."
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={() => saveProfile.mutate()} loading={saveProfile.isPending} disabled={!displayName.trim()}>
-              <Save aria-hidden className="size-4" />
-              Save account
-            </Button>
-            {saveProfile.isSuccess && (
-              <span role="status" className="text-sm font-medium text-success-700">Saved.</span>
-            )}
-            {saveProfile.isError && (
-              <span role="alert" className="text-sm font-medium text-danger-700">Could not save your account.</span>
-            )}
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Change password" subtitle="Use at least 8 characters." />
-        <CardBody className="space-y-4">
-          <Input label="Current password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="New password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
-            <Input label="Confirm new" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => changePassword.mutate()}
-              loading={changePassword.isPending}
-              disabled={!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}
-            >
-              Update password
-            </Button>
-            {changePassword.isSuccess && (
-              <span role="status" className="text-sm font-medium text-success-700">Password updated.</span>
-            )}
-            {changePassword.isError && (
-              <span role="alert" className="text-sm font-medium text-danger-700">
-                {(changePassword.error as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail ??
-                  (changePassword.error as Error)?.message ??
-                  'Could not update your password.'}
-              </span>
-            )}
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card className="border-danger-500/40 lg:col-span-2">
-        <CardHeader
-          title="Delete account"
-          subtitle="Removes your account, carts, favorites, want lists, and notifications everywhere. This cannot be undone."
-        />
-        <CardBody className="space-y-3">
-          {!deleteArmed ? (
-            <Button variant="ghost" className="text-danger-700" onClick={() => setDeleteArmed(true)}>
-              <Trash2 aria-hidden className="size-4" />
-              Delete my account…
-            </Button>
-          ) : (
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-64">
-                <Input
-                  label="Confirm with your password"
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </div>
-              <Button
-                variant="ghost"
-                className="text-danger-700"
-                loading={deleteAccount.isPending}
-                disabled={!deletePassword}
-                onClick={() => deleteAccount.mutate()}
-              >
-                <Trash2 aria-hidden className="size-4" />
-                Permanently delete
-              </Button>
-              <Button variant="secondary" onClick={() => setDeleteArmed(false)}>
-                Cancel
-              </Button>
-            </div>
-          )}
-          {deleteAccount.isError && (
-            <p role="alert" className="text-sm font-medium text-danger-700">
-              {(deleteAccount.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-                'Could not delete your account.'}
-            </p>
-          )}
-        </CardBody>
-      </Card>
-    </div>
-  )
-}
-
 function ProfilePanel({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
   const [saved, setSaved] = useState(false)

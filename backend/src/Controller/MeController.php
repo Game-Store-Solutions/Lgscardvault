@@ -72,6 +72,17 @@ class MeController extends AbstractController
         return $this->json($this->serializeMe($user));
     }
 
+    /**
+     * Stores where this customer has any activity, newest first — the
+     * query lives in StoreRepository::findWithActivityForUser.
+     */
+    #[Route('/me/stores', name: 'api_me_stores', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function myStores(): JsonResponse
+    {
+        return $this->json($this->storeRepository->findWithActivityForUser($this->requireUser()));
+    }
+
     /** Change own password; requires the current password. */
     #[Route('/me/password', name: 'api_me_password', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]

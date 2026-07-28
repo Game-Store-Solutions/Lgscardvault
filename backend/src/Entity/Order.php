@@ -136,6 +136,11 @@ class Order
     #[Groups(['order:read'])]
     private int $totalCents = 0;
 
+    /** Store credit spent on this order, in cents (0 = none). Refunded on cancel/refund. */
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['order:read'])]
+    private int $creditAppliedCents = 0;
+
     #[ORM\Column]
     #[Groups(['order:read'])]
     private \DateTimeImmutable $createdAt;
@@ -270,6 +275,18 @@ class Order
     public function getTotalCents(): int
     {
         return $this->totalCents;
+    }
+
+    public function getCreditAppliedCents(): int
+    {
+        return $this->creditAppliedCents;
+    }
+
+    public function setCreditAppliedCents(int $creditAppliedCents): static
+    {
+        $this->creditAppliedCents = max(0, $creditAppliedCents);
+
+        return $this;
     }
 
     public function setTotalCents(int $totalCents): static

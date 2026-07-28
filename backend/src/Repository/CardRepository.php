@@ -35,6 +35,28 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Exact-name lookup for decklist lines: full name or the front face of a
+     * double-faced card ("Fable of the Mirror-Breaker // ..."). Any printing
+     * satisfies a deck line, so the first match wins.
+     */
+    public function findOneByExactName(string $name): ?\App\Entity\Card
+    {
+        $lower = mb_strtolower(trim($name));
+        if ('' === $lower) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('c')
+            ->andWhere('LOWER(c.name) = :name OR LOWER(c.name) LIKE :front')
+            ->setParameter('name', $lower)
+            ->setParameter('front', $lower.' //%')
+            ->orderBy('c.releasedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Printing lookup by natural key. A printing is uniquely identified by
      * set code + collector number, and every import row carries both — this
      * is the primary (indexed, exact) match path for imports; name search is

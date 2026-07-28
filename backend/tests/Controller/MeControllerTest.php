@@ -114,4 +114,31 @@ final class MeControllerTest extends WebTestCase
         $this->em->clear();
         self::assertNull($this->em->getRepository(User::class)->find($customerId));
     }
+
+    public function testMyStoresListsEveryStoreWithActivity(): void
+    {
+        $storeA = $this->fixtures->store();
+        $storeB = $this->fixtures->store();
+        $quiet = $this->fixtures->store();
+        $customer = $this->fixtures->user(['ROLE_USER']);
+
+        // Saved profile at store A; a sell submission at store B; nothing at the third.
+        $profile = (new \App\Entity\StoreCustomer())->setUser($customer)->setStore($storeA);
+        $submission = (new \App\Entity\SellSubmission())->setStore($storeB)->setUser($customer);
+        $this->em->persist($profile);
+        $this->em->persist($submission);
+        $this->em->flush();
+
+        $this->authenticate($customer);
+        $stores = $this->jsonRequest('GET', '/api/me/stores');
+
+        $slugs = array_column($stores, 'slug');
+        self::assertContains($storeA->getSlug(), $slugs);
+        self::assertContains($storeB->getSlug(), $slugs);
+        self::assertNotContains($quiet->getSlug(), $slugs, 'stores without any activity stay out of the list');
+
+        $bySlug = array_column($stores, null, 'slug');
+        self::assertSame(1, $bySlug[$storeB->getSlug()]['submissionCount']);
+        self::assertSame(0, $bySlug[$storeB->getSlug()]['orderCount']);
+    }
 }

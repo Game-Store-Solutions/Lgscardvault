@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
@@ -18,7 +18,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
-import type { CartItem, InventoryItem, Order, OrderFulfillment } from '../api/types'
+import type { CartItem, InventoryItem, Order, OrderFulfillment, StoreCreditSummary } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
@@ -53,12 +53,25 @@ export default function CartPage() {
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>('pickup')
   const { kioskMode } = useKioskMode()
   const [kioskCustomerName, setKioskCustomerName] = useState('')
+  const [useCredit, setUseCredit] = useState(false)
+
+  // Store credit can be applied by signed-in customers (not kiosk walk-ups).
+  const creditQuery = useQuery({
+    queryKey: ['store-credit', slug],
+    enabled: Boolean(user && slug && !kioskMode),
+    queryFn: async () => {
+      const { data } = await api.get<StoreCreditSummary>(`/stores/${slug}/customer/credit`)
+      return data
+    },
+  })
+  const creditBalanceCents = creditQuery.data?.balanceCents ?? 0
 
   const testOrder = useMutation({
     mutationFn: async () => {
       const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, {
         fulfillment: kioskMode ? 'pickup' : fulfillment,
         ...(kioskMode ? { channel: 'kiosk', customerName: kioskCustomerName.trim() } : {}),
+        ...(useCredit && !kioskMode ? { useStoreCredit: true } : {}),
       })
       return data
     },
@@ -72,6 +85,7 @@ export default function CartPage() {
         queryClient.invalidateQueries({ queryKey: ordersKey(slug) }),
         // Checkout consumes stock — refresh listings so counts are current.
         queryClient.invalidateQueries({ queryKey: inventoryKey(slug) }),
+        queryClient.invalidateQueries({ queryKey: ['store-credit', slug] }),
       ])
     },
   })
@@ -186,6 +200,10 @@ export default function CartPage() {
             fulfillment={fulfillment}
             onFulfillmentChange={setFulfillment}
             kioskMode={kioskMode}
+            creditBalanceCents={creditBalanceCents}
+            useCredit={useCredit}
+            onUseCreditChange={setUseCredit}
+            subtotalCents={subtotalCents}
             kioskCustomerName={kioskCustomerName}
             onKioskCustomerNameChange={setKioskCustomerName}
             testCheckoutEnabled={TEST_CHECKOUT_ENABLED}
@@ -366,6 +384,10 @@ function OrderSummary({
   fulfillment,
   onFulfillmentChange,
   kioskMode = false,
+  creditBalanceCents = 0,
+  useCredit = false,
+  onUseCreditChange,
+  subtotalCents = 0,
   kioskCustomerName = '',
   onKioskCustomerNameChange,
   testCheckoutEnabled,
@@ -381,6 +403,10 @@ function OrderSummary({
   fulfillment: OrderFulfillment
   onFulfillmentChange: (value: OrderFulfillment) => void
   kioskMode?: boolean
+  creditBalanceCents?: number
+  useCredit?: boolean
+  onUseCreditChange?: (value: boolean) => void
+  subtotalCents?: number
   kioskCustomerName?: string
   onKioskCustomerNameChange?: (value: string) => void
   testCheckoutEnabled: boolean
@@ -389,6 +415,7 @@ function OrderSummary({
   createdOrder: Order | null
   onCreateTestOrder: () => void
 }) {
+  const creditApplied = !kioskMode && useCredit ? Math.min(creditBalanceCents, subtotalCents) : 0
   return (
     <aside className="rounded-card border border-border bg-surface p-5 shadow-card lg:sticky lg:top-20">
       <div className="flex items-center justify-between gap-3">
@@ -433,11 +460,29 @@ function OrderSummary({
         <SummaryRow label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={subtotalLabel} strong />
         <SummaryRow label="Shipping" value={fulfillment === 'pickup' ? 'Free — in-store pickup' : 'Calculated at checkout'} />
         <SummaryRow label="Taxes" value="Calculated at checkout" />
+        {creditApplied > 0 && <SummaryRow label="Store credit" value={`−${formatPrice(creditApplied)}`} />}
         <div className="flex items-baseline justify-between border-t border-border pt-4">
           <dt className="font-bold text-fg">Estimated total</dt>
-          <dd className="font-display text-3xl font-extrabold text-fg">{subtotalLabel}</dd>
+          <dd className="font-display text-3xl font-extrabold text-fg">
+            {creditApplied > 0 ? formatPrice(Math.max(0, subtotalCents - creditApplied)) : subtotalLabel}
+          </dd>
         </div>
       </dl>
+
+      {!kioskMode && creditBalanceCents > 0 && (
+        <label className="mt-4 flex items-center justify-between gap-3 rounded-btn border border-success-500/30 bg-success-50 px-3 py-2 text-sm">
+          <span className="flex items-center gap-2 font-medium text-success-700">
+            <input
+              type="checkbox"
+              checked={useCredit}
+              onChange={(e) => onUseCreditChange?.(e.target.checked)}
+              className="size-4 accent-current"
+            />
+            Apply store credit
+          </span>
+          <span className="font-bold text-success-700">{formatPrice(creditBalanceCents)} available</span>
+        </label>
+      )}
 
       {testCheckoutEnabled || kioskMode ? (
         <div className="mt-5 space-y-3">

@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import type { ComponentType, ReactNode } from 'react'
 import { cx } from '../../lib/cx'
 
 export interface TabItem {
   id: string
   label: ReactNode
-  icon?: LucideIcon
+  /** Any icon component taking a className — lucide icons or tinted wrappers. */
+  icon?: ComponentType<{ className?: string }>
 }
 
 export interface TabsProps {

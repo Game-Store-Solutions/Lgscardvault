@@ -13,7 +13,9 @@ use App\Repository\BuylistEntryRepository;
 use App\Repository\CardRepository;
 use App\Repository\SellSubmissionRepository;
 use App\Repository\StoreRepository;
+use App\Entity\StoreCreditTransaction;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Credit\StoreCreditLedger;
 use App\Service\Inventory\StoreInventoryWriter;
 use App\Service\Store\TradeRateResolver;
 use Doctrine\ORM\EntityManagerInterface;
@@ -51,6 +53,7 @@ final class StoreBuylistController extends AbstractController
         private readonly CatalogCardResolver $catalogCardResolver,
         private readonly TradeRateResolver $tradeRates,
         private readonly StoreInventoryWriter $inventoryWriter,
+        private readonly StoreCreditLedger $creditLedger,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -399,6 +402,25 @@ final class StoreBuylistController extends AbstractController
         }
 
         if (SellSubmission::STATUS_COMPLETED === $status) {
+            // Store-credit payouts land on the customer's ledger when the deal
+            // settles. Kiosk submissions are owned by the staff account, so the
+            // walk-up customer is paid at the counter instead.
+            $seller = $submission->getUser();
+            if (SellSubmission::PAYOUT_CREDIT === $submission->getPayoutMethod()
+                && SellSubmission::CHANNEL_KIOSK !== $submission->getChannel()
+                && $submission->getTotalOfferCents() > 0
+                && $seller instanceof User
+            ) {
+                $this->creditLedger->grant(
+                    $store,
+                    $seller,
+                    $submission->getTotalOfferCents(),
+                    StoreCreditTransaction::KIND_SELL_SUBMISSION,
+                    sellSubmission: $submission,
+                    note: sprintf('Sell/trade submission #%d', $submission->getId() ?? 0),
+                );
+            }
+
             foreach ($submission->getItems() as $item) {
                 $quantity = $item->getAcceptedQuantity() ?? $item->getQuantity();
                 $card = $item->getCard();
