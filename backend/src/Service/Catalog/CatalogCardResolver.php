@@ -141,6 +141,7 @@ final readonly class CatalogCardResolver
         return [
             'id' => (string) $card->getId(),
             'oracleId' => (string) $card->getOracleId(),
+            'game' => $card->resolvedGameCode(),
             'name' => $card->getName(),
             'setCode' => $card->getSetCode(),
             'setName' => $card->getSetName(),

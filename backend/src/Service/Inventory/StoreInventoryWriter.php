@@ -35,7 +35,10 @@ final readonly class StoreInventoryWriter
     ): InventoryItem {
         // Enrich based on missing price/Scryfall data regardless of flush mode.
         // The import path calls write(flush: false); without this it would never enrich.
-        if (null === $card->getScryfallData()) {
+        // Scryfall only knows Magic: TCGCSV-sourced cards from other games must
+        // never trigger a Scryfall lookup (their ids aren't Scryfall ids).
+        $game = $card->getGame();
+        if (null === $card->getScryfallData() && (null === $game || $game->isMtg())) {
             try {
                 $this->scryfallClient->fetchCardById($card->getId());
             } catch (\Throwable $e) {

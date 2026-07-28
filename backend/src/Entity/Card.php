@@ -29,11 +29,28 @@ class Card
     #[Groups(['card:read', 'inventory:read'])]
     private Uuid $oracleId;
 
+    /**
+     * The game this card belongs to. Null means Magic (the pre-multi-game
+     * catalog default); use resolvedGameCode() when serializing.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Game $game = null;
+
+    /** TCGCSV set linkage for cards sourced from TCGCSV (non-MTG catalogs). */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(name: 'game_set_id', nullable: true, onDelete: 'SET NULL')]
+    private ?GameSet $gameSet = null;
+
+    /** TCGplayer product id, when known — joins the card to TCGCSV pricing. */
+    #[ORM\Column(type: 'bigint', nullable: true)]
+    private ?string $tcgplayerProductId = null;
+
     #[ORM\Column(length: 255)]
     #[Groups(['card:read', 'inventory:read'])]
     private string $name;
 
-    #[ORM\Column(length: 10)]
+    #[ORM\Column(length: 40)]
     #[Groups(['card:read', 'inventory:read'])]
     private string $setCode;
 
@@ -161,6 +178,21 @@ class Card
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getGame(): ?Game { return $this->game; }
+    public function setGame(?Game $game): static { $this->game = $game; return $this; }
+
+    public function getGameSet(): ?GameSet { return $this->gameSet; }
+    public function setGameSet(?GameSet $gameSet): static { $this->gameSet = $gameSet; return $this; }
+
+    public function getTcgplayerProductId(): ?int { return null === $this->tcgplayerProductId ? null : (int) $this->tcgplayerProductId; }
+    public function setTcgplayerProductId(?int $tcgplayerProductId): static { $this->tcgplayerProductId = null === $tcgplayerProductId ? null : (string) $tcgplayerProductId; return $this; }
+
+    /** Game code for serialization; legacy rows without a game are Magic. */
+    public function resolvedGameCode(): string
+    {
+        return $this->game?->getCode() ?? Game::CODE_MTG;
     }
 
     public function getOracleId(): Uuid
