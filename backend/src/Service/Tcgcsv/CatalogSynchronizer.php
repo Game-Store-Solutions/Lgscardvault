@@ -58,9 +58,17 @@ final readonly class CatalogSynchronizer
     /**
      * Synchronizes the full TCGCSV catalog for one game.
      *
-     * @return array<string, int> counters for the sync-run summary
+     * A game can carry a thousand groups, so one unlucky group (a malformed
+     * payload, a transient 5xx that outlived its retries) must not throw away
+     * the whole run: failures are counted, logged, and the sync moves on.
+     * Only a failure to list the groups at all aborts.
+     *
+     * @param int|null                    $maxGroups stop after this many groups (smoke runs); null = all
+     * @param (callable(string, int): void)|null $onProgress receives (group name, groups done so far)
+     *
+     * @return array<string, int|list<string>> counters for the sync-run summary
      */
-    public function sync(Game $game): array
+    public function sync(Game $game, ?int $maxGroups = null, ?callable $onProgress = null): array
     {
         $categoryId = $game->getTcgcsvCategoryId();
         if (null === $categoryId) {
@@ -69,34 +77,80 @@ final readonly class CatalogSynchronizer
 
         $counters = [
             'groupsSeen' => 0,
+            'groupsFailed' => 0,
             'setsCreated' => 0,
             'setsUpdated' => 0,
             'cardsUpserted' => 0,
             'sealedUpserted' => 0,
         ];
+        /** @var list<string> $failures */
+        $failures = [];
 
-        foreach ($this->tcgcsvClient->fetchGroups($categoryId) as $group) {
+        $groups = $this->tcgcsvClient->fetchGroups($categoryId);
+        if (null !== $maxGroups && $maxGroups > 0) {
+            $groups = array_slice($groups, 0, $maxGroups);
+        }
+
+        foreach ($groups as $group) {
             $groupId = (int) ($group['groupId'] ?? 0);
             if ($groupId <= 0) {
                 continue;
             }
 
-            ++$counters['groupsSeen'];
-            $set = $this->upsertSet($game, $groupId, $group, $counters);
+            $groupName = is_string($group['name'] ?? null) ? $group['name'] : 'Group '.$groupId;
 
-            $products = $this->tcgcsvClient->fetchProducts($categoryId, $groupId);
-            $prices = $this->indexPrices($this->tcgcsvClient->fetchPrices($categoryId, $groupId));
+            try {
+                $set = $this->upsertSet($game, $groupId, $group, $counters);
 
-            $this->syncGroupProducts($game, $set, $products, $prices, $counters);
+                $products = $this->tcgcsvClient->fetchProducts($categoryId, $groupId);
+                $prices = $this->indexPrices($this->tcgcsvClient->fetchPrices($categoryId, $groupId));
 
-            // Flush per group: bounds memory and makes partial progress
-            // durable if a later group's fetch fails mid-run.
-            $this->entityManager->flush();
+                $this->syncGroupProducts($game, $set, $products, $prices, $counters);
+
+                // Flush per group: bounds memory and makes partial progress
+                // durable if a later group's fetch fails mid-run.
+                $this->entityManager->flush();
+                ++$counters['groupsSeen'];
+            } catch (\Throwable $e) {
+                ++$counters['groupsFailed'];
+                if (count($failures) < 20) {
+                    $failures[] = sprintf('%s (%d): %s', $groupName, $groupId, $e->getMessage());
+                }
+                $this->logger->warning('TCGCSV group {group} failed for {game}: {error}', [
+                    'group' => $groupId,
+                    'game' => $game->getCode(),
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->assertManagerUsable();
+            }
+
+            if (null !== $onProgress) {
+                $onProgress($groupName, $counters['groupsSeen'] + $counters['groupsFailed']);
+            }
         }
 
         $this->logger->info('TCGCSV sync finished for {game}.', ['game' => $game->getCode()] + $counters);
 
+        if ([] !== $failures) {
+            $counters['failures'] = $failures;
+        }
+
         return $counters;
+    }
+
+    /**
+     * Most group failures are HTTP-side (a fetch threw before the flush), so
+     * the pending set entity is complete and simply flushes with the next
+     * group. A failure in the flush itself closes the manager, and nothing
+     * afterwards can be written — abort so the run is recorded as failed
+     * instead of "succeeding" with every remaining group counted as failed.
+     */
+    private function assertManagerUsable(): void
+    {
+        if (!$this->entityManager->isOpen()) {
+            throw new \RuntimeException('The entity manager closed during the sync; aborting so the run is recorded as failed.');
+        }
     }
 
     /** @param array<string, mixed> $group */

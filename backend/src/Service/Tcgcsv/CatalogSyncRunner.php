@@ -25,7 +25,11 @@ final readonly class CatalogSyncRunner
     ) {
     }
 
-    public function run(string $gameCode): CatalogSyncRun
+    /**
+     * @param int|null                           $maxGroups  bound the run to N groups (smoke runs); null = full catalog
+     * @param (callable(string, int): void)|null $onProgress receives (group name, groups done so far)
+     */
+    public function run(string $gameCode, ?int $maxGroups = null, ?callable $onProgress = null): CatalogSyncRun
     {
         $game = $this->gameRepository->findOneByCode($gameCode);
         if (!$game instanceof Game) {
@@ -38,7 +42,7 @@ final readonly class CatalogSyncRunner
         $this->entityManager->flush();
 
         try {
-            $summary = $this->synchronizer->sync($game);
+            $summary = $this->synchronizer->sync($game, $maxGroups, $onProgress);
             $run->setStatus(CatalogSyncRun::STATUS_SUCCEEDED);
             $run->setSummary($summary);
         } catch (\Throwable $e) {

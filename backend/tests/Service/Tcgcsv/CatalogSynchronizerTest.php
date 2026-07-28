@@ -25,6 +25,9 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  */
 final class CatalogSynchronizerTest extends KernelTestCase
 {
+    /** Mirrors the scoped `tcgcsv.client` base URI from http_client.yaml. */
+    private const BASE_URI = 'https://tcgcsv.com/tcgplayer/';
+
     private EntityManagerInterface $em;
     private GameRepository $games;
 
@@ -52,12 +55,12 @@ final class CatalogSynchronizerTest extends KernelTestCase
             }
 
             return new MockResponse(json_encode(['results' => []]));
-        });
+        }, self::BASE_URI);
 
         $c = static::getContainer();
 
         return new CatalogSynchronizer(
-            new TcgcsvClient($http),
+            new TcgcsvClient($http, requestIntervalUs: 0),
             $this->em,
             $c->get(GameSetRepository::class),
             $c->get(SealedProductRepository::class),
@@ -214,12 +217,80 @@ final class CatalogSynchronizerTest extends KernelTestCase
         self::assertSame(24999, $sealed->getMarketPriceCents());
     }
 
-    public function testRunnerRecordsFailedRunWhenMirrorErrors(): void
+    public function testMaxGroupsBoundsASmokeRun(): void
     {
-        $http = new MockHttpClient(static fn (): MockResponse => new MockResponse('oops', ['http_code' => 500]));
+        $game = $this->games->findOneByCode('onepiece');
+        self::assertNotNull($game);
+
+        $fixture = $this->onePieceFixture();
+        $fixture['/68/groups'][] = [
+            'groupId' => 23767,
+            'name' => 'Paramount War',
+            'abbreviation' => 'OP02',
+            'publishedOn' => '2023-03-10T00:00:00',
+        ];
+
+        $summary = $this->synchronizer($fixture)->sync($game, maxGroups: 1);
+
+        self::assertSame(1, $summary['groupsSeen'], 'only the first set is fetched');
+        self::assertNull(
+            static::getContainer()->get(GameSetRepository::class)->findOneByTcgcsvGroupId(23767),
+            'the bounded run never reaches the second set'
+        );
+    }
+
+    public function testOneBadGroupDoesNotAbortTheWholeSync(): void
+    {
+        $game = $this->games->findOneByCode('onepiece');
+        self::assertNotNull($game);
+
+        // Two groups; the first one's product fetch 500s past its retries.
+        $http = new MockHttpClient(function (string $method, string $url): MockResponse {
+            if (str_ends_with($url, '/68/groups')) {
+                return new MockResponse(json_encode(['results' => [
+                    ['groupId' => 24001, 'name' => 'Broken Set', 'abbreviation' => 'BAD'],
+                    ['groupId' => 23766, 'name' => 'Romance Dawn', 'abbreviation' => 'OP01'],
+                ]]));
+            }
+            if (str_contains($url, '/24001/')) {
+                return new MockResponse('nope', ['http_code' => 500]);
+            }
+            if (str_ends_with($url, '/68/23766/products')) {
+                return new MockResponse(json_encode(['results' => [
+                    ['productId' => 450002, 'name' => 'Romance Dawn Booster Box', 'extendedData' => []],
+                ]]));
+            }
+
+            return new MockResponse(json_encode(['results' => []]));
+        }, self::BASE_URI);
+
         $c = static::getContainer();
         $synchronizer = new CatalogSynchronizer(
-            new TcgcsvClient($http),
+            new TcgcsvClient($http, requestIntervalUs: 0),
+            $this->em,
+            $c->get(GameSetRepository::class),
+            $c->get(SealedProductRepository::class),
+            $c->get(CardRepository::class),
+            new NullLogger(),
+        );
+
+        $summary = $synchronizer->sync($game);
+
+        self::assertSame(1, $summary['groupsFailed']);
+        self::assertSame(1, $summary['groupsSeen'], 'the healthy set still synced');
+        self::assertNotEmpty($summary['failures']);
+        self::assertNotNull(
+            $c->get(SealedProductRepository::class)->findOneByTcgcsvProductId(450002),
+            'products from the healthy set landed despite the broken one'
+        );
+    }
+
+    public function testRunnerRecordsFailedRunWhenMirrorErrors(): void
+    {
+        $http = new MockHttpClient(static fn (): MockResponse => new MockResponse('oops', ['http_code' => 500]), self::BASE_URI);
+        $c = static::getContainer();
+        $synchronizer = new CatalogSynchronizer(
+            new TcgcsvClient($http, requestIntervalUs: 0),
             $this->em,
             $c->get(GameSetRepository::class),
             $c->get(SealedProductRepository::class),
