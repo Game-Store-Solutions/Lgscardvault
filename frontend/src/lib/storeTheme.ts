@@ -43,12 +43,17 @@ export function isDarkPalette(p: StorePalette): boolean {
   return reference ? relativeLuminance(reference) < 0.4 : false
 }
 
-/** Build the CSS-variable overrides for a palette. Keys are token variable names. */
-export function storeThemeVars(p: StorePalette): Record<string, string> {
+/**
+ * Build the CSS-variable overrides for a palette. Keys are token variable
+ * names. `forceDark` picks the dark brand-ramp direction even when the
+ * palette itself has no dark background — used when only brand colors are
+ * applied on top of the app's default dark theme.
+ */
+export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<string, string> {
   const vars: Record<string, string> = {}
   const bg = norm(p.backgroundColor)
   const surfaceExplicit = norm(p.surfaceColor)
-  const dark = isDarkPalette(p)
+  const dark = forceDark ?? isDarkPalette(p)
 
   const primary = norm(p.primaryColor)
   if (primary) {

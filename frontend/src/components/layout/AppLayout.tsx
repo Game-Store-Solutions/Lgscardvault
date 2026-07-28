@@ -18,6 +18,27 @@ export default function AppLayout() {
   const exactStoreMatch = useMatch('/s/:slug')
   const storeSlug = storeMatch?.params.slug ?? exactStoreMatch?.params.slug
 
+  // Remember the last store browsed so the account menu still has a
+  // destination on store-less pages like the homepage.
+  const [lastStoreSlug, setLastStoreSlug] = useState(() => {
+    try {
+      return localStorage.getItem('last-store-slug') ?? ''
+    } catch {
+      return ''
+    }
+  })
+  useEffect(() => {
+    if (storeSlug && storeSlug !== lastStoreSlug) {
+      setLastStoreSlug(storeSlug)
+      try {
+        localStorage.setItem('last-store-slug', storeSlug)
+      } catch {
+        // Storage unavailable (private mode) — in-memory state still works.
+      }
+    }
+  }, [storeSlug, lastStoreSlug])
+  const accountSlug = storeSlug ?? (lastStoreSlug || undefined)
+
   // Live cart count for the active store, so the navbar badge stays in sync.
   const { data: cart = [] } = useCustomerCart(storeSlug ?? '', Boolean(user && storeSlug))
   const cartCount = cart.reduce((total, entry) => total + entry.quantity, 0)
@@ -194,14 +215,6 @@ export default function AppLayout() {
               </div>
             )}
 
-            {/* Customers get "My account" as their primary button while in a store. */}
-            {user && !isStoreOwner && !isSuperAdmin && storeSlug && (
-              <Link to={`/s/${storeSlug}/account`} className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-                <UserCircle aria-hidden className="size-4" />
-                My account
-              </Link>
-            )}
-
             {user ? (
               <div ref={userMenuRef} className="relative">
                 <button
@@ -222,9 +235,9 @@ export default function AppLayout() {
                       <p className="truncate text-sm font-bold text-fg">{user.displayName}</p>
                       <p className="truncate text-xs text-fg-muted">{user.email}</p>
                     </div>
-                    {storeSlug && (
+                    {accountSlug && (
                       <Link
-                        to={`/s/${storeSlug}/account`}
+                        to={`/s/${accountSlug}/account`}
                         onClick={() => setUserMenuOpen(false)}
                         className="mt-1 flex items-center gap-2 rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
                       >
@@ -352,8 +365,8 @@ export default function AppLayout() {
                 </Link>
               ))}
 
-              {user && storeSlug && (
-                <Link to={`/s/${storeSlug}/account`} onClick={closeMobile} className={mobileLinkClass}>
+              {user && accountSlug && (
+                <Link to={`/s/${accountSlug}/account`} onClick={closeMobile} className={mobileLinkClass}>
                   My account
                 </Link>
               )}
