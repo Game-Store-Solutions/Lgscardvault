@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, Search, XCircle } from 'lucide-react'
-import { cardImage, formatPrice, scryfallPriceCents } from '../api/client'
+import { ArrowLeft, BellPlus, Check, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, Search, ShoppingCart, XCircle } from 'lucide-react'
+import api, { cardImage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
-import { useInventory, useStore, useStoreTheme } from '../hooks'
+import { useCart, useInventory, useStore, useStoreTheme } from '../hooks'
+import { customerKeys } from '../hooks/useCustomer'
+import { useAuth } from '../context/AuthContext'
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Textarea } from '../components/ui'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
@@ -99,6 +102,58 @@ export default function MassSearchPage() {
   useStoreTheme(store)
 
   const { data: inventory = [], isLoading } = useInventory(slug)
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const { query: cartQuery, setItem: cartSetItem } = useCart(slug, Boolean(user))
+  const [carted, setCarted] = useState<Set<string>>(new Set())
+  const [wanted, setWanted] = useState<Set<string>>(new Set())
+
+  /** Put the fillable copies in the cart, cheapest listings first. */
+  function addFillToCart(result: LineResult) {
+    let remaining = result.quantity
+    const cart = cartQuery.data ?? []
+    for (const item of result.listings) {
+      if (remaining <= 0) break
+      const inCart = cart.find((entry) => entry.inventoryItem.id === item.id)?.quantity ?? 0
+      const take = Math.min(remaining, Math.max(0, item.quantity - inCart))
+      if (take > 0) {
+        cartSetItem.mutate({ item, quantity: inCart + take })
+        remaining -= take
+      }
+    }
+    setCarted((current) => new Set(current).add(result.name.toLowerCase()))
+  }
+
+  /** Want-list the copies the store can't fill; restocks trigger a notification. */
+  const addWant = useMutation({
+    mutationFn: async (result: LineResult) => {
+      const best = result.listings[0]
+      await api.post(`/stores/${slug}/customer/want-list`, {
+        cardId: best?.card.id,
+        cardName: best?.card.name ?? result.name,
+        setCode: best?.card.setCode ?? '',
+        isFoil: false,
+        quantity: Math.max(1, result.quantity - result.fillable),
+        notes: 'Added from mass search',
+      })
+    },
+    onSuccess: async (_data, result) => {
+      setWanted((current) => new Set(current).add(result.name.toLowerCase()))
+      await queryClient.invalidateQueries({ queryKey: customerKeys.wantList(slug) })
+    },
+  })
+
+  const lineActions = (result: LineResult) => (
+    <LineActions
+      result={result}
+      signedIn={Boolean(user)}
+      carted={carted.has(result.name.toLowerCase())}
+      wanted={wanted.has(result.name.toLowerCase())}
+      wantPending={addWant.isPending && addWant.variables?.name === result.name}
+      onCart={() => addFillToCart(result)}
+      onWant={() => addWant.mutate(result)}
+    />
+  )
 
   // A deck's "check availability" hand-off drops its list here (one-shot).
   const [text, setText] = useState(() => {
@@ -259,13 +314,13 @@ export default function MassSearchPage() {
               {view === 'grid' ? (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                   {results.map((result) => (
-                    <ResultTile key={result.name.toLowerCase()} result={result} slug={slug} />
+                    <ResultTile key={result.name.toLowerCase()} result={result} slug={slug} actions={lineActions(result)} />
                   ))}
                 </div>
               ) : (
                 <div className="space-y-3">
                   {results.map((result) => (
-                    <ResultRow key={result.name.toLowerCase()} result={result} slug={slug} />
+                    <ResultRow key={result.name.toLowerCase()} result={result} slug={slug} actions={lineActions(result)} />
                   ))}
                 </div>
               )}
@@ -277,7 +332,60 @@ export default function MassSearchPage() {
   )
 }
 
-function ResultRow({ result, slug }: { result: LineResult; slug: string }) {
+/**
+ * Per-line actions: put the in-stock copies in the cart; want-list the rest
+ * (or all of a missing card) — restocks notify the customer automatically.
+ */
+function LineActions({
+  result,
+  signedIn,
+  carted,
+  wanted,
+  wantPending,
+  onCart,
+  onWant,
+}: {
+  result: LineResult
+  signedIn: boolean
+  carted: boolean
+  wanted: boolean
+  wantPending: boolean
+  onCart: () => void
+  onWant: () => void
+}) {
+  if (!signedIn) return null
+  const missing = result.quantity - result.fillable
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {result.fillable > 0 &&
+        (carted ? (
+          <Badge tone="success">
+            <Check aria-hidden className="size-3" /> In cart
+          </Badge>
+        ) : (
+          <Button size="sm" onClick={onCart}>
+            <ShoppingCart aria-hidden className="size-4" />
+            Add {result.fillable} to cart
+          </Button>
+        ))}
+      {missing > 0 &&
+        (wanted ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-success-700">
+            <Check aria-hidden className="size-3.5" />
+            On your want list — we'll notify you when it's in stock
+          </span>
+        ) : (
+          <Button size="sm" variant="secondary" loading={wantPending} onClick={onWant}>
+            <BellPlus aria-hidden className="size-4" />
+            {result.fillable > 0 ? `Want-list the other ${missing}` : 'Add to want list'}
+          </Button>
+        ))}
+    </div>
+  )
+}
+
+function ResultRow({ result, slug, actions }: { result: LineResult; slug: string; actions?: React.ReactNode }) {
   const meta = STATUS_META[result.status]
   const Icon = meta.icon
   const best = result.listings[0]
@@ -344,12 +452,14 @@ function ResultRow({ result, slug }: { result: LineResult; slug: string }) {
           })}
         </div>
       )}
+
+      {actions && <div className="mt-3 border-t border-border pt-3">{actions}</div>}
     </div>
   )
 }
 
 /** Grid view: an image-first tile per requested line, status badge on the art. */
-function ResultTile({ result, slug }: { result: LineResult; slug: string }) {
+function ResultTile({ result, slug, actions }: { result: LineResult; slug: string; actions?: React.ReactNode }) {
   const meta = STATUS_META[result.status]
   const best = result.listings[0]
   const image = best ? cardImage(best.card) : null
@@ -376,15 +486,23 @@ function ResultTile({ result, slug }: { result: LineResult; slug: string }) {
   )
 
   if (!best) {
-    return <div className="opacity-75">{body}</div>
+    return (
+      <div>
+        <div className="opacity-75">{body}</div>
+        {actions && <div className="mt-2 px-0.5">{actions}</div>}
+      </div>
+    )
   }
 
   return (
-    <Link
-      to={`/s/${slug}/cards/${best.id}`}
-      className="group rounded-card transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-    >
-      {body}
-    </Link>
+    <div>
+      <Link
+        to={`/s/${slug}/cards/${best.id}`}
+        className="group block rounded-card transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        {body}
+      </Link>
+      {actions && <div className="mt-2 px-0.5">{actions}</div>}
+    </div>
   )
 }
