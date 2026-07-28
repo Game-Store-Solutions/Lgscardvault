@@ -32,7 +32,13 @@ interface NavItem {
   end?: boolean
 }
 
-function useAdminNav(): { context: string; items: NavItem[] } {
+/** A labeled group of nav links; the heading is omitted when null. */
+interface NavSection {
+  heading: string | null
+  items: NavItem[]
+}
+
+function useAdminNav(): { context: string; sections: NavSection[] } {
   const location = useLocation()
   const params = useParams()
   const isPlatform = location.pathname.startsWith('/platform/admin')
@@ -40,37 +46,60 @@ function useAdminNav(): { context: string; items: NavItem[] } {
   if (isPlatform) {
     return {
       context: 'Platform administration',
-      items: [
-        { to: '/platform/admin', label: 'Overview', icon: LayoutDashboard, end: true },
-        { to: '/platform/admin/sync-jobs', label: 'Sync jobs', icon: RefreshCw },
-        { to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone },
+      sections: [
+        { heading: null, items: [{ to: '/platform/admin', label: 'Overview', icon: LayoutDashboard, end: true }] },
+        {
+          heading: 'Catalog',
+          items: [{ to: '/platform/admin/sync-jobs', label: 'Sync jobs', icon: RefreshCw }],
+        },
+        {
+          heading: 'Platform',
+          items: [{ to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone }],
+        },
       ],
     }
   }
 
   const slug = params.slug
   const base = slug ? `/s/${slug}/admin` : '/'
+  // Grouped so the sidebar reads as sections (what you stock, how you sell,
+  // how the storefront looks) rather than one flat list of eleven links.
   return {
     context: 'Store administration',
-    items: [
-      { to: base, label: 'Inventory', icon: Boxes, end: true },
-      { to: `${base}/sealed`, label: 'Sealed', icon: Package },
-      { to: `${base}/branding`, label: 'Branding', icon: Palette },
-      { to: `${base}/spotlight`, label: 'Spotlight', icon: Sparkles },
-      { to: `${base}/case-cards`, label: 'Case cards', icon: GalleryHorizontalEnd },
-      { to: `${base}/payments`, label: 'Payments', icon: CreditCard },
-      { to: `${base}/orders`, label: 'Orders', icon: ReceiptText },
-      { to: `${base}/sell-trade`, label: 'Sell / Trade', icon: WalletCards },
-      { to: `${base}/reports`, label: 'Reports', icon: TrendingUp },
-      { to: `${base}/csv`, label: 'CSV import', icon: FileSpreadsheet },
-      { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
+    sections: [
+      {
+        heading: 'Inventory',
+        items: [
+          { to: base, label: 'Singles', icon: Boxes, end: true },
+          { to: `${base}/sealed`, label: 'Sealed', icon: Package },
+          { to: `${base}/case-cards`, label: 'Case cards', icon: GalleryHorizontalEnd },
+          { to: `${base}/csv`, label: 'Imports', icon: FileSpreadsheet },
+        ],
+      },
+      {
+        heading: 'Commerce',
+        items: [
+          { to: `${base}/orders`, label: 'Orders', icon: ReceiptText },
+          { to: `${base}/sell-trade`, label: 'Sell / Trade', icon: WalletCards },
+          { to: `${base}/payments`, label: 'Payments', icon: CreditCard },
+          { to: `${base}/reports`, label: 'Reports', icon: TrendingUp },
+        ],
+      },
+      {
+        heading: 'Storefront',
+        items: [
+          { to: `${base}/branding`, label: 'Branding', icon: Palette },
+          { to: `${base}/spotlight`, label: 'Spotlight', icon: Sparkles },
+          { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
+        ],
+      },
     ],
   }
 }
 
 export default function AdminLayout() {
   const { user, logout } = useAuth()
-  const { context, items } = useAdminNav()
+  const { context, sections } = useAdminNav()
   const params = useParams()
   // Theme the owner admin portal with the store's branding (no-op for platform admin).
   const { data: store } = useStore(params.slug)
@@ -130,26 +159,37 @@ export default function AdminLayout() {
           <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-fg-muted">
             {context}
           </p>
-          {items.map((item) => {
-            const Icon = item.icon
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                onClick={() => setSidebarOpen(false)}
-                className={navLinkClass}
-              >
-                <Icon aria-hidden className="size-4" />
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                {item.label === 'Orders' && activeOrderCount > 0 && (
-                  <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger-600 px-1.5 text-[0.68rem] font-black leading-none text-white ring-2 ring-surface">
-                    {activeOrderCount > 99 ? '99+' : activeOrderCount}
-                  </span>
-                )}
-              </NavLink>
-            )
-          })}
+          {sections.map((section, index) => (
+            <div key={section.heading ?? `group-${index}`} className={index > 0 ? 'mt-3' : undefined}>
+              {section.heading && (
+                <p className="px-3 pb-1 text-[0.68rem] font-bold uppercase tracking-wider text-fg-muted/80">
+                  {section.heading}
+                </p>
+              )}
+              <div className="flex flex-col gap-1">
+                {section.items.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      onClick={() => setSidebarOpen(false)}
+                      className={navLinkClass}
+                    >
+                      <Icon aria-hidden className="size-4" />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.label === 'Orders' && activeOrderCount > 0 && (
+                        <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger-600 px-1.5 text-[0.68rem] font-black leading-none text-white ring-2 ring-surface">
+                          {activeOrderCount > 99 ? '99+' : activeOrderCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="border-t border-border p-3">

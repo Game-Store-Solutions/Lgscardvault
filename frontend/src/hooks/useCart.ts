@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
-import type { CartItem, InventoryItem } from '../api/types'
+import type { CartItem, InventoryItem, SealedInventoryLine } from '../api/types'
 import { customerKeys, useCustomerCart } from './useCustomer'
 
 /** Copies wanted, clamped to what the listing has in stock (min 1). */
@@ -30,13 +30,13 @@ export function useCart(slug: string, enabled = true) {
       const previous = queryClient.getQueryData<CartItem[]>(key)
       queryClient.setQueryData<CartItem[]>(key, (current = []) => {
         if (quantity <= 0) {
-          return current.filter((entry) => entry.inventoryItem.id !== item.id)
+          return current.filter((entry) => entry.inventoryItem?.id !== item.id)
         }
         const clamped = clampToStock(quantity, item)
-        const existing = current.find((entry) => entry.inventoryItem.id === item.id)
+        const existing = current.find((entry) => entry.inventoryItem?.id === item.id)
         if (existing) {
           return current.map((entry) =>
-            entry.inventoryItem.id === item.id ? { ...entry, quantity: clamped } : entry,
+            entry.inventoryItem?.id === item.id ? { ...entry, quantity: clamped } : entry,
           )
         }
         const optimistic: CartItem = {
@@ -64,7 +64,62 @@ export function useCart(slug: string, enabled = true) {
       await queryClient.cancelQueries({ queryKey: key })
       const previous = queryClient.getQueryData<CartItem[]>(key)
       queryClient.setQueryData<CartItem[]>(key, (current = []) =>
-        current.filter((entry) => entry.inventoryItem.id !== item.id),
+        current.filter((entry) => entry.inventoryItem?.id !== item.id),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(key, context.previous)
+    },
+    onSettled: invalidate,
+  })
+
+  /** Set the quantity for a sealed listing (upsert). Quantity ≤ 0 removes it. */
+  const setSealedItem = useMutation({
+    mutationFn: async ({ item, quantity }: { item: SealedInventoryLine; quantity: number }) => {
+      await api.put(`/stores/${slug}/customer/cart/sealed/${item.id}`, { quantity })
+    },
+    onMutate: async ({ item, quantity }) => {
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData<CartItem[]>(key)
+      queryClient.setQueryData<CartItem[]>(key, (current = []) => {
+        if (quantity <= 0) {
+          return current.filter((entry) => entry.sealedItem?.id !== item.id)
+        }
+        const clamped = Math.max(1, Math.min(quantity, item.quantity))
+        if (current.some((entry) => entry.sealedItem?.id === item.id)) {
+          return current.map((entry) =>
+            entry.sealedItem?.id === item.id ? { ...entry, quantity: clamped } : entry,
+          )
+        }
+        const optimistic: CartItem = {
+          id: -item.id,
+          quantity: clamped,
+          isSealed: true,
+          inventoryItem: null,
+          sealedItem: item,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        return [optimistic, ...current]
+      })
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(key, context.previous)
+    },
+    onSettled: invalidate,
+  })
+
+  const removeSealedItem = useMutation({
+    mutationFn: async (item: SealedInventoryLine) => {
+      await api.delete(`/stores/${slug}/customer/cart/sealed/${item.id}`)
+    },
+    onMutate: async (item) => {
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData<CartItem[]>(key)
+      queryClient.setQueryData<CartItem[]>(key, (current = []) =>
+        current.filter((entry) => entry.sealedItem?.id !== item.id),
       )
       return { previous }
     },
@@ -90,7 +145,7 @@ export function useCart(slug: string, enabled = true) {
     onSettled: invalidate,
   })
 
-  return { query, setItem, removeItem, clear }
+  return { query, setItem, removeItem, setSealedItem, removeSealedItem, clear }
 }
 
 export default useCart

@@ -190,7 +190,7 @@ export default function CardDetailsPage() {
       (entry.cardName.toLowerCase() === item.card.name.toLowerCase() && entry.setCode === item.card.setCode),
   )
 
-  const cartEntry = (cartQuery.data ?? []).find((entry) => entry.inventoryItem.id === item.id)
+  const cartEntry = (cartQuery.data ?? []).find((entry) => entry.inventoryItem?.id === item.id)
   const inCart = Boolean(cartEntry)
   const outOfStock = item.quantity < 1
 

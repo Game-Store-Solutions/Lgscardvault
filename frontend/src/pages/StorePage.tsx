@@ -79,7 +79,7 @@ export default function StorePage() {
   const cartByItemId = useMemo(() => {
     const map = new Map<number, number>()
     for (const entry of cartQuery.data ?? []) {
-      map.set(entry.inventoryItem.id, entry.quantity)
+      if (entry.inventoryItem) map.set(entry.inventoryItem.id, entry.quantity)
     }
     return map
   }, [cartQuery.data])

@@ -114,7 +114,7 @@ export default function MassSearchPage() {
     const cart = cartQuery.data ?? []
     for (const item of result.listings) {
       if (remaining <= 0) break
-      const inCart = cart.find((entry) => entry.inventoryItem.id === item.id)?.quantity ?? 0
+      const inCart = cart.find((entry) => entry.inventoryItem?.id === item.id)?.quantity ?? 0
       const take = Math.min(remaining, Math.max(0, item.quantity - inCart))
       if (take > 0) {
         cartSetItem.mutate({ item, quantity: inCart + take })

@@ -9,6 +9,7 @@ import {
   ImageOff,
   Lock,
   Minus,
+  Package,
   PackageCheck,
   Plus,
   RotateCcw,
@@ -18,7 +19,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
-import type { CartItem, InventoryItem, Order, OrderFulfillment, StoreCreditSummary } from '../api/types'
+import type { CartItem, InventoryItem, Order, OrderFulfillment, SealedInventoryLine, StoreCreditSummary } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
@@ -31,7 +32,7 @@ import { StorePageLoader } from '../components/store/StorePageLoader'
 const TEST_CHECKOUT_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_CHECKOUT === 'true'
 
 function lineUnitCents(entry: CartItem): number {
-  return entry.inventoryItem.priceCents
+  return entry.sealedItem?.priceCents ?? entry.inventoryItem?.priceCents ?? 0
 }
 
 interface RemovedLine {
@@ -46,7 +47,7 @@ export default function CartPage() {
   const { data: store } = useStore(slug)
   useStoreTheme(store)
 
-  const { query, setItem, removeItem, clear } = useCart(slug, Boolean(user))
+  const { query, setItem, removeItem, setSealedItem, removeSealedItem, clear } = useCart(slug, Boolean(user))
   const { data: cart = [], isLoading } = query
   const [removed, setRemoved] = useState<RemovedLine | null>(null)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
@@ -103,7 +104,8 @@ export default function CartPage() {
 
     for (const entry of cart) {
       itemCount += entry.quantity
-      if (entry.inventoryItem.card.setCode) sets.add(entry.inventoryItem.card.setCode.toUpperCase())
+      const setCode = entry.inventoryItem?.card.setCode
+      if (setCode) sets.add(setCode.toUpperCase())
 
       const unit = lineUnitCents(entry)
       subtotalCents += unit * entry.quantity
@@ -128,6 +130,13 @@ export default function CartPage() {
   )
 
   function handleRemove(entry: CartItem) {
+    // Undo is offered for singles; sealed lines are re-added from the
+    // storefront's sealed row, which stays a click away.
+    if (entry.sealedItem) {
+      removeSealedItem.mutate(entry.sealedItem)
+      return
+    }
+    if (!entry.inventoryItem) return
     setRemoved({ item: entry.inventoryItem, quantity: entry.quantity })
     removeItem.mutate(entry.inventoryItem)
   }
@@ -181,15 +190,28 @@ export default function CartPage() {
       ) : (
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_23rem]">
           <ul className="space-y-3">
-            {cart.map((entry) => (
-              <CartLine
-                key={entry.inventoryItem.id}
-                entry={entry}
-                slug={slug}
-                onSetQuantity={(quantity) => setItem.mutate({ item: entry.inventoryItem, quantity })}
-                onRemove={() => handleRemove(entry)}
-              />
-            ))}
+            {cart.map((entry) =>
+              entry.sealedItem ? (
+                <SealedCartLine
+                  key={`sealed-${entry.sealedItem.id}`}
+                  entry={entry}
+                  sealed={entry.sealedItem}
+                  onSetQuantity={(quantity) =>
+                    setSealedItem.mutate({ item: entry.sealedItem!, quantity })
+                  }
+                  onRemove={() => handleRemove(entry)}
+                />
+              ) : entry.inventoryItem ? (
+                <CartLine
+                  key={entry.inventoryItem.id}
+                  entry={entry}
+                  slug={slug}
+                  item={entry.inventoryItem}
+                  onSetQuantity={(quantity) => setItem.mutate({ item: entry.inventoryItem!, quantity })}
+                  onRemove={() => handleRemove(entry)}
+                />
+              ) : null,
+            )}
           </ul>
 
           <OrderSummary
@@ -584,18 +606,107 @@ function TrustNote({ icon: Icon, title, text }: { icon: typeof ShieldCheck; titl
   )
 }
 
+/**
+ * Cart line for a sealed product. Deliberately simpler than the singles
+ * line: no condition, foil, rarity accent, or card link — a sealed box has
+ * none of those axes.
+ */
+function SealedCartLine({
+  entry,
+  sealed,
+  onSetQuantity,
+  onRemove,
+}: {
+  entry: CartItem
+  sealed: SealedInventoryLine
+  onSetQuantity: (quantity: number) => void
+  onRemove: () => void
+}) {
+  const product = sealed.product
+  const atMax = entry.quantity >= sealed.quantity
+  const linePrice = formatPrice(sealed.priceCents * entry.quantity)
+
+  function step(delta: number) {
+    const next = Math.max(1, Math.min(entry.quantity + delta, sealed.quantity))
+    if (next !== entry.quantity) onSetQuantity(next)
+  }
+
+  return (
+    <li className="grid gap-4 rounded-card border border-border bg-surface p-4 shadow-card sm:grid-cols-[6.75rem_minmax(0,1fr)] sm:p-5">
+      <div className="grid h-40 w-28 place-items-center overflow-hidden rounded-btn border border-border bg-bg sm:h-36 sm:w-full">
+        {product?.imageUrl ? (
+          <img src={product.imageUrl} alt={product.name} className="size-full object-contain" />
+        ) : (
+          <Package aria-hidden className="size-6 text-fg-muted" />
+        )}
+      </div>
+
+      <div className="min-w-0 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="font-display text-xl font-extrabold leading-snug tracking-tight text-fg [overflow-wrap:anywhere]">
+              {product?.name ?? 'Sealed product'}
+            </p>
+            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-fg-muted">
+              {[product?.gameName ?? product?.gameCode, product?.setName].filter(Boolean).join(' / ') || 'Sealed'}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <Badge tone="brand">Sealed</Badge>
+              {sealed.quantity <= 3 && <Badge tone="warning">Low stock</Badge>}
+            </div>
+          </div>
+
+          <div className="text-left sm:text-right">
+            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Line total</p>
+            <p className="font-display text-2xl font-extrabold text-fg">{linePrice}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center rounded-btn border border-border">
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              disabled={entry.quantity <= 1}
+              aria-label="Decrease quantity"
+              className="px-3 py-1.5 text-fg-muted disabled:opacity-40 hover:text-fg"
+            >
+              −
+            </button>
+            <span className="min-w-10 px-2 text-center text-sm font-bold text-fg">{entry.quantity}</span>
+            <button
+              type="button"
+              onClick={() => step(1)}
+              disabled={atMax}
+              aria-label="Increase quantity"
+              className="px-3 py-1.5 text-fg-muted disabled:opacity-40 hover:text-fg"
+            >
+              +
+            </button>
+          </div>
+          <span className="text-sm text-fg-muted">{formatPrice(sealed.priceCents)} each</span>
+          <Button variant="ghost" size="sm" onClick={onRemove}>
+            Remove
+          </Button>
+        </div>
+      </div>
+    </li>
+  )
+}
+
 function CartLine({
   entry,
   slug,
+  item,
   onSetQuantity,
   onRemove,
 }: {
   entry: CartItem
   slug: string
+  item: InventoryItem
   onSetQuantity: (quantity: number) => void
   onRemove: () => void
 }) {
-  const item = entry.inventoryItem
   const accent = rarityAccent(item.card.rarity)
   const image = cardImage(item.card)
   const unit = lineUnitCents(entry)

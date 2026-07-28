@@ -1,6 +1,8 @@
-import { Package } from 'lucide-react'
+import { Package, ShoppingCart } from 'lucide-react'
 import { formatPrice } from '../../api/client'
-import { useSealedSpotlight } from '../../hooks'
+import { useAuth } from '../../context/AuthContext'
+import { useCart, useSealedSpotlight } from '../../hooks'
+import { Button } from '../ui'
 
 /**
  * Storefront rail of the store's freshest in-stock sealed products
@@ -8,9 +10,13 @@ import { useSealedSpotlight } from '../../hooks'
  * the store carries no sealed stock, so single-focus stores stay clean.
  */
 export function SealedSpotlightRow({ slug }: { slug: string }) {
+  const { user } = useAuth()
   const { data: lines = [] } = useSealedSpotlight(slug)
+  const { query: cartQuery, setSealedItem } = useCart(slug, Boolean(user))
 
   if (lines.length === 0) return null
+
+  const cart = cartQuery.data ?? []
 
   return (
     <section>
@@ -21,7 +27,7 @@ export function SealedSpotlightRow({ slug }: { slug: string }) {
           </span>
           Sealed products
         </h2>
-        <p className="mt-1 text-sm text-fg-muted">Booster boxes, bundles, and decks in stock — ask in store to purchase</p>
+        <p className="mt-1 text-sm text-fg-muted">Booster boxes, bundles, and decks in stock</p>
       </div>
       <div className="flex snap-x gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {lines.map((line) => {
@@ -54,6 +60,24 @@ export function SealedSpotlightRow({ slug }: { slug: string }) {
                 <span className="font-display text-base font-bold text-fg">{formatPrice(line.priceCents)}</span>
                 <span className="text-xs font-medium text-fg-muted">{line.quantity} in stock</span>
               </div>
+              {user && (
+                <Button
+                  size="sm"
+                  className="mt-2 w-full"
+                  disabled={setSealedItem.isPending}
+                  onClick={() =>
+                    setSealedItem.mutate({
+                      item: line,
+                      // Adding again tops the line up by one, matching the
+                      // singles "add another copy" behavior.
+                      quantity: (cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0) + 1,
+                    })
+                  }
+                >
+                  <ShoppingCart aria-hidden className="size-4" />
+                  Add to cart
+                </Button>
+              )}
             </div>
           )
         })}
