@@ -19,7 +19,21 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
   const image = cardImage(item.card)
   const notes = parseInventoryNotes(item.notes)
   return (
-    <div className="group flex gap-4 rounded-card border border-border bg-surface p-4 shadow-card transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-16px_rgb(16_24_40_/0.25)]">
+    // The whole tile opens the manage-item modal; the action buttons stop
+    // the click so delete never falls through to edit.
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Manage ${item.card.name}`}
+      onClick={onEdit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onEdit()
+        }
+      }}
+      className="group flex cursor-pointer gap-4 rounded-card border border-border bg-surface p-4 shadow-card transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_16px_40px_-16px_rgb(16_24_40_/0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    >
       <div
         className={cx('relative h-40 w-[7rem] flex-shrink-0 overflow-hidden rounded-btn border-2 bg-black/90', item.isFoil && 'foil-card')}
         style={{ borderColor: accent }}
@@ -49,13 +63,25 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
             </p>
           </div>
           <div className="flex flex-shrink-0 gap-1">
-            <Button variant="ghost" size="sm" onClick={onEdit} aria-label={`Edit ${item.card.name}`} title="Edit item">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit()
+              }}
+              aria-label={`Edit ${item.card.name}`}
+              title="Edit item"
+            >
               <Pencil className="size-4" aria-hidden />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              onClick={onDelete}
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
               loading={deleting}
               aria-label={`Remove ${item.card.name}`}
               title="Remove item"

@@ -31,6 +31,7 @@ import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
+import { ManaCost } from '../components/mtg/ManaSymbol'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -200,7 +201,6 @@ export default function CardDetailsPage() {
     [
       { label: 'Set', value: card.setName },
       { label: 'Rarity', value: card.rarity, capitalize: true },
-      { label: 'Mana cost', value: card.manaCost },
       { label: 'Released', value: card.releasedAt ? formatDate(card.releasedAt) : '' },
       { label: 'Artist', value: card.artist },
       { label: 'Language', value: card.lang?.toUpperCase() },
@@ -444,6 +444,14 @@ export default function CardDetailsPage() {
             <section className="rounded-card border border-border bg-surface p-6 shadow-card">
               <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">Card details</h2>
               <dl className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+                {card.manaCost && (
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-fg-muted">Mana cost</dt>
+                    <dd className="mt-1">
+                      <ManaCost cost={card.manaCost} className="size-5" />
+                    </dd>
+                  </div>
+                )}
                 {specs.map((spec) => (
                   <Spec key={spec.label} label={spec.label} value={spec.value} capitalize={spec.capitalize} />
                 ))}

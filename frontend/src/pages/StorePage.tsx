@@ -23,7 +23,7 @@ import { StoreHero } from '../components/store/StoreHero'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { cx } from '../lib/cx'
-import { MANA_COLORS } from '../lib/mtg'
+import { ManaSymbol } from '../components/mtg/ManaSymbol'
 import {
     QUICK_ACTIONS,
     SORTS,
@@ -280,7 +280,6 @@ export default function StorePage() {
           <p className="mb-2 text-sm font-bold text-fg">Color</p>
           <div className="flex flex-wrap gap-2">
             {COLORS.map((color) => {
-              const c = MANA_COLORS[color.key]
               const active = selectedColors.includes(color.key)
               return (
                 <button
@@ -290,14 +289,11 @@ export default function StorePage() {
                   aria-pressed={active}
                   title={`${color.label} · ${colorCounts[color.key] ?? 0} cards`}
                   className={cx(
-                    'grid size-8 place-items-center rounded-full border text-xs font-black transition-all',
-                    active
-                      ? 'scale-110 border-transparent ring-2 ring-brand-500 ring-offset-2 ring-offset-bg'
-                      : 'border-black/10 opacity-85 hover:opacity-100',
+                    'grid place-items-center rounded-full transition-all',
+                    active ? 'scale-110 ring-2 ring-brand-500 ring-offset-2 ring-offset-bg' : 'opacity-85 hover:opacity-100',
                   )}
-                  style={{ backgroundColor: c, color: color.dark ? '#1c1a2e' : '#fff' }}
                 >
-                  {color.key}
+                  <ManaSymbol symbol={color.key} className="size-8" />
                 </button>
               )
             })}
