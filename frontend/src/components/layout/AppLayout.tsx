@@ -5,7 +5,7 @@ import { useCustomerCart, useKioskMode, useTheme } from '../../hooks'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants } from '../ui'
-import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
+import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShieldCheck, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
 
 export default function AppLayout() {
   const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
@@ -25,9 +25,11 @@ export default function AppLayout() {
   const location = useLocation()
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [storeMenuOpen, setStoreMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
   const storeMenuRef = useRef<HTMLDivElement | null>(null)
+  const userMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -36,6 +38,9 @@ export default function AppLayout() {
       }
       if (!storeMenuRef.current?.contains(event.target as Node)) {
         setStoreMenuOpen(false)
+      }
+      if (!userMenuRef.current?.contains(event.target as Node)) {
+        setUserMenuOpen(false)
       }
     }
 
@@ -141,18 +146,12 @@ export default function AppLayout() {
               Stores
             </NavLink>
 
+            {/* One primary action per role; everything else lives in the avatar menu. */}
             {isSuperAdmin && (
               <Link to="/platform/admin" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                Admin
+                <ShieldCheck aria-hidden className="size-4" />
+                Platform admin
               </Link>
-            )}
-
-            {/* Kiosk terminals belong to stores: their owners flip the mode. */}
-            {isStoreOwner && (
-              <Button variant="secondary" size="sm" onClick={enterKioskMode}>
-                <Monitor aria-hidden className="size-4" />
-                Kiosk mode
-              </Button>
             )}
 
             {ownedStores.length === 1 && (
@@ -195,26 +194,72 @@ export default function AppLayout() {
               </div>
             )}
 
+            {/* Customers get "My account" as their primary button while in a store. */}
+            {user && !isStoreOwner && !isSuperAdmin && storeSlug && (
+              <Link to={`/s/${storeSlug}/account`} className={buttonVariants({ variant: 'primary', size: 'sm' })}>
+                <UserCircle aria-hidden className="size-4" />
+                My account
+              </Link>
+            )}
+
             {user ? (
-              <>
-                {storeSlug && (
-                  <Link
-                    to={`/s/${storeSlug}/account`}
-                    className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                  >
-                    <UserCircle aria-hidden className="size-4" />
-                    Account
-                  </Link>
-                )}
-                <span className="flex items-center gap-2 text-sm text-fg-muted">
+              <div ref={userMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((current) => !current)}
+                  aria-haspopup="menu"
+                  aria-expanded={userMenuOpen}
+                  aria-label="Account menu"
+                  className="flex items-center gap-2 rounded-full border border-border bg-surface py-1 pl-1 pr-2 text-sm text-fg transition-colors hover:border-brand-300"
+                >
                   <Avatar name={user.displayName} src={user.avatarUrl ?? undefined} size="sm" />
-                  <span className="hidden lg:inline">{user.displayName}</span>
-                </span>
-                <Button variant="secondary" size="sm" onClick={logout}>
-                  <LogOut aria-hidden className="size-4" />
-                  Logout
-                </Button>
-              </>
+                  <span className="hidden max-w-32 truncate font-medium lg:inline">{user.displayName}</span>
+                  <ChevronDown aria-hidden className="size-4 text-fg-muted" />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 z-20 mt-2 w-56 rounded-card border border-border bg-surface p-2 shadow-card">
+                    <div className="border-b border-border px-3 pb-2 pt-1">
+                      <p className="truncate text-sm font-bold text-fg">{user.displayName}</p>
+                      <p className="truncate text-xs text-fg-muted">{user.email}</p>
+                    </div>
+                    {storeSlug && (
+                      <Link
+                        to={`/s/${storeSlug}/account`}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="mt-1 flex items-center gap-2 rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
+                      >
+                        <UserCircle aria-hidden className="size-4 text-fg-muted" />
+                        My account
+                      </Link>
+                    )}
+                    {/* Kiosk terminals belong to stores: their owners flip the mode. */}
+                    {isStoreOwner && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserMenuOpen(false)
+                          enterKioskMode()
+                        }}
+                        className="flex w-full items-center gap-2 rounded-btn px-3 py-2 text-left text-sm text-fg hover:bg-bg"
+                      >
+                        <Monitor aria-hidden className="size-4 text-fg-muted" />
+                        Enter kiosk mode
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        logout()
+                      }}
+                      className="flex w-full items-center gap-2 rounded-btn px-3 py-2 text-left text-sm text-danger-700 hover:bg-bg"
+                    >
+                      <LogOut aria-hidden className="size-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <Link to="/login" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
@@ -297,7 +342,19 @@ export default function AppLayout() {
 
               {isSuperAdmin && (
                 <Link to="/platform/admin" onClick={closeMobile} className={mobileLinkClass}>
-                  Admin
+                  Platform admin
+                </Link>
+              )}
+
+              {ownedStores.map((store) => (
+                <Link key={store.id} to={`/s/${store.slug}/admin`} onClick={closeMobile} className={mobileLinkClass}>
+                  {ownedStores.length === 1 ? 'My store' : `Manage ${store.name}`}
+                </Link>
+              ))}
+
+              {user && storeSlug && (
+                <Link to={`/s/${storeSlug}/account`} onClick={closeMobile} className={mobileLinkClass}>
+                  My account
                 </Link>
               )}
 
@@ -310,20 +367,8 @@ export default function AppLayout() {
                   }}
                   className={`${mobileLinkClass} w-full text-left`}
                 >
-                  Kiosk mode
+                  Enter kiosk mode
                 </button>
-              )}
-
-              {ownedStores.map((store) => (
-                <Link key={store.id} to={`/s/${store.slug}/admin`} onClick={closeMobile} className={mobileLinkClass}>
-                  {ownedStores.length === 1 ? 'My store' : `Manage ${store.name}`}
-                </Link>
-              ))}
-
-              {user && storeSlug && (
-                <Link to={`/s/${storeSlug}/account`} onClick={closeMobile} className={mobileLinkClass}>
-                  Account
-                </Link>
               )}
 
               <div className="mt-2 border-t border-border pt-2">

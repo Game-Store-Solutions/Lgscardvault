@@ -6,6 +6,7 @@ import type { ApiError, CardDisplayStyle, Store } from '../../api/types'
 import { useStore } from '../../hooks'
 import { Button, Card, CardBody, CardHeader, Input, Textarea } from '../../components/ui'
 import { StorePreview } from '../../components/store'
+import { ImageUploadField } from '../../components/ImageUploadField'
 import {
   ColorField,
   PALETTE_DEFAULTS as DEFAULTS,
@@ -257,8 +258,20 @@ export default function BrandingTab({ slug }: { slug: string }) {
         <Card>
           <CardHeader title="Logo & hero image" subtitle="Paste hosted image URLs (https:// or a /path)." />
           <CardBody className="space-y-4">
-            <Input label="Logo / icon URL" placeholder="https://…/logo.png" value={form.logoUrl} onChange={(e) => set('logoUrl', e.target.value)} />
-            <Input label="Hero banner image URL" placeholder="https://…/banner.jpg" value={form.heroImageUrl} onChange={(e) => set('heroImageUrl', e.target.value)} />
+            <ImageUploadField
+              label="Logo / icon"
+              placeholder="https://…/logo.png"
+              value={form.logoUrl}
+              onChange={(value) => set('logoUrl', value)}
+              hint="Upload an image or paste a URL — also used by the loading screen."
+            />
+            <ImageUploadField
+              label="Hero banner image"
+              placeholder="https://…/banner.jpg"
+              value={form.heroImageUrl}
+              onChange={(value) => set('heroImageUrl', value)}
+              hint="Upload an image or paste a URL."
+            />
           </CardBody>
         </Card>
 

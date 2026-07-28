@@ -17,3 +17,7 @@
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+
+###> user image uploads (runtime data, never committed) ###
+/public/uploads/
+###< user image uploads ###
