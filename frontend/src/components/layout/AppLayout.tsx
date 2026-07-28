@@ -100,9 +100,9 @@ export default function AppLayout() {
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
             <span className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
               <span className="grid size-9 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">
-                MTG
+                LGS
               </span>
-              <span className="hidden sm:inline">MTG Marketplace</span>
+              <span className="hidden sm:inline">LGS Card Vault</span>
               <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-700">
                 Kiosk
               </span>
@@ -134,9 +134,9 @@ export default function AppLayout() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
             <span className="grid size-9 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">
-              MTG
+              LGS
             </span>
-            <span className="hidden sm:inline">MTG Marketplace</span>
+            <span className="hidden sm:inline">LGS Card Vault</span>
           </Link>
 
           <div className="flex items-center gap-3">
