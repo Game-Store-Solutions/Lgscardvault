@@ -52,8 +52,19 @@ export function useStoreTheme(store?: Store) {
   useEffect(() => {
     if (!store) return
     const dark = store.darkColors ?? {}
-    const palette = isDark && Object.keys(dark).length > 0 ? { ...store, ...dark } : store
-    const vars = storeThemeVars(palette)
+    let vars: Record<string, string>
+    if (isDark && Object.keys(dark).length > 0) {
+      vars = storeThemeVars({ ...store, ...dark })
+    } else if (isDark) {
+      // Dark toggle without an owner dark palette: apply only the brand
+      // colors (ramp flipped for dark) and let the app's default dark
+      // tokens style the neutrals. Pinning the light background/surface
+      // here as inline styles would override the .dark class and make the
+      // theme button appear to do nothing on branded storefronts.
+      vars = storeThemeVars({ primaryColor: store.primaryColor, accentColor: store.accentColor }, true)
+    } else {
+      vars = storeThemeVars(store)
+    }
     const root = document.documentElement
     const previous: Record<string, string> = {}
 
