@@ -19,6 +19,7 @@ import {
   useStoreTheme,
 } from '../hooks'
 import {
+  Avatar,
   Badge,
   Button,
   Card,
@@ -35,13 +36,30 @@ import {
   TabPanel,
   Textarea,
 } from '../components/ui'
-import { Heart, ImageOff, ListPlus, Plus, ReceiptText, Save, Search, Trash2, User, WalletCards, X } from 'lucide-react'
+import { BellRing, HandCoins, Heart, ImageOff, ListPlus, PackageOpen, Plus, ReceiptText, Save, Search, Smile, Sparkles, Trash2, WalletCards, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
-type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade'
-const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade']
+type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade' | 'notifications'
+const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade', 'notifications']
+
+/** Wrap a lucide icon with a fixed playful tint (and fill, where it reads well). */
+function tinted(Icon: LucideIcon, tintClasses: string) {
+  return function TintedIcon({ className }: { className?: string }) {
+    return <Icon aria-hidden className={`${className ?? ''} ${tintClasses}`} />
+  }
+}
+
+const TAB_ICONS = {
+  profile: tinted(Smile, 'text-amber-500'),
+  orders: tinted(PackageOpen, 'text-sky-500'),
+  favorites: tinted(Heart, 'fill-pink-400 text-pink-500'),
+  wantlist: tinted(Sparkles, 'fill-amber-300 text-amber-500'),
+  selltrade: tinted(HandCoins, 'text-emerald-600'),
+  notifications: tinted(BellRing, 'fill-violet-200 text-violet-500'),
+}
 
 export default function CustomerProfilePage() {
   const { slug = '' } = useParams()
@@ -60,6 +78,7 @@ export default function CustomerProfilePage() {
   const ordersQuery = useCustomerOrders(slug)
   const notificationsQuery = useCustomerNotifications(slug)
 
+  const unreadCount = (notificationsQuery.data ?? []).filter((n) => !n.readAt).length
   const favoritesCount = favoritesQuery.data?.length ?? 0
   const wantListCount = wantListQuery.data?.length ?? 0
   const ordersCount = ordersQuery.data?.length ?? 0
@@ -78,9 +97,7 @@ export default function CustomerProfilePage() {
 
       <Card>
         <CardBody className="flex items-center gap-4">
-          <span className="grid size-12 place-items-center rounded-full bg-brand-50 text-brand-600">
-            <User aria-hidden className="size-6" />
-          </span>
+          <Avatar name={user?.displayName ?? '?'} src={user?.avatarUrl ?? undefined} size="lg" />
           <div className="min-w-0">
             <p className="truncate font-bold text-fg">{user?.displayName ?? 'Signed-in customer'}</p>
             <p className="truncate text-sm text-fg-muted">{user?.email}</p>
@@ -95,11 +112,12 @@ export default function CustomerProfilePage() {
         value={tab}
         onChange={(id) => setTab(id as TabId)}
         tabs={[
-          { id: 'profile', label: 'Profile', icon: User },
-          { id: 'orders', label: `Orders (${ordersCount})`, icon: ReceiptText },
-          { id: 'favorites', label: `Favorites (${favoritesCount})`, icon: Heart },
-          { id: 'wantlist', label: `Want list (${wantListCount})`, icon: ListPlus },
-          { id: 'selltrade', label: 'Sell / Trade', icon: WalletCards },
+          { id: 'profile', label: 'Profile', icon: TAB_ICONS.profile },
+          { id: 'orders', label: `Orders (${ordersCount})`, icon: TAB_ICONS.orders },
+          { id: 'favorites', label: `Favorites (${favoritesCount})`, icon: TAB_ICONS.favorites },
+          { id: 'wantlist', label: `Want list (${wantListCount})`, icon: TAB_ICONS.wantlist },
+          { id: 'selltrade', label: 'Sell / Trade', icon: TAB_ICONS.selltrade },
+          { id: 'notifications', label: unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications', icon: TAB_ICONS.notifications },
         ]}
       />
 
@@ -127,6 +145,9 @@ export default function CustomerProfilePage() {
       </TabPanel>
       <TabPanel when="selltrade" value={tab}>
         <SellTradeHistoryPanel slug={slug} />
+      </TabPanel>
+      <TabPanel when="notifications" value={tab}>
+        <NotificationsTabPanel slug={slug} query={notificationsQuery} />
       </TabPanel>
     </div>
   )
@@ -234,6 +255,71 @@ function NotificationsPanel({
         />
       </CardBody>
     </Card>
+  )
+}
+
+/** Full notification history: unread up top with mark-read, earlier ones dimmed. */
+function NotificationsTabPanel({
+  slug,
+  query,
+}: {
+  slug: string
+  query: ReturnType<typeof useCustomerNotifications>
+}) {
+  const queryClient = useQueryClient()
+  const markRead = useMutation({
+    mutationFn: async (id: number) => {
+      await api.patch(`/stores/${slug}/customer/notifications/${id}/read`)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.notifications(slug) }),
+  })
+
+  if (query.isLoading) return <LoadingPanel label="Loading notifications…" />
+  const all = query.data ?? []
+  if (all.length === 0) {
+    return (
+      <Card className="mt-6">
+        <CardBody>
+          <EmptyState
+            icon={BellRing}
+            title="No notifications yet"
+            description="Order updates and want-list matches from this store will show up here."
+          />
+        </CardBody>
+      </Card>
+    )
+  }
+
+  const unread = all.filter((n) => !n.readAt)
+  const read = all.filter((n) => n.readAt)
+
+  return (
+    <div className="mt-6 space-y-6">
+      {unread.length > 0 && (
+        <Card>
+          <CardHeader title={`Unread (${unread.length})`} />
+          <CardBody>
+            <NotificationList notifications={unread} pendingId={markRead.variables} onMarkRead={(id) => markRead.mutate(id)} />
+          </CardBody>
+        </Card>
+      )}
+      {read.length > 0 && (
+        <Card>
+          <CardHeader title="Earlier" />
+          <CardBody>
+            <ul className="space-y-2">
+              {read.map((notification) => (
+                <li key={notification.id} className="rounded-btn border border-border bg-bg px-3 py-2 opacity-80">
+                  <p className="truncate text-sm font-bold text-fg">{notification.title}</p>
+                  <p className="text-xs text-fg-muted">{notification.body}</p>
+                  <p className="mt-0.5 text-xs text-fg-muted">{new Date(notification.createdAt).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+    </div>
   )
 }
 
