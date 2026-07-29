@@ -151,6 +151,46 @@ final class CatalogPricingTest extends KernelTestCase
         self::assertSame('3.75', $prices['usd'] ?? null, 'midPrice beats leaving the card unpriced');
     }
 
+    public function testFeedThumbnailsAreUpgradedToTheCdnsLargeRenditions(): void
+    {
+        // The feed links 200px thumbnails; the same CDN serves 400w and
+        // 1000x1000 renditions of every product image.
+        $this->sync('onepiece', 68, [
+            [
+                'productId' => 750001,
+                'name' => 'Monkey.D.Luffy',
+                'imageUrl' => 'https://tcgplayer-cdn.tcgplayer.com/product/750001_200w.jpg',
+                'extendedData' => [['name' => 'Number', 'value' => 'OP01-003']],
+            ],
+            [
+                'productId' => 750002,
+                'name' => 'Romance Dawn Booster Box',
+                'imageUrl' => 'https://tcgplayer-cdn.tcgplayer.com/product/750002_200w.jpg',
+                'extendedData' => [],
+            ],
+        ], []);
+
+        $uris = static::getContainer()->get(CardRepository::class)
+            ->find(CatalogSynchronizer::cardIdForProduct(750001))?->getImageUris();
+        self::assertSame('https://tcgplayer-cdn.tcgplayer.com/product/750001_400w.jpg', $uris['small'] ?? null);
+        self::assertSame('https://tcgplayer-cdn.tcgplayer.com/product/750001_in_1000x1000.jpg', $uris['normal'] ?? null);
+        self::assertSame('https://tcgplayer-cdn.tcgplayer.com/product/750001_in_1000x1000.jpg', $uris['large'] ?? null);
+
+        $sealed = static::getContainer()->get(SealedProductRepository::class)->findOneByTcgcsvProductId(750002);
+        self::assertSame('https://tcgplayer-cdn.tcgplayer.com/product/750002_in_1000x1000.jpg', $sealed?->getImageUrl());
+    }
+
+    public function testAnUnrecognisedImageUrlPassesThroughUntouched(): void
+    {
+        // A CDN format change must degrade to the feed's own image, never to
+        // a constructed URL that 404s.
+        self::assertSame(
+            'https://elsewhere.example/art/custom.png',
+            CatalogSynchronizer::imageVariant('https://elsewhere.example/art/custom.png', 'in_1000x1000'),
+        );
+        self::assertNull(CatalogSynchronizer::imageVariant(null, '400w'));
+    }
+
     public function testSealedFallsBackThroughTheSpreadToo(): void
     {
         $this->sync('onepiece', 68, [[
