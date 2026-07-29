@@ -329,8 +329,8 @@ final readonly class CatalogSynchronizer
 
         // Store prices Scryfall-shaped so every downstream consumer
         // (inventory pricing, buylist, market price resolver) just works.
-        $usd = $this->marketPrice($productPrices, 'Normal');
-        $usdFoil = $this->marketPrice($productPrices, 'Foil');
+        $usd = $this->priceForFinish($productPrices, foil: false);
+        $usdFoil = $this->priceForFinish($productPrices, foil: true);
         if (null !== $usd || null !== $usdFoil) {
             $card->setPrices(array_filter([
                 'usd' => $usd,
@@ -359,10 +359,14 @@ final readonly class CatalogSynchronizer
         $sealed->setImageUrl($this->stringValue($product, 'imageUrl'));
         $sealed->setUrl($this->stringValue($product, 'url'));
 
-        // Sealed products are printed once; pricing rides the Normal subtype.
+        // Sealed products are printed once, so any subtype row is theirs.
         $row = $productPrices['Normal'] ?? (reset($productPrices) ?: null);
         if (is_array($row)) {
-            $sealed->setMarketPriceCents($this->toCents($row['marketPrice'] ?? null));
+            $sealed->setMarketPriceCents(
+                $this->toCents($row['marketPrice'] ?? null)
+                    ?? $this->toCents($row['midPrice'] ?? null)
+                    ?? $this->toCents($row['lowPrice'] ?? null),
+            );
             $sealed->setLowPriceCents($this->toCents($row['lowPrice'] ?? null));
         }
 
@@ -436,11 +440,57 @@ final readonly class CatalogSynchronizer
     }
 
     /** @param array<string, array<string, mixed>> $productPrices */
-    private function marketPrice(array $productPrices, string $subType): ?string
+    /**
+     * Price for one finish, in dollars.
+     *
+     * Subtype names are per-game vocabulary, not a fixed pair. Magic and One
+     * Piece use "Normal"/"Foil", but Pokemon ships "Holofoil", "Reverse
+     * Holofoil", "1st Edition Holofoil"… and Flesh and Blood "Rainbow Foil"
+     * / "Cold Foil". Matching only the literal names "Normal" and "Foil" left
+     * every holo-only or specialty-foil card with no price at all.
+     *
+     * @param array<string, array<string, mixed>> $productPrices subtype => row
+     */
+    private function priceForFinish(array $productPrices, bool $foil): ?string
     {
-        $value = $productPrices[$subType]['marketPrice'] ?? null;
+        $row = $this->rowForFinish($productPrices, $foil);
+        if (null === $row) {
+            return null;
+        }
 
-        return is_numeric($value) && (float) $value > 0 ? number_format((float) $value, 2, '.', '') : null;
+        // TCGCSV frequently has no marketPrice for thinly traded printings
+        // while still publishing the spread; any of these beats no price.
+        foreach (['marketPrice', 'midPrice', 'lowPrice', 'highPrice'] as $field) {
+            $value = $row[$field] ?? null;
+            if (is_numeric($value) && (float) $value > 0) {
+                return number_format((float) $value, 2, '.', '');
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $productPrices
+     *
+     * @return array<string, mixed>|null
+     */
+    private function rowForFinish(array $productPrices, bool $foil): ?array
+    {
+        $exact = $foil ? 'Foil' : 'Normal';
+        if (isset($productPrices[$exact])) {
+            return $productPrices[$exact];
+        }
+
+        // Any subtype naming a foil treatment counts as foil; everything else
+        // is the plain printing.
+        foreach ($productPrices as $subType => $row) {
+            if (str_contains(strtolower($subType), 'foil') === $foil) {
+                return $row;
+            }
+        }
+
+        return null;
     }
 
     private function toCents(mixed $value): ?int

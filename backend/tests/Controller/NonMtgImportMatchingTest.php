@@ -173,6 +173,36 @@ final class NonMtgImportMatchingTest extends WebTestCase
         self::assertSame(['Monkey.D.Luffy', 'Trafalgar Law'], $names);
     }
 
+    public function testTheTemplateIsBuiltFromTheStoresOwnCatalog(): void
+    {
+        $store = $this->fixtures->store();
+        $this->syncOnePieceCatalog();
+        $this->authenticate($store->getOwner());
+
+        $this->client->request('GET', '/api/catalog/games/onepiece/import-template');
+        $template = (string) $this->client->getResponse()->getContent();
+
+        // Rows are the cards that were actually synced — not invented ones
+        // that would fail for a store whose catalog differs.
+        self::assertStringContainsString('Monkey.D.Luffy', $template);
+        self::assertStringContainsString('OP01-003', $template);
+        self::assertStringContainsString('OP-01', $template, "the sheet carries the catalog's own set code");
+    }
+
+    public function testAnUnsyncedGameStillGetsAShapeToCopy(): void
+    {
+        $store = $this->fixtures->store();
+        $this->authenticate($store->getOwner());
+
+        // Riftbound has nothing synced here; the template falls back to
+        // curated examples so the columns are still demonstrated.
+        $this->client->request('GET', '/api/catalog/games/riftbound/import-template');
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $template = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('collectorNumber', $template);
+        self::assertGreaterThanOrEqual(2, count(array_filter(explode("\n", trim($template)))));
+    }
+
     public function testRowsResolveDespiteSetAndPunctuationDrift(): void
     {
         $store = $this->fixtures->store();

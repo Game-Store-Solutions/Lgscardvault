@@ -153,6 +153,23 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Real cards from this game's catalog, for building an import template
+     * that is guaranteed to resolve. Prefers printings with a collector
+     * number, since that is the natural key the importer matches on.
+     *
+     * @return list<Card>
+     */
+    public function findSampleForGame(Game $game, int $limit = 2): array
+    {
+        return $this->scopedToGame($game)
+            ->andWhere("c.collectorNumber <> ''")
+            ->orderBy('c.name', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Cards in this game that share a name, whatever set they are in. Used to
      * turn "no match" into an error that says what the catalog does have.
      *

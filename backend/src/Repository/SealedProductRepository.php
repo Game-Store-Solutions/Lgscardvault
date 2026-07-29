@@ -23,6 +23,23 @@ class SealedProductRepository extends ServiceEntityRepository
     }
 
     /**
+     * Real sealed products from this game's catalog, for import templates
+     * that resolve on the first try.
+     *
+     * @return list<SealedProduct>
+     */
+    public function findSampleForGame(Game $game, int $limit = 2): array
+    {
+        return $this->createQueryBuilder('p')
+            ->leftJoin('p.gameSet', 's')->addSelect('s')
+            ->andWhere('p.game = :game')->setParameter('game', $game)
+            ->orderBy('p.name', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Import-time resolution for a sealed sheet row: the TCGplayer product
      * id is authoritative when present, otherwise an exact name match within
      * the game, optionally disambiguated by set name.
