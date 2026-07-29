@@ -208,6 +208,25 @@ class InventoryItemRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    /**
+     * Listings from the pre-multi-game era: a "Game: X" note (written by the
+     * old import recovery path) on an item whose card has no game row. These
+     * are the rows the LegacyGameLinkRepairer re-homes.
+     *
+     * @return list<InventoryItem>
+     */
+    public function findLegacyGameNoted(): array
+    {
+        return $this->createQueryBuilder('i')
+            ->join('i.card', 'c')
+            ->addSelect('c')
+            ->where('c.game IS NULL')
+            ->andWhere('LOWER(i.notes) LIKE :marker')
+            ->setParameter('marker', '%game:%')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findOneByStoreAndId(Store $store, int $id): ?InventoryItem
     {
         return $this->createQueryBuilder('i')
