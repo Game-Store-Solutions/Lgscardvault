@@ -447,7 +447,7 @@ function ResultRow({ result, slug, actions }: { result: LineResult; slug: string
               >
                 <span className="font-bold text-fg">{item.card.setCode?.toUpperCase() ?? '—'}</span>
                 {item.condition}
-                {item.isFoil ? ` · ${finishName(item.card, true)}` : ''} · {item.quantity} in stock
+                {item.isFoil ? ` · ${finishName(item.card, true, item.finish)}` : ''} · {item.quantity} in stock
                 {cents !== null ? ` · ${formatPrice(cents)}` : ''}
               </Link>
             )

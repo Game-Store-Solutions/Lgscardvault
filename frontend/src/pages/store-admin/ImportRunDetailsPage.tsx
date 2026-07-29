@@ -639,7 +639,7 @@ function BatchRecoveryModal({
                   <TD className="uppercase">{result.card?.setCode ?? result.row.set}</TD>
                   <TD>{result.card?.collectorNumber ?? result.row.collectorNumber}</TD>
                   <TD>{result.row.quantity}</TD>
-                  <TD>{result.row.isFoil ? 'Foil' : 'Nonfoil'}</TD>
+                  <TD>{result.row.finish}</TD>
                   <TD>{result.card ? formatScryfallPrice(result.card, result.row.isFoil ? 'foil' : 'nonfoil') : '-'}</TD>
                   <TD>
                     {result.card ? <Badge tone="success">Ready</Badge> : <Badge tone="danger">Needs review</Badge>}

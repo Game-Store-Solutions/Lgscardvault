@@ -5,9 +5,9 @@ import api, { cardImage, formatPrice, formatScryfallPrice, parsePriceInput, scry
 import type { CardSummary, InventoryItem } from '../../../api/types'
 import { Badge, Button, Input, Modal } from '../../../components/ui'
 import { InteractiveCard } from '../../../components/cards'
-import { CONDITION_LABELS, ConditionSegmented, FinishToggle, QuantityStepper, type Condition } from '../../../components/inventory'
+import { CONDITION_LABELS, ConditionSegmented, FinishPicker, QuantityStepper, type Condition } from '../../../components/inventory'
 import { rarityAccent } from '../../../lib/mtg'
-import { finishChoices } from '../../../lib/finishes'
+import { defaultFinishFor, finishChoices, finishOptions, isFoilFinish } from '../../../lib/finishes'
 
 /** Payload emitted when saving an inventory edit (shared with the update mutation). */
 export interface InventoryEditPayload {
@@ -17,7 +17,7 @@ export interface InventoryEditPayload {
   priceText: string
   costText: string
   condition: Condition
-  isFoil: boolean
+  finish: string
 }
 
 export interface EditInventoryModalProps {
@@ -51,12 +51,13 @@ function EditInventoryModalBody({
     item.acquisitionCostCents != null ? formatPrice(item.acquisitionCostCents) : '',
   )
   const [editCondition, setEditCondition] = useState<Condition>(item.condition)
-  const [editIsFoil, setEditIsFoil] = useState(item.isFoil)
+  const [editFinish, setEditFinish] = useState(item.finish || defaultFinishFor(item.card))
   const [variantSearchActive, setVariantSearchActive] = useState(false)
 
-  // The printing's own treatments name the toggle: "Normal / Holofoil" on a
-  // Pokemon card, "Nonfoil / Foil" on a Magic one.
-  const finishes = finishChoices(editSelectedCard)
+  // The printing's own treatments, so a Pokemon listing can be moved between
+  // Holofoil and Reverse Holofoil instead of one shared "foil".
+  const finishes = finishOptions(editSelectedCard)
+  const editIsFoil = isFoilFinish(editFinish)
   const marketCents = scryfallPriceCents(editSelectedCard, editIsFoil ? 'foil' : 'nonfoil')
   const priceCents = parsePriceInput(editPriceText)
   const priceInvalid = priceCents === null
@@ -68,7 +69,7 @@ function EditInventoryModalBody({
       it.id !== item.id &&
       it.card.id === editSelectedCard.id &&
       it.condition === editCondition &&
-      it.isFoil === editIsFoil,
+      it.finish === editFinish,
   )
 
   const { data: variantResults = [], isFetching: variantsLoading } = useQuery({
@@ -86,14 +87,14 @@ function EditInventoryModalBody({
 
   function selectVariant(card: CardSummary) {
     setEditSelectedCard(card)
-    const variantFinishes = finishChoices(card)
-    const nextIsFoil = variantFinishes.hasFoil && !variantFinishes.hasPlain
-      ? true
-      : variantFinishes.hasPlain && !variantFinishes.hasFoil
-        ? false
-        : editIsFoil
-    setEditIsFoil(nextIsFoil)
-    setEditPriceText(formatPrice(scryfallPriceCents(card, nextIsFoil ? 'foil' : 'nonfoil') ?? 0))
+    // Keep the treatment when the new printing also sells it; otherwise fall
+    // back to whatever that printing leads with.
+    const available = finishOptions(card)
+    const nextFinish = available.some((option) => option.value === editFinish)
+      ? editFinish
+      : defaultFinishFor(card)
+    setEditFinish(nextFinish)
+    setEditPriceText(formatPrice(scryfallPriceCents(card, isFoilFinish(nextFinish) ? 'foil' : 'nonfoil') ?? 0))
   }
 
   function useMarketPrice() {
@@ -122,7 +123,7 @@ function EditInventoryModalBody({
                 priceText: editPriceText,
                 costText: editCostText,
                 condition: editCondition,
-                isFoil: editIsFoil,
+                finish: editFinish,
               })
             }
           >
@@ -170,11 +171,7 @@ function EditInventoryModalBody({
 
             <div>
               <p className="mb-1.5 text-sm font-bold text-fg">Finish</p>
-              <FinishToggle
-                value={editIsFoil}
-                onChange={setEditIsFoil}
-                labels={{ plain: finishes.plain, foil: finishes.foil }}
-              />
+              <FinishPicker value={editFinish} options={finishes} onChange={setEditFinish} />
             </div>
 
             <div>
@@ -218,7 +215,7 @@ function EditInventoryModalBody({
               <div className="flex gap-2 rounded-card border border-warning-500/40 bg-warning-50 p-3 text-sm text-warning-700">
                 <AlertTriangle aria-hidden className="mt-0.5 size-4 flex-shrink-0" />
                 <p>
-                  A listing for this printing ({editCondition}, {editIsFoil ? finishes.foil : finishes.plain}) already exists with{' '}
+                  A listing for this printing ({editCondition}, {editFinish}) already exists with{' '}
                   <span className="font-bold">{mergeTarget.quantity}</span> in stock. Saving will <span className="font-bold">merge</span>{' '}
                   them into one listing of <span className="font-bold">{mergeTarget.quantity + editQuantity}</span>.
                 </p>

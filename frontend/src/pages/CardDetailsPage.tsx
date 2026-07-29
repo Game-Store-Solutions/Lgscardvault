@@ -324,7 +324,7 @@ export default function CardDetailsPage() {
           <div className="rounded-card border border-border bg-surface p-5 shadow-card">
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Store price</p>
-              <Badge tone={item.isFoil ? 'brand' : 'neutral'}>{finishName(item.card, item.isFoil)}</Badge>
+              <Badge tone={item.isFoil ? 'brand' : 'neutral'}>{finishName(item.card, item.isFoil, item.finish)}</Badge>
             </div>
             <p className="mt-1 font-display text-4xl font-bold text-fg">{formatPrice(item.priceCents)}</p>
             <p className="mt-1 text-sm font-bold text-fg">

@@ -3,14 +3,14 @@ import { formatScryfallPrice } from '../../../api/client'
 import type { CardSummary } from '../../../api/types'
 import { Button, Input } from '../../../components/ui'
 import { plainCardText } from '../../../lib/cardText'
-import { finishChoices } from '../../../lib/finishes'
-import { ConditionSegmented, FinishToggle, QuantityStepper, type Condition } from '../../../components/inventory'
+import { finishOptions, isFoilFinish } from '../../../lib/finishes'
+import { ConditionSegmented, FinishPicker, QuantityStepper, type Condition } from '../../../components/inventory'
 
 export interface SelectedCardEditorProps {
   card: CardSummary
   quantity: number
   condition: Condition
-  isFoil: boolean
+  finish: string
   pending: boolean
   costText: string
   /** Sell price in dollars; seeded from market price when one exists. */
@@ -19,7 +19,7 @@ export interface SelectedCardEditorProps {
   onCostChange: (value: string) => void
   onQuantityChange: (value: number) => void
   onConditionChange: (value: Condition) => void
-  onFinishChange: (value: 'nonfoil' | 'foil') => void
+  onFinishChange: (finish: string) => void
   onAdd: () => void
 }
 
@@ -28,7 +28,7 @@ export function SelectedCardEditor({
   card,
   quantity,
   condition,
-  isFoil,
+  finish,
   pending,
   costText,
   priceText,
@@ -39,15 +39,13 @@ export function SelectedCardEditor({
   onFinishChange,
   onAdd,
 }: SelectedCardEditorProps) {
-  // Finish labels come from the game's own catalog, so a Pokemon card offers
-  // "Normal / Holofoil" rather than Magic's "Nonfoil / Foil".
-  const finishes = finishChoices(card)
-  const onlyFoil = finishes.hasFoil && !finishes.hasPlain
-  const onlyNonfoil = finishes.hasPlain && !finishes.hasFoil
+  // Every treatment this printing is sold in, from the game's own catalog:
+  // "Normal / Holofoil / Reverse Holofoil", not Magic's two.
+  const finishes = finishOptions(card)
   // Mana cost is a Magic concept; showing it (empty) on a One Piece leader is
   // noise. Games outside Magic get the attributes they actually have.
   const isMagic = (card.gameCode ?? 'mtg') === 'mtg'
-  const marketPrice = formatScryfallPrice(card, isFoil ? 'foil' : 'nonfoil')
+  const marketPrice = formatScryfallPrice(card, isFoilFinish(finish) ? 'foil' : 'nonfoil')
   const hasMarketPrice = marketPrice !== '-'
   return (
     <div className="rounded-card border border-border bg-bg p-4">
@@ -60,7 +58,7 @@ export function SelectedCardEditor({
           </p>
         </div>
         <p className="text-xs uppercase text-fg-muted">
-          {(card.finishes?.length ? card.finishes : [finishes.plain]).join(' / ')}
+          {finishes.map((option) => option.value).join(' / ')}
         </p>
       </div>
 
@@ -85,19 +83,7 @@ export function SelectedCardEditor({
         </div>
         <div>
           <p className="mb-1.5 text-sm font-bold text-fg">Finish</p>
-          <FinishToggle
-            value={isFoil}
-            onChange={(v) => onFinishChange(v ? 'foil' : 'nonfoil')}
-            disabled={Boolean(onlyFoil || onlyNonfoil)}
-            labels={{ plain: finishes.plain, foil: finishes.foil }}
-          />
-          {finishes.extras.length > 0 && (
-            // Inventory stores one plain and one foil line per printing, so
-            // these treatments have no listing of their own yet.
-            <p className="mt-1 text-xs text-fg-muted">
-              Also printed as {finishes.extras.join(', ')} — stocked under {finishes.foil} for now.
-            </p>
-          )}
+          <FinishPicker value={finish} options={finishes} onChange={onFinishChange} />
         </div>
         <div className="sm:col-span-2">
           <p className="mb-1.5 text-sm font-bold text-fg">Condition</p>

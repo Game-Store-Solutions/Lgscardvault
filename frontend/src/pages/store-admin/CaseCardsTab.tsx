@@ -645,7 +645,7 @@ function StockingSheetModal({
                       {row.collectorNumber ? ` #${row.collectorNumber}` : ''}
                     </td>
                     <td className="py-2 pr-3 text-fg-muted">
-                      {row.isFoil ? 'Foil' : 'Nonfoil'}
+                      {row.finish}
                       {row.condition ? ` · ${row.condition}` : ''}
                     </td>
                     <td className="py-2 pr-3 text-right font-bold text-fg">{row.copies}</td>
@@ -689,7 +689,7 @@ function printStockingSheet(sheet: StockingSheet) {
         <tr>
           <td>${escapeHtml(row.cardName)}</td>
           <td>${escapeHtml(row.setCode?.toUpperCase() ?? '-')}${row.collectorNumber ? ' #' + escapeHtml(row.collectorNumber) : ''}</td>
-          <td>${row.isFoil ? 'Foil' : 'Nonfoil'}${row.condition ? ' · ' + escapeHtml(row.condition) : ''}</td>
+          <td>${escapeHtml(row.finish)}${row.condition ? ' · ' + escapeHtml(row.condition) : ''}</td>
           <td>${row.copies}</td>
           <td>[&nbsp;&nbsp;]</td>
         </tr>`,
@@ -882,7 +882,7 @@ function InventoryPicker({
                     <p className="truncate text-sm font-bold text-fg">{item.card.name}</p>
                     <p className="text-xs text-fg-muted">
                       {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
-                      {item.isFoil ? ' · Foil' : ''}
+                      {item.isFoil ? ` · ${item.finish}` : ''}
                     </p>
                   </div>
                   <Button

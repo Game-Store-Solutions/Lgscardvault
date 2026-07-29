@@ -209,6 +209,8 @@ export interface InventoryItem {
   /** What the store paid per copy; null = cost not tracked. */
   acquisitionCostCents?: number | null
   condition: 'NM' | 'LP' | 'MP' | 'HP' | 'DMG'
+  /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
+  finish: string
   isFoil: boolean
   notes?: string | null
   card: CardSummary
@@ -235,6 +237,8 @@ export interface StoreSectionCard {
     priceCents: number
     quantity: number
     condition: InventoryItem['condition']
+    /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
+    finish: string
     isFoil: boolean
     card: CardSummary | null
   }
@@ -302,6 +306,8 @@ export interface StockingSheetRow {
   setCode: string | null
   collectorNumber: string | null
   condition: string | null
+  /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
+  finish: string
   isFoil: boolean
   priceCents: number | null
   copies: number
@@ -352,6 +358,8 @@ export interface CustomerWantListEntry {
   card?: CardSummary | null
   cardName: string
   setCode?: string | null
+  /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
+  finish: string
   isFoil: boolean
   quantity: number
   notes?: string | null
@@ -368,6 +376,8 @@ export interface CsvImportRow {
   game: string
   set: string
   condition: string
+  /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
+  finish: string
   isFoil: boolean
   rarity: string
   quantity: number
@@ -521,6 +531,8 @@ export interface TradeRateSettings {
 export interface BuylistEntry {
   id: number
   offerCents: number | null
+  /** Treatment the store is buying, in the game's own words. */
+  wantsFinish: string
   wantsFoil: boolean
   maxQuantity: number | null
   active: boolean
@@ -536,6 +548,8 @@ export interface SellSubmissionItem {
   id: number
   cardId?: string | null
   cardName: string
+  /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
+  finish: string
   isFoil: boolean
   condition: string
   quantity: number
@@ -680,6 +694,8 @@ export interface ImportPreviewRow {
   collectorNumber?: string
   quantity: number
   condition?: string
+  /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
+  finish?: string
   isFoil?: boolean
   priceCents?: number | null
   marketPriceCents?: number | null

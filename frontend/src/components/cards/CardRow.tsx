@@ -55,10 +55,10 @@ export function CardRow({ item, slug }: CardRowProps) {
               style={{ backgroundImage: FOIL_GRADIENT }}
             >
               <Sparkles aria-hidden className="size-3" />
-              {finishName(item.card, true)}
+              {finishName(item.card, true, item.finish)}
             </span>
           ) : (
-            <Badge tone="neutral">{finishName(item.card, false)}</Badge>
+            <Badge tone="neutral">{finishName(item.card, false, item.finish)}</Badge>
           )}
         </div>
       </div>

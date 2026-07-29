@@ -73,7 +73,7 @@ export function CardTile({ item, slug }: CardTileProps) {
         <p className="mt-0.5 truncate text-xs text-fg-muted">
           {item.card.setCode?.toUpperCase() ?? '—'} · {item.condition}
           {item.card.rarity ? ` · ${rarityLabel(item.card.rarity)}` : ''}
-          {item.isFoil ? ` · ${finishName(item.card, true)}` : ''}
+          {item.isFoil ? ` · ${finishName(item.card, true, item.finish)}` : ''}
         </p>
         <p className="mt-2 text-xs font-medium text-fg-muted">{item.quantity} available</p>
       </div>

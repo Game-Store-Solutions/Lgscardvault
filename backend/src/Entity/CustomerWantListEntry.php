@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\CustomerWantListEntryRepository;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CustomerWantListEntryRepository::class)]
@@ -28,8 +29,9 @@ class CustomerWantListEntry
     #[ORM\Column(length: 120, nullable: true)]
     private ?string $setCode = null;
 
-    #[ORM\Column]
-    private bool $isFoil = false;
+    /** Treatment the customer wants, in the game's words. */
+    #[ORM\Column(length: FinishVocabulary::MAX_LENGTH, options: ['default' => FinishVocabulary::DEFAULT_PLAIN])]
+    private string $finish = FinishVocabulary::DEFAULT_PLAIN;
 
     #[ORM\Column]
     private int $quantity = 1;
@@ -98,16 +100,22 @@ class CustomerWantListEntry
         return $this;
     }
 
-    public function isFoil(): bool
+    public function getFinish(): string
     {
-        return $this->isFoil;
+        return $this->finish;
     }
 
-    public function setIsFoil(bool $isFoil): static
+    public function setFinish(string $finish): static
     {
-        $this->isFoil = $isFoil;
+        $canonical = FinishVocabulary::canonical($finish);
+        $this->finish = '' !== $canonical ? $canonical : FinishVocabulary::DEFAULT_PLAIN;
 
         return $this;
+    }
+
+    public function isFoil(): bool
+    {
+        return FinishVocabulary::isFoil($this->finish);
     }
 
     public function getQuantity(): int

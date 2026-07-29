@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\CardCondition;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -29,8 +30,9 @@ class SellSubmissionItem
     #[ORM\Column(length: 255)]
     private string $cardName = '';
 
-    #[ORM\Column]
-    private bool $isFoil = false;
+    /** Treatment the store is buying, in the game's words. */
+    #[ORM\Column(length: FinishVocabulary::MAX_LENGTH, options: ['default' => FinishVocabulary::DEFAULT_PLAIN])]
+    private string $finish = FinishVocabulary::DEFAULT_PLAIN;
 
     #[ORM\Column]
     private int $quantity = 1;
@@ -66,8 +68,9 @@ class SellSubmissionItem
     public function getCardName(): string { return $this->cardName; }
     public function setCardName(string $cardName): static { $this->cardName = $cardName; return $this; }
 
-    public function isFoil(): bool { return $this->isFoil; }
-    public function setIsFoil(bool $isFoil): static { $this->isFoil = $isFoil; return $this; }
+    public function getFinish(): string { return $this->finish; }
+    public function setFinish(string $finish): static { $this->finish = FinishVocabulary::canonical($finish) ?: FinishVocabulary::DEFAULT_PLAIN; return $this; }
+    public function isFoil(): bool { return FinishVocabulary::isFoil($this->finish); }
 
     public function getQuantity(): int { return $this->quantity; }
     public function setQuantity(int $quantity): static { $this->quantity = max(1, $quantity); return $this; }

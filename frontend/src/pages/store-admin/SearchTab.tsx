@@ -17,7 +17,7 @@ import {
   Pagination,
 } from '../../components/ui'
 import { type Condition } from '../../components/inventory'
-import { finishChoices } from '../../lib/finishes'
+import { defaultFinishFor, finishChoices, isFoilFinish } from '../../lib/finishes'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -41,7 +41,7 @@ export default function SearchTab({ slug }: { slug: string }) {
   const [quantity, setQuantity] = useState(1)
   const [priceText, setPriceText] = useState('')
   const [condition, setCondition] = useState<Condition>('NM')
-  const [isFoil, setIsFoil] = useState(false)
+  const [finish, setFinish] = useState('Nonfoil')
   const [costText, setCostText] = useState('')
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -49,8 +49,8 @@ export default function SearchTab({ slug }: { slug: string }) {
   // Seed the sell price from the market price when there is one. Games
   // outside Magic often have no price at all, and the old flow silently
   // listed those at $0.00 with no way to say otherwise.
-  function applyScryfallPrice(card: CardSummary, foil: boolean) {
-    const market = scryfallPriceCents(card, foil ? 'foil' : 'nonfoil')
+  function applyScryfallPrice(card: CardSummary, nextFinish: string) {
+    const market = scryfallPriceCents(card, isFoilFinish(nextFinish) ? 'foil' : 'nonfoil')
     setPriceText(market == null ? '' : (market / 100).toFixed(2))
   }
 
@@ -77,28 +77,24 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   function selectCatalogCard(card: CardSummary) {
     setSelectedCard(card)
-    let nextIsFoil = isFoil
-    // Which treatments exist is per game — "Holofoil only" is as much a
-    // one-sided printing as Magic's foil-only promos.
+    // Start on the treatment the search was filtered to, else the first one
+    // this printing is actually sold in — which outside Magic is "Normal",
+    // not "Nonfoil".
     const published = finishChoices(card)
-    if (catalogFinishFilter === 'foil') {
-      nextIsFoil = true
-    } else if (catalogFinishFilter === 'nonfoil') {
-      nextIsFoil = false
-    } else if (published.hasFoil && !published.hasPlain) {
-      nextIsFoil = true
-    } else if (published.hasPlain && !published.hasFoil) {
-      nextIsFoil = false
-    }
-    setIsFoil(nextIsFoil)
-    applyScryfallPrice(card, nextIsFoil)
+    const nextFinish =
+      catalogFinishFilter === 'foil'
+        ? published.foil
+        : catalogFinishFilter === 'nonfoil'
+          ? published.plain
+          : defaultFinishFor(card)
+    setFinish(nextFinish)
+    applyScryfallPrice(card, nextFinish)
   }
 
-  function handleFinishChange(value: 'nonfoil' | 'foil') {
-    const nextIsFoil = value === 'foil'
-    setIsFoil(nextIsFoil)
+  function handleFinishChange(nextFinish: string) {
+    setFinish(nextFinish)
     if (selectedCard) {
-      applyScryfallPrice(selectedCard, nextIsFoil)
+      applyScryfallPrice(selectedCard, nextFinish)
     }
   }
 
@@ -110,7 +106,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         quantity,
         priceCents: parsePriceInput(priceText) ?? 0,
         condition,
-        isFoil,
+        finish,
         acquisitionCostCents: parsePriceInput(costText),
       })
     },
@@ -132,7 +128,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         priceCents: parsePriceInput(payload.priceText) ?? 0,
         acquisitionCostCents: parsePriceInput(payload.costText),
         condition: payload.condition,
-        isFoil: payload.isFoil,
+        finish: payload.finish,
       })
       return data
     },
@@ -298,7 +294,7 @@ export default function SearchTab({ slug }: { slug: string }) {
               card={selectedCard}
               quantity={quantity}
               condition={condition}
-              isFoil={isFoil}
+              finish={finish}
               pending={addMutation.isPending}
               costText={costText}
               onCostChange={setCostText}

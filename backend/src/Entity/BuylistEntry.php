@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\BuylistEntryRepository;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -12,7 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
  */
 #[ORM\Entity(repositoryClass: BuylistEntryRepository::class)]
 #[ORM\Table(name: 'buylist_entries')]
-#[ORM\UniqueConstraint(name: 'uniq_buylist_store_card_foil', columns: ['store_id', 'card_id', 'wants_foil'])]
+#[ORM\UniqueConstraint(name: 'uniq_buylist_store_card_finish', columns: ['store_id', 'card_id', 'wants_finish'])]
 class BuylistEntry
 {
     #[ORM\Id]
@@ -39,8 +40,9 @@ class BuylistEntry
     #[ORM\Column(options: ['default' => true])]
     private bool $active = true;
 
-    #[ORM\Column(name: 'wants_foil')]
-    private bool $wantsFoil = false;
+    /** Treatment the store is buying, in the game's words. */
+    #[ORM\Column(name: 'wants_finish', length: FinishVocabulary::MAX_LENGTH, options: ['default' => FinishVocabulary::DEFAULT_PLAIN])]
+    private string $wantsFinish = FinishVocabulary::DEFAULT_PLAIN;
 
     /** Max copies the store wants; null = no cap. */
     #[ORM\Column(nullable: true)]
@@ -71,8 +73,9 @@ class BuylistEntry
     public function isActive(): bool { return $this->active; }
     public function setActive(bool $active): static { $this->active = $active; return $this; }
 
-    public function wantsFoil(): bool { return $this->wantsFoil; }
-    public function setWantsFoil(bool $wantsFoil): static { $this->wantsFoil = $wantsFoil; return $this; }
+    public function getWantsFinish(): string { return $this->wantsFinish; }
+    public function setWantsFinish(string $finish): static { $this->wantsFinish = FinishVocabulary::canonical($finish) ?: FinishVocabulary::DEFAULT_PLAIN; return $this; }
+    public function wantsFoil(): bool { return FinishVocabulary::isFoil($this->wantsFinish); }
 
     public function getMaxQuantity(): ?int { return $this->maxQuantity; }
     public function setMaxQuantity(?int $maxQuantity): static { $this->maxQuantity = $maxQuantity; return $this; }

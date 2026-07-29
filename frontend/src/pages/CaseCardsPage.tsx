@@ -170,7 +170,7 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
         <div className="mt-0.5 flex items-baseline justify-between gap-2">
           <span className="truncate text-xs uppercase tracking-wide text-fg-muted">
             {card.setCode?.toUpperCase() ?? '—'}
-            {inventoryItem.isFoil ? ` · ${finishName(inventoryItem.card, true)}` : ''}
+            {inventoryItem.isFoil ? ` · ${finishName(inventoryItem.card, true, inventoryItem.finish)}` : ''}
           </span>
           <span className="text-sm font-bold text-fg">{formatPrice(inventoryItem.priceCents)}</span>
         </div>

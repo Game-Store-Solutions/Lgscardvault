@@ -11,6 +11,7 @@ use App\Repository\CsvImportJobRepository;
 use App\Repository\CsvImportRowRepository;
 use App\Repository\CardRepository;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Catalog\FinishVocabulary;
 use App\Service\CsvImport\SealedImportProcessor;
 use App\Service\Doctrine\SqlDebugLogPruner;
 use App\Service\Inventory\StoreInventoryWriter;
@@ -194,7 +195,11 @@ final readonly class ProcessCsvImportMessageHandler
                     $card,
                     $quantity,
                     $condition,
-                    $row->isFoil(),
+                    FinishVocabulary::resolveForCard(
+                        $card,
+                        FinishVocabulary::isGeneric($row->getFinish()) ? null : $row->getFinish(),
+                        $row->isFoil(),
+                    ),
                     '' !== $notes ? $notes : null,
                     false,
                 );

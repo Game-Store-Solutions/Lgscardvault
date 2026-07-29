@@ -5,13 +5,12 @@ import type { CardSummary } from '../api/types'
  *
  * "Foil / Nonfoil" is Magic's wording. Pokemon sells Holofoil and Reverse
  * Holofoil, Flesh and Blood sells Rainbow Foil and Cold Foil, One Piece sells
- * plain Foil. The catalog sync records whatever names TCGplayer publishes on
- * `card.finishes`, and these helpers turn those into the labels the picker
- * shows, so a store never sees Magic's words on a Pokemon card.
+ * plain Foil. Inventory now stores the treatment's name, so a store can hold
+ * Holofoil and Reverse Holofoil as separate, separately priced listings.
  *
- * Storage is still the binary isFoil flag, so the picker offers one plain and
- * one foil choice; treatments beyond those two are surfaced as a note rather
- * than pretended to be separately stockable.
+ * These helpers mirror App\Service\Catalog\FinishVocabulary on the backend —
+ * same aliases, same per-game defaults, same foil/not-foil axis, which the
+ * card shimmer and market-price lookup still need.
  */
 
 /** Substrings that mark a foil treatment somewhere in the catalog. */
@@ -19,6 +18,9 @@ const FOIL_MARKERS = ['foil', 'holo', 'prism', 'rainbow', 'etched', 'shatter', '
 
 /** Names that read as foil-ish but are the plain printing. */
 const PLAIN_NAMES = new Set(['normal', 'unlimited', 'unlimited edition', '1st edition'])
+
+export const DEFAULT_PLAIN_FINISH = 'Nonfoil'
+export const DEFAULT_FOIL_FINISH = 'Foil'
 
 export function isFoilFinish(name: string): boolean {
   const normalized = name.trim().toLowerCase()
@@ -29,26 +31,56 @@ export function isFoilFinish(name: string): boolean {
   return FOIL_MARKERS.some((marker) => normalized.includes(marker))
 }
 
-/** Scryfall ships lowercase keys; every other source already ships prose. */
-const SCRYFALL_LABELS: Record<string, string> = {
-  nonfoil: 'Nonfoil',
-  foil: 'Foil',
+/** Spellings that mean the same treatment — Scryfall's lowercase keys included. */
+const ALIASES: Record<string, string> = {
+  nonfoil: DEFAULT_PLAIN_FINISH,
+  'non-foil': DEFAULT_PLAIN_FINISH,
+  'non foil': DEFAULT_PLAIN_FINISH,
+  foil: DEFAULT_FOIL_FINISH,
   etched: 'Etched Foil',
-  glossy: 'Glossy',
+  'etched foil': 'Etched Foil',
+  regular: 'Normal',
 }
 
+/** One spelling per treatment, matching what the backend stores. */
 export function finishLabel(name: string): string {
-  const trimmed = name.trim()
-  return SCRYFALL_LABELS[trimmed.toLowerCase()] ?? trimmed
+  const collapsed = name.trim().replace(/\s+/g, ' ')
+  if (!collapsed) return ''
+  return ALIASES[collapsed.toLowerCase()] ?? collapsed
 }
 
 /** What each game calls its plain and foil printings when a card doesn't say. */
 const GAME_DEFAULTS: Record<string, { plain: string; foil: string }> = {
-  mtg: { plain: 'Nonfoil', foil: 'Foil' },
+  mtg: { plain: DEFAULT_PLAIN_FINISH, foil: DEFAULT_FOIL_FINISH },
   pokemon: { plain: 'Normal', foil: 'Holofoil' },
   onepiece: { plain: 'Normal', foil: 'Foil' },
   fab: { plain: 'Normal', foil: 'Rainbow Foil' },
   riftbound: { plain: 'Normal', foil: 'Foil' },
+}
+
+type FinishSource = Pick<CardSummary, 'finishes' | 'gameCode'> | null | undefined
+
+export interface FinishOption {
+  value: string
+  isFoil: boolean
+}
+
+/**
+ * Every treatment this printing can be stocked as, in catalog order.
+ *
+ * A card whose treatments were never synced still offers its game's two, so
+ * the picker is never empty.
+ */
+export function finishOptions(card: FinishSource, gameCode?: string): FinishOption[] {
+  const defaults = GAME_DEFAULTS[card?.gameCode ?? gameCode ?? 'mtg'] ?? GAME_DEFAULTS.mtg
+
+  const published = (card?.finishes ?? []).map(finishLabel).filter(Boolean)
+  const names = published.length > 0 ? published : [defaults.plain, defaults.foil]
+
+  const seen = new Set<string>()
+  return names
+    .filter((name) => (seen.has(name) ? false : (seen.add(name), true)))
+    .map((value) => ({ value, isFoil: isFoilFinish(value) }))
 }
 
 export interface FinishChoices {
@@ -56,23 +88,17 @@ export interface FinishChoices {
   plain: string
   /** Label for the foil printing in this game's words. */
   foil: string
-  /** Treatments this printing has beyond the two selectable ones. */
-  extras: string[]
   /** Whether the catalog says this printing exists plain / foil at all. */
   hasPlain: boolean
   hasFoil: boolean
 }
 
-type FinishSource = Pick<CardSummary, 'finishes' | 'gameCode'> | null | undefined
-
 /**
- * The finish labels to show for a card. `gameCode` is the fallback for cards
- * that don't carry one (legacy Magic rows) and for empty pickers.
+ * The two ends of the foil axis for a card, for the places that are still
+ * binary: catalog filters, price previews, the shimmer.
  */
 export function finishChoices(card: FinishSource, gameCode?: string): FinishChoices {
-  const code = card?.gameCode ?? gameCode ?? 'mtg'
-  const defaults = GAME_DEFAULTS[code] ?? GAME_DEFAULTS.mtg
-
+  const defaults = GAME_DEFAULTS[card?.gameCode ?? gameCode ?? 'mtg'] ?? GAME_DEFAULTS.mtg
   const published = (card?.finishes ?? []).map(finishLabel).filter(Boolean)
   const plainNames = published.filter((name) => !isFoilFinish(name))
   const foilNames = published.filter(isFoilFinish)
@@ -80,7 +106,6 @@ export function finishChoices(card: FinishSource, gameCode?: string): FinishChoi
   return {
     plain: plainNames[0] ?? defaults.plain,
     foil: foilNames[0] ?? defaults.foil,
-    extras: [...plainNames.slice(1), ...foilNames.slice(1)],
     // A card with nothing recorded is treated as printable both ways rather
     // than locked to one — the catalog simply hasn't told us.
     hasPlain: published.length === 0 || plainNames.length > 0,
@@ -88,8 +113,24 @@ export function finishChoices(card: FinishSource, gameCode?: string): FinishChoi
   }
 }
 
-/** The single label for a listing that is already stored as foil / not foil. */
-export function finishName(card: FinishSource, isFoil: boolean, gameCode?: string): string {
+/**
+ * The finish to show for something already stored. Listings carry their own
+ * treatment; the card-derived label is only a fallback for older payloads.
+ */
+export function finishName(
+  card: FinishSource,
+  isFoil: boolean,
+  stored?: string | null,
+  gameCode?: string,
+): string {
+  const label = finishLabel(stored ?? '')
+  if (label) return label
+
   const choices = finishChoices(card, gameCode)
   return isFoil ? choices.foil : choices.plain
+}
+
+/** The treatment a card should default to when it is first picked. */
+export function defaultFinishFor(card: FinishSource, gameCode?: string): string {
+  return finishOptions(card, gameCode)[0]?.value ?? DEFAULT_PLAIN_FINISH
 }

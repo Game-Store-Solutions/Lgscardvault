@@ -770,10 +770,10 @@ function CartLine({
                   style={{ backgroundImage: FOIL_GRADIENT }}
                 >
                   <Sparkles aria-hidden className="size-3" />
-                  {finishName(item.card, true)}
+                  {finishName(item.card, true, item.finish)}
                 </span>
               ) : (
-                <Badge tone="neutral">{finishName(item.card, false)}</Badge>
+                <Badge tone="neutral">{finishName(item.card, false, item.finish)}</Badge>
               )}
               {item.quantity <= 3 && <Badge tone="warning">Low stock</Badge>}
             </div>

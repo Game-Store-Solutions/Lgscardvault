@@ -87,6 +87,7 @@ final class SectionSerializer
             'priceCents' => $item->getPriceCents(),
             'quantity' => $item->getQuantity(),
             'condition' => $item->getCondition()->value,
+            'finish' => $item->getFinish(),
             'isFoil' => $item->isFoil(),
             'card' => null !== $card ? $this->catalogCardResolver->serializeCard($card) : null,
         ];

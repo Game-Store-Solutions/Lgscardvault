@@ -359,7 +359,7 @@ function PreviewRow({ row, sealed }: { row: ImportPreviewRow; sealed: boolean })
       <TD>
         <p className="font-medium text-fg">{row.name || <span className="text-fg-muted">(blank)</span>}</p>
         <p className="text-xs text-fg-muted">
-          {[row.set, row.collectorNumber && `#${row.collectorNumber}`, !sealed && row.isFoil ? 'Foil' : '']
+          {[row.set, row.collectorNumber && `#${row.collectorNumber}`, !sealed && row.isFoil ? (row.finish ?? 'Foil') : '']
             .filter(Boolean)
             .join(' · ')}
         </p>

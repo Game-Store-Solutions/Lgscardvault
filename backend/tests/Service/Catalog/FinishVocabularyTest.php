@@ -54,6 +54,29 @@ final class FinishVocabularyTest extends TestCase
         self::assertFalse(FinishVocabulary::offers('foil', ['Normal']));
     }
 
+    public function testOneSpellingPerTreatment(): void
+    {
+        // Otherwise "non-foil" and "nonfoil" become two inventory lines of
+        // the same card, each with its own price.
+        self::assertSame('Nonfoil', FinishVocabulary::canonical('non-foil'));
+        self::assertSame('Nonfoil', FinishVocabulary::canonical('NONFOIL'));
+        self::assertSame('Foil', FinishVocabulary::canonical(' foil '));
+        self::assertSame('Etched Foil', FinishVocabulary::canonical('etched'));
+
+        // A treatment the catalog names is kept as the catalog writes it.
+        self::assertSame('Reverse Holofoil', FinishVocabulary::canonical('Reverse  Holofoil'));
+        self::assertSame('', FinishVocabulary::canonical('   '));
+    }
+
+    public function testTheGenericPlaceholdersAreRecognised(): void
+    {
+        self::assertTrue(FinishVocabulary::isGeneric('foil'));
+        self::assertTrue(FinishVocabulary::isGeneric('nonfoil'));
+        self::assertTrue(FinishVocabulary::isGeneric(''));
+        self::assertFalse(FinishVocabulary::isGeneric('Holofoil'), 'a real treatment is not a placeholder');
+        self::assertFalse(FinishVocabulary::isGeneric('Normal'));
+    }
+
     public function testAPrintingWithNoRecordedTreatmentsIsNeverHidden(): void
     {
         // An unpriced card has no subtypes to read; that is ignorance, not a

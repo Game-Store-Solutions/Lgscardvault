@@ -361,7 +361,7 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
                     <span className="block truncate text-sm font-bold text-fg">{item.card.name}</span>
                     <span className="block text-xs text-fg-muted">
                       {item.card.setCode?.toUpperCase()} · {item.condition}
-                      {item.isFoil ? ' · Foil' : ''} · {item.quantity} in stock
+                      {item.isFoil ? ` · ${item.finish}` : ''} · {item.quantity} in stock
                     </span>
                   </span>
                   <span className="shrink-0 text-sm font-bold text-fg">{formatPrice(item.priceCents)}</span>

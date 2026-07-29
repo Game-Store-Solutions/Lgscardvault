@@ -71,7 +71,7 @@ export function MarketplaceCard({
             Market Price: <span className="text-success-700">{marketPrice}</span>
           </p>
           <p className="mt-1 text-xs font-medium text-fg-muted">
-            {item.condition} / {finishName(item.card, item.isFoil)}
+            {item.condition} / {finishName(item.card, item.isFoil, item.finish)}
           </p>
 
           <div className="mt-3 max-w-36">

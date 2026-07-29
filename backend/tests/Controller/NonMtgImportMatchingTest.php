@@ -253,6 +253,53 @@ final class NonMtgImportMatchingTest extends WebTestCase
         self::assertStringContainsString('OP01-047', $error);
     }
 
+    public function testASheetThatNamesTheTreatmentStocksThatTreatment(): void
+    {
+        $store = $this->fixtures->store();
+        $this->syncOnePieceCatalog();
+        $this->authenticate($store->getOwner());
+
+        // A foil column carrying the treatment rather than Yes/No. This used
+        // to parse as NOT foil — "holofoil" is not the word "foil" — and the
+        // listing landed as a plain printing at the plain price.
+        $csv = "name,game,set,condition,foil,rarity,quantity,variant,collectorNumber\n"
+            ."Monkey.D.Luffy,One Piece,Romance Dawn,NM,Parallel Foil,Leader,1,,OP01-003\n";
+
+        $job = $this->uploadCsv(
+            "/api/stores/{$store->getSlug()}/csv-imports",
+            $csv,
+            ['game' => 'onepiece', 'type' => 'cards'],
+        );
+        static::getContainer()->get(ProcessCsvImportMessageHandler::class)(new ProcessCsvImportMessage($job['id']));
+
+        $inventory = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/inventory?game=onepiece");
+        $lines = $inventory['member'] ?? $inventory;
+        self::assertCount(1, $lines);
+        self::assertSame('Parallel Foil', $lines[0]['finish']);
+        self::assertTrue($lines[0]['isFoil']);
+    }
+
+    public function testAYesNoSheetGetsTheGamesOwnWordForThePrinting(): void
+    {
+        $store = $this->fixtures->store();
+        $this->syncOnePieceCatalog();
+        $this->authenticate($store->getOwner());
+
+        $csv = "name,game,set,condition,foil,rarity,quantity,variant,collectorNumber\n"
+            ."Trafalgar Law,One Piece,Romance Dawn,NM,No,Super Rare,1,,OP01-047\n";
+
+        $job = $this->uploadCsv(
+            "/api/stores/{$store->getSlug()}/csv-imports",
+            $csv,
+            ['game' => 'onepiece', 'type' => 'cards'],
+        );
+        static::getContainer()->get(ProcessCsvImportMessageHandler::class)(new ProcessCsvImportMessage($job['id']));
+
+        $inventory = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/inventory?game=onepiece");
+        $lines = $inventory['member'] ?? $inventory;
+        self::assertSame('Normal', $lines[0]['finish'], 'One Piece calls its plain printing "Normal"');
+    }
+
     public function testSyncedCardTextHasNoHtmlTags(): void
     {
         $this->syncOnePieceCatalog();
