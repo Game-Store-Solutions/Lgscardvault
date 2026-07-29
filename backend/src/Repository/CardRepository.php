@@ -122,6 +122,16 @@ class CardRepository extends ServiceEntityRepository
      */
     public function findOneForGame(Game $game, string $name, string $setCode = '', string $collectorNumber = ''): ?Card
     {
+        // Magic is Scryfall's domain (CatalogCardResolver), and this
+        // matcher's collector-number-first strategy is only sound where a
+        // collector number is unique within the game. In Magic "254" names
+        // hundreds of cards, so answering here would hand back an arbitrary
+        // one — which is exactly how a repair run once re-pointed listings
+        // at the wrong printings.
+        if ($game->isMtg()) {
+            return null;
+        }
+
         // 1. Natural key. Outside Magic a collector number ("OP01-003",
         //    "MON038") encodes its own set and is unique within the game, so
         //    it identifies the printing on its own. Matching on it first means

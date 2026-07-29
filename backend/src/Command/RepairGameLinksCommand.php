@@ -37,6 +37,7 @@ final class RepairGameLinksCommand extends Command
             ['Re-pointed to catalog cards' => $report['repointed']],
             ['Merged into existing lines' => $report['merged']],
             ['Cards tagged in place' => $report['retagged']],
+            ['Magic listings restored' => $report['restored']],
             ['Unresolved' => count($report['unresolved'])],
         );
 

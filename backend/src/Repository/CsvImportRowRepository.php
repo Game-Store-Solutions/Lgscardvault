@@ -122,6 +122,15 @@ class CsvImportRowRepository extends ServiceEntityRepository
     }
 
     /** @return array{queued: int, processing: int, imported: int, error: int} */
+    /**
+     * The row a "recovered from CSV import row #N in import #J" note points
+     * at. The note is 1-based for humans; storage is 0-based.
+     */
+    public function findByNoteReference(int $jobId, int $oneBasedRow): ?CsvImportRow
+    {
+        return $this->findOneBy(['job' => $jobId, 'rowIndex' => $oneBasedRow - 1]);
+    }
+
     public function countByStatus(CsvImportJob $job): array
     {
         $counts = [
