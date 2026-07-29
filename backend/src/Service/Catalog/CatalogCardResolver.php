@@ -142,6 +142,10 @@ final readonly class CatalogCardResolver
             'id' => (string) $card->getId(),
             'oracleId' => (string) $card->getOracleId(),
             'game' => $card->resolvedGameCode(),
+            // The frontend's CardSummary reads gameCode (matching the entity
+            // serializer); without it every catalog result read as Magic —
+            // wrong finish vocabulary, wrong defaults, wrong labels.
+            'gameCode' => $card->resolvedGameCode(),
             'name' => $card->getName(),
             'setCode' => $card->getSetCode(),
             'setName' => $card->getSetName(),
