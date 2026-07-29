@@ -179,16 +179,12 @@ export default function StorePage() {
 
   const totalCards = inventory.reduce((sum, item) => sum + item.quantity, 0)
 
-  // Counts come from the unscoped list so a tab always shows its own size,
-  // not the size of whatever is currently selected.
+  // Pure navigation — no counts on the pills. A number there can't say what
+  // it counts (listings? copies? sealed?), same reason it came off the
+  // admin selector.
   const gameOptions = useMemo(
-    () =>
-      storeGames.map((game) => ({
-        code: game.code,
-        name: game.name,
-        count: allInventory.filter((item) => (item.card.gameCode ?? 'mtg') === game.code).length,
-      })),
-    [storeGames, allInventory],
+    () => storeGames.map((game) => ({ code: game.code, name: game.name })),
+    [storeGames],
   )
 
   // One game at a time, always. An "All games" view interleaved every game

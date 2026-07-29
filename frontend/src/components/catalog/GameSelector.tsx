@@ -2,10 +2,12 @@ import type { CatalogGame } from '../../api/types'
 import { FilterPill, Select } from '../ui'
 import { cx } from '../../lib/cx'
 
-export interface GameOption extends Pick<CatalogGame, 'code' | 'name'> {
-  /** Optional count shown next to the name (listings, products, …). */
-  count?: number
-}
+/**
+ * Deliberately name-only: a count on a navigation pill can't say what it
+ * counts (listings? copies? sealed?). Per-game numbers belong in the
+ * workspace stats header, where they can be labeled.
+ */
+export type GameOption = Pick<CatalogGame, 'code' | 'name'>
 
 export interface GameSelectorProps {
   games: GameOption[]
@@ -41,9 +43,6 @@ export function GameSelector({
 }: GameSelectorProps) {
   if (games.length === 0) return null
 
-  const optionLabel = (game: GameOption) =>
-    undefined === game.count ? game.name : `${game.name} (${game.count})`
-
   return (
     <div className={cx('w-full', className)}>
       {/* Mobile: a native picker — reliable, no horizontal scrolling. */}
@@ -53,7 +52,7 @@ export function GameSelector({
           {includeAll && <option value="">{allLabel}</option>}
           {games.map((game) => (
             <option key={game.code} value={game.code}>
-              {optionLabel(game)}
+              {game.name}
             </option>
           ))}
         </Select>
@@ -68,7 +67,7 @@ export function GameSelector({
         )}
         {games.map((game) => (
           <FilterPill key={game.code} active={value === game.code} onClick={() => onChange(game.code)}>
-            {optionLabel(game)}
+            {game.name}
           </FilterPill>
         ))}
       </div>
