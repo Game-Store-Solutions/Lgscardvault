@@ -710,3 +710,12 @@ export interface StoreGame extends CatalogGame {
   hasSingles: boolean
   hasSealed: boolean
 }
+
+/** Inventory headline numbers for one game at one store. */
+export interface StoreGameStats {
+  gameCode: string
+  gameName: string
+  singles: { listings: number; copies: number }
+  sealed: { products: number; units: number }
+  total: { listings: number; copies: number }
+}

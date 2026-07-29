@@ -61,6 +61,27 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * Headline numbers for one game's singles in a store: how many distinct
+     * listings, and how many physical copies they represent.
+     *
+     * @return array{listings: int, copies: int}
+     */
+    public function statsForGame(Store $store, string $gameCode): array
+    {
+        $qb = $this->createQueryBuilder('i')
+            ->select('COUNT(i.id) AS listings', 'COALESCE(SUM(i.quantity), 0) AS copies')
+            ->join('i.card', 'c')
+            ->andWhere('i.store = :store')
+            ->setParameter('store', $store);
+
+        $this->scopeToGame($qb, $gameCode);
+
+        $row = $qb->getQuery()->getSingleResult();
+
+        return ['listings' => (int) $row['listings'], 'copies' => (int) $row['copies']];
+    }
+
+    /**
      * Game codes a store actually stocks, so the storefront only offers game
      * tabs that lead somewhere. Legacy NULL-game listings report as Magic.
      *

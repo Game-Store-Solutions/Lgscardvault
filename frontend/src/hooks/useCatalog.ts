@@ -7,6 +7,7 @@ import type {
   CatalogSyncRun,
   SealedInventoryLine,
   SealedSearchResult,
+  StoreGameStats,
 } from '../api/types'
 
 /* Multi-game catalog hooks: supported games, their sets, the shared sealed
@@ -20,6 +21,7 @@ export const sealedInventoryKey = (slug: string, game?: string) => ['sealed-inve
 export const sealedSpotlightKey = (slug: string) => ['sealed-spotlight', slug] as const
 export const syncRunsKey = ['catalog', 'sync-runs'] as const
 export const storeGamesKey = (slug: string) => ['store-games', slug] as const
+export const storeGameStatsKey = (slug: string, game: string) => ['store-game-stats', slug, game] as const
 
 export interface SealedSearchParams {
   game?: string
@@ -52,6 +54,22 @@ export function useStoreGames(slug: string) {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await api.get<StoreGame[]>(`/stores/${slug}/games`)
+      return data
+    },
+  })
+}
+
+/**
+ * Inventory numbers for the selected game. These live on the page rather
+ * than on the nav: one number per pill can't express singles vs sealed, and
+ * a bare count next to a game name reads as "results", not "stock".
+ */
+export function useStoreGameStats(slug: string, gameCode: string) {
+  return useQuery({
+    queryKey: storeGameStatsKey(slug, gameCode),
+    enabled: Boolean(slug && gameCode),
+    queryFn: async () => {
+      const { data } = await api.get<StoreGameStats>(`/stores/${slug}/games/${gameCode}/stats`)
       return data
     },
   })

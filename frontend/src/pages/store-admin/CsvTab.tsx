@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import api, { cardImage } from '../../api/client'
-import { inventoryKey, sealedInventoryKey, useCatalogGames } from '../../hooks'
+import { inventoryKey, sealedInventoryKey, useCatalogGames, useStoreGameStats } from '../../hooks'
 import type { CsvImportJob, CsvImportJobSummary, CsvImportRow } from '../../api/types'
 import {
   Card,
@@ -20,7 +20,7 @@ import {
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
 import ImportWizard from './ImportWizard'
 import { CardImage } from '../../components/cards'
-import { GameSelector } from '../../components/catalog'
+import { GameWorkspaceHeader } from '../../components/catalog'
 
 export default function CsvTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
@@ -68,10 +68,14 @@ export default function CsvTab({ slug }: { slug: string }) {
   const sealedJob = job?.importType === 'sealed'
 
   const { data: games = [] } = useCatalogGames()
-  const historyGames = useMemo(() => {
-    const seen = new Set(importRuns.map((run) => run.gameCode ?? 'mtg'))
-    return games.filter((game) => seen.has(game.code)).map((game) => ({ code: game.code, name: game.name }))
-  }, [games, importRuns])
+  const gameOptions = useMemo(() => games.map((game) => ({ code: game.code, name: game.name })), [games])
+  const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, historyGame)
+
+  useEffect(() => {
+    if (!historyGame && gameOptions.length > 0) {
+      setHistoryGame(gameOptions[0].code)
+    }
+  }, [historyGame, gameOptions])
   const visibleRuns = useMemo(
     () => (historyGame ? importRuns.filter((run) => (run.gameCode ?? 'mtg') === historyGame) : importRuns),
     [importRuns, historyGame],
@@ -79,6 +83,15 @@ export default function CsvTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
+      <GameWorkspaceHeader
+        games={gameOptions}
+        value={historyGame}
+        onChange={setHistoryGame}
+        stats={gameStats}
+        loading={statsLoading}
+        label="Imports for"
+      />
+
       <ImportWizard slug={slug} busy={isActive(job?.status)} onImported={refreshImports} />
 
       {job && (
@@ -182,19 +195,6 @@ export default function CsvTab({ slug }: { slug: string }) {
         <CardHeader
           title="Import run audit"
           subtitle="Review every CSV import run, open row details, or manage active work."
-          actions={
-            historyGames.length > 1 ? (
-              <GameSelector
-                games={historyGames}
-                value={historyGame}
-                onChange={setHistoryGame}
-                includeAll
-                allLabel="All games"
-                label="Filter history by game"
-                className="sm:w-auto"
-              />
-            ) : undefined
-          }
         />
         <CardBody className="p-0">
           <Table>

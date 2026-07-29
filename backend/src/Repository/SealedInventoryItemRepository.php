@@ -55,6 +55,27 @@ class SealedInventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * Headline numbers for one game's sealed stock in a store.
+     *
+     * @return array{products: int, units: int}
+     */
+    public function statsForGame(Store $store, string $gameCode): array
+    {
+        $row = $this->createQueryBuilder('i')
+            ->select('COUNT(i.id) AS products', 'COALESCE(SUM(i.quantity), 0) AS units')
+            ->join('i.sealedProduct', 'p')
+            ->join('p.game', 'g')
+            ->andWhere('i.store = :store')
+            ->andWhere('g.code = :gameCode')
+            ->setParameter('store', $store)
+            ->setParameter('gameCode', strtolower(trim($gameCode)))
+            ->getQuery()
+            ->getSingleResult();
+
+        return ['products' => (int) $row['products'], 'units' => (int) $row['units']];
+    }
+
+    /**
      * Game codes this store stocks sealed product for.
      *
      * @return list<string>

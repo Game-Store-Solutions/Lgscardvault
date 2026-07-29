@@ -27,43 +27,9 @@ final class StoreSealedInventoryController extends AbstractController
         private readonly StoreRepository $stores,
         private readonly SealedProductRepository $sealedProducts,
         private readonly SealedInventoryItemRepository $items,
-        private readonly \App\Repository\InventoryItemRepository $singles,
-        private readonly \App\Repository\GameRepository $games,
         private readonly SealedInventoryService $inventory,
         private readonly GameCatalogSerializer $serializer,
     ) {
-    }
-
-    /**
-     * Public: the games this store actually carries, in platform order, with
-     * what it stocks of each. Drives the storefront game switcher — offering
-     * a tab that leads to an empty shelf is worse than not offering it.
-     */
-    #[Route('/games', name: 'api_store_games', methods: ['GET'])]
-    public function games(string $slug): JsonResponse
-    {
-        $store = $this->stores->findOneBySlug($slug);
-        if (null === $store) {
-            return $this->json(['detail' => 'Store not found.'], 404);
-        }
-
-        $withSingles = $this->singles->findStockedGameCodes($store);
-        $withSealed = $this->items->findStockedGameCodes($store);
-        $stocked = array_unique([...$withSingles, ...$withSealed]);
-
-        $payload = [];
-        foreach ($this->games->findActive() as $game) {
-            if (!in_array($game->getCode(), $stocked, true)) {
-                continue;
-            }
-
-            $payload[] = $this->serializer->game($game) + [
-                'hasSingles' => in_array($game->getCode(), $withSingles, true),
-                'hasSealed' => in_array($game->getCode(), $withSealed, true),
-            ];
-        }
-
-        return $this->json($payload);
     }
 
     /** Public: in-stock sealed lines, optionally one game (?game=code). */

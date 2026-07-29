@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
-import { inventoryKey, useCatalogGames, useInventory } from '../../hooks'
-import { GameSelector } from '../../components/catalog'
+import { inventoryKey, useCatalogGames, useInventory, useStoreGameStats } from '../../hooks'
+import { GameWorkspaceHeader } from '../../components/catalog'
 import {
   Card,
   CardHeader,
@@ -162,25 +162,22 @@ export default function SearchTab({ slug }: { slug: string }) {
   })
 
   // Games present in this store's inventory; pills only render for 2+.
+  // Every platform game is offered as pure navigation — a store has to be
+  // able to start stocking a game it does not carry yet. The numbers live in
+  // the workspace header, where they can say what they count.
   const { data: games = [] } = useCatalogGames()
-  const gameOptions = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const item of inventory) {
-      const code = item.card.gameCode ?? 'mtg'
-      counts.set(code, (counts.get(code) ?? 0) + 1)
-    }
-
-    // Every platform game is offered (a store has to be able to start
-    // stocking a new one), with its current listing count for context.
-    return games.map((game) => ({ code: game.code, name: game.name, count: counts.get(game.code) ?? 0 }))
-  }, [games, inventory])
+  const gameOptions = useMemo(
+    () => games.map((game) => ({ code: game.code, name: game.name })),
+    [games],
+  )
+  const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, gameFilter)
+  const activeGameName = gameOptions.find((game) => game.code === gameFilter)?.name ?? 'this game'
 
   // Always manage exactly one game — a mixed table is how a One Piece card
-  // hides among thousands of Magic rows. Default to the first game the
-  // store actually stocks (platform order), falling back to Magic.
+  // hides among thousands of Magic rows.
   useEffect(() => {
     if (!gameFilter && gameOptions.length > 0) {
-      setGameFilter(gameOptions.find((game) => game.count > 0)?.code ?? gameOptions[0].code)
+      setGameFilter(gameOptions[0].code)
     }
   }, [gameFilter, gameOptions])
 
@@ -213,22 +210,18 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      {gameOptions.length > 1 && (
-        <Card>
-          <CardBody className="py-4">
-            <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Manage inventory for" />
-          </CardBody>
-        </Card>
-      )}
+      <GameWorkspaceHeader
+        games={gameOptions}
+        value={gameFilter}
+        onChange={setGameFilter}
+        stats={gameStats}
+        loading={statsLoading}
+      />
 
       <Card>
         <CardHeader
-          title="Add inventory"
-          subtitle={
-            gameFilter
-              ? `Searching the ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''} catalog.`
-              : 'Search the catalog, then add a printing to this store.'
-          }
+          title={`Add ${activeGameName} inventory`}
+          subtitle={`Searches the ${activeGameName} catalog — every printing that exists, not just what you stock. Results are limited to ${activeGameName}.`}
         />
         <CardBody className="space-y-5">
           {mutationError && (
@@ -315,13 +308,13 @@ export default function SearchTab({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader
-          title="Store inventory"
-          subtitle="Each item includes art, price, quantity, and quick edit actions."
+          title={`${activeGameName} inventory`}
+          subtitle={`What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`}
           actions={
             <Input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="Search this store's inventory…"
+              placeholder={`Search your ${activeGameName} stock…`}
               className="min-w-64"
             />
           }
