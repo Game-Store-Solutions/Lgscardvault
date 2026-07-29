@@ -50,6 +50,15 @@ final readonly class LegacyGameLinkRepairer
     {
         $report = ['repointed' => 0, 'retagged' => 0, 'merged' => 0, 'unresolved' => []];
 
+        // Rows this run has already moved, keyed by the unique tuple they now
+        // occupy. Repeated failed-import rounds left SEVERAL duplicates of
+        // the same printing; they all re-point to one catalog line in one
+        // run, and a database lookup cannot see a sibling that moved a
+        // moment ago in the same unit of work — without this map the flush
+        // dies on the unique key.
+        /** @var array<string, InventoryItem> $occupied */
+        $occupied = [];
+
         foreach ($this->inventoryItems->findLegacyGameNoted() as $item) {
             $gameName = $this->gameNameFromNotes((string) $item->getNotes());
             $game = null === $gameName ? null : $this->resolveGame($gameName);
@@ -67,7 +76,7 @@ final readonly class LegacyGameLinkRepairer
             );
 
             if ($catalogCard instanceof Card && !$catalogCard->getId()->equals($card->getId())) {
-                $this->repoint($item, $catalogCard, $report, $dryRun);
+                $this->repoint($item, $catalogCard, $occupied, $report, $dryRun);
                 continue;
             }
 
@@ -88,6 +97,7 @@ final readonly class LegacyGameLinkRepairer
                 $card->setGame($game);
                 $item->applyFinish(FinishVocabulary::resolveForCard($card, null, $item->isFoil()));
             }
+            $occupied[$this->tupleKey($item->getStore()?->getId(), $card, $item)] = $item;
             ++$report['retagged'];
         }
 
@@ -107,11 +117,21 @@ final readonly class LegacyGameLinkRepairer
      *
      * @param array{repointed: int, retagged: int, merged: int, unresolved: list<string>} $report
      */
-    private function repoint(InventoryItem $item, Card $catalogCard, array &$report, bool $dryRun): void
+    /** @param array<string, InventoryItem> $occupied */
+    private function repoint(InventoryItem $item, Card $catalogCard, array &$occupied, array &$report, bool $dryRun): void
     {
         $finish = FinishVocabulary::resolveForCard($catalogCard, null, $item->isFoil());
+        $key = sprintf(
+            '%s|%s|%s|%s',
+            $item->getStore()?->getId(),
+            $catalogCard->getId()->toRfc4122(),
+            $item->getCondition()->value,
+            $finish,
+        );
 
-        $existing = $this->inventoryItems->findOneBy([
+        // A sibling repaired earlier this run wins the tuple; the database
+        // is only consulted for lines that predate the run.
+        $existing = $occupied[$key] ?? $this->inventoryItems->findOneBy([
             'store' => $item->getStore(),
             'card' => $catalogCard,
             'condition' => $item->getCondition(),
@@ -123,6 +143,7 @@ final readonly class LegacyGameLinkRepairer
                 $existing->setQuantity($existing->getQuantity() + $item->getQuantity());
                 $this->entityManager->remove($item);
             }
+            $occupied[$key] = $existing;
             ++$report['merged'];
 
             return;
@@ -132,7 +153,20 @@ final readonly class LegacyGameLinkRepairer
             $item->setCard($catalogCard);
             $item->applyFinish($finish);
         }
+        $occupied[$key] = $item;
         ++$report['repointed'];
+    }
+
+    /** The unique tuple a retagged item now occupies (its card kept, finish re-resolved). */
+    private function tupleKey(?int $storeId, Card $card, InventoryItem $item): string
+    {
+        return sprintf(
+            '%s|%s|%s|%s',
+            $storeId,
+            $card->getId()->toRfc4122(),
+            $item->getCondition()->value,
+            $item->getFinish(),
+        );
     }
 
     /** The note line the old recovery path wrote: "Game: One Piece Card Game". */
