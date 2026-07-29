@@ -273,6 +273,7 @@ export default function ImportRunDetailsPage() {
       <ManualImportModal
         slug={slug}
         importId={importId}
+        gameCode={job?.gameCode ?? 'mtg'}
         row={recoveringRow}
         onClose={() => setRecoveringRow(null)}
         onResolved={async () => {
@@ -387,12 +388,15 @@ function scryfallSearchTerm(row: CsvImportRow): string {
 function ManualImportModal({
   slug,
   importId,
+  gameCode,
   row,
   onClose,
   onResolved,
 }: {
   slug: string
   importId: string
+  /** The import's game — recovery may only pick cards from its catalog. */
+  gameCode: string
   row: CsvImportRow | null
   onClose: () => void
   onResolved: () => Promise<void>
@@ -408,13 +412,16 @@ function ManualImportModal({
   }, [row])
 
   const { data: results = [], isFetching, refetch } = useQuery({
-    queryKey: ['csv-row-manual-card-search', row?.rowIndex, search],
+    queryKey: ['csv-row-manual-card-search', row?.rowIndex, search, gameCode],
     enabled: Boolean(row),
     queryFn: async () => {
       if (!row || !search.trim()) return []
       const { data } = await api.get<CardSummary[]>('/catalog/search', {
         params: {
           q: search,
+          // Scoped to the import's game — suggesting Magic printings for a
+          // Pokemon row is how game-less listings used to get created.
+          game: gameCode,
           ...(row.set.trim() ? { set: row.set.trim() } : {}),
           ...(row.collectorNumber.trim() ? { collectorNumber: row.collectorNumber.trim() } : {}),
           ...(row.rarity.trim() ? { rarity: row.rarity.trim() } : {}),

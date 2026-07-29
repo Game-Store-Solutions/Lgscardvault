@@ -300,6 +300,69 @@ final class NonMtgImportMatchingTest extends WebTestCase
         self::assertSame('Normal', $lines[0]['finish'], 'One Piece calls its plain printing "Normal"');
     }
 
+    public function testRecoveryIsScopedToTheImportsOwnGame(): void
+    {
+        $store = $this->fixtures->store();
+        $this->syncOnePieceCatalog();
+        $magicCard = $this->fixtures->card(9901, ['name' => 'Innocent Bystander']);
+        $this->authenticate($store->getOwner());
+
+        // A row that cannot resolve: wrong collector, name not in catalog.
+        $csv = "name,game,set,condition,foil,rarity,quantity,variant,collectorNumber\n"
+            ."Nonexistent Pirate,One Piece,Romance Dawn,NM,No,Rare,1,,OP01-999\n";
+        $job = $this->uploadCsv(
+            "/api/stores/{$store->getSlug()}/csv-imports",
+            $csv,
+            ['game' => 'onepiece', 'type' => 'cards'],
+        );
+        static::getContainer()->get(ProcessCsvImportMessageHandler::class)(new ProcessCsvImportMessage($job['id']));
+
+        // The failed-row preview answers from the One Piece catalog only —
+        // never the Scryfall cascade that used to "recover" these rows onto
+        // Magic-shaped, game-less cards.
+        $preview = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/csv-imports/{$job['id']}/failed/preview");
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertCount(1, $preview['results']);
+        self::assertStringContainsString('One Piece', (string) ($preview['results'][0]['error'] ?? ''));
+
+        // Manual recovery refuses a card from another game outright.
+        $this->client->request(
+            'POST',
+            "/api/stores/{$store->getSlug()}/csv-imports/{$job['id']}/rows/0/manual-import",
+            server: ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer],
+            content: json_encode(['cardId' => (string) $magicCard->getId(), 'quantity' => 1]),
+        );
+        self::assertSame(422, $this->client->getResponse()->getStatusCode(), 'a Magic card cannot recover a One Piece row');
+
+        // The right game's card works.
+        $opCardId = (string) CatalogSynchronizer::cardIdForProduct(450047);
+        $this->client->request(
+            'POST',
+            "/api/stores/{$store->getSlug()}/csv-imports/{$job['id']}/rows/0/manual-import",
+            server: ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer],
+            content: json_encode(['cardId' => $opCardId, 'quantity' => 1]),
+        );
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        $inventory = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/inventory?game=onepiece");
+        $names = array_column(array_column($inventory['member'] ?? $inventory, 'card'), 'name');
+        self::assertContains('Trafalgar Law', $names, 'the recovered listing lives in its own game');
+    }
+
+    public function testCatalogSearchPayloadCarriesGameCode(): void
+    {
+        $store = $this->fixtures->store();
+        $this->syncOnePieceCatalog();
+        $this->authenticate($store->getOwner());
+
+        // The add panel picks finish vocabulary and labels from gameCode;
+        // when this key was missing every catalog result read as Magic and a
+        // Pokemon card got listed as "Nonfoil".
+        $results = $this->jsonRequest('GET', '/api/catalog/search?q=Trafalgar+Law&game=onepiece');
+        self::assertNotEmpty($results);
+        self::assertSame('onepiece', $results[0]['gameCode'] ?? '(ABSENT)');
+    }
+
     public function testSyncedCardTextHasNoHtmlTags(): void
     {
         $this->syncOnePieceCatalog();

@@ -378,6 +378,38 @@ final class StoreCsvImportController extends AbstractController
         );
         $totalFailed = $this->rowRepository->count(['job' => $job, 'status' => CsvImportRow::STATUS_ERROR]);
 
+        // A non-Magic job resolves against ITS OWN game's catalog and nothing
+        // else. Running these rows through the Scryfall cascade is how a
+        // failed Pokemon row used to get "recovered" onto a Magic-shaped,
+        // game-less card — poisoning the store with listings that sit on the
+        // Magic shelf while their game's workspace cannot see them.
+        $jobGame = $job->getGame();
+        if ($jobGame instanceof Game && !$jobGame->isMtg()) {
+            $results = [];
+            foreach ($rows as $row) {
+                $card = $this->cardRepository->findOneForGame(
+                    $jobGame,
+                    $row->getName(),
+                    $row->getSetCode(),
+                    $row->getCollectorNumber(),
+                );
+
+                $result = ['row' => $this->serializeRow($row)];
+                if ($card instanceof Card) {
+                    $result['card'] = $this->catalogCardResolver->serializeCard($card);
+                } else {
+                    $result['error'] = sprintf('No %s catalog match for this row.', $jobGame->getName());
+                }
+                $results[] = $result;
+            }
+
+            return $this->json([
+                'results' => $results,
+                'totalFailedRows' => $totalFailed,
+                'remainingFailedRows' => max(0, $totalFailed - count($rows)),
+            ]);
+        }
+
         // Normalize set names → codes before hitting Scryfall's collection
         // endpoint: it only accepts codes, and CSVs often carry full names.
         $collectionMatches = $this->scryfallClient->fetchCollectionBySetCollectors(array_map(
@@ -544,6 +576,17 @@ final class StoreCsvImportController extends AbstractController
 
         if (null === $card) {
             return $this->json(['detail' => 'Selected card was not found.'], 404);
+        }
+
+        // A row can only be recovered onto a card from the job's own game —
+        // whatever the client sends. This is the hard stop that keeps a
+        // Pokemon row from ever landing on a Magic card again.
+        $jobGameCode = $job->resolvedGameCode();
+        if ($card->resolvedGameCode() !== $jobGameCode) {
+            return $this->json(['detail' => sprintf(
+                'That card is not from this import\'s game — pick a card from the %s catalog.',
+                $job->getGame()?->getName() ?? $jobGameCode,
+            )], 422);
         }
 
         $store = $job->getStore();

@@ -324,7 +324,15 @@ final readonly class CatalogSynchronizer
 
         $imageUrl = $this->stringValue($product, 'imageUrl');
         if (null !== $imageUrl) {
-            $card->setImageUris(['normal' => $imageUrl, 'small' => $imageUrl]);
+            // The feed hands out a 200px thumbnail, but the same CDN serves
+            // larger renditions of every product image — so ask for them.
+            // Small stays crisp on retina grid tiles; normal/large carry the
+            // card detail page and the interactive card viewer.
+            $card->setImageUris([
+                'small' => self::imageVariant($imageUrl, '400w'),
+                'normal' => self::imageVariant($imageUrl, 'in_1000x1000'),
+                'large' => self::imageVariant($imageUrl, 'in_1000x1000'),
+            ]);
         }
         $card->setScryfallUri($this->stringValue($product, 'url'));
 
@@ -366,7 +374,7 @@ final readonly class CatalogSynchronizer
         $sealed->setGame($game);
         $sealed->setGameSet($set);
         $sealed->setName(mb_substr($this->stringValue($product, 'name') ?? 'Product '.$productId, 0, 255));
-        $sealed->setImageUrl($this->stringValue($product, 'imageUrl'));
+        $sealed->setImageUrl(self::imageVariant($this->stringValue($product, 'imageUrl'), 'in_1000x1000'));
         $sealed->setUrl($this->stringValue($product, 'url'));
 
         // Sealed products are printed once, so any subtype row is theirs.
@@ -522,6 +530,25 @@ final readonly class CatalogSynchronizer
         }
 
         return array_values(array_unique($names));
+    }
+
+    /**
+     * A different rendition of a TCGplayer CDN product image.
+     *
+     * The feed's URLs end in a size suffix ("450001_200w.jpg"); the CDN also
+     * serves "_400w" and "_in_1000x1000" for the same product. URLs that
+     * don't match the pattern pass through untouched, so a future CDN change
+     * degrades to the feed's own image rather than a broken one.
+     */
+    public static function imageVariant(?string $url, string $size): ?string
+    {
+        if (null === $url) {
+            return null;
+        }
+
+        $swapped = preg_replace('/_(?:\d+w|in_\d+x\d+)\.jpg$/', sprintf('_%s.jpg', $size), $url, count: $count);
+
+        return 1 === $count && is_string($swapped) ? $swapped : $url;
     }
 
     private function toCents(mixed $value): ?int
