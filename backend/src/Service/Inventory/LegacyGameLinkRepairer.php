@@ -6,6 +6,7 @@ use App\Entity\Card;
 use App\Entity\Game;
 use App\Entity\InventoryItem;
 use App\Repository\CardRepository;
+use App\Repository\CsvImportRowRepository;
 use App\Repository\GameRepository;
 use App\Repository\InventoryItemRepository;
 use App\Service\Catalog\FinishVocabulary;
@@ -39,16 +40,17 @@ final readonly class LegacyGameLinkRepairer
         private InventoryItemRepository $inventoryItems,
         private CardRepository $cards,
         private GameRepository $games,
+        private CsvImportRowRepository $importRows,
         private LoggerInterface $logger,
     ) {
     }
 
     /**
-     * @return array{repointed: int, retagged: int, merged: int, unresolved: list<string>}
+     * @return array{repointed: int, retagged: int, merged: int, restored: int, unresolved: list<string>}
      */
     public function repair(bool $dryRun = false): array
     {
-        $report = ['repointed' => 0, 'retagged' => 0, 'merged' => 0, 'unresolved' => []];
+        $report = ['repointed' => 0, 'retagged' => 0, 'merged' => 0, 'restored' => 0, 'unresolved' => []];
 
         // Rows this run has already moved, keyed by the unique tuple they now
         // occupy. Repeated failed-import rounds left SEVERAL duplicates of
@@ -65,6 +67,20 @@ final readonly class LegacyGameLinkRepairer
             $card = $item->getCard();
 
             if (null === $game || !$card instanceof Card) {
+                continue;
+            }
+
+            // A "Game: Magic" note is not a contradiction — a game-less card
+            // IS Magic; there is nothing to move. Worse, an earlier version
+            // of this repair ran these through the collector-number matcher,
+            // which is only sound where collector numbers are unique per
+            // game — in Magic "254" names hundreds of cards, so listings
+            // could be re-pointed at arbitrary same-number printings. The
+            // recovery note references the import row, whose stored card
+            // snapshot is the ground truth; anything that drifted from it
+            // is put back.
+            if ($game->isMtg()) {
+                $this->restoreFromImportRow($item, $report, $dryRun);
                 continue;
             }
 
@@ -167,6 +183,54 @@ final readonly class LegacyGameLinkRepairer
             $item->getCondition()->value,
             $item->getFinish(),
         );
+    }
+
+    /**
+     * Puts a Magic listing back onto the card its import row recovered it
+     * to, when a previous repair run moved it. Items that never moved (or
+     * have no row to consult) are left silently alone.
+     *
+     * @param array{repointed: int, retagged: int, merged: int, restored: int, unresolved: list<string>} $report
+     */
+    private function restoreFromImportRow(InventoryItem $item, array &$report, bool $dryRun): void
+    {
+        $notes = (string) $item->getNotes();
+        if (1 !== preg_match('/recovered from CSV import row #(\d+) in import #(\d+)/i', $notes, $ref)) {
+            return;
+        }
+
+        $row = $this->importRows->findByNoteReference((int) $ref[2], (int) $ref[1]);
+        $snapshotId = $row?->getCard()['id'] ?? null;
+        if (!is_string($snapshotId) || '' === $snapshotId) {
+            return;
+        }
+
+        $current = $item->getCard();
+        if ($current instanceof Card && $current->getId()->toRfc4122() === $snapshotId) {
+            return;
+        }
+
+        try {
+            $original = $this->cards->find(\Symfony\Component\Uid\Uuid::fromString($snapshotId));
+        } catch (\InvalidArgumentException) {
+            return;
+        }
+        if (!$original instanceof Card) {
+            $report['unresolved'][] = sprintf(
+                'item #%d "%s": drifted from its import-row card %s, which no longer exists',
+                $item->getId(),
+                $item->getCard()?->getName() ?? '?',
+                $snapshotId,
+            );
+
+            return;
+        }
+
+        if (!$dryRun) {
+            $item->setCard($original);
+            $item->applyFinish(FinishVocabulary::resolveForCard($original, null, $item->isFoil()));
+        }
+        ++$report['restored'];
     }
 
     /** The note line the old recovery path wrote: "Game: One Piece Card Game". */

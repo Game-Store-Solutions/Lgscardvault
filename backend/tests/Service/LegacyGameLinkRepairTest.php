@@ -186,6 +186,64 @@ final class LegacyGameLinkRepairTest extends KernelTestCase
         self::assertNull($magic->getGame());
     }
 
+    public function testAMagicNoteIsNotAContradictionAndIsLeftAlone(): void
+    {
+        $store = $this->fixtures->store();
+
+        // An early importer stamped "Game: Magic: The Gathering" onto
+        // ordinary Magic listings. A game-less card IS Magic — the field run
+        // produced 115 useless warnings for these, and worse.
+        $magic = $this->fixtures->card(9810, ['name' => 'Desecration Demon']);
+        $item = $this->fixtures->inventoryItem($store, $magic, 2);
+        $item->setNotes("Manually recovered from CSV import row #5 in import #12\nGame: Magic: The Gathering");
+        $this->em->flush();
+
+        $report = static::getContainer()->get(LegacyGameLinkRepairer::class)->repair();
+
+        self::assertSame([], $report['unresolved'], 'no noise for a note that states the obvious');
+        self::assertSame(0, $report['repointed'] + $report['merged'] + $report['retagged'] + $report['restored']);
+        $this->em->refresh($item);
+        self::assertTrue($item->getCard()?->getId()->equals($magic->getId()), 'the listing is untouched');
+    }
+
+    public function testAMagicListingMovedByTheOldRunIsRestoredFromItsImportRow(): void
+    {
+        $store = $this->fixtures->store();
+
+        // Simulate the damage: the collector-number matcher re-pointed a
+        // Magic listing at an arbitrary same-number card. The import row the
+        // note references still snapshots the card it was recovered to.
+        $original = $this->fixtures->card(9811, ['name' => 'Fabled Passage', 'collector_number' => '244']);
+        $wrong = $this->fixtures->card(9812, ['name' => 'Swamp', 'collector_number' => '244']);
+
+        $job = new \App\Entity\CsvImportJob();
+        $job->setStore($store);
+        $job->setOriginalFilename('magic.csv');
+        $job->setStoragePath('');
+        $this->em->persist($job);
+        $this->em->flush();
+
+        $row = new \App\Entity\CsvImportRow();
+        $row->setJob($job);
+        $row->setRowIndex(4); // note says row #5 (1-based)
+        $row->setName('Fabled Passage');
+        $row->setCard(['id' => (string) $original->getId(), 'name' => 'Fabled Passage']);
+        $this->em->persist($row);
+
+        $item = $this->fixtures->inventoryItem($store, $wrong, 1);
+        $item->setNotes("Manually recovered from CSV import row #5 in import #{$job->getId()}\nGame: Magic: The Gathering");
+        $this->em->flush();
+
+        $report = static::getContainer()->get(LegacyGameLinkRepairer::class)->repair();
+
+        self::assertSame(1, $report['restored']);
+        $this->em->refresh($item);
+        self::assertTrue(
+            $item->getCard()?->getId()->equals($original->getId()),
+            'the listing is back on the card its import row recovered it to',
+        );
+    }
+
     public function testDryRunWritesNothing(): void
     {
         $store = $this->fixtures->store();
