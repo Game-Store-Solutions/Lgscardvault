@@ -118,6 +118,36 @@ final class LegacyGameLinkRepairTest extends KernelTestCase
         self::assertSame(5, $repo->find($already->getId())?->getQuantity(), 'its copies folded into the real line');
     }
 
+    public function testSeveralDuplicatesOfOnePrintingCollapseWithoutColliding(): void
+    {
+        // The crash from the field: repeated failed-import rounds each left
+        // their own game-less duplicate of the same printing. All of them
+        // re-point to the same catalog line in one run — the merge check
+        // must see the sibling repaired a moment earlier, not just the
+        // database, or the flush hits the unique key.
+        $store = $this->fixtures->store();
+        $onepiece = $this->game('onepiece');
+        $catalog = $this->catalogCard($onepiece, 'Roronoa Zoro', 'OP-01', 'OP01-025');
+
+        foreach ([2, 3, 4] as $i => $quantity) {
+            $duplicate = $this->legacyCard('Roronoa Zoro', 'Romance Dawn', 'OP01-025');
+            $item = $this->fixtures->inventoryItem($store, $duplicate, $quantity);
+            $item->setNotes('Game: One Piece Card Game');
+        }
+        $this->em->flush();
+
+        $report = static::getContainer()->get(LegacyGameLinkRepairer::class)->repair();
+
+        self::assertSame(1, $report['repointed'], 'one line claims the printing');
+        self::assertSame(2, $report['merged'], 'the other two fold into it');
+
+        $this->em->clear();
+        $lines = static::getContainer()->get(InventoryItemRepository::class)
+            ->findBy(['store' => $store->getId(), 'card' => $catalog->getId()]);
+        self::assertCount(1, $lines);
+        self::assertSame(9, $lines[0]->getQuantity(), 'all copies survive the collapse');
+    }
+
     public function testAnUnsyncedGameTagsTheCardInPlace(): void
     {
         $store = $this->fixtures->store();
