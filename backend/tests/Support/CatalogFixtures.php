@@ -131,7 +131,8 @@ final class CatalogFixtures
         return $user;
     }
 
-    public function inventoryItem(Store $store, Card $card, int $quantity = 1, CardCondition $condition = CardCondition::NM, bool $isFoil = false, int $priceCents = 100): InventoryItem
+    /** @param string $finish the treatment, in the card's game's own words */
+    public function inventoryItem(Store $store, Card $card, int $quantity = 1, CardCondition $condition = CardCondition::NM, string $finish = 'Nonfoil', int $priceCents = 100): InventoryItem
     {
         $item = new InventoryItem();
         $item->setStore($store);
@@ -139,7 +140,7 @@ final class CatalogFixtures
         $item->setQuantity($quantity);
         $item->setPriceCents($priceCents);
         $item->setCondition($condition);
-        $item->setIsFoil($isFoil);
+        $item->applyFinish($finish);
         $this->em->persist($item);
         $this->em->flush();
 

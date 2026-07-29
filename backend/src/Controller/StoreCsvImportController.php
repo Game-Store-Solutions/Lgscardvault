@@ -16,6 +16,7 @@ use App\Repository\GameRepository;
 use App\Repository\StoreRepository;
 use App\Security\ApiRateLimit;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Catalog\FinishVocabulary;
 use App\Service\CsvImport\CsvImportParser;
 use App\Service\CsvImport\ImportPreviewer;
 use App\Service\CsvImport\SealedCsvImportParser;
@@ -553,6 +554,7 @@ final class StoreCsvImportController extends AbstractController
         $item = $this->importRowIntoInventory($job, $store, $row, $card, [
             'condition' => $payload['condition'] ?? null,
             'quantity' => $payload['quantity'] ?? null,
+            'finish' => $payload['finish'] ?? null,
             'isFoil' => $payload['isFoil'] ?? null,
         ]);
 
@@ -681,7 +683,28 @@ final class StoreCsvImportController extends AbstractController
     }
 
     /**
-     * @param array{condition?: mixed, quantity?: mixed, isFoil?: mixed} $overrides
+     * The treatment a recovered row should be stocked as.
+     *
+     * An override names it outright; otherwise the sheet's own answer is
+     * used, and the platform's generic "Foil"/"Nonfoil" placeholder is
+     * replaced by whatever the printing actually calls that side.
+     *
+     * @param array{condition?: mixed, quantity?: mixed, finish?: mixed, isFoil?: mixed} $overrides
+     */
+    private function resolveRowFinish(CsvImportRow $row, Card $card, array $overrides): string
+    {
+        $requested = isset($overrides['finish']) ? (string) $overrides['finish'] : null;
+        if (null === $requested && array_key_exists('isFoil', $overrides) && null !== $overrides['isFoil']) {
+            return FinishVocabulary::resolveForCard($card, null, (bool) $overrides['isFoil']);
+        }
+
+        $requested ??= FinishVocabulary::isGeneric($row->getFinish()) ? null : $row->getFinish();
+
+        return FinishVocabulary::resolveForCard($card, $requested, $row->isFoil());
+    }
+
+    /**
+     * @param array{condition?: mixed, quantity?: mixed, finish?: mixed, isFoil?: mixed} $overrides
      */
     private function importRowIntoInventory(
         CsvImportJob $job,
@@ -692,14 +715,14 @@ final class StoreCsvImportController extends AbstractController
     ): \App\Entity\InventoryItem {
         $condition = CardCondition::tryFrom((string) ($overrides['condition'] ?? $row->getCondition())) ?? CardCondition::NM;
         $quantity = max(0, (int) ($overrides['quantity'] ?? $row->getQuantity()));
-        $isFoil = array_key_exists('isFoil', $overrides) && null !== $overrides['isFoil'] ? (bool) $overrides['isFoil'] : $row->isFoil();
+        $finish = $this->resolveRowFinish($row, $card, $overrides);
         $notes = implode("\n", array_values(array_filter([
             'Manually recovered from CSV import row #'.($row->getRowIndex() + 1).' in import #'.$job->getId(),
             '' !== $row->getGame() && !CsvImportRow::isMagicGame($row->getGame()) ? 'Game: '.$row->getGame() : '',
             '' !== $row->getVariant() ? 'Variant: '.$row->getVariant() : '',
         ])));
 
-        $item = $this->inventoryWriter->write($store, $card, $quantity, $condition, $isFoil, $notes, false);
+        $item = $this->inventoryWriter->write($store, $card, $quantity, $condition, $finish, $notes, false);
 
         $row
             ->setStatus(CsvImportRow::STATUS_IMPORTED)
@@ -786,7 +809,7 @@ final class StoreCsvImportController extends AbstractController
             ->setGame($this->truncate((string) ($rowData['game'] ?? ''), 80))
             ->setSetCode($this->truncate((string) ($rowData['set'] ?? ''), 120))
             ->setCondition($this->truncate((string) ($rowData['condition'] ?? 'NM'), 16))
-            ->setIsFoil((bool) ($rowData['isFoil'] ?? false))
+            ->setFinish((string) ($rowData['finish'] ?? FinishVocabulary::DEFAULT_PLAIN))
             ->setRarity($this->truncate((string) ($rowData['rarity'] ?? ''), 80))
             ->setQuantity((int) ($rowData['quantity'] ?? 0))
             ->setVariant($this->truncate((string) ($rowData['variant'] ?? ''), 255))
@@ -819,6 +842,7 @@ final class StoreCsvImportController extends AbstractController
             'game' => $row->getGame(),
             'set' => $row->getSetCode(),
             'condition' => $row->getCondition(),
+            'finish' => $row->getFinish(),
             'isFoil' => $row->isFoil(),
             'rarity' => $row->getRarity(),
             'quantity' => $row->getQuantity(),

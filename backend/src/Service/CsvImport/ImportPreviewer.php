@@ -2,6 +2,8 @@
 
 namespace App\Service\CsvImport;
 
+use App\Service\Catalog\FinishVocabulary;
+
 use App\Entity\CsvImportJob;
 use App\Entity\Game;
 use App\Repository\CardRepository;
@@ -114,7 +116,8 @@ final readonly class ImportPreviewer
             'collectorNumber' => $collectorNumber,
             'quantity' => (int) ($row['quantity'] ?? 0),
             'condition' => (string) ($row['condition'] ?? 'NM'),
-            'isFoil' => (bool) ($row['isFoil'] ?? false),
+            'finish' => (string) ($row['finish'] ?? FinishVocabulary::DEFAULT_PLAIN),
+            'isFoil' => FinishVocabulary::isFoil((string) ($row['finish'] ?? '')),
             'match' => $this->matchState($row, null !== $card),
             'matchedName' => $card?->getName(),
             'matchedSet' => $card?->getSetName() ?? $card?->getSetCode(),

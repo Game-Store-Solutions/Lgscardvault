@@ -2,6 +2,7 @@ import { cardImage, formatScryfallPrice } from '../../../api/client'
 import type { CardSummary } from '../../../api/types'
 import { Badge } from '../../../components/ui'
 import { CardImage } from '../../../components/cards'
+import { finishChoices } from '../../../lib/finishes'
 
 export interface CatalogResultCardProps {
   card: CardSummary
@@ -11,7 +12,10 @@ export interface CatalogResultCardProps {
 
 /** A single catalog search hit in the "Add inventory" picker grid. */
 export function CatalogResultCard({ card, selected, onSelect }: CatalogResultCardProps) {
-  const previewFinish = card.finishes?.includes('foil') && !card.finishes.includes('nonfoil') ? 'foil' : 'nonfoil'
+  // Price the printing by what it is actually sold as: a holo-only Pokemon
+  // card has no plain price to preview.
+  const finishes = finishChoices(card)
+  const previewFinish = finishes.hasFoil && !finishes.hasPlain ? 'foil' : 'nonfoil'
   return (
     <button
       type="button"
@@ -36,7 +40,7 @@ export function CatalogResultCard({ card, selected, onSelect }: CatalogResultCar
         {card.setName && <span className="block truncate text-xs text-fg-muted">{card.setName}</span>}
         <span className="block text-xs font-bold text-brand-600">{formatScryfallPrice(card, previewFinish)}</span>
         <span className="flex flex-wrap gap-1 pt-1">
-          {(card.finishes?.length ? card.finishes : ['nonfoil']).map((finish) => (
+          {(card.finishes?.length ? card.finishes : [finishes.plain]).map((finish) => (
             <Badge key={finish} className="uppercase">
               {finish}
             </Badge>

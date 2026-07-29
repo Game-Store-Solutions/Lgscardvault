@@ -15,6 +15,7 @@ use App\Repository\SellSubmissionRepository;
 use App\Repository\StoreRepository;
 use App\Entity\StoreCreditTransaction;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Catalog\FinishVocabulary;
 use App\Service\Credit\StoreCreditLedger;
 use App\Service\Inventory\StoreInventoryWriter;
 use App\Service\Pricing\MarketPriceResolver;
@@ -136,9 +137,16 @@ final class StoreBuylistController extends AbstractController
             $card = $this->marketPrices->ensurePriced($card);
         }
 
-        $wantsFoil = (bool) ($payload['wantsFoil'] ?? false);
-        $existing = $this->buylistEntries->findOneBy(['store' => $store, 'card' => $card, 'wantsFoil' => $wantsFoil]);
-        $entry = $existing ?? (new BuylistEntry())->setStore($store)->setCard($card)->setWantsFoil($wantsFoil);
+        // Either the treatment by name ("Holofoil") or the old boolean; both
+        // are resolved against the printing so the entry stores the game's
+        // own word for it.
+        $wantsFinish = FinishVocabulary::resolveForCard(
+            $card,
+            isset($payload['wantsFinish']) ? (string) $payload['wantsFinish'] : null,
+            isset($payload['wantsFoil']) ? (bool) $payload['wantsFoil'] : null,
+        );
+        $existing = $this->buylistEntries->findOneBy(['store' => $store, 'card' => $card, 'wantsFinish' => $wantsFinish]);
+        $entry = $existing ?? (new BuylistEntry())->setStore($store)->setCard($card)->setWantsFinish($wantsFinish);
         $entry->setOfferCents($offerCents);
         $entry->setMaxQuantity($this->readNullablePositiveInt($payload['maxQuantity'] ?? null));
         $entry->setActive((bool) ($payload['active'] ?? true));
@@ -281,8 +289,8 @@ final class StoreBuylistController extends AbstractController
                     return $this->json(['detail' => 'One of the lines does not reference this store\'s buy list.'], 422);
                 }
                 $card = $entry->getCard();
-                $isFoil = $entry->wantsFoil();
-                $marketCents = null !== $card ? $this->marketPrices->marketPriceCents($card, $isFoil) : null;
+                $finish = $entry->getWantsFinish();
+                $marketCents = null !== $card ? $this->marketPrices->marketPriceCents($card, $entry->wantsFoil()) : null;
                 $offerCents = $entry->getOfferCents()
                     ?? $this->tradeRates->offerCents((int) $marketCents, $buylistRatePercent);
                 if (null === $entry->getOfferCents() && null === $marketCents) {
@@ -306,10 +314,11 @@ final class StoreBuylistController extends AbstractController
                 if (!$card instanceof Card) {
                     return $this->json(['detail' => 'One of the lines references an unknown card.'], 422);
                 }
-                $isFoil = $line['isFoil'];
+                $finish = FinishVocabulary::resolveForCard($card, $line['finish']);
+                $isFoil = FinishVocabulary::isFoil($finish);
                 $marketCents = $this->marketPrices->marketPriceCents($card, $isFoil);
                 if (null === $marketCents) {
-                    return $this->json(['detail' => sprintf('No market price for "%s"%s — ask the store at the counter.', $card->getName(), $isFoil ? ' (foil)' : '')], 422);
+                    return $this->json(['detail' => sprintf('No market price for "%s"%s — ask the store at the counter.', $card->getName(), $isFoil ? ' ('.$finish.')' : '')], 422);
                 }
                 $offerCents = $this->tradeRates->offerCents($marketCents, $ratePercent);
                 $quantity = $line['quantity'];
@@ -319,7 +328,7 @@ final class StoreBuylistController extends AbstractController
             $submission->addItem((new SellSubmissionItem())
                 ->setCard($card)
                 ->setCardName($card?->getName() ?? 'Unknown card')
-                ->setIsFoil($isFoil)
+                ->setFinish($finish)
                 ->setCondition($line['condition'])
                 ->setQuantity($quantity)
                 ->setMarketPriceCents($marketCents ?? 0)
@@ -453,7 +462,7 @@ final class StoreBuylistController extends AbstractController
                     $card,
                     $quantity,
                     $item->getCondition(),
-                    $item->isFoil(),
+                    $item->getFinish(),
                     flush: false,
                     acquisitionCostCents: $item->getOfferCentsEach(),
                 );
@@ -486,7 +495,7 @@ final class StoreBuylistController extends AbstractController
      *
      * @param array<int, mixed> $items
      *
-     * @return JsonResponse|list<array{entryId: ?int, cardId: ?Uuid, isFoil: bool, condition: CardCondition, quantity: int}>
+     * @return JsonResponse|list<array{entryId: ?int, cardId: ?Uuid, finish: ?string, condition: CardCondition, quantity: int}>
      */
     private function mergeSubmissionLines(array $items): JsonResponse|array
     {
@@ -505,7 +514,7 @@ final class StoreBuylistController extends AbstractController
             $cardId = null;
             if (isset($itemData['buylistEntryId'])) {
                 $entryId = (int) $itemData['buylistEntryId'];
-                $isFoil = false; // finish comes from the entry
+                $finish = null; // the treatment comes from the entry
                 $key = sprintf('entry:%d:%s', $entryId, $condition->value);
             } else {
                 try {
@@ -513,14 +522,20 @@ final class StoreBuylistController extends AbstractController
                 } catch (\InvalidArgumentException) {
                     return $this->json(['detail' => sprintf('Line %d needs a buylistEntryId or a valid cardId.', $i)], 422);
                 }
-                $isFoil = (bool) ($itemData['isFoil'] ?? false);
-                $key = sprintf('card:%s:%d:%s', $cardId, $isFoil ? 1 : 0, $condition->value);
+                // Named treatment wins; the boolean is the legacy client.
+                $finish = FinishVocabulary::canonical((string) ($itemData['finish'] ?? ''));
+                if ('' === $finish) {
+                    $finish = ((bool) ($itemData['isFoil'] ?? false))
+                        ? FinishVocabulary::DEFAULT_FOIL
+                        : FinishVocabulary::DEFAULT_PLAIN;
+                }
+                $key = sprintf('card:%s:%s:%s', $cardId, $finish, $condition->value);
             }
 
             if (isset($merged[$key])) {
                 $merged[$key]['quantity'] += $quantity;
             } else {
-                $merged[$key] = ['entryId' => $entryId, 'cardId' => $cardId, 'isFoil' => $isFoil, 'condition' => $condition, 'quantity' => $quantity];
+                $merged[$key] = ['entryId' => $entryId, 'cardId' => $cardId, 'finish' => $finish, 'condition' => $condition, 'quantity' => $quantity];
             }
         }
 
@@ -558,6 +573,7 @@ final class StoreBuylistController extends AbstractController
         return [
             'id' => $entry->getId(),
             'offerCents' => $entry->getOfferCents(),
+            'wantsFinish' => $entry->getWantsFinish(),
             'wantsFoil' => $entry->wantsFoil(),
             'maxQuantity' => $entry->getMaxQuantity(),
             'active' => $entry->isActive(),
@@ -576,6 +592,7 @@ final class StoreBuylistController extends AbstractController
                 'id' => $item->getId(),
                 'cardId' => null !== $item->getCard() ? (string) $item->getCard()->getId() : null,
                 'cardName' => $item->getCardName(),
+                'finish' => $item->getFinish(),
                 'isFoil' => $item->isFoil(),
                 'condition' => $item->getCondition()->value,
                 'quantity' => $item->getQuantity(),

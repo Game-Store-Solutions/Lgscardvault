@@ -27,12 +27,13 @@ import {
   sealedSpotlightKey,
   useCatalogGames,
   useDebouncedValue,
+  useStoreGameStats,
   useGameSets,
   useSealedCatalogSearch,
   useStoreSealedInventory,
 } from '../../hooks'
 import { Package } from 'lucide-react'
-import { GameSelector } from '../../components/catalog'
+import { GameWorkspaceHeader } from '../../components/catalog'
 import { CardImage } from '../../components/cards'
 
 /**
@@ -54,6 +55,8 @@ export default function SealedTab({ slug }: { slug: string }) {
   const { data: games = [] } = useCatalogGames()
   const { data: sets = [] } = useGameSets(gameFilter)
   const { data: inventory = [], isLoading: inventoryLoading } = useStoreSealedInventory(slug)
+  const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, gameFilter)
+  const activeGameName = games.find((game) => game.code === gameFilter)?.name ?? 'this game'
   const catalogQuery = useSealedCatalogSearch({
     game: gameFilter || undefined,
     setId: setFilter || undefined,
@@ -99,8 +102,9 @@ export default function SealedTab({ slug }: { slug: string }) {
         </div>
       )}
 
-      {/* Same switcher as the singles tab and the storefront. */}
-      <GameSelector
+      {/* Same workspace header as the singles tab: navigation, then this
+          game's own numbers. */}
+      <GameWorkspaceHeader
         games={games.map((game) => ({ code: game.code, name: game.name }))}
         value={gameFilter}
         onChange={(code) => {
@@ -108,13 +112,15 @@ export default function SealedTab({ slug }: { slug: string }) {
           setSetFilter(0)
           setPage(1)
         }}
+        stats={gameStats}
+        loading={statsLoading}
         label="Manage sealed for"
       />
 
       {/* The store's sealed stock */}
       <Card>
         <CardHeader
-          title="Sealed in stock"
+          title={`${activeGameName} sealed in stock`}
           subtitle="Boxes, bundles, and decks this store carries. Prices default to the TCGplayer market snapshot."
         />
         <CardBody className="p-0">
@@ -156,13 +162,13 @@ export default function SealedTab({ slug }: { slug: string }) {
       {/* Catalog browser */}
       <Card>
         <CardHeader
-          title="Sealed catalog"
-          subtitle="Browse the shared multi-game catalog and add products to your inventory."
+          title={`${activeGameName} sealed catalog`}
+          subtitle={`Every ${activeGameName} sealed product in the catalog — add what you stock.`}
         />
         <CardBody className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
-              placeholder="Search sealed products…"
+              placeholder={`Search ${activeGameName} sealed products…`}
               value={search}
               onChange={(event) => { setSearch(event.target.value); setPage(1) }}
             />

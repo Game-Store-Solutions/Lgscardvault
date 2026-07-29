@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\InventoryItem;
 use App\Entity\Store;
+use App\Service\Catalog\FinishVocabulary;
 use App\Entity\StoreCase;
 use App\Entity\StoreSection;
 use App\Entity\StoreSectionCard;
@@ -447,6 +448,7 @@ final class StoreSectionController extends AbstractController
                 'setCode' => $card?->getSetCode(),
                 'collectorNumber' => $card?->getCollectorNumber(),
                 'condition' => $item?->getCondition()->value,
+                'finish' => $item?->getFinish() ?? FinishVocabulary::DEFAULT_PLAIN,
                 'isFoil' => $item?->isFoil() ?? false,
                 'priceCents' => $item?->getPriceCents(),
                 'copies' => $copies,

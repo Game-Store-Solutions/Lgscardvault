@@ -11,13 +11,14 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Enum\CardCondition;
 use App\Repository\InventoryItemRepository;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: InventoryItemRepository::class)]
 #[ORM\Table(name: 'inventory_items')]
-#[ORM\UniqueConstraint(name: 'UNIQ_INVENTORY_STORE_CARD', fields: ['store', 'card', 'condition', 'isFoil'])]
+#[ORM\UniqueConstraint(name: 'UNIQ_INVENTORY_STORE_CARD', fields: ['store', 'card', 'condition', 'finish'])]
 #[ORM\Index(name: 'idx_inventory_store_id_id', columns: ['store_id', 'id'])]
 #[ApiResource(
     operations: [
@@ -124,9 +125,25 @@ class InventoryItem
     #[Groups(['inventory:read', 'inventory:write'])]
     private CardCondition $condition = CardCondition::NM;
 
-    #[ORM\Column]
-    #[Groups(['inventory:read', 'inventory:write'])]
-    private bool $isFoil = false;
+    /**
+     * The treatment this listing is of, in the game's own words: "Nonfoil"
+     * and "Foil" for Magic, "Normal" / "Holofoil" / "Reverse Holofoil" for
+     * Pokemon, "Cold Foil" for Flesh and Blood. Part of the line's identity,
+     * so a store can price Holofoil and Reverse Holofoil separately.
+     */
+    #[ORM\Column(length: FinishVocabulary::MAX_LENGTH, options: ['default' => FinishVocabulary::DEFAULT_PLAIN])]
+    #[Groups(['inventory:read'])]
+    private string $finish = FinishVocabulary::DEFAULT_PLAIN;
+
+    /**
+     * Write-side inputs. Both are resolved against the card by
+     * StoreInventoryProcessor, which is the only place that knows which
+     * treatments the printing actually has. `foilHint` is the legacy
+     * boolean, still accepted so older clients and the CSV importer keep
+     * working.
+     */
+    private ?string $requestedFinish = null;
+    private ?bool $foilHint = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['inventory:read', 'inventory:write'])]
@@ -233,9 +250,56 @@ class InventoryItem
         return $this;
     }
 
+    public function getFinish(): string
+    {
+        return $this->finish;
+    }
+
+    /**
+     * Serializer entry point for the `finish` attribute on writes. The value
+     * is only a request: it is matched against the printing's own treatments
+     * before it becomes the stored finish.
+     */
+    #[Groups(['inventory:write'])]
+    public function setFinish(?string $finish): static
+    {
+        $this->requestedFinish = $finish;
+
+        return $this;
+    }
+
+    /** Sets the resolved treatment. Callers go through FinishVocabulary. */
+    public function applyFinish(string $finish): static
+    {
+        $canonical = FinishVocabulary::canonical($finish);
+        $this->finish = '' !== $canonical ? $canonical : FinishVocabulary::DEFAULT_PLAIN;
+
+        return $this;
+    }
+
+    public function getRequestedFinish(): ?string
+    {
+        return $this->requestedFinish;
+    }
+
+    public function getFoilHint(): ?bool
+    {
+        return $this->foilHint;
+    }
+
+    /** Did the request say anything about the finish at all? */
+    public function hasFinishInput(): bool
+    {
+        return null !== $this->requestedFinish || null !== $this->foilHint;
+    }
+
+    /**
+     * Which side of the foil axis this treatment sits on. Prices, the card
+     * shimmer, and buylist matching are all still binary.
+     */
     public function isFoil(): bool
     {
-        return $this->isFoil;
+        return FinishVocabulary::isFoil($this->finish);
     }
 
     /**
@@ -244,15 +308,22 @@ class InventoryItem
      * stripped), leaving the `isFoil` group attribute with no readable getter — so
      * it was silently omitted from every response.
      */
-    #[Groups(['inventory:read', 'inventory:write'])]
+    #[Groups(['inventory:read'])]
     public function getIsFoil(): bool
     {
-        return $this->isFoil;
+        return $this->isFoil();
     }
 
+    /**
+     * Legacy write path: a client that only knows foil / not foil. This
+     * records a REQUEST, not the stored finish — resolving it needs the card,
+     * which only the processor has. Application code sets the treatment with
+     * applyFinish().
+     */
+    #[Groups(['inventory:write'])]
     public function setIsFoil(bool $isFoil): static
     {
-        $this->isFoil = $isFoil;
+        $this->foilHint = $isFoil;
 
         return $this;
     }

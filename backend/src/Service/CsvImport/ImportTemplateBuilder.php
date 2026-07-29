@@ -4,14 +4,21 @@ namespace App\Service\CsvImport;
 
 use App\Entity\CsvImportJob;
 use App\Entity\Game;
+use App\Repository\CardRepository;
+use App\Repository\SealedProductRepository;
 
 /**
  * Builds the downloadable sample CSV for a game.
  *
- * The headers come from the same vocabulary the parsers accept, so a
- * template can never drift from what the importer actually reads, and the
- * example rows are written in each game's own conventions — Magic set codes
- * and collector numbers look nothing like One Piece's "OP01-003".
+ * The rows are REAL entries from that game's synced catalog, not invented
+ * ones. A template full of plausible-looking examples is worse than
+ * useless: a store downloads it, imports it unchanged, and every row fails
+ * because those exact printings were never synced — which reads as a broken
+ * importer. Sampling the catalog means the sample always resolves.
+ *
+ * The curated examples below are the fallback for a game with nothing
+ * synced yet, where no template could import successfully anyway; they at
+ * least show the shape and each game's own conventions.
  */
 final readonly class ImportTemplateBuilder
 {
@@ -88,6 +95,12 @@ final readonly class ImportTemplateBuilder
         ['Example Starter Deck', 'Set Name', '14.99'],
     ];
 
+    public function __construct(
+        private CardRepository $cards,
+        private SealedProductRepository $sealedProducts,
+    ) {
+    }
+
     public function build(Game $game, string $importType): string
     {
         return CsvImportJob::TYPE_SEALED === $importType
@@ -107,6 +120,26 @@ final readonly class ImportTemplateBuilder
     private function buildCards(Game $game): string
     {
         $rows = [self::CARD_HEADERS];
+
+        // Real catalog entries first — these import cleanly by construction.
+        foreach ($this->cards->findSampleForGame($game) as $card) {
+            $rows[] = [
+                $card->getName(),
+                $game->getName(),
+                $card->getSetCode(),
+                'NM',
+                'No',
+                (string) ($card->getRarity() ?? ''),
+                '1',
+                '',
+                $card->getCollectorNumber(),
+            ];
+        }
+
+        if (count($rows) > 1) {
+            return $this->toCsv($rows);
+        }
+
         foreach (self::CARD_EXAMPLES[$game->getCode()] ?? self::GENERIC_CARD_EXAMPLE as [$name, $set, $rarity, $collector, $foil]) {
             // Column order must match CARD_HEADERS exactly.
             $rows[] = [$name, $game->getName(), $set, 'NM', $foil, $rarity, '1', '', $collector];
@@ -118,6 +151,25 @@ final readonly class ImportTemplateBuilder
     private function buildSealed(Game $game): string
     {
         $rows = [self::SEALED_HEADERS];
+
+        foreach ($this->sealedProducts->findSampleForGame($game) as $product) {
+            $rows[] = [
+                $product->getName(),
+                (string) ($product->getGameSet()?->getName() ?? ''),
+                '1',
+                null !== $product->getMarketPriceCents()
+                    ? number_format($product->getMarketPriceCents() / 100, 2, '.', '')
+                    : '',
+                // The TCGplayer id makes the row match exactly, whatever the
+                // name looks like.
+                (string) $product->getTcgcsvProductId(),
+            ];
+        }
+
+        if (count($rows) > 1) {
+            return $this->toCsv($rows);
+        }
+
         foreach (self::SEALED_EXAMPLES[$game->getCode()] ?? self::GENERIC_SEALED_EXAMPLE as [$name, $set, $price]) {
             // productId is optional; blank means "match on name".
             $rows[] = [$name, $set, '1', $price, ''];

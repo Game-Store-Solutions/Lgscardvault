@@ -31,6 +31,7 @@ import {
   Textarea,
 } from '../components/ui'
 import { formatDate } from '../lib/format'
+import { finishChoices, finishOptions, isFoilFinish } from '../lib/finishes'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
@@ -53,17 +54,17 @@ interface SellLine {
   key: string
   card: CardSummary
   entry: BuylistEntry | null
-  isFoil: boolean
+  finish: string
   condition: Condition
   quantity: number
 }
 
-function lineKey(card: CardSummary, entry: BuylistEntry | null, isFoil: boolean, condition: Condition): string {
-  return entry ? `entry:${entry.id}:${condition}` : `card:${card.id}:${isFoil ? 'f' : 'n'}:${condition}`
+function lineKey(card: CardSummary, entry: BuylistEntry | null, finish: string, condition: Condition): string {
+  return entry ? `entry:${entry.id}:${condition}` : `card:${card.id}:${finish}:${condition}`
 }
 
 function lineMarketCents(line: SellLine): number | null {
-  return scryfallPriceCents(line.card, line.isFoil ? 'foil' : 'nonfoil')
+  return scryfallPriceCents(line.card, isFoilFinish(line.finish) ? 'foil' : 'nonfoil')
 }
 
 /**
@@ -216,7 +217,7 @@ export default function SellTradePage() {
         items: lines.map((line) =>
           line.entry
             ? { buylistEntryId: line.entry.id, quantity: line.quantity, condition: line.condition }
-            : { cardId: line.card.id, quantity: line.quantity, condition: line.condition, isFoil: line.isFoil },
+            : { cardId: line.card.id, quantity: line.quantity, condition: line.condition, finish: line.finish },
         ),
       })
       return data
@@ -230,25 +231,25 @@ export default function SellTradePage() {
     },
   })
 
-  function addLine(card: CardSummary, entry: BuylistEntry | null, isFoil: boolean, condition: Condition, quantity: number) {
-    const key = lineKey(card, entry, isFoil, condition)
+  function addLine(card: CardSummary, entry: BuylistEntry | null, finish: string, condition: Condition, quantity: number) {
+    const key = lineKey(card, entry, finish, condition)
     setLines((current) => {
       const cap = entry?.maxQuantity ?? Number.POSITIVE_INFINITY
       const existing = current.find((line) => line.key === key)
       if (existing) {
         return current.map((line) => (line.key === key ? { ...line, quantity: Math.min(line.quantity + quantity, cap) } : line))
       }
-      return [...current, { key, card, entry, isFoil, condition, quantity: Math.min(quantity, cap) }]
+      return [...current, { key, card, entry, finish, condition, quantity: Math.min(quantity, cap) }]
     })
     setSubmitted(false)
   }
 
-  function updateLine(key: string, patch: Partial<Pick<SellLine, 'quantity' | 'condition' | 'card' | 'isFoil'>>) {
+  function updateLine(key: string, patch: Partial<Pick<SellLine, 'quantity' | 'condition' | 'card' | 'finish'>>) {
     setLines((current) =>
       current.map((line) => {
         if (line.key !== key) return line
         const next = { ...line, ...patch }
-        next.key = lineKey(next.card, next.entry, next.isFoil, next.condition)
+        next.key = lineKey(next.card, next.entry, next.finish, next.condition)
         return next
       }),
     )
@@ -270,7 +271,8 @@ export default function SellTradePage() {
               const priced = data
                 .filter((card) => matchesName(card, name) && scryfallPriceCents(card, 'nonfoil') != null)
                 .sort((a, b) => (scryfallPriceCents(a, 'nonfoil') ?? 0) - (scryfallPriceCents(b, 'nonfoil') ?? 0))
-              if (priced.length > 0) addLine(priced[0], null, false, 'NM', quantity)
+              // A pasted decklist means plain copies — in that printing's own word for it.
+              if (priced.length > 0) addLine(priced[0], null, finishChoices(priced[0]).plain, 'NM', quantity)
               else misses.push(name)
             } catch {
               misses.push(name)
@@ -420,7 +422,7 @@ export default function SellTradePage() {
                       card={card}
                       rates={effectiveRates}
                       payoutMethod={payoutMethod}
-                      onAdd={(isFoil, condition, quantity) => addLine(card, null, isFoil, condition, quantity)}
+                      onAdd={(finish, condition, quantity) => addLine(card, null, finish, condition, quantity)}
                     />
                   ))}
                 </ul>
@@ -464,7 +466,7 @@ export default function SellTradePage() {
                       rates={effectiveRates}
                       payoutMethod={payoutMethod}
                       disabled={!user}
-                      onAdd={() => entry.card && addLine(entry.card, entry, entry.wantsFoil, 'NM', 1)}
+                      onAdd={() => entry.card && addLine(entry.card, entry, entry.wantsFinish, 'NM', 1)}
                     />
                   ))}
                 </ul>
@@ -555,16 +557,16 @@ function SearchResultRow({
   card: CardSummary
   rates: TradeRates
   payoutMethod: SellPayoutMethod
-  onAdd: (isFoil: boolean, condition: Condition, quantity: number) => void
+  onAdd: (finish: string, condition: Condition, quantity: number) => void
 }) {
-  const [isFoil, setIsFoil] = useState(false)
+  // Every treatment this printing is sold in, so a customer selling a
+  // Reverse Holofoil can say so instead of picking "Foil".
+  const finishes = finishOptions(card)
+  const [finish, setFinish] = useState(finishes[0]?.value ?? 'Nonfoil')
   const [condition, setCondition] = useState<Condition>('NM')
   const [quantity, setQuantity] = useState(1)
 
-  const finishes = card.finishes ?? ['nonfoil']
-  const hasFoil = finishes.includes('foil') || finishes.includes('etched')
-  const hasNonfoil = finishes.includes('nonfoil')
-  const market = scryfallPriceCents(card, isFoil ? 'foil' : 'nonfoil')
+  const market = scryfallPriceCents(card, isFoilFinish(finish) ? 'foil' : 'nonfoil')
   const percent = payoutMethod === 'credit' ? rates.creditPercent : rates.cashPercent
   const offer = market == null ? null : Math.floor((market * percent) / 100)
 
@@ -588,10 +590,13 @@ function SearchResultRow({
         </p>
       </div>
       <div className="flex items-end gap-2">
-        {hasFoil && hasNonfoil && (
-          <Select label="Finish" value={isFoil ? 'foil' : 'nonfoil'} onChange={(e) => setIsFoil(e.target.value === 'foil')} className="w-24">
-            <option value="nonfoil">Normal</option>
-            <option value="foil">Foil</option>
+        {finishes.length > 1 && (
+          <Select label="Finish" value={finish} onChange={(e) => setFinish(e.target.value)} className="w-32">
+            {finishes.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.value}
+              </option>
+            ))}
           </Select>
         )}
         <Select label="Cond." value={condition} onChange={(e) => setCondition(e.target.value as Condition)} className="w-20">
@@ -609,7 +614,7 @@ function SearchResultRow({
           onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
           className="w-16"
         />
-        <Button size="sm" variant="secondary" disabled={offer == null} onClick={() => onAdd(!hasNonfoil || isFoil, condition, quantity)}>
+        <Button size="sm" variant="secondary" disabled={offer == null} onClick={() => onAdd(finish, condition, quantity)}>
           Add
         </Button>
       </div>
@@ -644,7 +649,7 @@ function BuylistTile({
         <p className="truncate text-sm font-bold text-fg">{card.name}</p>
         <p className="truncate text-xs text-fg-muted">
           {card.setCode?.toUpperCase() ?? '—'}
-          {entry.wantsFoil ? ' · Foil' : ''}
+          {entry.wantsFoil ? ` · ${entry.wantsFinish}` : ''}
           {entry.maxQuantity != null ? ` · up to ${entry.maxQuantity}` : ''}
         </p>
         <div className="flex items-center justify-between gap-2">
@@ -711,7 +716,7 @@ function SummaryPanel({
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="truncate font-bold text-fg">
                   {line.card.name}
-                  {line.isFoil ? ' ✨' : ''}
+                  {isFoilFinish(line.finish) ? ` ✨ ${line.finish}` : ''}
                 </p>
                 <p className="text-xs text-fg-muted">
                   {line.card.setCode?.toUpperCase() ?? '—'}
@@ -897,7 +902,7 @@ function ChangePrintingModal({
       ) : (
         <ul className="grid max-h-[60vh] grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-4">
           {(printingsQuery.data ?? []).map((card) => {
-            const market = scryfallPriceCents(card, line.isFoil ? 'foil' : 'nonfoil')
+            const market = scryfallPriceCents(card, isFoilFinish(line.finish) ? 'foil' : 'nonfoil')
             return (
               <li key={card.id}>
                 <button

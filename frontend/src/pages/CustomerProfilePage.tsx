@@ -222,7 +222,7 @@ function SellTradeHistoryPanel({ slug }: { slug: string }) {
                 <li key={item.id} className="flex items-center justify-between gap-3">
                   <span className="min-w-0 truncate text-fg">
                     {item.quantity}× {item.cardName}
-                    {item.isFoil ? ' (Foil)' : ''}
+                    {item.isFoil ? ` (${item.finish})` : ''}
                   </span>
                   <span className="shrink-0 text-fg-muted">{formatPrice(item.offerCentsEach)} each</span>
                 </li>
@@ -680,7 +680,7 @@ function FavoritesPanel({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Badge>{favorite.inventoryItem.condition}</Badge>
                 <Badge tone={favorite.inventoryItem.isFoil ? 'brand' : 'neutral'}>
-                  {favorite.inventoryItem.isFoil ? 'Foil' : 'Nonfoil'}
+                  {favorite.inventoryItem.finish}
                 </Badge>
               </div>
               <p className="mt-2 text-lg font-bold text-fg">
@@ -757,7 +757,7 @@ function WantListPanel({
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-fg-muted">
                           {entry.setCode && <Badge>{entry.setCode.toUpperCase()}</Badge>}
                           <Badge tone={entry.isFoil ? 'brand' : 'neutral'}>
-                            {entry.isFoil ? 'Foil' : 'Nonfoil'}
+                            {entry.finish}
                           </Badge>
                           <span>Qty {entry.quantity}</span>
                         </div>

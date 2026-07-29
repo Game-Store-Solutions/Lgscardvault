@@ -12,6 +12,7 @@ use App\Entity\Order;
 use App\Entity\SealedInventoryItem;
 use App\Entity\OrderLine;
 use App\Entity\Store;
+use App\Service\Catalog\FinishVocabulary;
 use App\Entity\StoreCustomer;
 use App\Entity\User;
 use App\Repository\CardRepository;
@@ -210,7 +211,7 @@ final class StoreCustomerController extends AbstractController
             ->setCard($card)
             ->setCardName(mb_substr($cardName, 0, 255))
             ->setSetCode($this->nullableString($payload['setCode'] ?? $card?->getSetCode(), 120))
-            ->setIsFoil((bool) ($payload['isFoil'] ?? false))
+            ->setFinish($this->wantedFinish($payload, $card))
             ->setQuantity(max(1, (int) ($payload['quantity'] ?? 1)))
             ->setNotes($this->nullableString($payload['notes'] ?? null, 255));
 
@@ -777,6 +778,30 @@ final class StoreCustomerController extends AbstractController
     }
 
     /** @return array<string, mixed> */
+    /**
+     * The treatment a want-list entry is for. A named one wins; otherwise the
+     * old boolean is translated into the printing's own word for that side.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function wantedFinish(array $payload, ?Card $card): string
+    {
+        $requested = isset($payload['finish']) ? (string) $payload['finish'] : null;
+        $foilHint = isset($payload['isFoil']) ? (bool) $payload['isFoil'] : null;
+
+        if (!$card instanceof Card) {
+            // A free-text want with no catalog match to consult.
+            $canonical = FinishVocabulary::canonical((string) $requested);
+            if ('' !== $canonical) {
+                return $canonical;
+            }
+
+            return ($foilHint ?? false) ? FinishVocabulary::DEFAULT_FOIL : FinishVocabulary::DEFAULT_PLAIN;
+        }
+
+        return FinishVocabulary::resolveForCard($card, $requested, $foilHint);
+    }
+
     private function serializeWantListEntry(CustomerWantListEntry $entry): array
     {
         return [
@@ -784,6 +809,7 @@ final class StoreCustomerController extends AbstractController
             'card' => $this->serializeCard($entry->getCard()),
             'cardName' => $entry->getCardName(),
             'setCode' => $entry->getSetCode(),
+            'finish' => $entry->getFinish(),
             'isFoil' => $entry->isFoil(),
             'quantity' => $entry->getQuantity(),
             'notes' => $entry->getNotes(),
@@ -873,6 +899,7 @@ final class StoreCustomerController extends AbstractController
             'quantity' => $item->getQuantity(),
             'priceCents' => $item->getPriceCents(),
             'condition' => $item->getCondition()->value,
+            'finish' => $item->getFinish(),
             'isFoil' => $item->isFoil(),
             'notes' => $item->getNotes(),
             'card' => $this->serializeCard($item->getCard()),

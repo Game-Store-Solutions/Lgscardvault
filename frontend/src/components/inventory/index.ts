@@ -7,5 +7,5 @@ export type { QuantityStepperProps } from './QuantityStepper'
 export { ConditionSegmented } from './ConditionSegmented'
 export type { ConditionSegmentedProps } from './ConditionSegmented'
 
-export { FoilToggle } from './FoilToggle'
-export type { FoilToggleProps } from './FoilToggle'
+export { FinishPicker } from './FinishPicker'
+export type { FinishPickerProps } from './FinishPicker'

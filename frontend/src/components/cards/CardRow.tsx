@@ -5,6 +5,7 @@ import type { InventoryItem } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { CardImage } from './CardImage'
 import { Badge } from '../ui'
+import { finishName } from '../../lib/finishes'
 import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../../lib/mtg'
 
 export interface CardRowProps {
@@ -54,10 +55,10 @@ export function CardRow({ item, slug }: CardRowProps) {
               style={{ backgroundImage: FOIL_GRADIENT }}
             >
               <Sparkles aria-hidden className="size-3" />
-              Foil
+              {finishName(item.card, true, item.finish)}
             </span>
           ) : (
-            <Badge tone="neutral">Nonfoil</Badge>
+            <Badge tone="neutral">{finishName(item.card, false, item.finish)}</Badge>
           )}
         </div>
       </div>

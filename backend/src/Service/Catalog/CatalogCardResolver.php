@@ -197,11 +197,11 @@ final readonly class CatalogCardResolver
             return false;
         }
 
-        if ('' !== $finish) {
-            $finishes = $card->getFinishes() ?? [];
-            if (!in_array($finish, $finishes, true)) {
-                return false;
-            }
+        // Outside Magic the treatment is called "Holofoil" or "Rainbow Foil",
+        // never the literal "foil" the filter sends, so compare the axis
+        // rather than the word.
+        if ('' !== $finish && !FinishVocabulary::offers($finish, $card->getFinishes())) {
+            return false;
         }
 
         return true;

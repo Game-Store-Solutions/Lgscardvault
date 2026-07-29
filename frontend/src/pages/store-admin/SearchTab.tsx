@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
-import { inventoryKey, useCatalogGames, useInventory } from '../../hooks'
-import { GameSelector } from '../../components/catalog'
+import { inventoryKey, useCatalogGames, useInventory, useStoreGameStats } from '../../hooks'
+import { GameWorkspaceHeader } from '../../components/catalog'
 import {
   Card,
   CardHeader,
@@ -17,6 +17,7 @@ import {
   Pagination,
 } from '../../components/ui'
 import { type Condition } from '../../components/inventory'
+import { defaultFinishFor, finishChoices, isFoilFinish } from '../../lib/finishes'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -40,7 +41,7 @@ export default function SearchTab({ slug }: { slug: string }) {
   const [quantity, setQuantity] = useState(1)
   const [priceText, setPriceText] = useState('')
   const [condition, setCondition] = useState<Condition>('NM')
-  const [isFoil, setIsFoil] = useState(false)
+  const [finish, setFinish] = useState('Nonfoil')
   const [costText, setCostText] = useState('')
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -48,8 +49,8 @@ export default function SearchTab({ slug }: { slug: string }) {
   // Seed the sell price from the market price when there is one. Games
   // outside Magic often have no price at all, and the old flow silently
   // listed those at $0.00 with no way to say otherwise.
-  function applyScryfallPrice(card: CardSummary, foil: boolean) {
-    const market = scryfallPriceCents(card, foil ? 'foil' : 'nonfoil')
+  function applyScryfallPrice(card: CardSummary, nextFinish: string) {
+    const market = scryfallPriceCents(card, isFoilFinish(nextFinish) ? 'foil' : 'nonfoil')
     setPriceText(market == null ? '' : (market / 100).toFixed(2))
   }
 
@@ -76,25 +77,24 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   function selectCatalogCard(card: CardSummary) {
     setSelectedCard(card)
-    let nextIsFoil = isFoil
-    if (catalogFinishFilter === 'foil') {
-      nextIsFoil = true
-    } else if (catalogFinishFilter === 'nonfoil') {
-      nextIsFoil = false
-    } else if (card.finishes?.includes('foil') && !card.finishes.includes('nonfoil')) {
-      nextIsFoil = true
-    } else if (card.finishes?.includes('nonfoil') && !card.finishes.includes('foil')) {
-      nextIsFoil = false
-    }
-    setIsFoil(nextIsFoil)
-    applyScryfallPrice(card, nextIsFoil)
+    // Start on the treatment the search was filtered to, else the first one
+    // this printing is actually sold in — which outside Magic is "Normal",
+    // not "Nonfoil".
+    const published = finishChoices(card)
+    const nextFinish =
+      catalogFinishFilter === 'foil'
+        ? published.foil
+        : catalogFinishFilter === 'nonfoil'
+          ? published.plain
+          : defaultFinishFor(card)
+    setFinish(nextFinish)
+    applyScryfallPrice(card, nextFinish)
   }
 
-  function handleFinishChange(value: 'nonfoil' | 'foil') {
-    const nextIsFoil = value === 'foil'
-    setIsFoil(nextIsFoil)
+  function handleFinishChange(nextFinish: string) {
+    setFinish(nextFinish)
     if (selectedCard) {
-      applyScryfallPrice(selectedCard, nextIsFoil)
+      applyScryfallPrice(selectedCard, nextFinish)
     }
   }
 
@@ -106,7 +106,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         quantity,
         priceCents: parsePriceInput(priceText) ?? 0,
         condition,
-        isFoil,
+        finish,
         acquisitionCostCents: parsePriceInput(costText),
       })
     },
@@ -128,7 +128,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         priceCents: parsePriceInput(payload.priceText) ?? 0,
         acquisitionCostCents: parsePriceInput(payload.costText),
         condition: payload.condition,
-        isFoil: payload.isFoil,
+        finish: payload.finish,
       })
       return data
     },
@@ -162,25 +162,25 @@ export default function SearchTab({ slug }: { slug: string }) {
   })
 
   // Games present in this store's inventory; pills only render for 2+.
+  // Every platform game is offered as pure navigation — a store has to be
+  // able to start stocking a game it does not carry yet. The numbers live in
+  // the workspace header, where they can say what they count.
   const { data: games = [] } = useCatalogGames()
-  const gameOptions = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const item of inventory) {
-      const code = item.card.gameCode ?? 'mtg'
-      counts.set(code, (counts.get(code) ?? 0) + 1)
-    }
-
-    // Every platform game is offered (a store has to be able to start
-    // stocking a new one), with its current listing count for context.
-    return games.map((game) => ({ code: game.code, name: game.name, count: counts.get(game.code) ?? 0 }))
-  }, [games, inventory])
+  const gameOptions = useMemo(
+    () => games.map((game) => ({ code: game.code, name: game.name })),
+    [games],
+  )
+  const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, gameFilter)
+  const activeGameName = gameOptions.find((game) => game.code === gameFilter)?.name ?? 'this game'
+  // The finish filter is worded in the managed game's own terms, so a Pokemon
+  // workspace offers "Holofoil only" rather than Magic's "Foil only".
+  const gameFinishes = finishChoices(null, gameFilter)
 
   // Always manage exactly one game — a mixed table is how a One Piece card
-  // hides among thousands of Magic rows. Default to the first game the
-  // store actually stocks (platform order), falling back to Magic.
+  // hides among thousands of Magic rows.
   useEffect(() => {
     if (!gameFilter && gameOptions.length > 0) {
-      setGameFilter(gameOptions.find((game) => game.count > 0)?.code ?? gameOptions[0].code)
+      setGameFilter(gameOptions[0].code)
     }
   }, [gameFilter, gameOptions])
 
@@ -213,22 +213,18 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      {gameOptions.length > 1 && (
-        <Card>
-          <CardBody className="py-4">
-            <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Manage inventory for" />
-          </CardBody>
-        </Card>
-      )}
+      <GameWorkspaceHeader
+        games={gameOptions}
+        value={gameFilter}
+        onChange={setGameFilter}
+        stats={gameStats}
+        loading={statsLoading}
+      />
 
       <Card>
         <CardHeader
-          title="Add inventory"
-          subtitle={
-            gameFilter
-              ? `Searching the ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''} catalog.`
-              : 'Search the catalog, then add a printing to this store.'
-          }
+          title={`Add ${activeGameName} inventory`}
+          subtitle={`Searches the ${activeGameName} catalog — every printing that exists, not just what you stock. Results are limited to ${activeGameName}.`}
         />
         <CardBody className="space-y-5">
           {mutationError && (
@@ -269,8 +265,8 @@ export default function SearchTab({ slug }: { slug: string }) {
                   onChange={(e) => setCatalogFinishFilter(e.target.value as 'all' | 'foil' | 'nonfoil')}
                 >
                   <option value="all">All finishes</option>
-                  <option value="nonfoil">Nonfoil only</option>
-                  <option value="foil">Foil only</option>
+                  <option value="nonfoil">{gameFinishes.plain} only</option>
+                  <option value="foil">{gameFinishes.foil} only</option>
                 </Select>
               )}
             </Field>
@@ -298,7 +294,7 @@ export default function SearchTab({ slug }: { slug: string }) {
               card={selectedCard}
               quantity={quantity}
               condition={condition}
-              isFoil={isFoil}
+              finish={finish}
               pending={addMutation.isPending}
               costText={costText}
               onCostChange={setCostText}
@@ -315,13 +311,13 @@ export default function SearchTab({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader
-          title="Store inventory"
-          subtitle="Each item includes art, price, quantity, and quick edit actions."
+          title={`${activeGameName} inventory`}
+          subtitle={`What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`}
           actions={
             <Input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="Search this store's inventory…"
+              placeholder={`Search your ${activeGameName} stock…`}
               className="min-w-64"
             />
           }

@@ -484,7 +484,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
                   </p>
                   <p className="text-xs text-fg-muted">
                     {entry.card?.setCode?.toUpperCase()}
-                    {entry.wantsFoil ? ' · Foil' : ''}
+                    {entry.wantsFoil ? ` · ${entry.wantsFinish}` : ''}
                     {entry.maxQuantity != null ? ` · up to ${entry.maxQuantity}` : ''}
                     {entry.offerCents == null ? ` · ${premiumLabel(entry)}` : ''}
                   </p>
@@ -786,7 +786,7 @@ function printReviewSheet(submission: SellSubmission, reviewed: ReviewedLine[]) 
       const accepted = item.acceptedQuantity ?? (state && state.accepted ? state.acceptedQuantity : item.quantity)
       return `
         <tr>
-          <td>${escapeHtml(item.cardName)}${item.isFoil ? ' (Foil)' : ''}</td>
+          <td>${escapeHtml(item.cardName)}${item.isFoil ? ' (' + escapeHtml(item.finish) + ')' : ''}</td>
           <td>${escapeHtml(item.setCode?.toUpperCase() ?? '-')}</td>
           <td>${escapeHtml(item.condition)}</td>
           <td>${item.quantity}</td>

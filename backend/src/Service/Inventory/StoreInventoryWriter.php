@@ -7,6 +7,7 @@ use App\Entity\InventoryItem;
 use App\Entity\Store;
 use App\Enum\CardCondition;
 use App\Repository\InventoryItemRepository;
+use App\Service\Catalog\FinishVocabulary;
 use App\Service\Notification\WantListNotifier;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,6 +25,10 @@ final readonly class StoreInventoryWriter
     }
 
     /**
+     * @param string   $finish     the treatment being stocked, in the game's own
+     *                             words ("Holofoil", "Cold Foil"). Callers with
+     *                             only the old boolean go through
+     *                             FinishVocabulary::resolveForCard() first.
      * @param int|null $priceCents explicit sell price; null falls back to the
      *                             card's market price. Games outside Magic
      *                             often have no market price at all, so the
@@ -35,7 +40,7 @@ final readonly class StoreInventoryWriter
         Card $card,
         int $quantity,
         CardCondition $condition,
-        bool $isFoil,
+        string $finish,
         ?string $notes = null,
         bool $flush = true,
         ?int $acquisitionCostCents = null,
@@ -61,7 +66,7 @@ final readonly class StoreInventoryWriter
         // the CSV handler flush + recover the whole batch on conflict (it owns
         // the transaction boundary and requeues contended rows).
         if (!$flush) {
-            return $this->applyWrite($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents, $priceCents);
+            return $this->applyWrite($store, $card, $quantity, $condition, $finish, $notes, $acquisitionCostCents, $priceCents);
         }
 
         // Immediate path (flush=true, web add/edit/manual-import): a native
@@ -69,7 +74,7 @@ final readonly class StoreInventoryWriter
         // (store, card, condition, foil) tuple can neither 500 on the unique
         // constraint (the old check-then-insert race) nor lose an increment
         // (the old read-modify-write) — the quantity is summed in-database.
-        return $this->upsertLine($store, $card, $quantity, $condition, $isFoil, $notes, $acquisitionCostCents, $priceCents);
+        return $this->upsertLine($store, $card, $quantity, $condition, $finish, $notes, $acquisitionCostCents, $priceCents);
     }
 
     /**
@@ -86,19 +91,20 @@ final readonly class StoreInventoryWriter
         Card $card,
         int $quantity,
         CardCondition $condition,
-        bool $isFoil,
+        string $finish,
         ?string $notes,
         ?int $acquisitionCostCents = null,
         ?int $priceCents = null,
     ): InventoryItem {
-        $priceCents ??= $this->resolvePriceCents($card, $isFoil);
+        $finish = $this->canonicalFinish($finish);
+        $priceCents ??= $this->resolvePriceCents($card, FinishVocabulary::isFoil($finish));
         $connection = $this->entityManager->getConnection();
 
         $id = $connection->fetchOne(
             <<<'SQL'
-            INSERT INTO inventory_items (store_id, card_id, quantity, price_cents, acquisition_cost_cents, condition, is_foil, notes, version)
-            VALUES (:store, :card, :quantity, :price, :cost, :condition, :foil, :notes, 1)
-            ON CONFLICT (store_id, card_id, condition, is_foil)
+            INSERT INTO inventory_items (store_id, card_id, quantity, price_cents, acquisition_cost_cents, condition, finish, notes, version)
+            VALUES (:store, :card, :quantity, :price, :cost, :condition, :finish, :notes, 1)
+            ON CONFLICT (store_id, card_id, condition, finish)
             DO UPDATE SET
                 quantity = inventory_items.quantity + EXCLUDED.quantity,
                 price_cents = EXCLUDED.price_cents,
@@ -114,7 +120,7 @@ final readonly class StoreInventoryWriter
                 'price' => $priceCents,
                 'cost' => $acquisitionCostCents,
                 'condition' => $condition->value,
-                'foil' => $isFoil ? 'true' : 'false',
+                'finish' => $finish,
                 'notes' => null !== $notes && '' !== trim($notes) ? $notes : '',
             ],
             [
@@ -154,20 +160,21 @@ final readonly class StoreInventoryWriter
         Card $card,
         int $quantity,
         CardCondition $condition,
-        bool $isFoil,
+        string $finish,
         ?string $notes,
         ?int $acquisitionCostCents = null,
         ?int $priceCents = null,
     ): InventoryItem {
+        $finish = $this->canonicalFinish($finish);
         $item = $this->inventoryItemRepository->findOneBy([
             'store' => $store,
             'card' => $card,
             'condition' => $condition,
-            'isFoil' => $isFoil,
+            'finish' => $finish,
         ]);
 
         if (!$item instanceof InventoryItem) {
-            $item = $this->findScheduledInventoryItem($store, $card, $condition, $isFoil);
+            $item = $this->findScheduledInventoryItem($store, $card, $condition, $finish);
         }
 
         if (!$item instanceof InventoryItem) {
@@ -175,13 +182,13 @@ final readonly class StoreInventoryWriter
             $item->setStore($store);
             $item->setCard($card);
             $item->setCondition($condition);
-            $item->setIsFoil($isFoil);
+            $item->applyFinish($finish);
             $item->setQuantity(0);
             $this->entityManager->persist($item);
         }
 
         $item->setQuantity($item->getQuantity() + $quantity);
-        $item->setPriceCents($priceCents ?? $this->resolvePriceCents($card, $isFoil));
+        $item->setPriceCents($priceCents ?? $this->resolvePriceCents($card, FinishVocabulary::isFoil($finish)));
         if (null !== $acquisitionCostCents) {
             $item->setAcquisitionCostCents($acquisitionCostCents);
         }
@@ -235,9 +242,9 @@ final readonly class StoreInventoryWriter
         Store $store,
         Card $card,
         CardCondition $condition,
-        bool $isFoil,
+        string $finish,
     ): ?InventoryItem {
-        $target = $this->inventoryKey($store, $card, $condition, $isFoil);
+        $target = $this->inventoryKey($store, $card, $condition, $finish);
         if (null === $target) {
             return null;
         }
@@ -250,7 +257,7 @@ final readonly class StoreInventoryWriter
                 continue;
             }
 
-            $key = $this->inventoryKey($entity->getStore(), $entity->getCard(), $entity->getCondition(), $entity->isFoil());
+            $key = $this->inventoryKey($entity->getStore(), $entity->getCard(), $entity->getCondition(), $entity->getFinish());
             if (null !== $key && !isset($pending[$key])) {
                 $pending[$key] = $entity;
             }
@@ -260,11 +267,11 @@ final readonly class StoreInventoryWriter
     }
 
     /**
-     * Builds a stable composite key (store id + card id + condition + foil) used to
+     * Builds a stable composite key (store id + card id + condition + finish) used to
      * deduplicate pending inventory items. Uuid is rendered via toRfc4122() so the
      * comparison is exact/strict; returns null when identifiers are not yet available.
      */
-    private function inventoryKey(?Store $store, ?Card $card, CardCondition $condition, bool $isFoil): ?string
+    private function inventoryKey(?Store $store, ?Card $card, CardCondition $condition, string $finish): ?string
     {
         $storeId = $store?->getId();
         $cardId = $card?->getId();
@@ -272,6 +279,14 @@ final readonly class StoreInventoryWriter
             return null;
         }
 
-        return sprintf('%d|%s|%s|%s', $storeId, $cardId->toRfc4122(), $condition->value, $isFoil ? '1' : '0');
+        return sprintf('%d|%s|%s|%s', $storeId, $cardId->toRfc4122(), $condition->value, $finish);
+    }
+
+    /** Never write an empty or oddly spelled treatment into the line's identity. */
+    private function canonicalFinish(string $finish): string
+    {
+        $canonical = FinishVocabulary::canonical($finish);
+
+        return '' !== $canonical ? $canonical : FinishVocabulary::DEFAULT_PLAIN;
     }
 }

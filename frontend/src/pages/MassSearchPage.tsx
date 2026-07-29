@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Textarea } from '../components/ui'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
+import { finishName } from '../lib/finishes'
 
 /** One parsed request line: how many copies of which card name. */
 interface RequestLine {
@@ -446,7 +447,7 @@ function ResultRow({ result, slug, actions }: { result: LineResult; slug: string
               >
                 <span className="font-bold text-fg">{item.card.setCode?.toUpperCase() ?? '—'}</span>
                 {item.condition}
-                {item.isFoil ? ' · Foil' : ''} · {item.quantity} in stock
+                {item.isFoil ? ` · ${finishName(item.card, true, item.finish)}` : ''} · {item.quantity} in stock
                 {cents !== null ? ` · ${formatPrice(cents)}` : ''}
               </Link>
             )

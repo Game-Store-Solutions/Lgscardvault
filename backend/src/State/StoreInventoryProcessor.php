@@ -9,6 +9,7 @@ use App\Entity\Store;
 use App\MultiTenancy\TenantContext;
 use App\Repository\CardRepository;
 use App\Repository\InventoryItemRepository;
+use App\Service\Catalog\FinishVocabulary;
 use App\Service\Inventory\StoreInventoryWriter;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
@@ -85,11 +86,19 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
                 }
             }
 
+            // Resolve the requested treatment against the printing itself, so
+            // "foil" on a Pokemon card becomes that card's Holofoil rather
+            // than Magic's word for it. A PATCH that says nothing about the
+            // finish keeps the one the listing already has.
+            $finish = $data->hasFinishInput()
+                ? FinishVocabulary::resolveForCard($targetCard, $data->getRequestedFinish(), $data->getFoilHint())
+                : $existing->getFinish();
+
             $conflict = $this->inventoryItemRepository->findOneBy([
                 'store' => $store,
                 'card' => $targetCard,
                 'condition' => $data->getCondition(),
-                'isFoil' => $data->isFoil(),
+                'finish' => $finish,
             ]);
 
             if ($conflict instanceof InventoryItem && $conflict->getId() !== $existing->getId()) {
@@ -120,7 +129,7 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
             $existing->setPriceCents($data->getPriceCents());
             $existing->setAcquisitionCostCents($data->getAcquisitionCostCents());
             $existing->setCondition($data->getCondition());
-            $existing->setIsFoil($data->isFoil());
+            $existing->applyFinish($finish);
             $existing->setNotes($data->getNotes());
             $this->entityManager->flush();
 
@@ -141,7 +150,7 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
             $card,
             $data->getQuantity(),
             $data->getCondition(),
-            $data->isFoil(),
+            FinishVocabulary::resolveForCard($card, $data->getRequestedFinish(), $data->getFoilHint()),
             $data->getNotes(),
             acquisitionCostCents: $data->getAcquisitionCostCents(),
             priceCents: $data->getPriceCents() > 0 ? $data->getPriceCents() : null,

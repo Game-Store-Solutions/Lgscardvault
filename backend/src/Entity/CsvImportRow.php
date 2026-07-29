@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\CsvImportRowRepository;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CsvImportRowRepository::class)]
@@ -53,8 +54,9 @@ class CsvImportRow
     #[ORM\Column(length: 16)]
     private string $condition = 'NM';
 
-    #[ORM\Column]
-    private bool $isFoil = false;
+    /** Treatment named by the sheet, in the game's words ("Holofoil"). */
+    #[ORM\Column(length: FinishVocabulary::MAX_LENGTH, options: ['default' => FinishVocabulary::DEFAULT_PLAIN])]
+    private string $finish = FinishVocabulary::DEFAULT_PLAIN;
 
     #[ORM\Column(length: 80)]
     private string $rarity = '';
@@ -113,8 +115,9 @@ class CsvImportRow
     public function setSetCode(string $setCode): static { $this->setCode = $setCode; return $this; }
     public function getCondition(): string { return $this->condition; }
     public function setCondition(string $condition): static { $this->condition = $condition; return $this; }
-    public function isFoil(): bool { return $this->isFoil; }
-    public function setIsFoil(bool $isFoil): static { $this->isFoil = $isFoil; return $this; }
+    public function getFinish(): string { return $this->finish; }
+    public function setFinish(string $finish): static { $this->finish = FinishVocabulary::canonical($finish) ?: FinishVocabulary::DEFAULT_PLAIN; return $this; }
+    public function isFoil(): bool { return FinishVocabulary::isFoil($this->finish); }
     public function getRarity(): string { return $this->rarity; }
     public function setRarity(string $rarity): static { $this->rarity = $rarity; return $this; }
     public function getQuantity(): int { return $this->quantity; }

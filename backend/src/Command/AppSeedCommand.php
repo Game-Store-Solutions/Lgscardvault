@@ -82,7 +82,7 @@ class AppSeedCommand extends Command
                 ->setQuantity(4 + $index)
                 ->setPriceCents(199 + ($index * 100))
                 ->setCondition(CardCondition::NM)
-                ->setIsFoil($index === 2)
+                ->applyFinish(2 === $index ? 'Foil' : 'Nonfoil')
                 ->setNotes('Demo inventory item');
 
             $this->entityManager->persist($item);

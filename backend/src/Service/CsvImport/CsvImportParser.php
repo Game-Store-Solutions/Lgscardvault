@@ -2,6 +2,8 @@
 
 namespace App\Service\CsvImport;
 
+use App\Service\Catalog\FinishVocabulary;
+
 final class CsvImportParser
 {
     /** Hard cap on data rows we will parse/persist for a single import. */
@@ -102,7 +104,9 @@ final class CsvImportParser
                 'game' => trim((string) ($cols[$index['game']] ?? '')),
                 'set' => trim((string) ($cols[$index['set']] ?? '')),
                 'condition' => $this->parseCondition((string) ($cols[$index['condition']] ?? 'NM')),
-                'isFoil' => $this->parseFoil((string) ($cols[$index['foil']] ?? ''), $variant),
+                // The sheet's own word for the treatment ("Holofoil"), or
+                // the platform placeholder when it only said yes/no.
+                'finish' => $this->parseFinish((string) ($cols[$index['foil']] ?? ''), $variant),
                 'rarity' => trim((string) ($cols[$index['rarity']] ?? '')),
                 'quantity' => $quantity,
                 'variant' => $variant,
@@ -146,11 +150,33 @@ final class CsvImportParser
         };
     }
 
-    private function parseFoil(string $value, string $variant): bool
+    /**
+     * The treatment a row is for.
+     *
+     * A `foil` column saying Yes/No is the common case, but sheets outside
+     * Magic write the treatment itself ("Holofoil", "Cold Foil") — and those
+     * used to parse as not-foil, because "holofoil" is not the word "foil".
+     */
+    private function parseFinish(string $value, string $variant): string
     {
-        $normalized = strtolower(trim($value.' '.$variant));
-        foreach (['1', 'true', 'yes', 'y', 'foil'] as $token) {
-            if (in_array($token, preg_split('/\s+/', $normalized) ?: [], true)) {
+        $normalized = strtolower(trim($value));
+
+        if (in_array($normalized, ['1', 'true', 'yes', 'y'], true)) {
+            return FinishVocabulary::DEFAULT_FOIL;
+        }
+
+        if (in_array($normalized, ['', '0', 'false', 'no', 'n'], true)) {
+            // Some exports carry the treatment in the variant column instead.
+            return $this->variantIsFoil($variant) ? FinishVocabulary::DEFAULT_FOIL : FinishVocabulary::DEFAULT_PLAIN;
+        }
+
+        return FinishVocabulary::canonical($value);
+    }
+
+    private function variantIsFoil(string $variant): bool
+    {
+        foreach (preg_split('/\s+/', strtolower(trim($variant))) ?: [] as $token) {
+            if ('' !== $token && FinishVocabulary::isFoil($token)) {
                 return true;
             }
         }
