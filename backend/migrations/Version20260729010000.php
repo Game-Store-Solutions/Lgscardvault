@@ -58,12 +58,18 @@ final class Version20260729010000 extends AbstractMigration
         $this->addSql('ALTER TABLE buylist_entries DROP wants_foil');
 
         // --- what a customer sold / wants ----------------------------------
+        // Both tables allow card_id NULL (free-form sells, free-text wants,
+        // and the SET NULL FK), and the card join above skips those rows.
+        // They still know which side of the axis they were on — without the
+        // fallback a foil row would forget it was foil.
         $this->addSql("ALTER TABLE sell_submission_items ADD finish VARCHAR(40) DEFAULT 'Nonfoil' NOT NULL");
         $this->addSql($this->backfillFromCard('sell_submission_items', 'is_foil'));
+        $this->addSql("UPDATE sell_submission_items SET finish = 'Foil' WHERE is_foil AND card_id IS NULL");
         $this->addSql('ALTER TABLE sell_submission_items DROP is_foil');
 
         $this->addSql("ALTER TABLE customer_want_list_entries ADD finish VARCHAR(40) DEFAULT 'Nonfoil' NOT NULL");
         $this->addSql($this->backfillFromCard('customer_want_list_entries', 'is_foil'));
+        $this->addSql("UPDATE customer_want_list_entries SET finish = 'Foil' WHERE is_foil AND card_id IS NULL");
         $this->addSql('ALTER TABLE customer_want_list_entries DROP is_foil');
 
         // --- import rows ----------------------------------------------------

@@ -5,7 +5,7 @@ import { Badge, Button } from '../../../components/ui'
 import { cx } from '../../../lib/cx'
 import { parseInventoryNotes } from '../../../lib/inventoryNotes'
 import { FOIL_GRADIENT, rarityAccent } from '../../../lib/mtg'
-import { finishChoices } from '../../../lib/finishes'
+import { finishName } from '../../../lib/finishes'
 
 export interface InventoryResultCardProps {
   item: InventoryItem
@@ -19,8 +19,9 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
   const accent = rarityAccent(item.card.rarity)
   const image = cardImage(item.card)
   const notes = parseInventoryNotes(item.notes)
-  // The listing's finish badge speaks the game's language, not Magic's.
-  const finishes = finishChoices(item.card)
+  // The badge shows THIS listing's treatment — a Reverse Holofoil line must
+  // not borrow the card's first foil label ("Holofoil").
+  const finishLabel = finishName(item.card, item.isFoil, item.finish)
   return (
     // The whole tile opens the manage-item modal; the action buttons stop
     // the click so delete never falls through to edit.
@@ -103,10 +104,10 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
               style={{ backgroundImage: FOIL_GRADIENT }}
             >
               <Sparkles aria-hidden className="size-3" />
-              {finishes.foil}
+              {finishLabel}
             </span>
           ) : (
-            <Badge tone="neutral">{finishes.plain}</Badge>
+            <Badge tone="neutral">{finishLabel}</Badge>
           )}
           <Badge tone="brand">{item.quantity} in stock</Badge>
           {notes.variant && <Badge tone="neutral">{notes.variant}</Badge>}
