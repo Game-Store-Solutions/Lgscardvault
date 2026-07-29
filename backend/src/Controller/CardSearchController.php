@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Card;
 use App\Entity\Game;
 use App\Repository\CardRepository;
 use App\Security\ApiRateLimit;
@@ -86,10 +87,16 @@ class CardSearchController extends AbstractController
         }
 
         if (!$game->isMtg()) {
-            return $this->json(array_map(
-                $this->catalogCardResolver->serializeCard(...),
+            // The same filters the Magic path honors. Skipping them here meant
+            // a Pokemon workspace's set / rarity / finish pickers changed
+            // nothing at all — the results came back untouched.
+            $matches = array_filter(
                 $this->cardRepository->searchByNameForGame($game, $query, 40),
-            ));
+                fn (Card $card): bool => $this->catalogCardResolver
+                    ->matchesFilters($card, $setCode, $collectorNumber, $rarity, $finish),
+            );
+
+            return $this->json(array_map($this->catalogCardResolver->serializeCard(...), array_values($matches)));
         }
 
         /** @var array<string, \App\Entity\Card> $merged */

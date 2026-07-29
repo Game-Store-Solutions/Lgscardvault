@@ -3,7 +3,8 @@ import { formatScryfallPrice } from '../../../api/client'
 import type { CardSummary } from '../../../api/types'
 import { Button, Input } from '../../../components/ui'
 import { plainCardText } from '../../../lib/cardText'
-import { ConditionSegmented, FoilToggle, QuantityStepper, type Condition } from '../../../components/inventory'
+import { finishChoices } from '../../../lib/finishes'
+import { ConditionSegmented, FinishToggle, QuantityStepper, type Condition } from '../../../components/inventory'
 
 export interface SelectedCardEditorProps {
   card: CardSummary
@@ -38,8 +39,11 @@ export function SelectedCardEditor({
   onFinishChange,
   onAdd,
 }: SelectedCardEditorProps) {
-  const onlyFoil = card.finishes?.includes('foil') && !card.finishes?.includes('nonfoil')
-  const onlyNonfoil = card.finishes?.includes('nonfoil') && !card.finishes?.includes('foil')
+  // Finish labels come from the game's own catalog, so a Pokemon card offers
+  // "Normal / Holofoil" rather than Magic's "Nonfoil / Foil".
+  const finishes = finishChoices(card)
+  const onlyFoil = finishes.hasFoil && !finishes.hasPlain
+  const onlyNonfoil = finishes.hasPlain && !finishes.hasFoil
   // Mana cost is a Magic concept; showing it (empty) on a One Piece leader is
   // noise. Games outside Magic get the attributes they actually have.
   const isMagic = (card.gameCode ?? 'mtg') === 'mtg'
@@ -56,7 +60,7 @@ export function SelectedCardEditor({
           </p>
         </div>
         <p className="text-xs uppercase text-fg-muted">
-          {(card.finishes?.length ? card.finishes : ['nonfoil']).join(' / ')}
+          {(card.finishes?.length ? card.finishes : [finishes.plain]).join(' / ')}
         </p>
       </div>
 
@@ -81,11 +85,19 @@ export function SelectedCardEditor({
         </div>
         <div>
           <p className="mb-1.5 text-sm font-bold text-fg">Finish</p>
-          <FoilToggle
+          <FinishToggle
             value={isFoil}
             onChange={(v) => onFinishChange(v ? 'foil' : 'nonfoil')}
             disabled={Boolean(onlyFoil || onlyNonfoil)}
+            labels={{ plain: finishes.plain, foil: finishes.foil }}
           />
+          {finishes.extras.length > 0 && (
+            // Inventory stores one plain and one foil line per printing, so
+            // these treatments have no listing of their own yet.
+            <p className="mt-1 text-xs text-fg-muted">
+              Also printed as {finishes.extras.join(', ')} — stocked under {finishes.foil} for now.
+            </p>
+          )}
         </div>
         <div className="sm:col-span-2">
           <p className="mb-1.5 text-sm font-bold text-fg">Condition</p>

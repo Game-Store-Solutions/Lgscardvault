@@ -9,6 +9,7 @@ use App\Entity\SealedProduct;
 use App\Repository\CardRepository;
 use App\Repository\GameSetRepository;
 use App\Repository\SealedProductRepository;
+use App\Service\Catalog\FinishVocabulary;
 use App\Service\Doctrine\SqlDebugLogPruner;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -327,6 +328,15 @@ final readonly class CatalogSynchronizer
         }
         $card->setScryfallUri($this->stringValue($product, 'url'));
 
+        // The treatments this printing is actually published in, in the
+        // catalog's own words ("Holofoil", "Reverse Holofoil", "Rainbow
+        // Foil"). Magic's nonfoil/foil pair is one game's vocabulary, and
+        // the UI labels its finish picker from this.
+        $finishes = $this->finishNames($productPrices);
+        if ([] !== $finishes) {
+            $card->setFinishes($finishes);
+        }
+
         // Store prices Scryfall-shaped so every downstream consumer
         // (inventory pricing, buylist, market price resolver) just works.
         $usd = $this->priceForFinish($productPrices, foil: false);
@@ -485,12 +495,33 @@ final readonly class CatalogSynchronizer
         // Any subtype naming a foil treatment counts as foil; everything else
         // is the plain printing.
         foreach ($productPrices as $subType => $row) {
-            if (str_contains(strtolower($subType), 'foil') === $foil) {
+            if (FinishVocabulary::isFoil((string) $subType) === $foil) {
                 return $row;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The treatment names this printing is sold in, deduplicated and in the
+     * order the catalog publishes them.
+     *
+     * @param array<string, array<string, mixed>> $productPrices subTypeName => price row
+     *
+     * @return list<string>
+     */
+    private function finishNames(array $productPrices): array
+    {
+        $names = [];
+        foreach (array_keys($productPrices) as $subType) {
+            $name = trim((string) $subType);
+            if ('' !== $name) {
+                $names[] = mb_substr($name, 0, 40);
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     private function toCents(mixed $value): ?int

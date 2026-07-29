@@ -7,6 +7,7 @@ import { Card, CardBody, EmptyState, buttonVariants } from '../components/ui'
 import type { StoreSectionCard } from '../api/types'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
+import { finishName } from '../lib/finishes'
 
 /**
  * Storefront Case Cards page (/s/:slug/case-cards). Deliberately restrained:
@@ -169,7 +170,7 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
         <div className="mt-0.5 flex items-baseline justify-between gap-2">
           <span className="truncate text-xs uppercase tracking-wide text-fg-muted">
             {card.setCode?.toUpperCase() ?? '—'}
-            {inventoryItem.isFoil ? ' · Foil' : ''}
+            {inventoryItem.isFoil ? ` · ${finishName(inventoryItem.card, true)}` : ''}
           </span>
           <span className="text-sm font-bold text-fg">{formatPrice(inventoryItem.priceCents)}</span>
         </div>

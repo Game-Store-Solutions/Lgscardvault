@@ -96,6 +96,26 @@ final class CatalogPricingTest extends KernelTestCase
         );
     }
 
+    public function testTheTreatmentNamesTheCatalogPublishesAreRecorded(): void
+    {
+        // The UI labels its finish picker from these. Storing them is what
+        // lets a Pokemon card read "Normal / Holofoil" instead of Magic's
+        // "Nonfoil / Foil".
+        $this->sync('pokemon', 3, [[
+            'productId' => 710002,
+            'name' => 'Pikachu',
+            'extendedData' => [['name' => 'Number', 'value' => '173']],
+        ]], [
+            ['productId' => 710002, 'subTypeName' => 'Normal', 'marketPrice' => 1.25],
+            ['productId' => 710002, 'subTypeName' => 'Reverse Holofoil', 'marketPrice' => 4.0],
+        ]);
+
+        $card = static::getContainer()->get(CardRepository::class)
+            ->find(CatalogSynchronizer::cardIdForProduct(710002));
+
+        self::assertSame(['Normal', 'Reverse Holofoil'], $card?->getFinishes());
+    }
+
     public function testFleshAndBloodSpecialtyFoilsArePriced(): void
     {
         $this->sync('fab', 62, [[

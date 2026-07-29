@@ -17,6 +17,7 @@ import {
   Pagination,
 } from '../../components/ui'
 import { type Condition } from '../../components/inventory'
+import { finishChoices } from '../../lib/finishes'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -77,13 +78,16 @@ export default function SearchTab({ slug }: { slug: string }) {
   function selectCatalogCard(card: CardSummary) {
     setSelectedCard(card)
     let nextIsFoil = isFoil
+    // Which treatments exist is per game — "Holofoil only" is as much a
+    // one-sided printing as Magic's foil-only promos.
+    const published = finishChoices(card)
     if (catalogFinishFilter === 'foil') {
       nextIsFoil = true
     } else if (catalogFinishFilter === 'nonfoil') {
       nextIsFoil = false
-    } else if (card.finishes?.includes('foil') && !card.finishes.includes('nonfoil')) {
+    } else if (published.hasFoil && !published.hasPlain) {
       nextIsFoil = true
-    } else if (card.finishes?.includes('nonfoil') && !card.finishes.includes('foil')) {
+    } else if (published.hasPlain && !published.hasFoil) {
       nextIsFoil = false
     }
     setIsFoil(nextIsFoil)
@@ -172,6 +176,9 @@ export default function SearchTab({ slug }: { slug: string }) {
   )
   const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, gameFilter)
   const activeGameName = gameOptions.find((game) => game.code === gameFilter)?.name ?? 'this game'
+  // The finish filter is worded in the managed game's own terms, so a Pokemon
+  // workspace offers "Holofoil only" rather than Magic's "Foil only".
+  const gameFinishes = finishChoices(null, gameFilter)
 
   // Always manage exactly one game — a mixed table is how a One Piece card
   // hides among thousands of Magic rows.
@@ -262,8 +269,8 @@ export default function SearchTab({ slug }: { slug: string }) {
                   onChange={(e) => setCatalogFinishFilter(e.target.value as 'all' | 'foil' | 'nonfoil')}
                 >
                   <option value="all">All finishes</option>
-                  <option value="nonfoil">Nonfoil only</option>
-                  <option value="foil">Foil only</option>
+                  <option value="nonfoil">{gameFinishes.plain} only</option>
+                  <option value="foil">{gameFinishes.foil} only</option>
                 </Select>
               )}
             </Field>

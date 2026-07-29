@@ -30,6 +30,7 @@ import { Badge, Button, buttonVariants, ErrorState } from '../components/ui'
 import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../lib/mtg'
+import { finishName } from '../lib/finishes'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { CardText, ManaCost } from '../components/mtg/ManaSymbol'
 import { plainCardText } from '../lib/cardText'
@@ -218,8 +219,8 @@ export default function CardDetailsPage() {
 
   const priceRows = (
     [
-      { label: 'Nonfoil', value: formatScryfallPrice(card, 'nonfoil') },
-      { label: 'Foil', value: formatScryfallPrice(card, 'foil') },
+      { label: finishName(card, false), value: formatScryfallPrice(card, 'nonfoil') },
+      { label: finishName(card, true), value: formatScryfallPrice(card, 'foil') },
       { label: 'Etched', value: formatScryfallPrice(card, 'etched') },
     ] as { label: string; value: string }[]
   ).filter((row, index) => index === 0 || row.value !== '-')
@@ -323,7 +324,7 @@ export default function CardDetailsPage() {
           <div className="rounded-card border border-border bg-surface p-5 shadow-card">
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Store price</p>
-              <Badge tone={item.isFoil ? 'brand' : 'neutral'}>{item.isFoil ? 'Foil' : 'Nonfoil'}</Badge>
+              <Badge tone={item.isFoil ? 'brand' : 'neutral'}>{finishName(item.card, item.isFoil)}</Badge>
             </div>
             <p className="mt-1 font-display text-4xl font-bold text-fg">{formatPrice(item.priceCents)}</p>
             <p className="mt-1 text-sm font-bold text-fg">

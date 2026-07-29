@@ -24,6 +24,7 @@ import { customerKeys } from '../hooks/useCustomer'
 import { Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
 import { CardImage, SpotlightCard } from '../components/cards'
 import { cx } from '../lib/cx'
+import { finishName } from '../lib/finishes'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
@@ -769,10 +770,10 @@ function CartLine({
                   style={{ backgroundImage: FOIL_GRADIENT }}
                 >
                   <Sparkles aria-hidden className="size-3" />
-                  Foil
+                  {finishName(item.card, true)}
                 </span>
               ) : (
-                <Badge tone="neutral">Nonfoil</Badge>
+                <Badge tone="neutral">{finishName(item.card, false)}</Badge>
               )}
               {item.quantity <= 3 && <Badge tone="warning">Low stock</Badge>}
             </div>

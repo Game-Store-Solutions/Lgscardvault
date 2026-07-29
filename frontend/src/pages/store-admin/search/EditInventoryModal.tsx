@@ -5,8 +5,9 @@ import api, { cardImage, formatPrice, formatScryfallPrice, parsePriceInput, scry
 import type { CardSummary, InventoryItem } from '../../../api/types'
 import { Badge, Button, Input, Modal } from '../../../components/ui'
 import { InteractiveCard } from '../../../components/cards'
-import { CONDITION_LABELS, ConditionSegmented, FoilToggle, QuantityStepper, type Condition } from '../../../components/inventory'
+import { CONDITION_LABELS, ConditionSegmented, FinishToggle, QuantityStepper, type Condition } from '../../../components/inventory'
 import { rarityAccent } from '../../../lib/mtg'
+import { finishChoices } from '../../../lib/finishes'
 
 /** Payload emitted when saving an inventory edit (shared with the update mutation). */
 export interface InventoryEditPayload {
@@ -53,6 +54,9 @@ function EditInventoryModalBody({
   const [editIsFoil, setEditIsFoil] = useState(item.isFoil)
   const [variantSearchActive, setVariantSearchActive] = useState(false)
 
+  // The printing's own treatments name the toggle: "Normal / Holofoil" on a
+  // Pokemon card, "Nonfoil / Foil" on a Magic one.
+  const finishes = finishChoices(editSelectedCard)
   const marketCents = scryfallPriceCents(editSelectedCard, editIsFoil ? 'foil' : 'nonfoil')
   const priceCents = parsePriceInput(editPriceText)
   const priceInvalid = priceCents === null
@@ -71,7 +75,9 @@ function EditInventoryModalBody({
     queryKey: ['card-variants', slug, item.card.id, item.card.name],
     queryFn: async () => {
       const { data } = await api.get<CardSummary[]>('/catalog/search', {
-        params: { q: item.card.name },
+        // Other printings of this card mean other printings in ITS game —
+        // an unscoped search would answer with Magic for every game.
+        params: { q: item.card.name, game: item.card.gameCode ?? 'mtg' },
       })
       return data.filter((card) => card.id !== item.card.id).slice(0, 12)
     },
@@ -80,9 +86,12 @@ function EditInventoryModalBody({
 
   function selectVariant(card: CardSummary) {
     setEditSelectedCard(card)
-    const cardHasFoil = card.finishes?.includes('foil') ?? false
-    const cardHasNonfoil = card.finishes?.includes('nonfoil') ?? false
-    const nextIsFoil = cardHasFoil && !cardHasNonfoil ? true : cardHasNonfoil && !cardHasFoil ? false : editIsFoil
+    const variantFinishes = finishChoices(card)
+    const nextIsFoil = variantFinishes.hasFoil && !variantFinishes.hasPlain
+      ? true
+      : variantFinishes.hasPlain && !variantFinishes.hasFoil
+        ? false
+        : editIsFoil
     setEditIsFoil(nextIsFoil)
     setEditPriceText(formatPrice(scryfallPriceCents(card, nextIsFoil ? 'foil' : 'nonfoil') ?? 0))
   }
@@ -161,7 +170,11 @@ function EditInventoryModalBody({
 
             <div>
               <p className="mb-1.5 text-sm font-bold text-fg">Finish</p>
-              <FoilToggle value={editIsFoil} onChange={setEditIsFoil} />
+              <FinishToggle
+                value={editIsFoil}
+                onChange={setEditIsFoil}
+                labels={{ plain: finishes.plain, foil: finishes.foil }}
+              />
             </div>
 
             <div>
@@ -205,7 +218,7 @@ function EditInventoryModalBody({
               <div className="flex gap-2 rounded-card border border-warning-500/40 bg-warning-50 p-3 text-sm text-warning-700">
                 <AlertTriangle aria-hidden className="mt-0.5 size-4 flex-shrink-0" />
                 <p>
-                  A listing for this printing ({editCondition}, {editIsFoil ? 'Foil' : 'Nonfoil'}) already exists with{' '}
+                  A listing for this printing ({editCondition}, {editIsFoil ? finishes.foil : finishes.plain}) already exists with{' '}
                   <span className="font-bold">{mergeTarget.quantity}</span> in stock. Saving will <span className="font-bold">merge</span>{' '}
                   them into one listing of <span className="font-bold">{mergeTarget.quantity + editQuantity}</span>.
                 </p>
@@ -234,8 +247,9 @@ function EditInventoryModalBody({
                     <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                       {variantResults.map((card) => {
                         const selectedVariant = editSelectedCard.id === card.id
+                        const variantChoices = finishChoices(card)
                         const previewFinish =
-                          card.finishes?.includes('foil') && !card.finishes.includes('nonfoil') ? 'foil' : 'nonfoil'
+                          variantChoices.hasFoil && !variantChoices.hasPlain ? 'foil' : 'nonfoil'
                         return (
                           <button
                             key={card.id}
