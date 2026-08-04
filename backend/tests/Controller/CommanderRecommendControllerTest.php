@@ -99,10 +99,10 @@ final class CommanderRecommendControllerTest extends WebTestCase
         self::assertArrayHasKey('id', $buddy['inventoryItem'], 'inventory id is required for cart PUT');
     }
 
-    public function testCommanderSearchFindsLegendaries(): void
+    public function testCommanderSearchUsesCommandersCatalogNotInventory(): void
     {
         $store = $this->fixtures->store('cmd-search-store');
-        $this->fixtures->card(710, [
+        $krenko = $this->fixtures->card(710, [
             'name' => 'Krenko Searchable',
             'type_line' => 'Legendary Creature — Goblin',
             'color_identity' => ['R'],
@@ -113,6 +113,10 @@ final class CommanderRecommendControllerTest extends WebTestCase
             'type_line' => 'Creature — Goblin',
             'color_identity' => ['R'],
         ]);
+        // Not in inventory — must still be searchable via commanders table.
+        $commander = new \App\Entity\Commander($krenko->getOracleId(), $krenko);
+        $commander->syncFromCard($krenko);
+        $this->em->persist($commander);
         $this->em->flush();
 
         $this->client->request('GET', '/api/stores/'.$store->getSlug().'/recommend/commanders?q=Krenko');
@@ -121,6 +125,7 @@ final class CommanderRecommendControllerTest extends WebTestCase
         $names = array_column($payload, 'name');
         self::assertContains('Krenko Searchable', $names);
         self::assertNotContains('Not A Commander', $names);
+        self::assertSame((string) $krenko->getId(), $payload[0]['id']);
     }
 
     public function testBulkCartAcceptsRecommendedInventoryIds(): void

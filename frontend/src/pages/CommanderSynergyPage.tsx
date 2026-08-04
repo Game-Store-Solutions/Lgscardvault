@@ -138,7 +138,9 @@ export default function CommanderSynergyPage() {
             Deck Builder
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-            Pick a commander. We rank cards already in this store&apos;s inventory that share its
+            Search any commander-legal card (kept locally from Scryfall&apos;s weekly
+            <span className="font-mono"> is:commander </span>
+            sync). We rank cards already in this store&apos;s inventory that share its
             strategy — then you can buy them one at a time or add your picks to cart en masse.
           </p>
         </div>
@@ -239,7 +241,7 @@ export default function CommanderSynergyPage() {
             <EmptyState
               icon={Sparkles}
               title="Choose a commander"
-              description="Search the catalog for a legendary creature. We'll score this store's in-stock cards that fit its color identity and themes."
+              description="Search the local commanders catalog (every Scryfall-legal commander). We'll score this store's in-stock cards that fit its color identity and themes."
             />
           ) : recommend.isLoading ? (
             <p className="text-sm text-fg-muted">Scoring in-stock synergies…</p>
