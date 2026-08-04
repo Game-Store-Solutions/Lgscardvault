@@ -21,6 +21,17 @@ export {
 } from './useCustomer'
 export { useCart } from './useCart'
 export {
+  useCommanderSearch,
+  useCommanderRecommendations,
+  commanderSearchKey,
+  commanderRecommendKey,
+} from './useCommanderRecommend'
+export type {
+  CommanderSummary,
+  CommanderRecommendation,
+  CommanderRecommendResponse,
+} from './useCommanderRecommend'
+export {
   useCatalogGames,
   useStoreGames,
   useStoreGameStats,
