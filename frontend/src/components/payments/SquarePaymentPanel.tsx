@@ -3,6 +3,7 @@ import type { ApplePay, Card, GooglePay, TokenResult } from '@square/web-sdk'
 import { CreditCard, Loader2 } from 'lucide-react'
 import type { PaymentMethodType } from '../../api/types'
 import { Button } from '../ui'
+import { isDevBuild } from '../../lib/runtimeEnv'
 import { useSquarePayments } from './useSquarePayments'
 
 export type TokenizedPayment = {
@@ -188,8 +189,14 @@ export function SquarePaymentPanel({
     <div className="space-y-4">
       {environment === 'sandbox' && (
         <p className="rounded-btn bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
-          Square sandbox — test card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry, CVV{' '}
-          <span className="font-mono">111</span>, postal code <span className="font-mono">94103</span>.
+          {isDevBuild ? (
+            <>
+              Test mode — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry, CVV{' '}
+              <span className="font-mono">111</span>, postal <span className="font-mono">94103</span>.
+            </>
+          ) : (
+            <>Test mode — cards are not charged. Use Square sandbox test card numbers.</>
+          )}
         </p>
       )}
 

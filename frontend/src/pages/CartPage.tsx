@@ -28,7 +28,9 @@ import { finishName } from '../lib/finishes'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
-const TEST_CHECKOUT_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_CHECKOUT === 'true'
+import { showDevCheckoutTools } from '../lib/runtimeEnv'
+
+const TEST_CHECKOUT_ENABLED = showDevCheckoutTools
 
 function lineUnitCents(entry: CartItem): number {
   return entry.sealedItem?.priceCents ?? entry.inventoryItem?.priceCents ?? 0
@@ -65,6 +67,16 @@ export default function CartPage() {
     },
   })
   const creditBalanceCents = creditQuery.data?.balanceCents ?? 0
+
+  const checkoutConfigQuery = useQuery({
+    queryKey: ['store-checkout-config', slug],
+    enabled: Boolean(slug && user && !kioskMode),
+    queryFn: async () => {
+      const { data } = await api.get<{ enabled: boolean }>(`/stores/${slug}/customer/checkout/config`)
+      return data
+    },
+  })
+  const squareCheckoutEnabled = checkoutConfigQuery.data?.enabled === true
 
   /** Shared by the paid and simulated paths: both empty the cart and move stock. */
   const handleOrderPlaced = useCallback(
@@ -234,7 +246,7 @@ export default function CartPage() {
             kioskCustomerName={kioskCustomerName}
             onKioskCustomerNameChange={setKioskCustomerName}
             buyerEmail={user?.email ?? ''}
-            testCheckoutEnabled={TEST_CHECKOUT_ENABLED}
+            testCheckoutEnabled={TEST_CHECKOUT_ENABLED && !squareCheckoutEnabled}
             testOrderPending={testOrder.isPending}
             testOrderError={testOrder.error}
             createdOrder={createdOrder}
@@ -321,10 +333,10 @@ function CartHeader({
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-600">Secure checkout preview</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-600">Secure checkout</p>
             <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-fg sm:text-5xl">Your cart</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-muted sm:text-base">
-              Review quantities, verify printings, and keep browsing {storeName} before checkout opens.
+              Review your items before you pay.
             </p>
           </div>
 
@@ -550,7 +562,7 @@ function OrderSummary({
             Create test order (no charge)
           </Button>
           <p className="rounded-btn border border-warning-500/30 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700">
-            Local testing only. Places a pending order without charging a card.
+            Developer shortcut — places an order without charging a card.
           </p>
         </div>
       )}

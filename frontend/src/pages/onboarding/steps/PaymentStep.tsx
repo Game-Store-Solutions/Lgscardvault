@@ -4,6 +4,7 @@ import api, { extractErrorMessage, formatPrice } from '../../../api/client'
 import type { PaymentClientConfig, Plan } from '../../../api/types'
 import { Button } from '../../../components/ui'
 import { SquarePaymentPanel } from '../../../components/payments/SquarePaymentPanel'
+import { isDevBuild } from '../../../lib/runtimeEnv'
 import { METHOD_LABELS } from '../config'
 import type { OnboardingPayment, PatchPayment } from '../types'
 
@@ -88,10 +89,10 @@ export function PaymentStep({
           confirmLabel="Verify payment method"
           onTokenized={patchPayment}
         />
-      ) : (
+      ) : isDevBuild ? (
         <div className="space-y-3">
           <p className="rounded-btn bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
-            Mock mode — no real charge is made. Add Square credentials to take live payments.
+            Dev only — Square is not configured; no real charge is made.
           </p>
           <Button
             variant="secondary"
@@ -107,6 +108,10 @@ export function PaymentStep({
             Use a simulated card
           </Button>
         </div>
+      ) : (
+        <p className="rounded-btn border border-border bg-bg px-3 py-2 text-sm text-fg-muted">
+          Payment verification is unavailable right now. Please try again later or contact support.
+        </p>
       )}
 
       {payment.methodType && payment.token && (

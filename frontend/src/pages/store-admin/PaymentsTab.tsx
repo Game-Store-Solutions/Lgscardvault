@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { CheckCircle2, CreditCard, ExternalLink, RefreshCw, Square, Unplug } from 'lucide-react'
 import api, { extractErrorMessage, formatPrice } from '../../api/client'
 import type { SquareConnectResponse, StorePaymentStatus, StoreSubscriptionStatus } from '../../api/types'
 import { Badge, Button, Card, CardBody, CardHeader, ErrorState, LoadingPanel } from '../../components/ui'
 import { SquarePaymentPanel, type TokenizedPayment } from '../../components/payments/SquarePaymentPanel'
+import { isDevBuild } from '../../lib/runtimeEnv'
 import { METHOD_LABELS } from '../onboarding/config'
 import { useAuth } from '../../context/AuthContext'
 
@@ -13,6 +16,10 @@ const subscriptionKey = (slug: string) => ['store-subscription', slug] as const
 export default function PaymentsTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [oauthReturnMessage, setOauthReturnMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(
+    null,
+  )
   const {
     data,
     isLoading,
@@ -34,13 +41,40 @@ export default function PaymentsTab({ slug }: { slug: string }) {
     },
   })
 
+  const [squareConnect, setSquareConnect] = useState<SquareConnectResponse | null>(null)
+
+  useEffect(() => {
+    const square = searchParams.get('square')
+    if (!square) {
+      return
+    }
+
+    const next = new URLSearchParams(searchParams)
+    next.delete('square')
+    setSearchParams(next, { replace: true })
+
+    if (square === 'connected') {
+      setOauthReturnMessage({ tone: 'success', text: 'Square connected. Refreshing status…' })
+      void queryClient.invalidateQueries({ queryKey: paymentKey(slug) })
+      void refetch()
+    } else if (square === 'error') {
+      setOauthReturnMessage({
+        tone: 'danger',
+        text: isDevBuild
+          ? 'Square authorization did not finish. Keep the sandbox dashboard open, then try Connect Square again.'
+          : 'Square authorization did not finish. Try Connect Square again, or contact support if it keeps failing.',
+      })
+    }
+  }, [queryClient, refetch, searchParams, setSearchParams, slug])
+
   const connectMutation = useMutation({
     mutationFn: async () => {
       const { data } = await api.post<SquareConnectResponse>(`/stores/${slug}/payments/square/connect`)
       return data
     },
     onSuccess: (result) => {
-      window.location.assign(result.authorizationUrl)
+      setSquareConnect(result)
+      window.open(result.authorizationUrl, '_blank', 'noopener,noreferrer')
     },
   })
 
@@ -149,7 +183,9 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                 />
                 <PaymentFact label="Next bill" value={formatDate(sub.currentPeriodEnd)} />
                 <PaymentFact label="Last charged" value={formatDate(sub.lastChargedAt)} />
-                <PaymentFact label="Billing mode" value={`${sub.mode} (${sub.environment})`} wide />
+                {isDevBuild && (
+                  <PaymentFact label="Billing mode" value={`${sub.mode} (${sub.environment})`} wide />
+                )}
               </dl>
 
               {sub.mode === 'square' ? (
@@ -166,7 +202,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                   confirmLabel="Save new payment method"
                   onTokenized={(p) => updatePaymentMutation.mutate(p)}
                 />
-              ) : (
+              ) : isDevBuild ? (
                 <Button
                   variant="secondary"
                   loading={updatePaymentMutation.isPending}
@@ -180,8 +216,12 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                   }
                 >
                   <CreditCard aria-hidden className="size-4" />
-                  Simulate card update (mock mode)
+                  Simulate card update (dev only)
                 </Button>
+              ) : (
+                <p className="text-sm text-fg-muted">
+                  Platform billing is not configured yet. Contact support to update your subscription payment method.
+                </p>
               )}
 
               {updatePaymentMutation.isSuccess && (
@@ -207,6 +247,14 @@ export default function PaymentsTab({ slug }: { slug: string }) {
           }
         />
         <CardBody>
+          {oauthReturnMessage && (
+            <p
+              role="status"
+              className={`mb-4 text-sm font-medium ${oauthReturnMessage.tone === 'success' ? 'text-success-700' : 'text-danger-700'}`}
+            >
+              {oauthReturnMessage.text}
+            </p>
+          )}
           <div className="rounded-card border border-border bg-bg p-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex gap-4">
@@ -219,11 +267,64 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                     <Badge tone={connected ? 'success' : square?.status === 'error' ? 'danger' : 'neutral'}>
                       {connected ? 'Connected' : square?.status === 'error' ? 'Needs attention' : 'Not connected'}
                     </Badge>
-                    {square?.environment && <Badge tone="neutral">{square.environment}</Badge>}
+                    {square?.environment && (
+                      <Badge tone="neutral">
+                        {square.environment === 'sandbox' && !isDevBuild ? 'Test mode' : square.environment}
+                      </Badge>
+                    )}
                   </div>
                   <p className="mt-1 max-w-2xl text-sm leading-6 text-fg-muted">
                     Let this store authorize Square so checkout can charge through the store owner&apos;s Square seller account.
                   </p>
+
+                  {!connected && isDevBuild && (
+                    <div className="mt-3 max-w-2xl rounded-btn border border-border bg-surface px-3 py-3 text-sm leading-6 text-fg-muted">
+                      <p className="font-medium text-fg">Square sandbox (developers)</p>
+                      <ol className="mt-2 list-decimal space-y-1 pl-5">
+                        <li>
+                          In the{' '}
+                          <a
+                            href="https://developer.squareup.com/apps"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                          >
+                            Square Developer Console
+                          </a>
+                          , open this app with <span className="font-medium text-fg">Sandbox</span> selected.
+                        </li>
+                        <li>
+                          Go to <span className="font-medium text-fg">Sandbox test accounts</span> and open{' '}
+                          <span className="font-medium text-fg">Square Dashboard</span> for a test seller. Leave that tab open.
+                        </li>
+                        <li>
+                          Click <span className="font-medium text-fg">Connect Square</span> and approve access in the new tab.
+                        </li>
+                      </ol>
+                    </div>
+                  )}
+
+                  {!connected && !isDevBuild && (
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-muted">
+                      You will sign in with Square and approve access so this store can accept card payments at checkout.
+                    </p>
+                  )}
+
+                  {squareConnect && !connected && (
+                    <p className="mt-3 text-sm leading-6 text-fg-muted">
+                      Finish authorization in the Square tab
+                      {squareConnect.environment === 'sandbox' ? ' (test mode)' : ''}. If it did not open,{' '}
+                      <a
+                        href={squareConnect.authorizationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                      >
+                        continue to Square
+                      </a>
+                      , then return here and click Refresh.
+                    </p>
+                  )}
 
                   {connected && (
                     <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">

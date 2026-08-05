@@ -114,6 +114,8 @@ Wallet caveats: Apple Pay needs a registered domain (Square dashboard → **Appl
 
 Once a store connects Square under **Store admin → Payments**, its cart shows a real payment form and `POST /api/stores/{slug}/customer/checkout` charges the shopper through that store's account. The platform never touches the funds.
 
+**Connecting a store in sandbox:** register redirect URL `http://127.0.0.1:8000/api/integrations/square/callback` on the app's **OAuth** page (Sandbox toggle). Before **Connect Square**, open **Sandbox test accounts → Open / Square Dashboard** for a test seller and leave that tab open — sandbox OAuth does not use a normal login screen; without an open sandbox dashboard the authorize page errors or stays blank. Production OAuth behaves like a normal seller sign-in.
+
 The order is reserved and committed *before* the card is charged, then settled:
 
 1. Build the order, consume stock, spend store credit — committed as one transaction.

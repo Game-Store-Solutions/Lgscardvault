@@ -46,13 +46,28 @@ export function CheckoutPanel({
   })
 
   const config = configQuery.data
+  const loadingConfig = configQuery.isLoading
+
+  if (loadingConfig) {
+    return (
+      <Button className="mt-5 w-full" size="lg" disabled>
+        <PackageCheck aria-hidden className="size-4" />
+        Loading checkout…
+      </Button>
+    )
+  }
 
   if (!config?.enabled) {
     return (
-      <Button className="mt-5 w-full" size="lg" disabled title="This store has not enabled online payments">
-        <Lock aria-hidden className="size-4" />
-        Checkout
-      </Button>
+      <div className="mt-5 space-y-2">
+        <Button className="w-full" size="lg" disabled title="This store has not enabled online payments">
+          <Lock aria-hidden className="size-4" />
+          Pay with card
+        </Button>
+        <p className="rounded-btn border border-border bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">
+          Online card checkout is not available for this store yet.
+        </p>
+      </div>
     )
   }
 

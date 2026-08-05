@@ -680,7 +680,7 @@ final class StoreCustomerController extends AbstractController
     #[Route('/checkout/config', name: 'api_store_customer_checkout_config', methods: ['GET'])]
     public function checkoutConfig(string $slug): JsonResponse
     {
-        $store = $this->resolveStore($slug);
+        $store = $this->storeRepository->findOneBySlug($slug);
         if (!$store instanceof Store) {
             return $this->json(['detail' => 'Store not found.'], 404);
         }

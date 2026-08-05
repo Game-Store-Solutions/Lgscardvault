@@ -38,6 +38,7 @@ import api, { extractErrorMessage, unwrapCollection } from '../api/client'
 import type { AdminIntegrations, AdminUser, IntegrationStatus, ScryfallSyncResult, Store } from '../api/types'
 import { StoreApplicationModal } from './platform-admin/StoreApplicationModal'
 import { BillingPanel } from './platform-admin/BillingPanel'
+import { isDevBuild } from '../lib/runtimeEnv'
 
 export default function PlatformAdminPage() {
   const queryClient = useQueryClient()
@@ -228,7 +229,11 @@ export default function PlatformAdminPage() {
       <Card>
         <CardHeader
           title="Integrations"
-          subtitle="Open each provider console to create credentials, then add them in backend/.env.local and restart the API."
+          subtitle={
+            isDevBuild
+              ? 'Open each provider console to create credentials, then add them in backend/.env.local and restart the API.'
+              : 'Provider connection status for this environment. Configure secrets in your deployment env file.'
+          }
           actions={
             <Button variant="secondary" size="sm" onClick={() => void integrationsQuery.refetch()}>
               <RefreshCw aria-hidden className="size-4" />
