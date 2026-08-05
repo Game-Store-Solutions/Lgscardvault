@@ -14,6 +14,7 @@ erDiagram
     stores ||--o{ orders : "receives"
     stores ||--o{ csv_import_jobs : "runs"
     stores ||--o{ store_payment_accounts : "connects"
+    stores ||--o{ subscription_charges : "billed as"
     stores ||--o{ customer_notifications : "sends"
     cards ||--o{ inventory_items : "listed as"
     cards ||--o{ order_lines : "sold as"
@@ -55,6 +56,26 @@ erDiagram
         text hero_subheading
         string tagline
         string card_display_style
+        string plan_key
+        string subscription_status
+        timestamp current_period_end
+        timestamp last_charged_at
+        int billing_attempts
+        timestamp next_attempt_at
+        string payment_customer_id
+        string payment_card_id
+        string payment_last4
+        timestamp created_at
+    }
+    subscription_charges {
+        int id PK
+        int store_id FK
+        string plan_key
+        int amount_cents
+        string status
+        string reference
+        text failure_reason
+        int attempt
         timestamp created_at
     }
     cards {
@@ -87,6 +108,9 @@ erDiagram
         string customer_name
         string customer_email
         int total_cents
+        int credit_applied_cents
+        int paid_cents
+        string payment_reference
         timestamp created_at
     }
     order_lines {
@@ -201,7 +225,7 @@ The tenant discriminator is `store_id`.
 | Group | Tables | How they are scoped |
 |-------|--------|---------------------|
 | Tenant root | `stores` | Resolved from the URL slug |
-| Directly scoped | `inventory_items`, `orders`, `csv_import_jobs`, `store_customers`, `store_payment_accounts`, `customer_notifications` | Have a `store_id` column. `inventory_items` and `orders` are additionally enforced by `TenantFilter` at the SQL level |
+| Directly scoped | `inventory_items`, `orders`, `csv_import_jobs`, `store_customers`, `store_payment_accounts`, `subscription_charges`, `customer_notifications` | Have a `store_id` column. `inventory_items` and `orders` are additionally enforced by `TenantFilter` at the SQL level |
 | Transitively scoped | `order_lines`, `csv_import_rows`, `cart_items`, `customer_favorites`, `customer_want_list_entries` | Reached through a directly scoped parent |
 | Global/shared | `users`, `cards` | `users` are global identities; `cards` is the shared catalog |
 
@@ -214,8 +238,10 @@ See [auth-and-tenancy.md](auth-and-tenancy.md#multi-tenancy-filter) for request-
 | `CardCondition` | `inventory_items.condition` | `NM`, `LP`, `MP`, `HP`, `DMG` |
 | `OrderStatus` | `orders.status` | `pending`, `received`, `fulfilled`, `paid`, `shipped`, `completed`, `cancelled`, `refunded` |
 | Card display style | `stores.card_display_style` | `gallery`, `marketplace` |
-| Payment provider | `store_payment_accounts.provider` | `square` today; PayPal can be added later |
+| Payment provider | `store_payment_accounts.provider` | `square` today |
 | Payment status | `store_payment_accounts.status` | `connected`, `disconnected`, `error` |
+| Subscription status | `stores.subscription_status` | `inactive`, `payment_required`, `active`, `past_due`, `suspended` |
+| Subscription charge | `subscription_charges.status` | `paid`, `failed` |
 | Notification type | `customer_notifications.type` | `order_fulfilled` today |
 
 ## Key constraints
@@ -241,3 +267,5 @@ See [auth-and-tenancy.md](auth-and-tenancy.md#multi-tenancy-filter) for request-
 - Store customer payment fields are metadata only: card brand, last4, and expiry. Full card numbers are not stored.
 - `store_payment_accounts.access_token_encrypted` and `refresh_token_encrypted` hold provider tokens after encryption by `SecretCipher`.
 - Payment status serialization intentionally excludes provider tokens.
+- Platform subscription vault ids (`payment_customer_id`, `payment_card_id`) live on `stores` and are never returned by the API; only `payment_last4` and status are exposed to store owners / platform admins.
+- `subscription_charges` is the month-over-month ledger for platform billing; `stores.current_period_end` is the current-state pointer the renewer uses.

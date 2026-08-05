@@ -7,7 +7,7 @@ import {
   Palette as PaletteIcon,
   UserPlus,
 } from 'lucide-react'
-import type { OnboardingPaymentMethod } from '../../api/types'
+import type { PaymentMethodType } from '../../api/types'
 
 /** The ordered wizard steps. Order here drives the stepper and navigation. */
 export const STEPS = [
@@ -37,11 +37,10 @@ export const STEP_SUBTITLE: Record<StepKey, string> = {
   review: 'Review everything, then submit for platform review.',
 }
 
-export const METHOD_LABELS: Record<OnboardingPaymentMethod, string> = {
-  paypal: 'PayPal',
+export const METHOD_LABELS: Record<PaymentMethodType, string> = {
+  card: 'Credit / debit card',
   apple_pay: 'Apple Pay',
   google_pay: 'Google Pay',
-  card: 'Credit / debit card',
 }
 
 export const SLUG_RE = /^[a-z0-9-]+$/

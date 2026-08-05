@@ -38,6 +38,11 @@ security:
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/sso, roles: PUBLIC_ACCESS }
+        # Square calls these server-to-server with no session. The OAuth callback
+        # is guarded by its signed state parameter and the webhook by its HMAC
+        # signature, so neither relies on the firewall for authentication.
+        - { path: ^/api/integrations/square/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/integrations/square/webhook, roles: PUBLIC_ACCESS }
         - { path: ^/api/stores, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/catalog, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/admin, roles: ROLE_SUPER_ADMIN }

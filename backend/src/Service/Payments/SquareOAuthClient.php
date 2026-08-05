@@ -14,8 +14,10 @@ final readonly class SquareOAuthClient
         'PAYMENTS_WRITE',
     ];
 
-    public function __construct(private HttpClientInterface $httpClient)
-    {
+    public function __construct(
+        private HttpClientInterface $httpClient,
+        private SquareCredentials $credentials,
+    ) {
     }
 
     public function isConfigured(): bool
@@ -25,9 +27,7 @@ final readonly class SquareOAuthClient
 
     public function environment(): string
     {
-        $environment = strtolower((string) ($_ENV['SQUARE_ENVIRONMENT'] ?? $_SERVER['SQUARE_ENVIRONMENT'] ?? 'sandbox'));
-
-        return 'production' === $environment ? 'production' : 'sandbox';
+        return $this->credentials->environment();
     }
 
     /** @return list<string> */
@@ -98,6 +98,75 @@ final readonly class SquareOAuthClient
         ];
     }
 
+    /**
+     * Square OAuth access tokens expire (30 days), so a store that connected
+     * once would silently stop taking payments without this.
+     *
+     * @return array{
+     *   accessToken: string,
+     *   refreshToken: string|null,
+     *   merchantId: string|null,
+     *   expiresAt: \DateTimeImmutable|null
+     * }
+     */
+    public function refreshToken(string $refreshToken): array
+    {
+        $response = $this->httpClient->request('POST', $this->oauthBaseUrl().'/token', [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ],
+            'json' => [
+                'client_id' => $this->applicationId(),
+                'client_secret' => $this->applicationSecret(),
+                'refresh_token' => $refreshToken,
+                'grant_type' => 'refresh_token',
+            ],
+        ]);
+
+        $data = $response->toArray(false);
+        if ($response->getStatusCode() >= 400) {
+            throw new \RuntimeException($this->errorMessage($data, 'Square rejected the refresh token.'));
+        }
+
+        return [
+            'accessToken' => (string) ($data['access_token'] ?? ''),
+            // Square may rotate the refresh token; keep the old one if it doesn't.
+            'refreshToken' => isset($data['refresh_token']) ? (string) $data['refresh_token'] : null,
+            'merchantId' => isset($data['merchant_id']) ? (string) $data['merchant_id'] : null,
+            'expiresAt' => isset($data['expires_at']) ? new \DateTimeImmutable((string) $data['expires_at']) : null,
+        ];
+    }
+
+    /**
+     * The first active location for a connected merchant. Both the Web Payments
+     * SDK and CreatePayment need a location id, and OAuth never returns one.
+     */
+    public function primaryLocationId(string $accessToken): ?string
+    {
+        $response = $this->httpClient->request('GET', $this->apiBaseUrl().'/v2/locations', [
+            'headers' => [
+                'Authorization' => 'Bearer '.$accessToken,
+                'Square-Version' => $this->credentials->apiVersion(),
+                'Accept' => 'application/json',
+            ],
+        ]);
+
+        $data = $response->toArray(false);
+        if ($response->getStatusCode() >= 400) {
+            throw new \RuntimeException($this->errorMessage($data, 'Could not read Square locations.'));
+        }
+
+        $locations = is_array($data['locations'] ?? null) ? $data['locations'] : [];
+        foreach ($locations as $location) {
+            if (is_array($location) && 'ACTIVE' === ($location['status'] ?? null) && isset($location['id'])) {
+                return (string) $location['id'];
+            }
+        }
+
+        return null;
+    }
+
     public function revoke(string $accessToken): void
     {
         if ('' === $accessToken) {
@@ -124,19 +193,22 @@ final readonly class SquareOAuthClient
 
     private function oauthBaseUrl(): string
     {
-        return 'production' === $this->environment()
-            ? 'https://connect.squareup.com/oauth2'
-            : 'https://connect.squareupsandbox.com/oauth2';
+        return $this->apiBaseUrl().'/oauth2';
+    }
+
+    private function apiBaseUrl(): string
+    {
+        return $this->credentials->apiBaseUrl();
     }
 
     private function applicationId(): string
     {
-        return trim((string) ($_ENV['SQUARE_APPLICATION_ID'] ?? $_SERVER['SQUARE_APPLICATION_ID'] ?? ''));
+        return $this->credentials->applicationId();
     }
 
     private function applicationSecret(): string
     {
-        return trim((string) ($_ENV['SQUARE_APPLICATION_SECRET'] ?? $_SERVER['SQUARE_APPLICATION_SECRET'] ?? ''));
+        return $this->credentials->applicationSecret();
     }
 
     /** @param array<string, mixed> $data */

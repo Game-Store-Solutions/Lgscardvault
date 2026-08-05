@@ -37,6 +37,8 @@ import {
 import api, { extractErrorMessage, unwrapCollection } from '../api/client'
 import type { AdminIntegrations, AdminUser, IntegrationStatus, ScryfallSyncResult, Store } from '../api/types'
 import { StoreApplicationModal } from './platform-admin/StoreApplicationModal'
+import { BillingPanel } from './platform-admin/BillingPanel'
+import { isDevBuild } from '../lib/runtimeEnv'
 
 export default function PlatformAdminPage() {
   const queryClient = useQueryClient()
@@ -214,10 +216,24 @@ export default function PlatformAdminPage() {
         </Card>
       )}
 
+      <section className="space-y-4">
+        <div>
+          <h2 className="font-display text-xl font-bold text-fg">Subscription billing</h2>
+          <p className="text-sm text-fg-muted">
+            What store owners pay the marketplace each month, and who is behind.
+          </p>
+        </div>
+        <BillingPanel />
+      </section>
+
       <Card>
         <CardHeader
           title="Integrations"
-          subtitle="Open each provider console to create credentials, then add them in backend/.env.local and restart the API."
+          subtitle={
+            isDevBuild
+              ? 'Open each provider console to create credentials, then add them in backend/.env.local and restart the API.'
+              : 'Provider connection status for this environment. Configure secrets in your deployment env file.'
+          }
           actions={
             <Button variant="secondary" size="sm" onClick={() => void integrationsQuery.refetch()}>
               <RefreshCw aria-hidden className="size-4" />
@@ -242,10 +258,10 @@ export default function PlatformAdminPage() {
           />
           <IntegrationTile
             title="Subscription payments"
-            detail={integrationsQuery.data?.subscriptionPayments.provider ?? 'Braintree'}
+            detail={integrationsQuery.data?.subscriptionPayments.provider ?? 'Square'}
             status={integrationsQuery.data?.subscriptionPayments}
-            setupUrl="https://www.braintreepayments.com/sandbox"
-            setupLabel="Open Braintree"
+            setupUrl="https://developer.squareup.com/apps"
+            setupLabel="Open Square"
           />
         </CardBody>
       </Card>

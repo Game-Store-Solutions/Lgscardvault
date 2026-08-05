@@ -125,7 +125,12 @@ export function useOnboarding() {
         address: data.address,
         branding: data.branding,
         payment: paymentRequired
-          ? { methodType: data.payment.methodType, nonce: data.payment.nonce, last4: data.payment.last4 }
+          ? {
+              methodType: data.payment.methodType,
+              token: data.payment.token,
+              last4: data.payment.last4,
+              verificationToken: data.payment.verificationToken,
+            }
           : {},
       })
       await refreshUser()

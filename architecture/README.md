@@ -28,6 +28,7 @@ Two backend styles coexist:
 | **Data model** | Tables, columns, foreign keys, ER diagram, and the multi-tenancy pattern | [data-model.md](data-model.md) |
 | **Auth & tenancy** | Login, register, `/me`, JWT mechanics, role-based access, and tenant SQL filtering | [auth-and-tenancy.md](auth-and-tenancy.md) |
 | **Stores & branding** | Public store directory, storefront by slug, branding/theme editor, store payment connections, platform admin | [stores-and-branding.md](stores-and-branding.md) |
+| **Payments & billing** | Platform subscriptions (owner → marketplace), store checkout (shopper → store), renewals/dunning, admin billing dashboard | [payments-and-billing.md](payments-and-billing.md) |
 | **Catalog & inventory** | Card catalog search, inventory browse, inventory CRUD, Scryfall bulk sync, card details, spotlight | [catalog-and-inventory.md](catalog-and-inventory.md) |
 | **Case cards** | Owner-curated storefront sections filled manually or auto-pulled by price/rarity from inventory | [case-cards.md](case-cards.md) |
 | **CSV import** | Async bulk import lifecycle, failed-row recovery, card resolution, inventory writes, and live polling | [csv-import.md](csv-import.md) |
@@ -56,7 +57,7 @@ flowchart LR
         scry["Scryfall API"]
         mtg["MTGJSON"]
         mail["Mailpit SMTP, dev"]
-        square["Square OAuth"]
+        square["Square<br/>platform billing + OAuth"]
     end
 
     user --> spa
@@ -68,7 +69,7 @@ flowchart LR
     worker -- "resolve cards" --> mtg
     api -- "catalog search / sync" --> scry
     api -- "fulfilled order email" --> mail
-    api -- "store payment connect" --> square
+    api -- "subscriptions + store checkout" --> square
 ```
 
 ## Recurring patterns worth knowing
@@ -78,10 +79,11 @@ flowchart LR
 - **Card resolution cascade** - local DB -> Scryfall -> MTGJSON, used by catalog search, CSV import, and failed-row recovery.
 - **Batched async import** - the CSV worker claims rows with `SELECT ... FOR UPDATE SKIP LOCKED`, processes 25 at a time, and self-dispatches the next batch.
 - **Persisted notifications** - customer notifications are stored in `customer_notifications`; Mailpit email is a delivery side effect. The frontend currently polls every 15 seconds.
+- **Two Square money paths** - the platform bills store owners with its own access token; each store charges shoppers through a connected OAuth account. See [payments-and-billing.md](payments-and-billing.md).
 - **Provider-owned payments** - payment provider credentials belong to the store connection in `store_payment_accounts`; the API never returns provider tokens.
 
 ## Local development dependencies
 
 - PostgreSQL stores application data and the Messenger queue table.
 - Mailpit receives local fulfillment emails on SMTP port `1025`; its UI runs on `http://localhost:8025`.
-- Square OAuth is optional locally. When Square env vars are missing, the payments UI reports that Square is not configured, and local test orders still work because they bypass payment capture.
+- Square is optional locally. Without credentials, subscription and checkout UIs run in mock mode; `POST /customer/test-order` still places unpaid pending orders for fulfillment testing.

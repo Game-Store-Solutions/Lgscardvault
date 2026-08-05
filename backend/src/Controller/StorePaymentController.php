@@ -7,10 +7,13 @@ use App\Entity\StorePaymentAccount;
 use App\Entity\User;
 use App\Repository\StorePaymentAccountRepository;
 use App\Repository\StoreRepository;
+use App\Repository\UserRepository;
 use App\Service\Payments\SignedOAuthState;
 use App\Service\Payments\SquareOAuthClient;
+use App\Service\Payments\StoreCheckoutGateway;
 use App\Service\Security\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -27,7 +30,10 @@ final class StorePaymentController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly SignedOAuthState $oauthState,
         private readonly SquareOAuthClient $squareOAuthClient,
+        private readonly StoreCheckoutGateway $checkoutGateway,
         private readonly SecretCipher $secretCipher,
+        private readonly UserRepository $userRepository,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -65,8 +71,13 @@ final class StorePaymentController extends AbstractController
             return $this->json(['detail' => 'Square OAuth is not configured.'], 422);
         }
 
-        $redirectUri = $this->generateUrl('api_square_oauth_callback', [], UrlGeneratorInterface::ABSOLUTE_URL);
-        $state = $this->oauthState->create(StorePaymentAccount::PROVIDER_SQUARE, $store->getSlug() ?? $slug, $user->getId());
+        $redirectUri = $this->squareOAuthRedirectUri();
+        $state = $this->oauthState->create(
+            StorePaymentAccount::PROVIDER_SQUARE,
+            $store->getSlug() ?? $slug,
+            $user->getId(),
+            redirectUri: $redirectUri,
+        );
 
         return $this->json([
             'authorizationUrl' => $this->squareOAuthClient->authorizationUrl($redirectUri, $state),
@@ -123,11 +134,16 @@ final class StorePaymentController extends AbstractController
             }
 
             $store = $this->storeRepository->findOneBySlug($storeSlug);
-            if (!$store instanceof Store || $store->getOwner()?->getId() !== $payload['userId']) {
+            if (!$store instanceof Store) {
                 throw new \RuntimeException('Store authorization could not be verified.');
             }
 
-            $redirectUri = $this->generateUrl('api_square_oauth_callback', [], UrlGeneratorInterface::ABSOLUTE_URL);
+            $initiator = $this->userRepository->find($payload['userId']);
+            if (!$initiator instanceof User || !$this->canCompleteSquareOAuth($initiator, $store)) {
+                throw new \RuntimeException('Store authorization could not be verified.');
+            }
+
+            $redirectUri = '' !== ($payload['redirectUri'] ?? '') ? $payload['redirectUri'] : $this->squareOAuthRedirectUri();
             $token = $this->squareOAuthClient->obtainToken($code, $redirectUri);
 
             if ('' === $token['accessToken']) {
@@ -149,10 +165,38 @@ final class StorePaymentController extends AbstractController
             }
             $this->entityManager->flush();
 
+            // OAuth never returns a location, but checkout cannot run without
+            // one. A failure here is recoverable — the gateway retries lazily.
+            $this->checkoutGateway->syncLocation($account);
+
             return $this->redirectToAdminPayments($storeSlug, 'connected');
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $this->logger->warning('Square OAuth callback failed', [
+                'storeSlug' => $storeSlug,
+                'error' => $e->getMessage(),
+            ]);
+
             return $this->redirectToAdminPayments($storeSlug, 'error');
         }
+    }
+
+    private function canCompleteSquareOAuth(User $user, Store $store): bool
+    {
+        if ($store->getOwner()?->getId() === $user->getId()) {
+            return true;
+        }
+
+        return in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true);
+    }
+
+    private function squareOAuthRedirectUri(): string
+    {
+        $configured = trim((string) ($_ENV['SQUARE_OAUTH_REDIRECT_URI'] ?? $_SERVER['SQUARE_OAUTH_REDIRECT_URI'] ?? ''));
+        if ('' !== $configured) {
+            return $configured;
+        }
+
+        return $this->generateUrl('api_square_oauth_callback', [], UrlGeneratorInterface::ABSOLUTE_URL);
     }
 
     private function resolveManagedStore(string $slug): ?Store
@@ -190,10 +234,17 @@ final class StorePaymentController extends AbstractController
 
     private function redirectToAdminPayments(string $storeSlug, string $status): RedirectResponse
     {
-        $target = '' !== $storeSlug
+        $path = '' !== $storeSlug
             ? sprintf('/s/%s/admin/payments?square=%s', rawurlencode($storeSlug), rawurlencode($status))
             : sprintf('/?square=%s', rawurlencode($status));
 
-        return new RedirectResponse($target);
+        return new RedirectResponse($this->frontendUrl().$path);
+    }
+
+    private function frontendUrl(): string
+    {
+        $url = trim((string) ($_ENV['APP_FRONTEND_URL'] ?? $_SERVER['APP_FRONTEND_URL'] ?? ''));
+
+        return rtrim('' !== $url ? $url : 'http://localhost:5173', '/');
     }
 }

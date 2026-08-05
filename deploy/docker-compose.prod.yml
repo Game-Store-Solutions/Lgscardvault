@@ -54,6 +54,27 @@ services:
       replicas: 2
     restart: unless-stopped
 
+  # Schedule ticker: turns the recurring definitions in src/Scheduler/ into
+  # queued messages (nightly catalog syncs and subscription renewals). It only
+  # dispatches; the `worker` service above does the actual work.
+  #
+  # Must stay at a single replica — a second ticker would emit each recurring
+  # message twice. Renewals are idempotent per billing period so that would not
+  # double-charge, but catalog syncs would run twice for nothing.
+  scheduler:
+    build:
+      context: ../backend
+    command: php bin/console messenger:consume scheduler_catalog scheduler_billing --time-limit=3600 --memory-limit=256M -v
+    env_file: [/etc/mtgstore/prod.env]
+    environment:
+      APP_ENV: prod
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      replicas: 1
+    restart: unless-stopped
+
   frontend:
     build:
       context: ../frontend

@@ -3,12 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\Store;
+use App\Entity\SubscriptionCharge;
 use App\Entity\User;
 use App\Repository\StoreRepository;
 use App\Repository\UserRepository;
 use App\Service\Onboarding\AddressAutocompleteClient;
-use App\Service\Onboarding\PaymentGatewayClient;
 use App\Service\Onboarding\PlanCatalog;
+use App\Service\Payments\SubscriptionBillingInterface;
 use App\Service\Store\StoreSettingsUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,7 +35,7 @@ class OnboardingController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly PlanCatalog $planCatalog,
         private readonly AddressAutocompleteClient $addressClient,
-        private readonly PaymentGatewayClient $paymentGateway,
+        private readonly SubscriptionBillingInterface $billing,
         private readonly StoreSettingsUpdater $settingsUpdater,
     ) {
     }
@@ -51,15 +52,11 @@ class OnboardingController extends AbstractController
         return $this->json(['suggestions' => $this->addressClient->search($query, $country)]);
     }
 
-    #[Route('/payments/onboarding/client-token', name: 'api_onboarding_payment_token', methods: ['GET'])]
+    #[Route('/payments/onboarding/client-config', name: 'api_onboarding_payment_config', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    public function paymentToken(): JsonResponse
+    public function paymentConfig(): JsonResponse
     {
-        try {
-            return $this->json($this->paymentGateway->clientToken());
-        } catch (\RuntimeException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_SERVICE_UNAVAILABLE);
-        }
+        return $this->json($this->billing->clientConfig());
     }
 
     #[Route('/onboarding/store', name: 'api_onboarding_store', methods: ['POST'])]
@@ -108,13 +105,14 @@ class OnboardingController extends AbstractController
         $priceCents = (int) ($plan['priceCents'] ?? 0);
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
         $methodType = (string) ($payment['methodType'] ?? '');
-        $nonce = (string) ($payment['nonce'] ?? '');
+        $sourceId = (string) ($payment['token'] ?? '');
+        $verificationToken = $this->nullableString($payment['verificationToken'] ?? null, 1024);
 
         if ($priceCents > 0) {
-            if (!in_array($methodType, PaymentGatewayClient::METHODS, true)) {
+            if (!in_array($methodType, SubscriptionBillingInterface::METHODS, true)) {
                 return $this->json(['error' => 'Choose a payment method to continue.'], Response::HTTP_BAD_REQUEST);
             }
-            if ('' === $nonce) {
+            if ('' === $sourceId) {
                 return $this->json(['error' => 'Payment could not be verified. Please try again.'], Response::HTTP_BAD_REQUEST);
             }
         }
@@ -149,12 +147,36 @@ class OnboardingController extends AbstractController
 
         // --- Charge only after everything else validated ---
         try {
-            $subscription = $this->paymentGateway->recordSubscription($nonce, $methodType, $priceCents);
+            $subscription = $this->billing->startSubscription(
+                $sourceId,
+                $priceCents,
+                [
+                    'email' => $user->getEmail(),
+                    'name' => $user->getDisplayName(),
+                    'reference' => $slug,
+                ],
+                $verificationToken,
+            );
         } catch (\RuntimeException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
         }
+
         $store->setSubscriptionStatus($subscription['status'])
-            ->setPaymentReference($subscription['reference']);
+            ->setPaymentReference($subscription['reference'])
+            ->setPaymentCustomerId($subscription['customerId'])
+            ->setPaymentCardId($subscription['cardId']);
+
+        // The first period is paid; renewals only become due once it lapses.
+        // Free tiers keep a null period end so the renewer never selects them.
+        if ($priceCents > 0) {
+            $store->markSubscriptionCharged(new \DateTimeImmutable());
+            $this->entityManager->persist(SubscriptionCharge::paid($store, $priceCents, $subscription['reference']));
+        }
+
+        // Prefer the processor's own card details over anything the browser sent.
+        if (null !== $subscription['last4']) {
+            $store->setPaymentLast4($subscription['last4']);
+        }
 
         $this->entityManager->persist($store);
 

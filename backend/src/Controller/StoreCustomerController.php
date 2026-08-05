@@ -24,6 +24,11 @@ use App\Repository\InventoryItemRepository;
 use App\Repository\OrderRepository;
 use App\Repository\StoreCustomerRepository;
 use App\Repository\StoreRepository;
+use App\Enum\OrderStatus;
+use App\Service\Checkout\CartOrderBuilder;
+use App\Service\Checkout\OrderStockReleaser;
+use App\Service\Checkout\OutOfStockException;
+use App\Service\Payments\CheckoutGatewayInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -48,8 +53,10 @@ final class StoreCustomerController extends AbstractController
         private readonly InventoryItemRepository $inventoryRepository,
         private readonly CardRepository $cardRepository,
         private readonly OrderRepository $orderRepository,
-        private readonly \App\Service\CaseCards\SectionSaleAllocator $sectionSaleAllocator,
         private readonly \App\Service\Credit\StoreCreditLedger $creditLedger,
+        private readonly CartOrderBuilder $orderBuilder,
+        private readonly OrderStockReleaser $stockReleaser,
+        private readonly CheckoutGatewayInterface $checkoutGateway,
         private readonly EntityManagerInterface $entityManager,
         private readonly KernelInterface $kernel,
     ) {
@@ -542,92 +549,143 @@ final class StoreCustomerController extends AbstractController
             $customerEmail = null;
         }
 
-        $order = (new Order())
-            ->setStore($store)
-            ->setReference($this->generateOrderReference())
-            ->setCustomerName($customerName)
-            ->setCustomerEmail($customerEmail)
-            ->setChannel($channel)
-            ->setFulfillment($fulfillment);
-
-        $total = 0;
-        foreach ($cartItems as $cartItem) {
-            // Sealed lines sell a boxed product: no card, no case section, and
-            // stock comes off the store's sealed listing instead.
-            if ($cartItem->isSealed()) {
-                $sealedItem = $cartItem->getSealedInventoryItem();
-                $product = $sealedItem?->getSealedProduct();
-                if (!$sealedItem instanceof SealedInventoryItem || null === $product || $sealedItem->getQuantity() < 1) {
-                    return $this->json(['detail' => 'One or more cart items are no longer in stock.'], 422);
-                }
-
-                $quantity = min($cartItem->getQuantity(), $sealedItem->getQuantity());
-                $line = (new OrderLine())
-                    ->setSealedProduct($product)
-                    ->setSealedInventoryItem($sealedItem)
-                    ->setCardName($product->getName())
-                    ->setQuantity($quantity)
-                    ->setPriceCents($sealedItem->getPriceCents())
-                    ->setAcquisitionCostCents($sealedItem->getAcquisitionCostCents());
-
-                $sealedItem->setQuantity($sealedItem->getQuantity() - $quantity);
-                $sealedItem->touch();
-
-                $order->addLine($line);
-                $total += $quantity * $sealedItem->getPriceCents();
-                continue;
-            }
-
-            $inventoryItem = $cartItem->getInventoryItem();
-            if (!$inventoryItem instanceof InventoryItem || $inventoryItem->getQuantity() < 1) {
-                return $this->json(['detail' => 'One or more cart items are no longer in stock.'], 422);
-            }
-
-            $quantity = min($cartItem->getQuantity(), $inventoryItem->getQuantity());
-            $line = (new OrderLine())
-                ->setCard($inventoryItem->getCard())
-                ->setInventoryItem($inventoryItem)
-                ->setCardName($inventoryItem->getCard()?->getName() ?? 'Unknown card')
-                ->setQuantity($quantity)
-                ->setPriceCents($inventoryItem->getPriceCents())
-                ->setAcquisitionCostCents($inventoryItem->getAcquisitionCostCents());
-
-            // The sale consumes real stock at placement. The line's quantity is
-            // clamped to available stock above, so this can never go negative;
-            // cancelling/refunding the order adds it back (StoreOrderStatusProcessor).
-            $inventoryItem->setQuantity($inventoryItem->getQuantity() - $quantity);
-
-            // If this listing sits in a display-case section with pool copies
-            // left, the sale comes from the case: deplete the section pool and
-            // stamp the line with its case/section for pull + print sheets.
-            $this->sectionSaleAllocator->allocateLine($line, $inventoryItem, $quantity);
-
-            $order->addLine($line);
-            $total += $quantity * $inventoryItem->getPriceCents();
-        }
-
-        $order->setTotalCents($total);
-
-        // Store credit: signed-in (non-kiosk) customers can put their balance
-        // toward the order. The ledger entry joins this flush, so the spend
-        // lands atomically with the order or not at all.
-        if (is_array($payload) && ($payload['useStoreCredit'] ?? false) && Order::CHANNEL_KIOSK !== $channel) {
-            $applied = min($this->creditLedger->balance($user, $store), $total);
-            if ($applied > 0) {
-                $this->creditLedger->spend($store, $user, $applied, $order);
-                $order->setCreditAppliedCents($applied);
-            }
-        }
-
-        $this->entityManager->persist($order);
-
-        foreach ($cartItems as $cartItem) {
-            $this->entityManager->remove($cartItem);
+        try {
+            $order = $this->orderBuilder->build(
+                $store,
+                $user,
+                $cartItems,
+                $channel,
+                $fulfillment,
+                $customerName,
+                $customerEmail,
+                is_array($payload) && (bool) ($payload['useStoreCredit'] ?? false),
+            );
+        } catch (OutOfStockException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
         }
 
         $this->entityManager->flush();
 
         return $this->json($this->serializeOrder($order), 201);
+    }
+
+    /**
+     * Real card checkout: the shopper pays the STORE through the store's own
+     * connected Square account. The platform never touches the funds.
+     *
+     * Ordering matters. The order is reserved and flushed first so stock and
+     * store credit are committed atomically, then the card is charged, then the
+     * order is settled. A decline rolls the reservation back. The alternative —
+     * charging first — risks taking money with no record of what it bought.
+     */
+    #[Route('/checkout', name: 'api_store_customer_checkout', methods: ['POST'])]
+    public function checkout(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+
+        $fulfillment = (string) ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP);
+        if (!in_array($fulfillment, Order::FULFILLMENTS, true)) {
+            return $this->json(['detail' => sprintf('Unknown fulfillment method. Valid: %s.', implode(', ', Order::FULFILLMENTS))], 422);
+        }
+
+        if (!$this->checkoutGateway->isReady($store)) {
+            return $this->json(['detail' => 'This store is not accepting online payments yet.'], 422);
+        }
+
+        $customer = $this->findCustomer($store);
+        if (!$customer instanceof StoreCustomer) {
+            return $this->json(['detail' => 'Your cart is empty.'], 422);
+        }
+
+        $cartItems = $this->cartRepository->findForCustomer($customer);
+        if ([] === $cartItems) {
+            return $this->json(['detail' => 'Your cart is empty.'], 422);
+        }
+
+        try {
+            $order = $this->orderBuilder->build(
+                $store,
+                $user,
+                $cartItems,
+                Order::CHANNEL_ONLINE,
+                $fulfillment,
+                $user->getDisplayName(),
+                $user->getEmail(),
+                (bool) ($payload['useStoreCredit'] ?? false),
+            );
+        } catch (OutOfStockException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
+
+        $amountDue = $order->getTotalCents() - $order->getCreditAppliedCents();
+
+        // Store credit can cover the whole basket, in which case there is
+        // nothing to charge and no card is required.
+        if ($amountDue <= 0) {
+            $order->setStatus(OrderStatus::PAID)->setPaidCents(0);
+            $this->entityManager->flush();
+
+            return $this->json($this->serializeOrder($order), 201);
+        }
+
+        $sourceId = trim((string) ($payload['token'] ?? ''));
+        if ('' === $sourceId) {
+            return $this->json(['detail' => 'A payment method is required.'], 422);
+        }
+
+        $this->entityManager->flush();
+
+        try {
+            // The order reference is the idempotency key, so a retried request
+            // for the same order can never charge the shopper twice.
+            $payment = $this->checkoutGateway->charge(
+                $store,
+                $amountDue,
+                $sourceId,
+                $order->getReference(),
+                trim((string) ($payload['verificationToken'] ?? '')) ?: null,
+                $order->getReference(),
+                $user->getEmail(),
+            );
+        } catch (\RuntimeException $e) {
+            $this->stockReleaser->release($order);
+            $order->setStatus(OrderStatus::CANCELLED);
+            $this->entityManager->flush();
+
+            return $this->json(['detail' => $e->getMessage()], 402);
+        }
+
+        $order
+            ->setStatus(OrderStatus::PAID)
+            ->setPaidCents($amountDue)
+            ->setPaymentReference($payment['paymentId']);
+
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeOrder($order) + ['receiptUrl' => $payment['receiptUrl']], 201);
+    }
+
+    /** Public Square configuration the cart needs to render its payment form. */
+    #[Route('/checkout/config', name: 'api_store_customer_checkout_config', methods: ['GET'])]
+    public function checkoutConfig(string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        return $this->json($this->checkoutGateway->checkoutConfig($store));
     }
 
     private function resolveStore(string $slug): ?Store
@@ -850,6 +908,7 @@ final class StoreCustomerController extends AbstractController
             'channel' => $order->getChannel(),
             'totalCents' => $order->getTotalCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
+            'paidCents' => $order->getPaidCents(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),
         ];

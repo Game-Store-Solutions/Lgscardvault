@@ -10,7 +10,7 @@ final readonly class SignedOAuthState
     {
     }
 
-    public function create(string $provider, string $storeSlug, int $userId, int $ttlSeconds = 600): string
+    public function create(string $provider, string $storeSlug, int $userId, int $ttlSeconds = 600, string $redirectUri = ''): string
     {
         $payload = [
             'provider' => $provider,
@@ -19,6 +19,9 @@ final readonly class SignedOAuthState
             'expiresAt' => time() + $ttlSeconds,
             'nonce' => bin2hex(random_bytes(16)),
         ];
+        if ('' !== trim($redirectUri)) {
+            $payload['redirectUri'] = trim($redirectUri);
+        }
 
         $encodedPayload = $this->base64UrlEncode(json_encode($payload, JSON_THROW_ON_ERROR));
         $signature = $this->sign($encodedPayload);
@@ -26,7 +29,7 @@ final readonly class SignedOAuthState
         return $encodedPayload.'.'.$signature;
     }
 
-    /** @return array{provider: string, storeSlug: string, userId: int, expiresAt: int, nonce: string} */
+    /** @return array{provider: string, storeSlug: string, userId: int, expiresAt: int, nonce: string, redirectUri?: string} */
     public function verify(string $state): array
     {
         [$encodedPayload, $signature] = array_pad(explode('.', $state, 2), 2, '');
@@ -49,6 +52,7 @@ final readonly class SignedOAuthState
             'userId' => (int) $payload['userId'],
             'expiresAt' => (int) $payload['expiresAt'],
             'nonce' => (string) $payload['nonce'],
+            'redirectUri' => isset($payload['redirectUri']) ? (string) $payload['redirectUri'] : '',
         ];
     }
 

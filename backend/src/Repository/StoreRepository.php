@@ -22,6 +22,29 @@ class StoreRepository extends ServiceEntityRepository
         return $this->findOneBy(['slug' => $slug]);
     }
 
+    /**
+     * Stores whose paid period has lapsed and that are ready for another
+     * charge attempt. Suspended stores are excluded: dunning is exhausted and
+     * restoring them is a deliberate act, not something a cron should undo.
+     *
+     * @return list<Store>
+     */
+    public function findDueForRenewal(\DateTimeImmutable $now): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.isActive = :active')
+            ->andWhere('s.subscriptionStatus IN (:statuses)')
+            ->andWhere('s.currentPeriodEnd IS NOT NULL')
+            ->andWhere('s.currentPeriodEnd <= :now')
+            ->andWhere('s.nextAttemptAt IS NULL OR s.nextAttemptAt <= :now')
+            ->setParameter('active', true)
+            ->setParameter('statuses', [Store::SUBSCRIPTION_ACTIVE, Store::SUBSCRIPTION_PAST_DUE])
+            ->setParameter('now', $now)
+            ->orderBy('s.currentPeriodEnd', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return list<Store> */
     public function findActiveStores(): array
     {

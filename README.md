@@ -68,6 +68,87 @@ npm run dev
 
 Open **http://localhost:5173**. The frontend proxies `/api` → `http://127.0.0.1:8000` (configured in `frontend/vite.config.ts`), so no frontend env file is needed for local dev.
 
+### Scripts
+
+Once the one-time bootstrap is done, `start-dev` brings up Docker, the API, the CSV worker, and the frontend together, streaming logs to `.dev-logs/` and stopping everything on Ctrl+C:
+
+```powershell
+.\start-dev.ps1     # Windows
+```
+
+```bash
+./start-dev.sh      # macOS / Linux
+```
+
+`scripts/dev-setup.ps1` covers the one-time bootstrap on Windows (dependencies, JWT keys, migrations, seed) — including a fallback for the OpenSSL issue below. Run it once, then use `start-dev` daily.
+
+> The `docker-compose.yml` project name is pinned to `store`, so multiple checkouts of this repo share one Postgres volume instead of fighting over ports 5432/1025/8025.
+
+### Square sandbox (owner subscriptions)
+
+Square handles both money flows, but through **two separate integrations**:
+
+| Flow | Merchant | Credentials |
+|------|----------|-------------|
+| Owner pays the platform for a tier | The platform | Access token + location id |
+| Shopper pays a store at checkout | Each store | Square OAuth (application secret) |
+
+Sandbox and production credentials live side by side under separate names, and `SQUARE_ENVIRONMENT` picks the set. Deploying is therefore a one-variable change, and a half-finished switch cannot quietly send sandbox keys to the live API: each environment reads only its own pair, so a missing production token falls back to mock mode instead of failing against real money.
+
+Copy `backend/.env.local.example` to `backend/.env.local` and paste sandbox values from the [Square developer dashboard](https://developer.squareup.com/apps) — pick your application, then flip the dashboard's **Sandbox** toggle:
+
+| Variable | Where to find it |
+|----------|------------------|
+| `SQUARE_SANDBOX_APPLICATION_ID` | Credentials tab — also used by the browser SDK |
+| `SQUARE_SANDBOX_ACCESS_TOKEN` | Credentials tab, sandbox access token |
+| `SQUARE_SANDBOX_LOCATION_ID` | Locations tab |
+| `SQUARE_SANDBOX_APPLICATION_SECRET` | Credentials tab, OAuth secret — only needed to connect stores |
+
+The `SQUARE_PRODUCTION_*` equivalents stay blank until launch. Tests never load `.env.local`, so the suite cannot reach the real Square API.
+
+With credentials set, the onboarding **Payment** step renders the Square Web Payments SDK — card plus Apple Pay and Google Pay buttons (test card `4111 1111 1111 1111`, CVV `111`, postal `94103`). Without them the wizard stays in **mock** mode. The card is vaulted as a Square customer + card on file, so renewals bill without the owner present. Owners can swap the card under **Store admin → Payments → Platform subscription**.
+
+Wallet caveats: Apple Pay needs a registered domain (Square dashboard → **Apple Pay**) and only appears in Safari; Google Pay only appears in supporting browsers. Both hide themselves silently when unavailable, so the card form is always the fallback.
+
+### Customer checkout (shoppers paying a store)
+
+Once a store connects Square under **Store admin → Payments**, its cart shows a real payment form and `POST /api/stores/{slug}/customer/checkout` charges the shopper through that store's account. The platform never touches the funds.
+
+**Connecting a store in sandbox:** register redirect URL `http://127.0.0.1:8000/api/integrations/square/callback` on the app's **OAuth** page (Sandbox toggle). Before **Connect Square**, open **Sandbox test accounts → Open / Square Dashboard** for a test seller and leave that tab open — sandbox OAuth does not use a normal login screen; without an open sandbox dashboard the authorize page errors or stays blank. Production OAuth behaves like a normal seller sign-in.
+
+The order is reserved and committed *before* the card is charged, then settled:
+
+1. Build the order, consume stock, spend store credit — committed as one transaction.
+2. Charge the remainder (total minus credit), keyed on the order reference so a retry cannot bill twice.
+3. On success mark the order `paid` and record the Square payment id; on decline restock, refund the credit, cancel the order, and return `402`.
+
+Charging first would risk taking money with no record of what it bought. Store credit covering the whole basket skips the card entirely.
+
+`POST .../customer/test-order` still exists for local development and kiosk sales, and places a pending order without charging anything.
+
+> Square OAuth access tokens expire after 30 days. `StoreCheckoutGateway` refreshes them automatically within a week of expiry and back-fills the merchant's location id, so stores connected before that logic existed heal on first use.
+
+### Renewals and dunning
+
+A store pays for its first month during onboarding, and `currentPeriodEnd` records when that period runs out. Only stores past that moment are charged, so running the job twice in a day — or catching up after an outage — bills nothing extra. Every attempt also carries an idempotency key derived from the store, period and attempt number, so two overlapping runs collapse into one charge on Square's side.
+
+A declined renewal moves the store to `past_due` and retries after 1, then 3, then 5 days. When those are exhausted it becomes `suspended` and is no longer retried automatically; the owner saving a new card under **Store admin → Payments** clears the backoff and queues a fresh attempt.
+
+```bash
+php bin/console app:subscriptions:charge --dry-run   # what is due right now
+php bin/console app:subscriptions:charge             # actually bill it
+```
+
+In production the job runs nightly at 03:15 UTC from `App\Scheduler\BillingSchedule`. **That requires the schedule ticker to be running** — `messenger:consume scheduler_billing` — or nothing is ever billed. The deploy configs under `deploy/` include it as a single-instance `scheduler` service alongside the workers.
+
+### Webhooks
+
+`POST /api/integrations/square/webhook` is how the platform learns about money it did not move itself: a refund issued from a seller's own Square dashboard, a shopper disputing a charge, or a merchant revoking our access. Without it a store could disconnect on Square's side and keep showing a checkout form that cannot work.
+
+Create a subscription under **Webhooks** in the developer dashboard, point it at that path, and copy the signature key into `SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY`. `SQUARE_WEBHOOK_URL` must match the notification URL exactly, because the URL is part of what Square signs.
+
+The endpoint is unauthenticated by necessity, so the HMAC signature is the only thing standing in front of it; an unconfigured key rejects every request rather than trusting the caller. Each accepted event is recorded in `square_webhook_events` by its Square event id, so a redelivery is a no-op instead of a second refund.
+
 The detailed walk-through below explains each step and the platform-specific gotchas.
 
 ---
@@ -137,6 +218,16 @@ This writes `config/jwt/private.pem` and `config/jwt/public.pem` using the passp
 > openssl genpkey -algorithm RSA -out config/jwt/private.pem -aes256 -pass pass:$PASS -pkeyopt rsa_keygen_bits:4096
 > openssl pkey -in config/jwt/private.pem -passin pass:$PASS -pubout -out config/jwt/public.pem
 > ```
+>
+> On Windows the OpenSSL CLI usually isn't on `PATH`, and clearing the variable
+> isn't enough because PHP then looks for a default config that also doesn't
+> exist. Point it at the minimal config committed here and use the PHP fallback:
+> ```powershell
+> $env:OPENSSL_CONF = "$PWD\config\openssl.cnf"
+> php bin/generate-jwt-keys.php
+> ```
+> This only affects key *generation* — signing and verifying tokens at runtime
+> work with the broken variable in place, so `start-dev` needs no env tweak.
 
 ### 4. Run migrations
 
