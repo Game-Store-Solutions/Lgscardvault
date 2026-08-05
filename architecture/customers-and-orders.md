@@ -15,6 +15,7 @@ Customer routes are under `StoreCustomerController` at `/api/stores/{slug}/custo
 | Want list | `GET /want-list`, `POST /want-list`, `DELETE /want-list/{id}` |
 | Cart | `GET /cart`, `PUT /cart/{itemId}`, `DELETE /cart/{itemId}`, `DELETE /cart` |
 | Local test order | `POST /test-order` |
+| Paid checkout | `GET /checkout/config`, `POST /checkout` |
 | Customer order history | `GET /orders` |
 | Customer notifications | `GET /notifications`, `PATCH /notifications/{id}/read` |
 | Owner orders | `GET /api/stores/{slug}/orders`, `POST /api/stores/{slug}/orders`, `GET /api/stores/{slug}/orders/{id}`, `PATCH /api/stores/{slug}/orders/{id}` |
@@ -94,9 +95,17 @@ sequenceDiagram
     Admin->>Ctl: GET /api/stores/{slug}/orders
 ```
 
-- `POST /customer/test-order` is available only in `dev` and `test`. In other environments the controller returns `404`.
-- The test order path does not charge Square or PayPal. It exists so order history, owner fulfillment, print sheets, notifications, and Mailpit email can be tested locally.
+- `POST /customer/test-order` is available only in `dev` and `test` (plus kiosk sales in any environment). In other environments the controller returns `404`.
+- The test order path does not charge anything. It exists so order history, owner fulfillment, print sheets, notifications, and Mailpit email can be tested locally.
 - The frontend exposes the action when `import.meta.env.DEV` or `VITE_ENABLE_TEST_CHECKOUT=true`.
+
+### Paid checkout
+
+`POST /customer/checkout` is the real path: it charges the shopper through the store's connected Square account (`StoreCheckoutGateway`) and settles the order as `paid`.
+
+Both paths share `CartOrderBuilder`, so they consume stock and spend store credit identically. The paid path commits that reservation first, then charges, then settles — a decline calls `OrderStockReleaser` to restock, refund the credit, and cancel the order, returning `402`. The order reference doubles as the processor idempotency key, so a retried request cannot charge twice.
+
+Orders record `paidCents` (cash actually captured, i.e. total minus store credit) and `paymentReference` (the Square payment id, for refunds).
 
 ---
 
@@ -219,7 +228,7 @@ Reports reuse the owner orders list. Revenue totals, pending/refunded totals, av
 
 ## Known gaps
 
-- Real payment capture is not wired into checkout yet. Square OAuth account linking exists, but test orders bypass payment providers.
+- Cancelling / refunding an order in store admin restocks inventory but does not yet issue a Square refund for the captured payment. Dashboard-issued refunds can be mirrored via webhooks when those are configured — see [payments-and-billing.md](payments-and-billing.md).
 - Tax and shipping are not calculated or stored on orders yet.
 - Notifications are polling-based, not pushed in realtime.
 - Fulfillment email is plain text and does not use templates or per-user notification preferences yet.

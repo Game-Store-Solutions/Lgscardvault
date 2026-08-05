@@ -56,7 +56,13 @@ export default function OwnerOnboardingWizard() {
             <PlanStep plans={o.plans} loading={o.plansLoading} selected={o.data.planKey} onSelect={(key) => o.patch({ planKey: key })} />
           )}
           {o.currentKey === 'payment' && (
-            <PaymentStep required={o.paymentRequired} plan={o.selectedPlan} payment={o.data.payment} patchPayment={o.patchPayment} />
+            <PaymentStep
+              required={o.paymentRequired}
+              plan={o.selectedPlan}
+              payment={o.data.payment}
+              billingEmail={o.data.email}
+              patchPayment={o.patchPayment}
+            />
           )}
           {o.currentKey === 'review' && (
             <ReviewStep data={o.data} plan={o.selectedPlan} paymentRequired={o.paymentRequired} onJump={o.jumpTo} />

@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
   ArrowLeft,
   BadgeCheck,
   Boxes,
   CreditCard,
-  Lock,
   Minus,
   PackageCheck,
   Plus,
@@ -22,6 +21,7 @@ import { useAuth } from '../context/AuthContext'
 import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
 import { Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
+import { CheckoutPanel } from '../components/payments/CheckoutPanel'
 import { CardImage, SpotlightCard } from '../components/cards'
 import { cx } from '../lib/cx'
 import { finishName } from '../lib/finishes'
@@ -66,16 +66,9 @@ export default function CartPage() {
   })
   const creditBalanceCents = creditQuery.data?.balanceCents ?? 0
 
-  const testOrder = useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, {
-        fulfillment: kioskMode ? 'pickup' : fulfillment,
-        ...(kioskMode ? { channel: 'kiosk', customerName: kioskCustomerName.trim() } : {}),
-        ...(useCredit && !kioskMode ? { useStoreCredit: true } : {}),
-      })
-      return data
-    },
-    onSuccess: async (order) => {
+  /** Shared by the paid and simulated paths: both empty the cart and move stock. */
+  const handleOrderPlaced = useCallback(
+    async (order: Order) => {
       setCreatedOrder(order)
       setKioskCustomerName('')
       queryClient.setQueryData(customerKeys.cart(slug), [])
@@ -88,6 +81,19 @@ export default function CartPage() {
         queryClient.invalidateQueries({ queryKey: ['store-credit', slug] }),
       ])
     },
+    [queryClient, slug],
+  )
+
+  const testOrder = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, {
+        fulfillment: kioskMode ? 'pickup' : fulfillment,
+        ...(kioskMode ? { channel: 'kiosk', customerName: kioskCustomerName.trim() } : {}),
+        ...(useCredit && !kioskMode ? { useStoreCredit: true } : {}),
+      })
+      return data
+    },
+    onSuccess: handleOrderPlaced,
   })
 
   useEffect(() => {
@@ -227,11 +233,13 @@ export default function CartPage() {
             subtotalCents={subtotalCents}
             kioskCustomerName={kioskCustomerName}
             onKioskCustomerNameChange={setKioskCustomerName}
+            buyerEmail={user?.email ?? ''}
             testCheckoutEnabled={TEST_CHECKOUT_ENABLED}
             testOrderPending={testOrder.isPending}
             testOrderError={testOrder.error}
             createdOrder={createdOrder}
             onCreateTestOrder={() => testOrder.mutate()}
+            onOrderPlaced={handleOrderPlaced}
           />
         </div>
       )}
@@ -263,17 +271,12 @@ export default function CartPage() {
               <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Estimated total</p>
               <p className="font-display text-xl font-bold text-fg">{subtotalLabel}</p>
             </div>
-            {TEST_CHECKOUT_ENABLED ? (
-              <Button size="lg" loading={testOrder.isPending} onClick={() => testOrder.mutate()}>
-                <PackageCheck aria-hidden className="size-4" />
-                Test order
-              </Button>
-            ) : (
-              <Button size="lg" disabled title="Checkout coming soon">
-                <Lock aria-hidden className="size-4" />
-                Checkout
-              </Button>
-            )}
+            {/* The payment form lives in the summary panel, which is below the
+                lines on mobile — jump to it rather than duplicating it here. */}
+            <a href="#order-summary" className={buttonVariants({ variant: 'primary', size: 'lg' })}>
+              <PackageCheck aria-hidden className="size-4" />
+              Checkout
+            </a>
           </div>
         </div>
       )}
@@ -411,11 +414,13 @@ function OrderSummary({
   subtotalCents = 0,
   kioskCustomerName = '',
   onKioskCustomerNameChange,
+  buyerEmail,
   testCheckoutEnabled,
   testOrderPending,
   testOrderError,
   createdOrder,
   onCreateTestOrder,
+  onOrderPlaced,
 }: {
   slug: string
   storeName: string
@@ -430,15 +435,17 @@ function OrderSummary({
   subtotalCents?: number
   kioskCustomerName?: string
   onKioskCustomerNameChange?: (value: string) => void
+  buyerEmail: string
   testCheckoutEnabled: boolean
   testOrderPending: boolean
   testOrderError: unknown
   createdOrder: Order | null
   onCreateTestOrder: () => void
+  onOrderPlaced: (order: Order) => void
 }) {
   const creditApplied = !kioskMode && useCredit ? Math.min(creditBalanceCents, subtotalCents) : 0
   return (
-    <aside className="rounded-card border border-border bg-surface p-5 shadow-card lg:sticky lg:top-20">
+    <aside id="order-summary" className="scroll-mt-20 rounded-card border border-border bg-surface p-5 shadow-card lg:sticky lg:top-20">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-xl font-bold text-fg">Order summary</h2>
@@ -505,45 +512,68 @@ function OrderSummary({
         </label>
       )}
 
-      {testCheckoutEnabled || kioskMode ? (
+      {/* Kiosk rings up walk-ups at the counter and takes payment in person, so
+          it never shows the card form. */}
+      {kioskMode ? (
         <div className="mt-5 space-y-3">
           <Button
             className="w-full"
             size="lg"
             loading={testOrderPending}
-            disabled={kioskMode && !kioskCustomerName.trim()}
+            disabled={!kioskCustomerName.trim()}
             onClick={onCreateTestOrder}
           >
             <PackageCheck aria-hidden className="size-4" />
-            {kioskMode ? 'Place kiosk order' : 'Create test order'}
+            Place kiosk order
           </Button>
-          <p className="rounded-btn border border-warning-500/30 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700">
-            Local testing only. This creates a pending order from the cart without charging Square.
-          </p>
-          {Boolean(testOrderError) && (
-            <p className="rounded-btn border border-danger-500/30 bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-700">
-              {extractErrorMessage(testOrderError, 'Could not create test order.')}
-            </p>
-          )}
-          {createdOrder && (
-            <Link to={`/s/${slug}/admin/orders`} className={`${buttonVariants({ variant: 'secondary', size: 'md' })} w-full`}>
-              View {createdOrder.reference}
-            </Link>
-          )}
         </div>
       ) : (
-        <Button className="mt-5 w-full" size="lg" disabled title="Checkout coming soon">
-          <Lock aria-hidden className="size-4" />
-          Checkout
-        </Button>
+        <CheckoutPanel
+          slug={slug}
+          amountDueCents={subtotalCents - creditApplied}
+          fulfillment={fulfillment}
+          useStoreCredit={useCredit}
+          buyerEmail={buyerEmail}
+          onPlaced={onOrderPlaced}
+        />
       )}
+
+      {testCheckoutEnabled && !kioskMode && (
+        <div className="mt-3 space-y-2">
+          <Button
+            variant="secondary"
+            className="w-full"
+            loading={testOrderPending}
+            onClick={onCreateTestOrder}
+          >
+            <PackageCheck aria-hidden className="size-4" />
+            Create test order (no charge)
+          </Button>
+          <p className="rounded-btn border border-warning-500/30 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700">
+            Local testing only. Places a pending order without charging a card.
+          </p>
+        </div>
+      )}
+
+      {Boolean(testOrderError) && (
+        <p className="mt-3 rounded-btn border border-danger-500/30 bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-700">
+          {extractErrorMessage(testOrderError, 'Could not create order.')}
+        </p>
+      )}
+
+      {createdOrder && (
+        <Link to={`/s/${slug}/admin/orders`} className={`${buttonVariants({ variant: 'secondary', size: 'md' })} mt-3 w-full`}>
+          View {createdOrder.reference}
+        </Link>
+      )}
+
       <Link to={`/s/${slug}`} className={`${buttonVariants({ variant: 'secondary', size: 'md' })} mt-2 w-full`}>
         Continue shopping
       </Link>
 
       <div className="mt-5 grid gap-3 border-t border-border pt-5">
         <TrustNote icon={ShieldCheck} title="Live inventory" text={`Stock counts come from ${storeName}'s current listings.`} />
-        <TrustNote icon={CreditCard} title="No charge yet" text="Checkout is not enabled, so this is only a saved cart." />
+        <TrustNote icon={CreditCard} title="Secure payments" text="Card details go straight to Square and never reach our servers." />
       </div>
     </aside>
   )

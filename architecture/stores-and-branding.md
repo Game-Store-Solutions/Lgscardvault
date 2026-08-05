@@ -129,17 +129,17 @@ sequenceDiagram
 ```
 
 - `GET /api/stores/{slug}/payments` returns sanitized provider status only.
-- `POST /payments/square/connect` requires `STORE_MANAGE` and returns an authorization URL when `SQUARE_APPLICATION_ID` and `SQUARE_APPLICATION_SECRET` are configured.
+- `POST /payments/square/connect` requires `STORE_MANAGE` and returns an authorization URL when sandbox/production application id + secret are configured (`SQUARE_SANDBOX_*` / `SQUARE_PRODUCTION_*`).
 - `POST /payments/square/disconnect` revokes the Square token when possible, then clears encrypted tokens and marks the account disconnected.
 - The callback verifies signed OAuth state before writing the connection, so a Square response can only attach to the store/user that initiated it.
-- PayPal is not implemented yet. The table and UI are provider-shaped so PayPal can follow the same status/connect/disconnect pattern later.
-- Real checkout payment capture is future work. Local test orders intentionally bypass Square.
+- Once connected, shopper checkout charges through that account — see [payments-and-billing.md](payments-and-billing.md#store-checkout-shopper--store).
+- The same Payments tab also shows the store's **platform subscription** status (up to date / past due / suspended) via `GET /api/stores/{slug}/subscription`.
 
 | Layer | Where |
 |-------|-------|
 | Frontend | `pages/store-admin/PaymentsTab.tsx` |
-| Routes | `Controller/StorePaymentController.php` |
-| Provider client | `Service/Payments/SquareOAuthClient.php` |
+| Routes | `Controller/StorePaymentController.php`, `Controller/StoreSubscriptionController.php` |
+| Provider client | `Service/Payments/SquareOAuthClient.php`, `StoreCheckoutGateway.php` |
 | OAuth state | `Service/Payments/SignedOAuthState.php` |
 | Secret handling | `Service/Security/SecretCipher.php` |
 | Repo/DB | `StorePaymentAccountRepository` -> `store_payment_accounts` |
@@ -153,11 +153,13 @@ flowchart LR
     subgraph FE["PlatformAdminPage.tsx"]
         stores["GET /admin/stores"]
         users["GET /admin/users"]
+        billing["GET /admin/billing"]
         create["POST /admin/stores"]
         editUser["POST/PATCH /admin/users"]
     end
     stores --> dstore["stores SELECT all"]
     users --> duser["users SELECT all"]
+    billing --> bill["AdminBillingController<br/>stores + subscription_charges"]
     create --> sap["StoreAdminProcessor::process()"]
     sap --> promote["promote owner to ROLE_STORE_OWNER"]
     sap --> wstore["stores INSERT/UPDATE + users UPDATE roles"]
@@ -169,10 +171,11 @@ flowchart LR
 - The tenant filter is disabled for admin routes so platform administrators can manage all stores.
 - Creating a store through `StoreAdminProcessor` promotes the chosen owner to `ROLE_STORE_OWNER`.
 - `UserAdminProcessor` hashes `plainPassword` before persisting.
+- Subscription billing (MRR, overdue, monthly history, charge-now) lives in `BillingPanel` — see [payments-and-billing.md](payments-and-billing.md#platform-admin-billing-dashboard).
 
 | Layer | Where |
 |-------|-------|
-| Frontend | `pages/PlatformAdminPage.tsx` |
-| Routes | `GET/POST /api/admin/stores`, `PATCH /api/admin/stores/{id}`, `GET/POST/PATCH /api/admin/users[/{id}]` |
-| Entry | `State/StoreAdminProcessor.php`, `State/UserAdminProcessor.php`, API Platform default collection providers |
-| DB | `stores`, `users` |
+| Frontend | `pages/PlatformAdminPage.tsx`, `pages/platform-admin/BillingPanel.tsx` |
+| Routes | `GET/POST /api/admin/stores`, `PATCH /api/admin/stores/{id}`, `GET/POST/PATCH /api/admin/users[/{id}]`, `GET /api/admin/billing` |
+| Entry | `State/StoreAdminProcessor.php`, `State/UserAdminProcessor.php`, `Controller/AdminBillingController.php` |
+| DB | `stores`, `users`, `subscription_charges` |

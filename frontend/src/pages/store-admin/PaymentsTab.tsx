@@ -1,13 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, ExternalLink, RefreshCw, Square, Unplug } from 'lucide-react'
-import api, { extractErrorMessage } from '../../api/client'
-import type { SquareConnectResponse, StorePaymentStatus } from '../../api/types'
+import { CheckCircle2, CreditCard, ExternalLink, RefreshCw, Square, Unplug } from 'lucide-react'
+import api, { extractErrorMessage, formatPrice } from '../../api/client'
+import type { SquareConnectResponse, StorePaymentStatus, StoreSubscriptionStatus } from '../../api/types'
 import { Badge, Button, Card, CardBody, CardHeader, ErrorState, LoadingPanel } from '../../components/ui'
+import { SquarePaymentPanel, type TokenizedPayment } from '../../components/payments/SquarePaymentPanel'
+import { METHOD_LABELS } from '../onboarding/config'
+import { useAuth } from '../../context/AuthContext'
 
 const paymentKey = (slug: string) => ['store-payments', slug] as const
+const subscriptionKey = (slug: string) => ['store-subscription', slug] as const
 
 export default function PaymentsTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const {
     data,
     isLoading,
@@ -17,6 +22,14 @@ export default function PaymentsTab({ slug }: { slug: string }) {
     queryKey: paymentKey(slug),
     queryFn: async () => {
       const { data } = await api.get<StorePaymentStatus>(`/stores/${slug}/payments`)
+      return data
+    },
+  })
+
+  const subscriptionQuery = useQuery({
+    queryKey: subscriptionKey(slug),
+    queryFn: async () => {
+      const { data } = await api.get<StoreSubscriptionStatus>(`/stores/${slug}/subscription`)
       return data
     },
   })
@@ -41,15 +54,55 @@ export default function PaymentsTab({ slug }: { slug: string }) {
     },
   })
 
+  const updatePaymentMutation = useMutation({
+    mutationFn: async (body: TokenizedPayment) => {
+      const { data } = await api.post<{ paymentMethodType: string; paymentLast4?: string }>(
+        `/stores/${slug}/subscription/payment-method`,
+        body,
+      )
+      return data
+    },
+    onSuccess: () => {
+      void subscriptionQuery.refetch()
+    },
+  })
+
   const square = data?.square
   const connected = square?.status === 'connected'
+  const sub = subscriptionQuery.data
+  // Saving a new card is the fix for both states, and it is the one action
+  // this panel offers — so say so rather than just showing a status word.
+  const billingAlert =
+    sub?.subscriptionStatus === 'suspended'
+      ? 'We could not collect your subscription after several attempts, so billing is paused. Save a new payment method below to restore it.'
+      : sub?.subscriptionStatus === 'past_due'
+        ? `A renewal was declined${sub.nextAttemptAt ? ` — we will try again on ${formatDate(sub.nextAttemptAt)}` : ''}. Save a new payment method below to settle it sooner.`
+        : ''
+
+  // The owner's real question is "am I paid up?", which the raw status word
+  // does not answer on its own.
+  const subscriptionBadge = !sub ? null : sub.priceCents <= 0 ? (
+    <Badge tone="neutral">Free plan</Badge>
+  ) : sub.subscriptionStatus === 'suspended' ? (
+    <Badge tone="danger">Billing paused</Badge>
+  ) : sub.subscriptionStatus === 'past_due' ? (
+    <Badge tone="danger">Payment failed</Badge>
+  ) : sub.subscriptionStatus === 'active' ? (
+    <Badge tone="success">
+      <CheckCircle2 aria-hidden className="size-3.5" />
+      Up to date
+    </Badge>
+  ) : (
+    <Badge tone="warning">Payment required</Badge>
+  )
   const errorMessage =
     extractErrorMessage(connectMutation.error, '') ||
     extractErrorMessage(disconnectMutation.error, '') ||
+    extractErrorMessage(updatePaymentMutation.error, '') ||
     square?.lastError ||
     ''
 
-  if (isLoading) return <LoadingPanel label="Loading payment connections..." />
+  if (isLoading || subscriptionQuery.isLoading) return <LoadingPanel label="Loading payment connections..." />
 
   if (error) {
     return (
@@ -63,8 +116,89 @@ export default function PaymentsTab({ slug }: { slug: string }) {
     <div className="space-y-6">
       <Card>
         <CardHeader
-          title="Payment connections"
-          subtitle="Connect this store to payment providers. Square is the first live provider; PayPal can plug into the same surface next."
+          title="Platform subscription"
+          subtitle="Your payment method for the Pro or Enterprise plan you pay to the marketplace."
+          actions={
+            <div className="flex items-center gap-2">
+              {subscriptionBadge}
+              <Button variant="secondary" size="sm" onClick={() => void subscriptionQuery.refetch()}>
+                <RefreshCw aria-hidden className="size-4" />
+                Refresh
+              </Button>
+            </div>
+          }
+        />
+        <CardBody>
+          {sub && sub.priceCents <= 0 ? (
+            <p className="text-sm text-fg-muted">
+              {sub.planName ?? 'Starter'} is free — no platform subscription payment method is required.
+            </p>
+          ) : sub ? (
+            <div className="space-y-4">
+              {billingAlert ? (
+                <p role="alert" className="rounded-card border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-fg">
+                  {billingAlert}
+                </p>
+              ) : null}
+
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <PaymentFact label="Plan" value={`${sub.planName ?? sub.planKey ?? '—'} · ${formatPrice(sub.priceCents)}/mo`} />
+                <PaymentFact
+                  label="Status"
+                  value={`${sub.subscriptionStatus}${sub.paymentMethodType ? ` · ${METHOD_LABELS[sub.paymentMethodType as keyof typeof METHOD_LABELS] ?? sub.paymentMethodType}` : ''}${sub.paymentLast4 ? ` •••• ${sub.paymentLast4}` : ''}`}
+                />
+                <PaymentFact label="Next bill" value={formatDate(sub.currentPeriodEnd)} />
+                <PaymentFact label="Last charged" value={formatDate(sub.lastChargedAt)} />
+                <PaymentFact label="Billing mode" value={`${sub.mode} (${sub.environment})`} wide />
+              </dl>
+
+              {sub.mode === 'square' ? (
+                <SquarePaymentPanel
+                  applicationId={sub.applicationId}
+                  locationId={sub.locationId}
+                  environment={sub.environment}
+                  // Zero keeps this a vault-only update: saving a new card must
+                  // never charge a renewal early.
+                  priceCents={0}
+                  currency={sub.currency}
+                  countryCode={sub.countryCode}
+                  billingEmail={user?.email ?? ''}
+                  confirmLabel="Save new payment method"
+                  onTokenized={(p) => updatePaymentMutation.mutate(p)}
+                />
+              ) : (
+                <Button
+                  variant="secondary"
+                  loading={updatePaymentMutation.isPending}
+                  onClick={() =>
+                    updatePaymentMutation.mutate({
+                      methodType: 'card',
+                      token: `mock-card-${Date.now().toString(36)}`,
+                      last4: '4242',
+                      verificationToken: '',
+                    })
+                  }
+                >
+                  <CreditCard aria-hidden className="size-4" />
+                  Simulate card update (mock mode)
+                </Button>
+              )}
+
+              {updatePaymentMutation.isSuccess && (
+                <p className="flex items-center gap-2 text-sm font-medium text-success-700">
+                  <CheckCircle2 aria-hidden className="size-4" />
+                  Payment method updated.
+                </p>
+              )}
+            </div>
+          ) : null}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Customer checkout (Square)"
+          subtitle="Connect Square so shoppers can pay your store at checkout."
           actions={
             <Button variant="secondary" size="sm" onClick={() => void refetch()}>
               <RefreshCw aria-hidden className="size-4" />
@@ -88,7 +222,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                     {square?.environment && <Badge tone="neutral">{square.environment}</Badge>}
                   </div>
                   <p className="mt-1 max-w-2xl text-sm leading-6 text-fg-muted">
-                    Let this store authorize Square so checkout can charge through the store owner's Square seller account.
+                    Let this store authorize Square so checkout can charge through the store owner&apos;s Square seller account.
                   </p>
 
                   {connected && (
@@ -111,21 +245,11 @@ export default function PaymentsTab({ slug }: { slug: string }) {
               <div className="flex shrink-0 flex-wrap gap-2">
                 {connected ? (
                   <>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      loading={connectMutation.isPending}
-                      onClick={() => connectMutation.mutate()}
-                    >
+                    <Button variant="secondary" size="sm" loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
                       <ExternalLink aria-hidden className="size-4" />
                       Reconnect
                     </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      loading={disconnectMutation.isPending}
-                      onClick={() => disconnectMutation.mutate()}
-                    >
+                    <Button variant="danger" size="sm" loading={disconnectMutation.isPending} onClick={() => disconnectMutation.mutate()}>
                       <Unplug aria-hidden className="size-4" />
                       Disconnect
                     </Button>

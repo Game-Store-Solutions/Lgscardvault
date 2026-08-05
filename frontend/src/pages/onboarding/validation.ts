@@ -44,7 +44,7 @@ export function isStepValid(
     case 'plan':
       return Boolean(data.planKey)
     case 'payment':
-      return !ctx.paymentRequired || (data.payment.methodType !== '' && data.payment.nonce !== '')
+      return !ctx.paymentRequired || (data.payment.methodType !== '' && data.payment.token !== '')
     case 'review':
     default:
       return true

@@ -125,13 +125,111 @@ export interface GeocodeSuggestion {
   longitude: number | null
 }
 
-export type OnboardingPaymentMethod = 'paypal' | 'apple_pay' | 'google_pay' | 'card'
+export type PaymentMethodType = 'card' | 'apple_pay' | 'google_pay'
 
-export interface PaymentClientToken {
-  clientToken: string
-  mode: 'braintree' | 'mock'
+/** Store-scoped Square config for shopper checkout; contains no secrets. */
+export interface StoreCheckoutConfig {
+  enabled: boolean
+  applicationId: string
+  locationId: string
   environment: string
-  methods: OnboardingPaymentMethod[]
+  currency: string
+  countryCode: string
+}
+
+/** Public Square Web Payments SDK configuration; contains no secrets. */
+export interface PaymentClientConfig {
+  mode: 'square' | 'mock'
+  environment: string
+  applicationId: string
+  locationId: string
+  methods: PaymentMethodType[]
+  currency: string
+  countryCode: string
+}
+
+export interface StoreSubscriptionStatus extends PaymentClientConfig {
+  planKey?: string | null
+  planName?: string | null
+  priceCents: number
+  subscriptionStatus: string
+  paymentMethodType?: PaymentMethodType | null
+  paymentLast4?: string | null
+  paymentConfigured: boolean
+  /** End of the paid period, and therefore the date of the next charge. */
+  currentPeriodEnd?: string | null
+  lastChargedAt?: string | null
+  /** Consecutive declined renewals; non-zero means the card needs attention. */
+  failedAttempts: number
+  nextAttemptAt?: string | null
+}
+
+/** Platform-side view of what store owners pay the marketplace. */
+export interface AdminBillingSummary {
+  /** Recurring revenue from subscriptions currently in good standing. */
+  mrrCents: number
+  /** Value of subscriptions that are past due or suspended. */
+  overdueCents: number
+  collectedThisMonthCents: number
+  activeCount: number
+  pastDueCount: number
+  suspendedCount: number
+  freeCount: number
+  /** Subscriptions whose period has lapsed and are awaiting collection. */
+  dueCount: number
+}
+
+export interface AdminBillingMonth {
+  /** Calendar month as YYYY-MM. */
+  month: string
+  paidCents: number
+  paidCount: number
+  failedCount: number
+}
+
+export interface AdminSubscription {
+  slug: string
+  name?: string | null
+  planKey?: string | null
+  priceCents: number
+  subscriptionStatus: string
+  isActive: boolean
+  paymentMethodType?: PaymentMethodType | null
+  paymentLast4?: string | null
+  hasCardOnFile: boolean
+  currentPeriodEnd?: string | null
+  lastChargedAt?: string | null
+  failedAttempts: number
+  nextAttemptAt?: string | null
+  isOverdue: boolean
+  ownerEmail?: string | null
+}
+
+export interface AdminSubscriptionCharge {
+  id: number
+  storeSlug?: string | null
+  storeName?: string | null
+  planKey?: string | null
+  amountCents: number
+  status: 'paid' | 'failed'
+  reference?: string | null
+  failureReason?: string | null
+  attempt: number
+  createdAt: string
+}
+
+export interface AdminBilling {
+  summary: AdminBillingSummary
+  months: AdminBillingMonth[]
+  subscriptions: AdminSubscription[]
+  recentCharges: AdminSubscriptionCharge[]
+}
+
+export interface AdminBillingRetryResult {
+  outcome: string
+  detail: string
+  subscriptionStatus: string
+  currentPeriodEnd?: string | null
 }
 
 export interface CardFace {

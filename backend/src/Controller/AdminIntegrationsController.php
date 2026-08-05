@@ -4,7 +4,8 @@ namespace App\Controller;
 
 use App\Service\Auth\OidcClient;
 use App\Service\Onboarding\AddressAutocompleteClient;
-use App\Service\Onboarding\PaymentGatewayClient;
+use App\Service\Payments\SquareCredentials;
+use App\Service\Payments\SubscriptionBillingInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -22,7 +23,8 @@ class AdminIntegrationsController extends AbstractController
     public function __construct(
         private readonly OidcClient $oidc,
         private readonly AddressAutocompleteClient $addressClient,
-        private readonly PaymentGatewayClient $paymentGateway,
+        private readonly SubscriptionBillingInterface $billing,
+        private readonly SquareCredentials $credentials,
     ) {
     }
 
@@ -41,10 +43,10 @@ class AdminIntegrationsController extends AbstractController
                 'envKeys' => ['MAPBOX_ACCESS_TOKEN'],
             ],
             'subscriptionPayments' => [
-                'configured' => $this->paymentGateway->isLive(),
-                'mode' => $this->paymentGateway->isLive() ? 'braintree' : 'mock',
-                'provider' => 'Braintree',
-                'envKeys' => ['BRAINTREE_MERCHANT_ID', 'BRAINTREE_PUBLIC_KEY', 'BRAINTREE_PRIVATE_KEY'],
+                'configured' => $this->billing->isLive(),
+                'mode' => $this->billing->isLive() ? 'square' : 'mock',
+                'provider' => 'Square',
+                'envKeys' => $this->credentials->envKeys(),
             ],
         ]);
     }

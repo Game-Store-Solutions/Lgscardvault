@@ -141,6 +141,15 @@ class Order
     #[Groups(['order:read'])]
     private int $creditAppliedCents = 0;
 
+    /** Cash actually captured by the store's processor, in cents (total minus credit). */
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['order:read'])]
+    private int $paidCents = 0;
+
+    /** Processor payment id, used to issue refunds when an order is cancelled. */
+    #[ORM\Column(length: 128, nullable: true)]
+    private ?string $paymentReference = null;
+
     #[ORM\Column]
     #[Groups(['order:read'])]
     private \DateTimeImmutable $createdAt;
@@ -292,6 +301,30 @@ class Order
     public function setTotalCents(int $totalCents): static
     {
         $this->totalCents = $totalCents;
+
+        return $this;
+    }
+
+    public function getPaidCents(): int
+    {
+        return $this->paidCents;
+    }
+
+    public function setPaidCents(int $paidCents): static
+    {
+        $this->paidCents = max(0, $paidCents);
+
+        return $this;
+    }
+
+    public function getPaymentReference(): ?string
+    {
+        return $this->paymentReference;
+    }
+
+    public function setPaymentReference(?string $paymentReference): static
+    {
+        $this->paymentReference = $paymentReference;
 
         return $this;
     }

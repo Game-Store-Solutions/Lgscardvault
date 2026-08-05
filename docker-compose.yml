@@ -1,3 +1,7 @@
+# Pinned so this checkout reuses the existing `store` stack (and its Postgres
+# volume) instead of creating a second one that fights for ports 5432/1025/8025.
+name: store
+
 services:
   postgres:
     image: postgres:16-alpine

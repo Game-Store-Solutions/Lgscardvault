@@ -276,15 +276,46 @@ class Store
 
     // --- Subscription plan / tier (selected during onboarding) ---
 
+    /** Never billed: free tier, or a paid store that has not paid yet. */
+    public const SUBSCRIPTION_INACTIVE = 'inactive';
+    /** Signed up but the card was never captured — no access to paid features. */
+    public const SUBSCRIPTION_PAYMENT_REQUIRED = 'payment_required';
+    /** Paid through {@see $currentPeriodEnd}. */
+    public const SUBSCRIPTION_ACTIVE = 'active';
+    /** A renewal was declined; still being retried under the dunning schedule. */
+    public const SUBSCRIPTION_PAST_DUE = 'past_due';
+    /** Dunning exhausted. Requires a new card, and a human decision to restore. */
+    public const SUBSCRIPTION_SUSPENDED = 'suspended';
+
     #[ORM\Column(length: 32, nullable: true)]
     #[Groups(['store:read', 'store:admin'])]
     private ?string $planKey = null;
 
     #[ORM\Column(length: 32, options: ['default' => 'inactive'])]
     #[Groups(['store:admin'])]
-    private string $subscriptionStatus = 'inactive';
+    private string $subscriptionStatus = self::SUBSCRIPTION_INACTIVE;
 
-    /** paypal | apple_pay | google_pay | card */
+    /**
+     * End of the period already paid for, and therefore the moment the next
+     * renewal falls due. Null for free tiers, which are never charged.
+     */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['store:admin'])]
+    private ?\DateTimeImmutable $currentPeriodEnd = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['store:admin'])]
+    private ?\DateTimeImmutable $lastChargedAt = null;
+
+    /** Consecutive failed renewal attempts; reset to zero on any success. */
+    #[ORM\Column(options: ['default' => 0])]
+    private int $billingAttempts = 0;
+
+    /** Dunning backoff — the renewal is not retried before this moment. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $nextAttemptAt = null;
+
+    /** card | apple_pay | google_pay */
     #[ORM\Column(length: 32, nullable: true)]
     #[Groups(['store:admin'])]
     private ?string $paymentMethodType = null;
@@ -297,6 +328,14 @@ class Store
     #[ORM\Column(length: 8, nullable: true)]
     #[Groups(['store:admin'])]
     private ?string $paymentLast4 = null;
+
+    /** Processor customer id holding the vaulted subscription card. Never exposed by the API. */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $paymentCustomerId = null;
+
+    /** Processor id of the card on file charged for renewals. Never exposed by the API. */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $paymentCardId = null;
 
     #[ORM\Column]
     #[Groups(['store:read', 'store:admin'])]
@@ -813,6 +852,88 @@ class Store
         return $this;
     }
 
+    public function getCurrentPeriodEnd(): ?\DateTimeImmutable
+    {
+        return $this->currentPeriodEnd;
+    }
+
+    public function setCurrentPeriodEnd(?\DateTimeImmutable $currentPeriodEnd): static
+    {
+        $this->currentPeriodEnd = $currentPeriodEnd;
+
+        return $this;
+    }
+
+    public function getLastChargedAt(): ?\DateTimeImmutable
+    {
+        return $this->lastChargedAt;
+    }
+
+    public function getBillingAttempts(): int
+    {
+        return $this->billingAttempts;
+    }
+
+    public function getNextAttemptAt(): ?\DateTimeImmutable
+    {
+        return $this->nextAttemptAt;
+    }
+
+    public function setNextAttemptAt(?\DateTimeImmutable $nextAttemptAt): static
+    {
+        $this->nextAttemptAt = $nextAttemptAt;
+
+        return $this;
+    }
+
+    /** True once the paid period has lapsed and no backoff is pending. */
+    public function isRenewalDue(\DateTimeImmutable $now): bool
+    {
+        if (null === $this->currentPeriodEnd || $this->currentPeriodEnd > $now) {
+            return false;
+        }
+
+        return null === $this->nextAttemptAt || $this->nextAttemptAt <= $now;
+    }
+
+    /**
+     * Advance to the next monthly period after a successful charge.
+     *
+     * Measured from the previous period end rather than "now" so that a cron
+     * that runs late — or a retry days into dunning — never shortens or shifts
+     * the owner's billing date.
+     */
+    public function markSubscriptionCharged(\DateTimeImmutable $now): static
+    {
+        $anchor = $this->currentPeriodEnd ?? $now;
+
+        // A long outage could leave the anchor several periods behind; walk it
+        // forward so we bill one period rather than immediately falling due again.
+        do {
+            $anchor = $anchor->modify('+1 month');
+        } while ($anchor <= $now);
+
+        $this->currentPeriodEnd = $anchor;
+        $this->lastChargedAt = $now;
+        $this->billingAttempts = 0;
+        $this->nextAttemptAt = null;
+        $this->subscriptionStatus = self::SUBSCRIPTION_ACTIVE;
+
+        return $this;
+    }
+
+    /** Record a declined renewal and schedule the next attempt. */
+    public function markSubscriptionAttemptFailed(\DateTimeImmutable $now, ?\DateTimeImmutable $retryAt): static
+    {
+        ++$this->billingAttempts;
+        $this->nextAttemptAt = $retryAt;
+        $this->subscriptionStatus = null === $retryAt
+            ? self::SUBSCRIPTION_SUSPENDED
+            : self::SUBSCRIPTION_PAST_DUE;
+
+        return $this;
+    }
+
     public function getPaymentMethodType(): ?string
     {
         return $this->paymentMethodType;
@@ -845,6 +966,30 @@ class Store
     public function setPaymentLast4(?string $paymentLast4): static
     {
         $this->paymentLast4 = $paymentLast4;
+
+        return $this;
+    }
+
+    public function getPaymentCustomerId(): ?string
+    {
+        return $this->paymentCustomerId;
+    }
+
+    public function setPaymentCustomerId(?string $paymentCustomerId): static
+    {
+        $this->paymentCustomerId = $paymentCustomerId;
+
+        return $this;
+    }
+
+    public function getPaymentCardId(): ?string
+    {
+        return $this->paymentCardId;
+    }
+
+    public function setPaymentCardId(?string $paymentCardId): static
+    {
+        $this->paymentCardId = $paymentCardId;
 
         return $this;
     }

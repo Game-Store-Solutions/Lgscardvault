@@ -9,6 +9,7 @@ use App\Repository\StorePaymentAccountRepository;
 use App\Repository\StoreRepository;
 use App\Service\Payments\SignedOAuthState;
 use App\Service\Payments\SquareOAuthClient;
+use App\Service\Payments\StoreCheckoutGateway;
 use App\Service\Security\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +28,7 @@ final class StorePaymentController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly SignedOAuthState $oauthState,
         private readonly SquareOAuthClient $squareOAuthClient,
+        private readonly StoreCheckoutGateway $checkoutGateway,
         private readonly SecretCipher $secretCipher,
     ) {
     }
@@ -148,6 +150,10 @@ final class StorePaymentController extends AbstractController
                 $this->entityManager->persist($account);
             }
             $this->entityManager->flush();
+
+            // OAuth never returns a location, but checkout cannot run without
+            // one. A failure here is recoverable — the gateway retries lazily.
+            $this->checkoutGateway->syncLocation($account);
 
             return $this->redirectToAdminPayments($storeSlug, 'connected');
         } catch (\Throwable) {

@@ -22,6 +22,12 @@ class StorePaymentAccountRepository extends ServiceEntityRepository
         return $this->findOneBy(['store' => $store, 'provider' => $provider]);
     }
 
+    /** Webhooks identify the store only by Square's merchant id. */
+    public function findOneByMerchantId(string $merchantId, string $provider = StorePaymentAccount::PROVIDER_SQUARE): ?StorePaymentAccount
+    {
+        return $this->findOneBy(['providerMerchantId' => $merchantId, 'provider' => $provider]);
+    }
+
     public function getOrCreateForStoreAndProvider(Store $store, string $provider): StorePaymentAccount
     {
         $account = $this->findOneForStoreAndProvider($store, $provider);

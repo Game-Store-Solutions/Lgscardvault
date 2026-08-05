@@ -11,7 +11,7 @@ use App\Entity\User;
 use App\Enum\OrderStatus;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\UserRepository;
-use App\Service\CaseCards\SectionSaleAllocator;
+use App\Service\Checkout\OrderStockReleaser;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
@@ -24,8 +24,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         private EntityManagerInterface $entityManager,
         private UserRepository $userRepository,
         private CustomerNotificationRepository $notificationRepository,
-        private SectionSaleAllocator $sectionSaleAllocator,
-        private \App\Service\Credit\StoreCreditLedger $creditLedger,
+        private OrderStockReleaser $stockReleaser,
         private MailerInterface $mailer,
     ) {
     }
@@ -47,11 +46,9 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
     }
 
     /**
-     * Entering CANCELLED/REFUNDED returns each line's stock: the purchased
-     * copies go back onto the inventory listing (checkout consumed them at
-     * placement), and case copies go back to their section pool. Both states
-     * are terminal in the status state machine, so stock can never be
-     * double-restored.
+     * Entering CANCELLED/REFUNDED returns each line's stock and any store
+     * credit spent. Both states are terminal in the status state machine, so
+     * stock can never be double-restored.
      */
     private function releaseCasePoolsIfNeeded(Order $order, mixed $originalStatus): void
     {
@@ -62,41 +59,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
             return;
         }
 
-        foreach ($order->getLines() as $line) {
-            $item = $line->getInventoryItem();
-            if (null !== $item) {
-                $item->setQuantity($item->getQuantity() + $line->getQuantity());
-            }
-
-            // Sealed lines restock their own listing; they never sit in a
-            // display-case section, so there is no pool to release.
-            $sealedItem = $line->getSealedInventoryItem();
-            if (null !== $sealedItem) {
-                $sealedItem->setQuantity($sealedItem->getQuantity() + $line->getQuantity());
-                $sealedItem->touch();
-            }
-
-            $this->sectionSaleAllocator->releaseLine($line);
-        }
-
-        // Store credit spent on the order comes back with the stock. The
-        // terminal-state guard above makes this a one-shot refund.
-        $store = $order->getStore();
-        if ($order->getCreditAppliedCents() > 0 && $store instanceof Store) {
-            $customer = null !== $order->getCustomerEmail()
-                ? $this->userRepository->findOneBy(['email' => $order->getCustomerEmail()])
-                : null;
-            if ($customer instanceof User) {
-                $this->creditLedger->grant(
-                    $store,
-                    $customer,
-                    $order->getCreditAppliedCents(),
-                    \App\Entity\StoreCreditTransaction::KIND_ORDER,
-                    order: $order,
-                    note: sprintf('Refund for order %s', $order->getReference()),
-                );
-            }
-        }
+        $this->stockReleaser->release($order);
     }
 
     private function createFulfilledNotificationIfNeeded(Order $order, mixed $originalStatus): void

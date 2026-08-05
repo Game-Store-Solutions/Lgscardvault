@@ -1,4 +1,4 @@
-import type { CardDisplayStyle, OnboardingPaymentMethod } from '../../api/types'
+import type { CardDisplayStyle, PaymentMethodType } from '../../api/types'
 import type { StorePreviewBranding } from '../../components/store'
 
 export interface OnboardingBranding {
@@ -29,9 +29,12 @@ export interface OnboardingAddress {
 }
 
 export interface OnboardingPayment {
-  methodType: OnboardingPaymentMethod | ''
-  nonce: string
+  methodType: PaymentMethodType | ''
+  /** Single-use Square payment token from the Web Payments SDK. */
+  token: string
   last4: string
+  /** Optional Strong Customer Authentication token from verifyBuyer(). */
+  verificationToken: string
 }
 
 export interface OnboardingData {
@@ -83,7 +86,7 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     cardDisplayStyle: 'gallery',
   },
   planKey: '',
-  payment: { methodType: '', nonce: '', last4: '' },
+  payment: { methodType: '', token: '', last4: '', verificationToken: '' },
 }
 
 /** Shared state-updater signatures, so step components stay terse. */

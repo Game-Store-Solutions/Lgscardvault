@@ -66,3 +66,21 @@ when@test:
         App\Service\Scryfall\ScryfallClient:
             alias: App\Tests\Support\FakeScryfallClient
             public: true
+
+        # Same idea for card checkout: exercise the money paths (capture,
+        # decline, rollback) without reaching Square.
+        App\Tests\Support\FakeCheckoutGateway:
+            autowire: true
+            public: true
+        App\Service\Payments\CheckoutGatewayInterface:
+            alias: App\Tests\Support\FakeCheckoutGateway
+            public: true
+
+        # And for the owner's subscription to the platform, so renewals and
+        # dunning can be driven through declines without charging anything.
+        App\Tests\Support\FakeSubscriptionBilling:
+            autowire: true
+            public: true
+        App\Service\Payments\SubscriptionBillingInterface:
+            alias: App\Tests\Support\FakeSubscriptionBilling
+            public: true

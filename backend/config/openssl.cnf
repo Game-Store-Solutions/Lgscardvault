@@ -1,0 +1,13 @@
+# Minimal OpenSSL config for JWT key generation on Windows when
+# OPENSSL_CONF points at a missing PostgreSQL ODBC path.
+openssl_conf = openssl_init
+
+[openssl_init]
+
+[req]
+default_bits = 4096
+prompt = no
+default_md = sha256
+distinguished_name = dn
+
+[dn]

@@ -1,0 +1,40 @@
+# systemd unit for the schedule ticker: it turns the recurring definitions in
+# src/Scheduler/ into queued messages (nightly catalog syncs and subscription
+# renewals). It only dispatches; mtgstore-worker@ executes the work, so without
+# this unit neither ever fires.
+#
+# Deliberately NOT a template unit like mtgstore-worker@: exactly one ticker
+# must run. A second would emit every recurring message twice. Renewals are
+# idempotent per billing period so that would not double-charge, but catalog
+# syncs would run twice for nothing.
+#
+# Install: copy to /etc/systemd/system/, edit User/WorkingDirectory/Environment,
+# then `systemctl daemon-reload && systemctl enable --now mtgstore-scheduler`.
+
+[Unit]
+Description=MTG Store schedule ticker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/mtgstore/backend
+# Secrets are injected via the environment file (NOT the committed .env).
+EnvironmentFile=/etc/mtgstore/worker.env
+Environment=APP_ENV=prod
+
+# Same memory/time bounding as the worker. The schedule is stateful, so a
+# restart replays a tick that was missed while the process was down.
+ExecStart=/usr/bin/php bin/console messenger:consume scheduler_catalog scheduler_billing \
+    --time-limit=3600 \
+    --memory-limit=256M \
+    -v
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
