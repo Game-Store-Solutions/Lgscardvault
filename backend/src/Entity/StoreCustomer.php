@@ -40,6 +40,18 @@ class StoreCustomer
     #[ORM\Column(length: 7, nullable: true)]
     private ?string $paymentExpires = null;
 
+    /** Square customer on the store merchant account (server-side only). */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $paymentCustomerId = null;
+
+    /** Vaulted card id for repeat checkout (server-side only). */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $paymentCardId = null;
+
+    /** card, apple_pay, or google_pay — how the saved method was tokenized. */
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $paymentMethodType = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -157,6 +169,45 @@ class StoreCustomer
     public function setPaymentExpires(?string $paymentExpires): static
     {
         $this->paymentExpires = $paymentExpires;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function getPaymentCustomerId(): ?string
+    {
+        return $this->paymentCustomerId;
+    }
+
+    public function setPaymentCustomerId(?string $paymentCustomerId): static
+    {
+        $this->paymentCustomerId = $paymentCustomerId;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function getPaymentCardId(): ?string
+    {
+        return $this->paymentCardId;
+    }
+
+    public function setPaymentCardId(?string $paymentCardId): static
+    {
+        $this->paymentCardId = $paymentCardId;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function getPaymentMethodType(): ?string
+    {
+        return $this->paymentMethodType;
+    }
+
+    public function setPaymentMethodType(?string $paymentMethodType): static
+    {
+        $this->paymentMethodType = $paymentMethodType;
         $this->touch();
 
         return $this;

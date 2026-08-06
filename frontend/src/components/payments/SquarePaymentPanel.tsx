@@ -43,6 +43,7 @@ export function SquarePaymentPanel({
   confirmLabel = 'Save payment method',
   paymentRequestLabel = 'Total',
   layout = 'checkout',
+  saveOnly = false,
   onTokenized,
 }: {
   applicationId: string
@@ -56,6 +57,8 @@ export function SquarePaymentPanel({
   paymentRequestLabel?: string
   /** checkout = wallets first (cart); vault = card form only (admin subscription). */
   layout?: 'checkout' | 'vault'
+  /** Save card/wallet without charging — enables express checkout at $0.01 for the wallet SDK. */
+  saveOnly?: boolean
   onTokenized: (payment: TokenizedPayment) => void
 }) {
   const { payments, loading, error: loadError } = useSquarePayments(applicationId, locationId, environment)
@@ -70,8 +73,10 @@ export function SquarePaymentPanel({
   const [error, setError] = useState('')
   const [walletsChecked, setWalletsChecked] = useState(false)
 
-  const walletsEnabled = priceCents > 0 && layout === 'checkout'
-  const amount = (priceCents / 100).toFixed(2)
+  const walletsEnabled = layout === 'checkout' && (priceCents > 0 || saveOnly)
+  const walletDisplayCents = saveOnly && priceCents <= 0 ? 1 : priceCents
+  const amount = (walletDisplayCents / 100).toFixed(2)
+  const vaultIntent = saveOnly || priceCents <= 0
   const showExpress = walletsEnabled && (googlePay || applePay)
   const showWalletDivider = showExpress
 
@@ -160,9 +165,9 @@ export function SquarePaymentPanel({
     try {
       const result = await payments.verifyBuyer(
         token,
-        priceCents > 0
-          ? { amount, currencyCode: currency, intent: 'CHARGE_AND_STORE', billingContact }
-          : { intent: 'STORE', billingContact },
+        vaultIntent
+          ? { intent: 'STORE', billingContact }
+          : { amount, currencyCode: currency, intent: 'CHARGE_AND_STORE', billingContact },
       )
       return result?.token ?? ''
     } catch {
@@ -268,6 +273,11 @@ export function SquarePaymentPanel({
   return (
     <div className="space-y-4">
       {sandboxBanner}
+      {saveOnly && (
+        <p className="text-xs leading-5 text-fg-muted">
+          Your payment method is saved securely with this store&apos;s Square account. You are not charged now.
+        </p>
+      )}
 
       {layout === 'checkout' ? (
         <>

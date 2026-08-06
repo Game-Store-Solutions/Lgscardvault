@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { cardImage, formatPrice, formatScryfallPrice, httpStatus } from '../api/client'
-import type { CardSummary, SellSubmission, StoreCreditSummary, StoreCustomer } from '../api/types'
+import type { CardSummary, SellSubmission, StoreCheckoutConfig, StoreCreditSummary, StoreCustomer } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import {
   customerKeys,
@@ -37,11 +37,14 @@ import {
   TabPanel,
   Textarea,
 } from '../components/ui'
-import { BellRing, HandCoins, Heart, ImageOff, ListPlus, PackageOpen, PiggyBank, Plus, ReceiptText, Save, Search, Smile, Sparkles, Trash2, WalletCards, X } from 'lucide-react'
+import { BellRing, CheckCircle2, CreditCard, HandCoins, Heart, ImageOff, ListPlus, PackageOpen, PiggyBank, Plus, ReceiptText, Save, Search, Smile, Sparkles, Trash2, WalletCards, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
+import { SquarePaymentPanel, type TokenizedPayment } from '../components/payments/SquarePaymentPanel'
+import { isDevBuild } from '../lib/runtimeEnv'
+import { METHOD_LABELS } from './onboarding/config'
 
 type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade' | 'credit' | 'notifications'
 const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade', 'credit', 'notifications']
@@ -416,13 +419,6 @@ function StoreCreditPanel({
 const profileSchema = z.object({
   phone: z.string().max(255),
   shippingAddress: z.string(),
-  paymentBrand: z.string().max(40),
-  paymentLast4: z
-    .string()
-    .refine((v) => v === '' || /^\d{4}$/.test(v), 'Enter the last 4 digits.'),
-  paymentExpires: z
-    .string()
-    .refine((v) => v === '' || /^(0[1-9]|1[0-2])\/(\d{2}|\d{4})$/.test(v), 'Use MM/YY or MM/YYYY.'),
 })
 
 type ProfileForm = z.infer<typeof profileSchema>
@@ -430,9 +426,6 @@ type ProfileForm = z.infer<typeof profileSchema>
 const EMPTY_PROFILE: ProfileForm = {
   phone: '',
   shippingAddress: '',
-  paymentBrand: '',
-  paymentLast4: '',
-  paymentExpires: '',
 }
 
 /**
@@ -442,9 +435,18 @@ const EMPTY_PROFILE: ProfileForm = {
  */
 function ProfilePanel({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [saved, setSaved] = useState(false)
 
   const profileQuery = useCustomerProfile(slug)
+
+  const checkoutConfigQuery = useQuery({
+    queryKey: ['store-checkout-config', slug],
+    queryFn: async () => {
+      const { data } = await api.get<StoreCheckoutConfig>(`/stores/${slug}/customer/checkout/config`)
+      return data
+    },
+  })
 
   const {
     register,
@@ -456,16 +458,12 @@ function ProfilePanel({ slug }: { slug: string }) {
     defaultValues: EMPTY_PROFILE,
   })
 
-  // Populate the form once the profile loads (or when switching stores).
   useEffect(() => {
     const data = profileQuery.data
     if (!data) return
     reset({
       phone: data.phone ?? '',
       shippingAddress: data.shippingAddress ?? '',
-      paymentBrand: data.paymentBrand ?? '',
-      paymentLast4: data.paymentLast4 ?? '',
-      paymentExpires: data.paymentExpires ?? '',
     })
   }, [profileQuery.data, reset])
 
@@ -479,11 +477,22 @@ function ProfilePanel({ slug }: { slug: string }) {
       reset({
         phone: data.phone ?? '',
         shippingAddress: data.shippingAddress ?? '',
-        paymentBrand: data.paymentBrand ?? '',
-        paymentLast4: data.paymentLast4 ?? '',
-        paymentExpires: data.paymentExpires ?? '',
       })
       setSaved(true)
+    },
+  })
+
+  const paymentMutation = useMutation({
+    mutationFn: async (payment: TokenizedPayment) => {
+      const { data } = await api.post<StoreCustomer>(`/stores/${slug}/customer/payment-method`, {
+        methodType: payment.methodType,
+        token: payment.token,
+        verificationToken: payment.verificationToken,
+      })
+      return data
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(customerKeys.profile(slug), data)
     },
   })
 
@@ -492,78 +501,126 @@ function ProfilePanel({ slug }: { slug: string }) {
     return <ErrorState title="Could not load your profile." onRetry={() => void profileQuery.refetch()} />
   }
 
+  const profile = profileQuery.data
+  const checkout = checkoutConfigQuery.data
+  const squareReady = Boolean(checkout?.enabled)
+
   return (
-    <form
-      onSubmit={handleSubmit((values) => {
-        setSaved(false)
-        mutation.mutate(values)
-      })}
-      className="grid gap-6 lg:grid-cols-2"
-    >
-      <Card>
-        <CardHeader title="Contact &amp; shipping" subtitle="How this store reaches you for orders." />
-        <CardBody className="space-y-4">
-          <Input label="Phone" placeholder="(555) 123-4567" error={errors.phone?.message} {...register('phone')} />
-          <Textarea
-            label="Shipping address"
-            placeholder="Street, city, state, ZIP"
-            rows={4}
-            error={errors.shippingAddress?.message}
-            {...register('shippingAddress')}
-          />
-        </CardBody>
-      </Card>
+    <div className="grid gap-6 lg:grid-cols-2">
+      <form
+        onSubmit={handleSubmit((values) => {
+          setSaved(false)
+          mutation.mutate(values)
+        })}
+        className="contents"
+      >
+        <Card>
+          <CardHeader title="Contact &amp; shipping" subtitle="How this store reaches you for orders." />
+          <CardBody className="space-y-4">
+            <Input label="Phone" placeholder="(555) 123-4567" error={errors.phone?.message} {...register('phone')} />
+            <Textarea
+              label="Shipping address"
+              placeholder="Street, city, state, ZIP"
+              rows={4}
+              error={errors.shippingAddress?.message}
+              {...register('shippingAddress')}
+            />
+            <div className="flex items-center gap-4 pt-1">
+              <Button type="submit" loading={mutation.isPending} disabled={!isDirty && !mutation.isPending}>
+                <Save aria-hidden className="size-4" />
+                Save changes
+              </Button>
+              {saved && !isDirty && (
+                <span role="status" className="text-sm font-medium text-success-700">
+                  Profile saved.
+                </span>
+              )}
+              {mutation.isError && (
+                <span role="alert" className="text-sm font-medium text-danger-700">
+                  Could not save your profile. Please try again.
+                </span>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      </form>
 
       <Card>
         <CardHeader
           title="Payment method"
-          subtitle="Stored for reference only — never the full card number."
+          subtitle={
+            squareReady
+              ? 'Save a card or wallet with this store for faster checkout.'
+              : 'This store has not enabled Square checkout yet.'
+          }
         />
         <CardBody className="space-y-4">
-          <Input
-            label="Card brand"
-            placeholder="Visa, Mastercard…"
-            error={errors.paymentBrand?.message}
-            {...register('paymentBrand')}
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Last 4 digits"
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="4242"
-              error={errors.paymentLast4?.message}
-              {...register('paymentLast4')}
+          {profile?.paymentConfigured && profile.paymentLast4 ? (
+            <p className="rounded-btn border border-border bg-bg px-3 py-2 text-sm text-fg">
+              <span className="font-semibold">
+                {profile.paymentMethodType
+                  ? METHOD_LABELS[profile.paymentMethodType]
+                  : profile.paymentBrand ?? 'Card'}
+              </span>
+              {' · '}
+              <span className="font-mono">•••• {profile.paymentLast4}</span>
+              {profile.paymentExpires ? ` · exp ${profile.paymentExpires}` : ''}
+            </p>
+          ) : (
+            <p className="text-sm text-fg-muted">No payment method saved for this store yet.</p>
+          )}
+
+          {checkoutConfigQuery.isLoading ? (
+            <p className="text-sm text-fg-muted">Loading payment options…</p>
+          ) : squareReady && checkout ? (
+            <SquarePaymentPanel
+              applicationId={checkout.applicationId}
+              locationId={checkout.locationId}
+              environment={checkout.environment}
+              priceCents={0}
+              currency={checkout.currency}
+              countryCode={checkout.countryCode}
+              billingEmail={user?.email ?? ''}
+              confirmLabel="Save payment method"
+              paymentRequestLabel="Save payment method"
+              layout="checkout"
+              saveOnly
+              onTokenized={(p) => paymentMutation.mutate(p)}
             />
-            <Input
-              label="Expires"
-              placeholder="MM/YYYY"
-              error={errors.paymentExpires?.message}
-              {...register('paymentExpires')}
-            />
-          </div>
+          ) : isDevBuild ? (
+            <Button
+              variant="secondary"
+              loading={paymentMutation.isPending}
+              onClick={() =>
+                paymentMutation.mutate({
+                  methodType: 'card',
+                  token: `mock-card-${Date.now().toString(36)}`,
+                  last4: '4242',
+                  verificationToken: '',
+                })
+              }
+            >
+              <CreditCard aria-hidden className="size-4" />
+              Simulate save (dev — store needs Square)
+            </Button>
+          ) : null}
+
+          {paymentMutation.isSuccess && (
+            <p className="flex items-center gap-2 text-sm font-medium text-success-700">
+              <CheckCircle2 aria-hidden className="size-4" />
+              Payment method saved.
+            </p>
+          )}
+          {paymentMutation.isError && (
+            <p role="alert" className="text-sm font-medium text-danger-700">
+              {httpStatus(paymentMutation.error) === 402
+                ? 'Your payment could not be verified. Try again or use another method.'
+                : 'Could not save your payment method. Please try again.'}
+            </p>
+          )}
         </CardBody>
       </Card>
-
-      <div className="flex items-center gap-4 lg:col-span-2">
-        <Button type="submit" loading={mutation.isPending} disabled={!isDirty && !mutation.isPending}>
-          <Save aria-hidden className="size-4" />
-          Save changes
-        </Button>
-        {saved && !isDirty && (
-          <span role="status" className="text-sm font-medium text-success-700">
-            Profile saved.
-          </span>
-        )}
-        {mutation.isError && (
-          <span role="alert" className="text-sm font-medium text-danger-700">
-            {httpStatus(mutation.error) === 422
-              ? 'Please check your payment details and try again.'
-              : 'Could not save your profile. Please try again.'}
-          </span>
-        )}
-      </div>
-    </form>
+    </div>
   )
 }
 

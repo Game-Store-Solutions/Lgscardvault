@@ -34,4 +34,10 @@ class StoreCustomerRepository extends ServiceEntityRepository
             ->setUser($user)
             ->setStore($store);
     }
+
+    /** @return list<StoreCustomer> */
+    public function findAllForUser(User $user): array
+    {
+        return $this->findBy(['user' => $user], ['updatedAt' => 'DESC']);
+    }
 }

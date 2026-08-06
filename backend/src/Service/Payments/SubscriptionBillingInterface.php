@@ -38,4 +38,19 @@ interface SubscriptionBillingInterface
      * @return array{reference: string, status: string}
      */
     public function chargeVaultedCard(string $customerId, string $cardId, int $priceCents, ?string $idempotencyKey = null): array;
+
+    /**
+     * Vault a shopper payment method on the platform merchant (marketplace wallet).
+     *
+     * @param array{email?: string, name?: string, reference?: string} $buyer
+     *
+     * @return array{customerId: string, cardId: string, last4: string|null, brand: string|null, expMonth: string|null, expYear: string|null}
+     */
+    public function vaultShopperPaymentMethod(
+        string $sourceId,
+        array $buyer = [],
+        ?string $existingCustomerId = null,
+        ?string $previousCardId = null,
+        ?string $verificationToken = null,
+    ): array;
 }

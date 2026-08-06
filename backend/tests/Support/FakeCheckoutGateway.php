@@ -45,6 +45,7 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
         ?string $verificationToken = null,
         ?string $referenceId = null,
         ?string $buyerEmail = null,
+        ?string $customerId = null,
     ): array {
         if (null !== $this->declineWith) {
             throw new \RuntimeException($this->declineWith);
@@ -63,8 +64,38 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
         ];
     }
 
+    public function chargeVaultedCard(
+        Store $store,
+        int $amountCents,
+        string $customerId,
+        string $cardId,
+        string $idempotencyKey,
+        ?string $referenceId = null,
+        ?string $buyerEmail = null,
+    ): array {
+        return $this->charge($store, $amountCents, $cardId, $idempotencyKey, null, $referenceId, $buyerEmail, $customerId);
+    }
+
     public function refund(Store $store, string $paymentId, int $amountCents, string $idempotencyKey, ?string $reason = null): array
     {
         return ['refundId' => 'sqrfd_1', 'status' => 'COMPLETED'];
+    }
+
+    public function vaultPaymentMethod(
+        Store $store,
+        string $sourceId,
+        ?string $verificationToken,
+        array $buyer,
+        ?string $existingCustomerId,
+        ?string $previousCardId,
+    ): array {
+        return [
+            'customerId' => $existingCustomerId ?? 'sqcust_test',
+            'cardId' => 'sqcard_'.bin2hex(random_bytes(4)),
+            'last4' => '4242',
+            'brand' => 'VISA',
+            'expMonth' => '12',
+            'expYear' => '2030',
+        ];
     }
 }

@@ -90,7 +90,8 @@ final class SubscriptionBillingClient implements SubscriptionBillingInterface
 
         $customerId = $this->createCustomer($buyer);
         $card = $this->createCard($customerId, $sourceId, $verificationToken);
-        $payment = $this->createPayment($customerId, $card['id'], $priceCents, $verificationToken);
+        // Verification tokens are single-use; card creation consumes it. Charge the vaulted card id instead.
+        $payment = $this->createPayment($customerId, $card['id'], $priceCents, null);
 
         return [
             'reference' => $payment,
@@ -129,6 +130,52 @@ final class SubscriptionBillingClient implements SubscriptionBillingInterface
         }
 
         return $card;
+    }
+
+    /**
+     * @param array{email?: string, name?: string, reference?: string} $buyer
+     *
+     * @return array{customerId: string, cardId: string, last4: string|null, brand: string|null, expMonth: string|null, expYear: string|null}
+     */
+    public function vaultShopperPaymentMethod(
+        string $sourceId,
+        array $buyer = [],
+        ?string $existingCustomerId = null,
+        ?string $previousCardId = null,
+        ?string $verificationToken = null,
+    ): array {
+        if (!$this->isLive()) {
+            return [
+                'customerId' => 'mock-customer-'.bin2hex(random_bytes(4)),
+                'cardId' => 'mock-card-'.bin2hex(random_bytes(4)),
+                'last4' => '1111',
+                'brand' => 'VISA',
+                'expMonth' => '12',
+                'expYear' => '2030',
+            ];
+        }
+
+        $customerId = (null !== $existingCustomerId && '' !== $existingCustomerId)
+            ? $existingCustomerId
+            : $this->createCustomer($buyer);
+
+        $card = $this->createCard($customerId, $sourceId, $verificationToken);
+
+        if (null !== $previousCardId && '' !== $previousCardId && $previousCardId !== $card['cardId']) {
+            try {
+                $this->request('POST', '/v2/cards/'.rawurlencode($previousCardId).'/disable');
+            } catch (\RuntimeException) {
+            }
+        }
+
+        return [
+            'customerId' => $customerId,
+            'cardId' => $card['cardId'],
+            'last4' => $card['last4'],
+            'brand' => $card['brand'],
+            'expMonth' => $card['expMonth'],
+            'expYear' => $card['expYear'],
+        ];
     }
 
     /**
@@ -189,7 +236,7 @@ final class SubscriptionBillingClient implements SubscriptionBillingInterface
         return $id;
     }
 
-    /** @return array{id: string, cardId: string, last4: string|null, brand: string|null} */
+    /** @return array{id: string, cardId: string, last4: string|null, brand: string|null, expMonth: string|null, expYear: string|null} */
     private function createCard(string $customerId, string $sourceId, ?string $verificationToken): array
     {
         $payload = [
@@ -213,6 +260,8 @@ final class SubscriptionBillingClient implements SubscriptionBillingInterface
             'cardId' => $id,
             'last4' => isset($response['card']['last_4']) ? (string) $response['card']['last_4'] : null,
             'brand' => isset($response['card']['card_brand']) ? (string) $response['card']['card_brand'] : null,
+            'expMonth' => isset($response['card']['exp_month']) ? (string) $response['card']['exp_month'] : null,
+            'expYear' => isset($response['card']['exp_year']) ? (string) $response['card']['exp_year'] : null,
         ];
     }
 

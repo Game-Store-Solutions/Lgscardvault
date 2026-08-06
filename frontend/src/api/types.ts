@@ -428,6 +428,8 @@ export interface StoreCustomer {
   paymentBrand?: string | null
   paymentLast4?: string | null
   paymentExpires?: string | null
+  paymentMethodType?: PaymentMethodType | null
+  paymentConfigured?: boolean
   createdAt: string | null
   updatedAt: string | null
 }

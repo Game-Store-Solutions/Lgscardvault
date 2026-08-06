@@ -639,7 +639,7 @@ export default function StorePage() {
           ) : (
             <div className="space-y-6">
               {cardDisplayStyle === 'marketplace' ? (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
                   {visibleResults.map((item) => (
                     <MarketplaceCard
                       key={item.id}

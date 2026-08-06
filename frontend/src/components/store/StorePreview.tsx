@@ -82,23 +82,27 @@ export function StorePreview({
               >
                 <ImageOff aria-hidden className="size-5" />
               </div>
-              <div className="flex min-w-0 flex-1 flex-col justify-center">
-                <p className="truncate font-display text-sm font-extrabold tracking-tight text-fg">Sample Card {n}</p>
-                <p className="mt-0.5 text-xs leading-5 text-fg-muted">
-                  Preview Set
-                  <br />
-                  {n === 1 ? 'Mythic' : 'Rare'}, #{n}42
+              <div className="flex min-w-0 flex-1 flex-col py-0.5">
+                <p className="truncate text-lg font-semibold text-fg">Sample Card {n}</p>
+                <p className="mt-0.5 text-sm text-fg-muted">Preview Set</p>
+                <p className="mt-0.5 text-[13px] text-fg-muted">
+                  {n === 1 ? 'Mythic' : 'Rare'} · #{n}42
                 </p>
-                <p className="mt-2 text-xs font-medium text-fg">3 listings from</p>
-                <p className="font-display text-xl font-extrabold leading-none text-fg">${(n * 1.53).toFixed(2)}</p>
-                <p className="mt-1 text-xs font-bold text-fg">
-                  Market Price: <span className="text-success-700">${(n * 1.86).toFixed(2)}</span>
-                </p>
-                <div className="mt-2 max-w-32">
+                <div className="mt-3 flex flex-1 flex-col">
+                  <p className="text-xs text-fg-muted">3 listings</p>
+                  <p className="mt-0.5 font-display text-[2.125rem] font-bold leading-none text-fg">
+                    ${(n * 1.53).toFixed(2)}
+                  </p>
+                  <p className="mt-1.5 text-[13px] font-medium text-success-600">
+                    Market ${(n * 1.86).toFixed(2)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-fg-muted">NM / {n === 1 ? 'Foil' : 'Nonfoil'}</p>
+                  <div className="mt-auto max-w-32 pt-3">
                   <Button size="sm" className="w-full">
                     <ShoppingCart aria-hidden className="size-3.5" />
                     Add to cart
                   </Button>
+                </div>
                 </div>
               </div>
             </div>

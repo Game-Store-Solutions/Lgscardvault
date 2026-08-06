@@ -80,6 +80,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         ?string $verificationToken = null,
         ?string $referenceId = null,
         ?string $buyerEmail = null,
+        ?string $customerId = null,
     ): array {
         if ($amountCents <= 0) {
             throw new \RuntimeException('There is nothing to charge.');
@@ -111,6 +112,9 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         if (null !== $buyerEmail && '' !== $buyerEmail) {
             $payload['buyer_email_address'] = $buyerEmail;
         }
+        if (null !== $customerId && '' !== $customerId) {
+            $payload['customer_id'] = $customerId;
+        }
 
         $response = $this->request($account, 'POST', '/v2/payments', $payload);
         $paymentId = $response['payment']['id'] ?? null;
@@ -124,6 +128,27 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             'status' => (string) ($response['payment']['status'] ?? 'UNKNOWN'),
             'receiptUrl' => isset($response['payment']['receipt_url']) ? (string) $response['payment']['receipt_url'] : null,
         ];
+    }
+
+    public function chargeVaultedCard(
+        Store $store,
+        int $amountCents,
+        string $customerId,
+        string $cardId,
+        string $idempotencyKey,
+        ?string $referenceId = null,
+        ?string $buyerEmail = null,
+    ): array {
+        return $this->charge(
+            $store,
+            $amountCents,
+            $cardId,
+            $idempotencyKey,
+            null,
+            $referenceId,
+            $buyerEmail,
+            $customerId,
+        );
     }
 
     /**
@@ -148,6 +173,105 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         return [
             'refundId' => (string) ($response['refund']['id'] ?? ''),
             'status' => (string) ($response['refund']['status'] ?? 'UNKNOWN'),
+        ];
+    }
+
+    /**
+     * @param array{email?: string, name?: string, reference?: string} $buyer
+     *
+     * @return array{customerId: string, cardId: string, last4: string|null, brand: string|null, expMonth: string|null, expYear: string|null}
+     */
+    public function vaultPaymentMethod(
+        Store $store,
+        string $sourceId,
+        ?string $verificationToken,
+        array $buyer,
+        ?string $existingCustomerId,
+        ?string $previousCardId,
+    ): array {
+        $account = $this->connectedAccount($store);
+        if (null === $account) {
+            throw new \RuntimeException('This store is not accepting online payments right now.');
+        }
+
+        $customerId = (null !== $existingCustomerId && '' !== $existingCustomerId)
+            ? $existingCustomerId
+            : $this->createCustomer($account, $buyer);
+
+        $card = $this->createCard($account, $customerId, $sourceId, $verificationToken);
+
+        if (null !== $previousCardId && '' !== $previousCardId && $previousCardId !== $card['cardId']) {
+            try {
+                $this->request($account, 'POST', '/v2/cards/'.rawurlencode($previousCardId).'/disable', []);
+            } catch (\RuntimeException) {
+                // A stale card left enabled is harmless; the new one is on file.
+            }
+        }
+
+        return [
+            'customerId' => $customerId,
+            'cardId' => $card['cardId'],
+            'last4' => $card['last4'],
+            'brand' => $card['brand'],
+            'expMonth' => $card['expMonth'],
+            'expYear' => $card['expYear'],
+        ];
+    }
+
+    /** @param array{email?: string, name?: string, reference?: string} $buyer */
+    private function createCustomer(StorePaymentAccount $account, array $buyer): string
+    {
+        $payload = array_filter([
+            'idempotency_key' => bin2hex(random_bytes(16)),
+            'email_address' => $buyer['email'] ?? null,
+            'given_name' => $buyer['name'] ?? null,
+            'reference_id' => isset($buyer['reference']) ? mb_substr((string) $buyer['reference'], 0, 40) : null,
+        ], static fn (?string $value): bool => null !== $value && '' !== $value);
+
+        $response = $this->request($account, 'POST', '/v2/customers', $payload);
+        $id = $response['customer']['id'] ?? null;
+
+        if (!is_string($id) || '' === $id) {
+            throw new \RuntimeException('Could not save your payment profile.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * @return array{cardId: string, last4: string|null, brand: string|null, expMonth: string|null, expYear: string|null}
+     */
+    private function createCard(
+        StorePaymentAccount $account,
+        string $customerId,
+        string $sourceId,
+        ?string $verificationToken,
+    ): array {
+        $payload = [
+            'idempotency_key' => bin2hex(random_bytes(16)),
+            'source_id' => $sourceId,
+            'card' => ['customer_id' => $customerId],
+        ];
+        if (null !== $verificationToken && '' !== $verificationToken) {
+            $payload['verification_token'] = $verificationToken;
+        }
+
+        $response = $this->request($account, 'POST', '/v2/cards', $payload);
+        $id = $response['card']['id'] ?? null;
+
+        if (!is_string($id) || '' === $id) {
+            throw new \RuntimeException('Could not save your payment method.');
+        }
+
+        $expMonth = isset($response['card']['exp_month']) ? (string) $response['card']['exp_month'] : null;
+        $expYear = isset($response['card']['exp_year']) ? (string) $response['card']['exp_year'] : null;
+
+        return [
+            'cardId' => $id,
+            'last4' => isset($response['card']['last_4']) ? (string) $response['card']['last_4'] : null,
+            'brand' => isset($response['card']['card_brand']) ? (string) $response['card']['card_brand'] : null,
+            'expMonth' => $expMonth,
+            'expYear' => $expYear,
         ];
     }
 
