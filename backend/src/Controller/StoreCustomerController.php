@@ -10,7 +10,6 @@ use App\Entity\CustomerWantListEntry;
 use App\Entity\InventoryItem;
 use App\Entity\Order;
 use App\Entity\SealedInventoryItem;
-use App\Entity\OrderLine;
 use App\Entity\Store;
 use App\Service\Catalog\FinishVocabulary;
 use App\Entity\StoreCustomer;
@@ -28,6 +27,8 @@ use App\Enum\OrderStatus;
 use App\Service\Checkout\CartOrderBuilder;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
+use App\Service\Order\CustomerOrderPagination;
+use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CheckoutGatewayInterface;
 use App\Service\Payments\CustomerPaymentProfileSync;
 use App\Service\Payments\SubscriptionBillingInterface;
@@ -55,6 +56,7 @@ final class StoreCustomerController extends AbstractController
         private readonly InventoryItemRepository $inventoryRepository,
         private readonly CardRepository $cardRepository,
         private readonly OrderRepository $orderRepository,
+        private readonly CustomerOrderSerializer $customerOrderSerializer,
         private readonly \App\Service\Credit\StoreCreditLedger $creditLedger,
         private readonly CartOrderBuilder $orderBuilder,
         private readonly OrderStockReleaser $stockReleaser,
@@ -449,7 +451,7 @@ final class StoreCustomerController extends AbstractController
     }
 
     #[Route('/orders', name: 'api_store_customer_orders', methods: ['GET'])]
-    public function orders(string $slug): JsonResponse
+    public function orders(Request $request, string $slug): JsonResponse
     {
         $store = $this->resolveStore($slug);
         if (!$store instanceof Store) {
@@ -461,10 +463,23 @@ final class StoreCustomerController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        return $this->json(array_map(
-            $this->serializeOrder(...),
-            $this->orderRepository->findByStoreAndCustomerEmail($store, $user->getEmail()),
-        ));
+        $pagination = CustomerOrderPagination::fromRequest($request);
+        $email = $user->getEmail();
+        $orders = $this->orderRepository->findPageByStoreAndCustomerEmail(
+            $store,
+            $email,
+            $pagination['offset'],
+            $pagination['itemsPerPage'],
+        );
+        $total = $this->orderRepository->countByStoreAndCustomerEmail($store, $email);
+
+        return CustomerOrderPagination::toJson(
+            $orders,
+            $total,
+            $pagination['page'],
+            $pagination['itemsPerPage'],
+            $this->customerOrderSerializer,
+        );
     }
 
     #[Route('/notifications', name: 'api_store_customer_notifications', methods: ['GET'])]
@@ -587,7 +602,7 @@ final class StoreCustomerController extends AbstractController
 
         $this->entityManager->flush();
 
-        return $this->json($this->serializeOrder($order), 201);
+        return $this->json($this->customerOrderSerializer->serialize($order), 201);
     }
 
     /**
@@ -656,7 +671,7 @@ final class StoreCustomerController extends AbstractController
 
         $this->entityManager->flush();
 
-        return $this->json($this->serializeOrder($order), 201);
+        return $this->json($this->customerOrderSerializer->serialize($order), 201);
     }
 
     /**
@@ -736,7 +751,7 @@ final class StoreCustomerController extends AbstractController
             $order->setStatus(OrderStatus::PAID)->setPaidCents(0);
             $this->entityManager->flush();
 
-            return $this->json($this->serializeOrder($order), 201);
+            return $this->json($this->customerOrderSerializer->serialize($order), 201);
         }
 
         $useSavedCard = false;
@@ -773,7 +788,7 @@ final class StoreCustomerController extends AbstractController
 
         $this->entityManager->flush();
 
-        return $this->json($this->serializeOrder($order) + ['receiptUrl' => $payment['receiptUrl']], 201);
+        return $this->json($this->customerOrderSerializer->serialize($order) + ['receiptUrl' => $payment['receiptUrl']], 201);
     }
 
     /**
@@ -1142,44 +1157,6 @@ final class StoreCustomerController extends AbstractController
                 : null,
             'createdAt' => $entry->getCreatedAt()->format(DATE_ATOM),
             'updatedAt' => $entry->getUpdatedAt()->format(DATE_ATOM),
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    private function serializeOrder(Order $order): array
-    {
-        return [
-            'id' => $order->getId(),
-            'reference' => $order->getReference(),
-            'status' => $order->getStatus()->value,
-            'storeName' => $order->getStore()?->getName(),
-            'storeSlug' => $order->getStore()?->getSlug(),
-            'customerName' => $order->getCustomerName(),
-            'customerEmail' => $order->getCustomerEmail(),
-            'fulfillment' => $order->getFulfillment(),
-            'channel' => $order->getChannel(),
-            'totalCents' => $order->getTotalCents(),
-            'creditAppliedCents' => $order->getCreditAppliedCents(),
-            'paidCents' => $order->getPaidCents(),
-            'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
-            'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    private function serializeOrderLine(OrderLine $line): array
-    {
-        return [
-            'id' => $line->getId(),
-            'cardName' => $line->getCardName(),
-            'quantity' => $line->getQuantity(),
-            'priceCents' => $line->getPriceCents(),
-            'imageUris' => $line->getCard()?->getImageUris(),
-            'setCode' => $line->getCard()?->getSetCode(),
-            'collectorNumber' => $line->getCard()?->getCollectorNumber(),
-            'caseName' => $line->getCaseName(),
-            'sectionTitle' => $line->getSectionTitle(),
-            'caseQuantity' => $line->getCaseQuantity(),
         ];
     }
 

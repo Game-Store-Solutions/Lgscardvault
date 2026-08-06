@@ -98,8 +98,6 @@ final class StoreGameStatsTest extends WebTestCase
         self::assertSame(2, $mtg['singles']['listings']);
         self::assertSame(6, $mtg['singles']['copies']);
         self::assertSame(0, $mtg['sealed']['products'], 'One Piece sealed must not count toward Magic');
-        self::assertSame(2, $mtg['total']['listings']);
-        self::assertSame(6, $mtg['total']['copies']);
 
         // One Piece sees its singles AND its sealed, and nothing of Magic's.
         $onepiece = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/games/onepiece/stats");
@@ -107,13 +105,11 @@ final class StoreGameStatsTest extends WebTestCase
         self::assertSame(3, $onepiece['singles']['copies']);
         self::assertSame(1, $onepiece['sealed']['products']);
         self::assertSame(5, $onepiece['sealed']['units']);
-        self::assertSame(2, $onepiece['total']['listings'], 'singles listings + sealed products');
-        self::assertSame(8, $onepiece['total']['copies'], 'copies + units');
 
         // A game this store does not carry reports honest zeroes.
         $fab = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/games/fab/stats");
-        self::assertSame(0, $fab['total']['listings']);
-        self::assertSame(0, $fab['total']['copies']);
+        self::assertSame(0, $fab['singles']['copies']);
+        self::assertSame(0, $fab['sealed']['units']);
         self::assertSame('Flesh and Blood', $fab['gameName']);
     }
 

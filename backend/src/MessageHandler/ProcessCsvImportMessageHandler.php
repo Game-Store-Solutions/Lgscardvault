@@ -93,7 +93,7 @@ final readonly class ProcessCsvImportMessageHandler
             $this->syncCounters($job);
             $this->entityManager->flush();
 
-            $batchSize = 25;
+            $batchSize = 40;
             // Atomically claim the next batch so concurrent handlers never collide.
             $rows = $this->rowRepository->claimNextQueued($job, $batchSize);
             if ([] === $rows) {
@@ -330,9 +330,10 @@ final readonly class ProcessCsvImportMessageHandler
 
         foreach ($rows as $row) {
             $finish = $row->isFoil() ? 'foil' : 'nonfoil';
+            $setCode = $this->catalogCardResolver->normalizeSetCode($row->getSetCode());
             $card = $this->catalogCardResolver->matchLocal(
                 $row->getName(),
-                $row->getSetCode(),
+                $setCode,
                 $row->getCollectorNumber(),
                 $row->getRarity(),
                 $finish,
@@ -343,7 +344,7 @@ final readonly class ProcessCsvImportMessageHandler
                 continue;
             }
 
-            if ('' !== trim($row->getSetCode()) && '' !== trim($row->getCollectorNumber())) {
+            if ('' !== trim($setCode) && '' !== trim($row->getCollectorNumber())) {
                 $missing[] = $row;
             }
         }
@@ -352,25 +353,28 @@ final readonly class ProcessCsvImportMessageHandler
             return $resolved;
         }
 
+        $identifiers = [];
+        foreach ($missing as $row) {
+            $identifiers[] = [
+                'set' => $this->catalogCardResolver->normalizeSetCode($row->getSetCode()),
+                'collectorNumber' => $row->getCollectorNumber(),
+            ];
+        }
+
         try {
-            $fetched = $this->scryfallClient->fetchCollectionBySetCollectors(array_map(
-                static fn (CsvImportRow $row): array => [
-                    'set' => $row->getSetCode(),
-                    'collectorNumber' => $row->getCollectorNumber(),
-                ],
-                $missing,
-            ));
+            $fetched = $this->scryfallClient->fetchCollectionBySetCollectors($identifiers);
         } catch (\Throwable) {
             // Batch fetch is an optimisation; rows fall back to per-row resolution.
             return $resolved;
         }
 
         foreach ($missing as $row) {
-            $card = $fetched[ScryfallClient::collectionKey($row->getSetCode(), $row->getCollectorNumber())] ?? null;
+            $setCode = $this->catalogCardResolver->normalizeSetCode($row->getSetCode());
+            $card = $fetched[ScryfallClient::collectionKey($setCode, $row->getCollectorNumber())] ?? null;
             if ($card instanceof Card && $this->catalogCardResolver->isAcceptableMatch(
                 $card,
                 $row->getName(),
-                $row->getSetCode(),
+                $setCode,
                 $row->getCollectorNumber(),
                 $row->getRarity(),
                 $row->isFoil() ? 'foil' : 'nonfoil',

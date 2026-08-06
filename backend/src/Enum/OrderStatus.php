@@ -48,4 +48,12 @@ enum OrderStatus: string
     {
         return self::FULFILLED === $this || self::COMPLETED === $this;
     }
+
+    /** Admin sidebar badge — in-progress orders; fulfilled/cancelled/refunded are excluded. */
+    public function isOpenForStoreBadge(): bool
+    {
+        return !$this->isFulfilled()
+            && self::CANCELLED !== $this
+            && self::REFUNDED !== $this;
+    }
 }

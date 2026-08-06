@@ -64,8 +64,7 @@ final class StoreGameController extends AbstractController
     }
 
     /**
-     * Staff: inventory statistics for one game — singles, sealed, and the
-     * combined total, in both listings and physical copies.
+     * Staff: inventory statistics for one game — singles copies and sealed units.
      */
     #[Route('/games/{code}/stats', name: 'api_store_game_stats', methods: ['GET'])]
     public function stats(string $slug, string $code): JsonResponse
@@ -90,10 +89,6 @@ final class StoreGameController extends AbstractController
             'gameName' => $game->getName(),
             'singles' => $singles,
             'sealed' => $sealed,
-            'total' => [
-                'listings' => $singles['listings'] + $sealed['products'],
-                'copies' => $singles['copies'] + $sealed['units'],
-            ],
         ]);
     }
 }

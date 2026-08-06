@@ -80,6 +80,10 @@ class SellSubmission
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $decidedAt = null;
 
+    /** When set, hidden from the active review queues (archive). */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $archivedAt = null;
+
     /** @var Collection<int, SellSubmissionItem> */
     #[ORM\OneToMany(mappedBy: 'submission', targetEntity: SellSubmissionItem::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $items;
@@ -120,6 +124,11 @@ class SellSubmission
 
     public function getDecidedAt(): ?\DateTimeImmutable { return $this->decidedAt; }
     public function setDecidedAt(?\DateTimeImmutable $decidedAt): static { $this->decidedAt = $decidedAt; return $this; }
+
+    public function getArchivedAt(): ?\DateTimeImmutable { return $this->archivedAt; }
+    public function setArchivedAt(?\DateTimeImmutable $archivedAt): static { $this->archivedAt = $archivedAt; return $this; }
+
+    public function isArchived(): bool { return null !== $this->archivedAt; }
 
     /** @return Collection<int, SellSubmissionItem> */
     public function getItems(): Collection { return $this->items; }

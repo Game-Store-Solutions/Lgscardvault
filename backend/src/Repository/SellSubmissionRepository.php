@@ -29,4 +29,16 @@ class SellSubmissionRepository extends ServiceEntityRepository
     {
         return $this->findBy(['user' => $user, 'store' => $store], ['createdAt' => 'DESC', 'id' => 'DESC'], 100);
     }
+
+    public function countPendingByStore(Store $store): int
+    {
+        return (int) $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->andWhere('s.store = :store')
+            ->andWhere('s.status = :pending')
+            ->setParameter('store', $store)
+            ->setParameter('pending', SellSubmission::STATUS_PENDING)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

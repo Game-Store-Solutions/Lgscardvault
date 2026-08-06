@@ -3,7 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\OrderRepository;
 use App\Repository\StoreRepository;
+use App\Service\Order\CustomerOrderPagination;
+use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CustomerPaymentProfileSync;
 use App\Service\Payments\SubscriptionBillingInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,6 +32,8 @@ class MeController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly StoreRepository $storeRepository,
+        private readonly OrderRepository $orderRepository,
+        private readonly CustomerOrderSerializer $customerOrderSerializer,
         private readonly SubscriptionBillingInterface $billing,
         private readonly CustomerPaymentProfileSync $paymentProfileSync,
     ) {
@@ -85,6 +90,39 @@ class MeController extends AbstractController
     public function myStores(): JsonResponse
     {
         return $this->json($this->storeRepository->findWithActivityForUser($this->requireUser()));
+    }
+
+    /** All orders placed with this account's email, every store, newest first. */
+    #[Route('/me/orders', name: 'api_me_orders', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function myOrders(Request $request): JsonResponse
+    {
+        $user = $this->requireUser();
+        $email = $user->getEmail();
+        if (null === $email || '' === trim($email)) {
+            return $this->json([
+                'items' => [],
+                'total' => 0,
+                'page' => 1,
+                'itemsPerPage' => CustomerOrderPagination::DEFAULT_ITEMS_PER_PAGE,
+            ]);
+        }
+
+        $pagination = CustomerOrderPagination::fromRequest($request);
+        $orders = $this->orderRepository->findPageByCustomerEmail(
+            $email,
+            $pagination['offset'],
+            $pagination['itemsPerPage'],
+        );
+        $total = $this->orderRepository->countByCustomerEmail($email);
+
+        return CustomerOrderPagination::toJson(
+            $orders,
+            $total,
+            $pagination['page'],
+            $pagination['itemsPerPage'],
+            $this->customerOrderSerializer,
+        );
     }
 
     #[Route('/me/payment-config', name: 'api_me_payment_config', methods: ['GET'])]

@@ -7,8 +7,10 @@ use ApiPlatform\State\Pagination\TraversablePaginator;
 use ApiPlatform\State\ProviderInterface;
 use App\Entity\Order;
 use App\Entity\Store;
+use App\Enum\AdminOrderQueue;
 use App\MultiTenancy\TenantContext;
 use App\Repository\OrderRepository;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -27,6 +29,7 @@ final readonly class StoreOrderCollectionProvider implements ProviderInterface
     public function __construct(
         private OrderRepository $orderRepository,
         private TenantContext $tenantContext,
+        private RequestStack $requestStack,
     ) {
     }
 
@@ -38,12 +41,18 @@ final readonly class StoreOrderCollectionProvider implements ProviderInterface
         }
 
         $filters = is_array($context['filters'] ?? null) ? $context['filters'] : [];
-        $page = max(1, (int) ($filters['page'] ?? 1));
-        $itemsPerPage = (int) ($filters['itemsPerPage'] ?? self::DEFAULT_ITEMS_PER_PAGE);
+        $request = $this->requestStack->getCurrentRequest();
+        $queueRaw = $filters['queue'] ?? $request?->query->get('queue');
+        $queue = AdminOrderQueue::tryFromFilter(is_string($queueRaw) ? $queueRaw : null);
+        $statuses = $queue?->statuses();
+
+        $page = max(1, (int) ($filters['page'] ?? $request?->query->get('page', 1)));
+        $itemsPerPage = (int) ($filters['itemsPerPage'] ?? $request?->query->get('itemsPerPage', self::DEFAULT_ITEMS_PER_PAGE));
+
         $itemsPerPage = min(self::MAX_ITEMS_PER_PAGE, max(1, $itemsPerPage));
 
-        $orders = $this->orderRepository->findPageByStore($store, ($page - 1) * $itemsPerPage, $itemsPerPage);
-        $total = $this->orderRepository->countByStore($store);
+        $orders = $this->orderRepository->findPageByStore($store, ($page - 1) * $itemsPerPage, $itemsPerPage, $statuses);
+        $total = $this->orderRepository->countByStore($store, $statuses);
 
         return new TraversablePaginator(new \ArrayIterator($orders), $page, $itemsPerPage, $total);
     }

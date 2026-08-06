@@ -241,6 +241,31 @@ final class StoreBuylistControllerTest extends WebTestCase
         self::assertSame(409, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testStaffCanArchiveAndRestoreAcceptedSubmission(): void
+    {
+        $store = $this->fixtures->store();
+        $card = $this->fixtures->card(976);
+        $card->setPrices(['usd' => '2.00']);
+        $customer = $this->fixtures->user(['ROLE_USER']);
+        $this->em->flush();
+        $base = "/api/stores/{$store->getSlug()}";
+
+        $this->authenticate($customer);
+        $submission = $this->jsonRequest('POST', "$base/sell-submissions", [
+            'payoutMethod' => 'cash',
+            'items' => [['cardId' => (string) $card->getId(), 'quantity' => 1, 'condition' => 'NM']],
+        ]);
+
+        $this->authenticate($store->getOwner());
+        $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['status' => 'accepted']);
+
+        $archived = $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['archived' => true]);
+        self::assertNotEmpty($archived['archivedAt']);
+
+        $restored = $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['archived' => false]);
+        self::assertNull($restored['archivedAt']);
+    }
+
     public function testKioskSubmissionsRequireStaffAndCustomerName(): void
     {
         $store = $this->fixtures->store();

@@ -104,6 +104,20 @@ final class CardSearchControllerTest extends WebTestCase
         self::assertSame('Counterspell', $results[0]['name']);
     }
 
+    public function testFindsCardWhenQueryOmitsAccents(): void
+    {
+        $this->fixtures->card(1, [
+            'name' => 'Adéwalé, Breaker of Chains',
+            'set' => 'acr',
+            'collector_number' => '224',
+        ]);
+
+        $results = $this->search(['q' => 'Adewale']);
+
+        self::assertNotEmpty($results);
+        self::assertStringContainsString('Adéwalé', $results[0]['name']);
+    }
+
     public function testEmptyQueryReturnsEmpty(): void
     {
         self::assertSame([], $this->search(['q' => '']));

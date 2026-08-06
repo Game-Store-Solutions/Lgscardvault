@@ -382,6 +382,21 @@ final class StoreBuylistController extends AbstractController
         return $this->json(array_map($this->serializeSubmission(...), $this->submissions->findForStore($store)));
     }
 
+    /** Staff nav badge: submissions awaiting first review. */
+    #[Route('/sell-submissions/pending-count', name: 'api_store_sell_submissions_pending_count', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function pendingSubmissionCount(string $slug): JsonResponse
+    {
+        $store = $this->findManagedStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        return $this->json([
+            'pendingCount' => $this->submissions->countPendingByStore($store),
+        ]);
+    }
+
     /**
      * Staff: decide a submission. Accepting may carry per-line accepted
      * quantities (partial accepts) and recomputes the offer totals to match
@@ -400,6 +415,11 @@ final class StoreBuylistController extends AbstractController
 
         $payload = json_decode($request->getContent(), true);
         $payload = is_array($payload) ? $payload : [];
+
+        if (array_key_exists('archived', $payload) && !array_key_exists('status', $payload)) {
+            return $this->applySubmissionArchive($submission, (bool) $payload['archived']);
+        }
+
         $status = (string) ($payload['status'] ?? '');
         if (!in_array($status, SellSubmission::STATUSES, true)) {
             return $this->json(['detail' => sprintf('Unknown status. Valid: %s.', implode(', ', SellSubmission::STATUSES))], 422);
@@ -471,6 +491,31 @@ final class StoreBuylistController extends AbstractController
 
         $submission->setStatus($status);
         $submission->setDecidedAt(new \DateTimeImmutable());
+        if (SellSubmission::STATUS_ACCEPTED === $status) {
+            $submission->setArchivedAt(null);
+        }
+        if (in_array($status, [SellSubmission::STATUS_COMPLETED, SellSubmission::STATUS_DECLINED], true)) {
+            $submission->setArchivedAt(new \DateTimeImmutable());
+        }
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeSubmission($submission));
+    }
+
+    private function applySubmissionArchive(SellSubmission $submission, bool $archived): JsonResponse
+    {
+        if ($archived) {
+            if (SellSubmission::STATUS_PENDING === $submission->getStatus()) {
+                return $this->json(['detail' => 'Decline pending submissions instead of archiving them.'], 422);
+            }
+            $submission->setArchivedAt(new \DateTimeImmutable());
+        } else {
+            if (!in_array($submission->getStatus(), [SellSubmission::STATUS_ACCEPTED], true)) {
+                return $this->json(['detail' => 'Only accepted submissions can be restored from the archive.'], 409);
+            }
+            $submission->setArchivedAt(null);
+        }
+
         $this->entityManager->flush();
 
         return $this->json($this->serializeSubmission($submission));
@@ -615,6 +660,7 @@ final class StoreBuylistController extends AbstractController
             'totalMarketCents' => $submission->getTotalMarketCents(),
             'createdAt' => $submission->getCreatedAt()->format(DATE_ATOM),
             'decidedAt' => $submission->getDecidedAt()?->format(DATE_ATOM),
+            'archivedAt' => $submission->getArchivedAt()?->format(DATE_ATOM),
             'customerName' => $submission->getKioskCustomerName() ?? $submission->getUser()?->getDisplayName(),
             'customerEmail' => SellSubmission::CHANNEL_KIOSK === $submission->getChannel() ? null : $submission->getUser()?->getEmail(),
             'items' => $items,

@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Card;
 use App\Entity\Game;
+use App\Service\Catalog\SearchTextNormalizer;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -30,9 +31,35 @@ class CardRepository extends ServiceEntityRepository
      */
     public function searchByName(string $query, int $limit = 20): array
     {
-        return $this->magicScoped()
+        return $this->mergeUniqueCards(
+            $this->searchByNameLike($this->magicScoped(), $query, $limit),
+            $this->searchMagicCatalogFolded($query, $limit),
+            $limit,
+        );
+    }
+
+    public function searchByNameForGame(Game $game, string $query, int $limit = 40): array
+    {
+        return $this->mergeUniqueCards(
+            $this->searchByNameLike($this->scopedToGame($game), $query, $limit),
+            $this->searchGameCatalogFolded($game, $query, $limit),
+            $limit,
+        );
+    }
+
+    /**
+     * @return list<Card>
+     */
+    private function searchByNameLike(QueryBuilder $scoped, string $query, int $limit): array
+    {
+        $needle = mb_strtolower(trim($query));
+        if ('' === $needle) {
+            return [];
+        }
+
+        return $scoped
             ->andWhere('LOWER(c.name) LIKE :query')
-            ->setParameter('query', '%'.strtolower($query).'%')
+            ->setParameter('query', '%'.$needle.'%')
             ->orderBy('c.name', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
@@ -40,32 +67,83 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
-     * Name search within one game. Non-Magic catalogs are local-only
-     * (TCGCSV), so this is the whole search for them — there is no remote
-     * leg to fall back to.
+     * @return list<Card>
+     */
+    private function searchMagicCatalogFolded(string $query, int $limit): array
+    {
+        $folded = SearchTextNormalizer::fold($query);
+        if ('' === $folded) {
+            return [];
+        }
+
+        return $this->searchByNameFoldedPhp($this->magicScoped(), $folded, $limit);
+    }
+
+    /**
+     * @return list<Card>
+     */
+    private function searchGameCatalogFolded(Game $game, string $query, int $limit): array
+    {
+        $folded = SearchTextNormalizer::fold($query);
+        if ('' === $folded) {
+            return [];
+        }
+
+        return $this->searchByNameFoldedPhp($this->scopedToGame($game), $folded, $limit);
+    }
+
+    /**
+     * First-letter candidate scan + accent-folded substring match in PHP.
      *
      * @return list<Card>
      */
-    public function searchByNameForGame(Game $game, string $query, int $limit = 40): array
+    private function searchByNameFoldedPhp(QueryBuilder $scoped, string $folded, int $limit): array
     {
-        $qb = $this->createQueryBuilder('c')
-            ->andWhere('LOWER(c.name) LIKE :query')
-            ->setParameter('query', '%'.mb_strtolower(trim($query)).'%')
-            ->orderBy('c.name', 'ASC')
-            ->setMaxResults($limit);
-
-        // Cards predating the multi-game catalog carry no game and are Magic.
-        if ($game->isMtg()) {
-            $qb->leftJoin('c.game', 'g')
-                ->andWhere('g.code = :code OR c.game IS NULL')
-                ->setParameter('code', Game::CODE_MTG);
-        } else {
-            $qb->join('c.game', 'g')
-                ->andWhere('g.code = :code')
-                ->setParameter('code', $game->getCode());
+        $prefix = mb_substr($folded, 0, 1);
+        if ('' === $prefix) {
+            return [];
         }
 
-        return $qb->getQuery()->getResult();
+        /** @var list<Card> $candidates */
+        $candidates = $scoped
+            ->andWhere('LOWER(c.name) LIKE :prefix')
+            ->setParameter('prefix', $prefix.'%')
+            ->orderBy('c.name', 'ASC')
+            ->setMaxResults(400)
+            ->getQuery()
+            ->getResult();
+
+        $matches = [];
+        foreach ($candidates as $card) {
+            if (str_contains(SearchTextNormalizer::fold($card->getName()), $folded)) {
+                $matches[] = $card;
+                if (\count($matches) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @param list<Card> $primary
+     * @param list<Card> $secondary
+     *
+     * @return list<Card>
+     */
+    private function mergeUniqueCards(array $primary, array $secondary, int $limit): array
+    {
+        /** @var array<string, Card> $byId */
+        $byId = [];
+        foreach ([...$primary, ...$secondary] as $card) {
+            $byId[(string) $card->getId()] = $card;
+            if (\count($byId) >= $limit) {
+                break;
+            }
+        }
+
+        return array_values($byId);
     }
 
     /**
@@ -323,7 +401,7 @@ class CardRepository extends ServiceEntityRepository
     /** Lowercase, stripped of the punctuation card names disagree about. */
     private function normalizeName(string $name): string
     {
-        return str_replace(['.', ' ', '-', ','], '', mb_strtolower(trim($name)));
+        return str_replace(['.', ' ', '-', ','], '', SearchTextNormalizer::fold($name));
     }
 
     /** Is this a set code the local catalog knows? (case-insensitive) */

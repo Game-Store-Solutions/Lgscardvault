@@ -141,4 +141,35 @@ final class MeControllerTest extends WebTestCase
         self::assertSame(1, $bySlug[$storeB->getSlug()]['submissionCount']);
         self::assertSame(0, $bySlug[$storeB->getSlug()]['orderCount']);
     }
+
+    public function testMyOrdersListsEveryStoreOrderForAccountEmail(): void
+    {
+        $storeA = $this->fixtures->store();
+        $storeB = $this->fixtures->store();
+        $customer = $this->fixtures->user(['ROLE_USER']);
+
+        foreach ([$storeA, $storeB] as $i => $store) {
+            $order = (new \App\Entity\Order())
+                ->setStore($store)
+                ->setCustomerEmail($customer->getEmail())
+                ->setCustomerName('Buyer')
+                ->setReference('ORD-TEST-'.$i)
+                ->setStatus(\App\Enum\OrderStatus::PENDING)
+                ->setTotalCents(1000)
+                ->setFulfillment(\App\Entity\Order::FULFILLMENT_PICKUP)
+                ->setChannel(\App\Entity\Order::CHANNEL_ONLINE);
+            $this->em->persist($order);
+        }
+        $this->em->flush();
+
+        $this->authenticate($customer);
+        $body = $this->jsonRequest('GET', '/api/me/orders?page=1&itemsPerPage=50');
+
+        self::assertArrayHasKey('items', $body);
+        self::assertSame(2, $body['total'] ?? null);
+        self::assertCount(2, $body['items']);
+        $slugs = array_column($body['items'], 'storeSlug');
+        self::assertContains($storeA->getSlug(), $slugs);
+        self::assertContains($storeB->getSlug(), $slugs);
+    }
 }

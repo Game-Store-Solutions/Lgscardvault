@@ -59,6 +59,7 @@ final class StoreCsvImportController extends AbstractController
         private readonly SealedCsvImportParser $sealedParser,
         private readonly ImportPreviewer $previewer,
         private readonly \App\Service\CsvImport\StalledImportRecoverer $stalledImportRecoverer,
+        private readonly \App\Service\CsvImport\CsvImportWorkerKick $csvImportWorkerKick,
         private readonly GameRepository $gameRepository,
         private readonly StoreInventoryWriter $inventoryWriter,
         private readonly ScryfallClient $scryfallClient,
@@ -223,7 +224,7 @@ final class StoreCsvImportController extends AbstractController
 
         // Jobs abandoned by a crashed worker are requeued here, so the list
         // never shows an import frozen at "processing" with nobody on it.
-        $this->stalledImportRecoverer->recoverForStore($store);
+        $this->maintainImportsForStore($store);
 
         return $this->json(array_map(
             $this->serializeJobSummary(...),
@@ -242,12 +243,15 @@ final class StoreCsvImportController extends AbstractController
 
         $this->denyAccessUnlessGranted('STORE_MANAGE', $store);
 
-        $this->stalledImportRecoverer->recoverForStore($store);
+        $this->maintainImportsForStore($store);
 
         $job = $this->jobRepository->findLatestByStore($store);
         if (null === $job) {
             return $this->json(null);
         }
+
+        $this->syncJobCounters($job);
+        $this->entityManager->flush();
 
         return $this->json($this->serializeJob($job, $request));
     }
@@ -267,6 +271,10 @@ final class StoreCsvImportController extends AbstractController
         if (null === $job) {
             return $this->json(['detail' => 'Import job not found.'], 404);
         }
+
+        $this->maintainImportsForStore($store);
+        $this->syncJobCounters($job);
+        $this->entityManager->flush();
 
         return $this->json($this->serializeJob($job, $request));
     }
@@ -676,6 +684,12 @@ final class StoreCsvImportController extends AbstractController
         return $this->jobRepository->findOneByStoreAndId($store, $id);
     }
 
+    private function maintainImportsForStore(Store $store): void
+    {
+        $this->stalledImportRecoverer->recoverForStore($store);
+        $this->csvImportWorkerKick->kickIdleJobsForStore($store);
+    }
+
     private function serializeJobSummary(CsvImportJob $job): array
     {
         return [
@@ -785,20 +799,24 @@ final class StoreCsvImportController extends AbstractController
         if (!in_array($rowStatus, ['queued', 'processing', 'imported', 'error'], true)) {
             $rowStatus = '';
         }
-        $rowLimit = min(250, max(25, $request->query->getInt('rowLimit', 75)));
+        $requestedRowLimit = $request->query->getInt('rowLimit', 75);
+        $rowLimit = $requestedRowLimit <= 0 ? 0 : min(250, max(25, $requestedRowLimit));
         $requestedOffset = $request->query->getInt('rowOffset', -1);
         $totalRows = $job->getTotalRows();
-        $processedRows = $job->getProcessedRows();
+        $statusCounts = $this->rowRepository->countByStatus($job);
+        $finishedRows = $statusCounts['imported'] + $statusCounts['error'];
+        $processedRows = $finishedRows + $statusCounts['processing'];
         $rowOffset = max(0, $requestedOffset);
         if ($requestedOffset < 0) {
             $rowOffset = max(0, min($processedRows, $totalRows) - 15);
         }
 
-        $statusCounts = $this->rowRepository->countByStatus($job);
         if ('' !== $rowStatus && $requestedOffset < 0) {
             $rowOffset = 0;
         }
-        $rows = $this->rowRepository->findWindow($job, $rowOffset, $rowLimit, '' !== $rowStatus ? $rowStatus : null);
+        $rows = 0 === $rowLimit
+            ? []
+            : $this->rowRepository->findWindow($job, $rowOffset, $rowLimit, '' !== $rowStatus ? $rowStatus : null);
 
         return [
             'id' => $job->getId(),
@@ -808,9 +826,9 @@ final class StoreCsvImportController extends AbstractController
             'originalFilename' => $job->getOriginalFilename(),
             'storagePath' => $job->getStoragePath(),
             'totalRows' => $job->getTotalRows(),
-            'processedRows' => $job->getProcessedRows(),
-            'importedRows' => $job->getImportedRows(),
-            'failedRows' => $job->getFailedRows(),
+            'processedRows' => $processedRows,
+            'importedRows' => $statusCounts['imported'],
+            'failedRows' => $statusCounts['error'],
             'queuedRows' => $statusCounts['queued'],
             'processingRows' => $statusCounts['processing'],
             'errorMessage' => $job->getErrorMessage(),

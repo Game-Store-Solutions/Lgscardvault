@@ -120,4 +120,31 @@ final class OrderRepositoryTest extends KernelTestCase
 
         self::assertCount(3, $this->repo->findByStoreAndCustomerEmail($store, 'buyer@test.local', 3));
     }
+
+    public function testCountOpenByStoreExcludesFulfilledAndClosed(): void
+    {
+        $store = $this->fixtures->store();
+        $this->order($store, 'open@test.local', 1, 500);
+        $fulfilled = $this->order($store, 'done@test.local', 1, 510);
+        $fulfilled->setStatus(OrderStatus::FULFILLED);
+        $cancelled = $this->order($store, 'cancel@test.local', 1, 520);
+        $cancelled->setStatus(OrderStatus::CANCELLED);
+        $this->em->flush();
+
+        self::assertSame(3, $this->repo->countByStore($store));
+        self::assertSame(1, $this->repo->countOpenByStore($store));
+    }
+
+    public function testFindPageByStoreFiltersByStatus(): void
+    {
+        $store = $this->fixtures->store();
+        $this->order($store, 'a@test.local', 1, 600);
+        $fulfilled = $this->order($store, 'b@test.local', 1, 610);
+        $fulfilled->setStatus(OrderStatus::FULFILLED);
+        $this->em->flush();
+
+        self::assertSame(2, $this->repo->countByStore($store, null));
+        self::assertSame(1, $this->repo->countByStore($store, [OrderStatus::PENDING]));
+        self::assertCount(1, $this->repo->findPageByStore($store, 0, 10, [OrderStatus::PENDING]));
+    }
 }

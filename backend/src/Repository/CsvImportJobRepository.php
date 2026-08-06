@@ -70,4 +70,17 @@ class CsvImportJobRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** @return list<CsvImportJob> */
+    public function findActiveForStore(Store $store): array
+    {
+        return $this->createQueryBuilder('job')
+            ->andWhere('job.store = :store')
+            ->andWhere('job.status IN (:active)')
+            ->setParameter('store', $store)
+            ->setParameter('active', [CsvImportJob::STATUS_QUEUED, CsvImportJob::STATUS_PROCESSING])
+            ->orderBy('job.updatedAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }
