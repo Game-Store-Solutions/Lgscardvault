@@ -26,17 +26,37 @@ export interface FlipCardProps {
   foil?: boolean
   /** Rarity accent used for the border. */
   accent?: string
+  /** Hide face frame on product details and similar layouts. */
+  borderless?: boolean
   className?: string
 }
 
 /** Distance (in "settle-degrees") a drag must cover before it flips on release. */
 const FLIP_THRESHOLD = 0.5
 
-function Face({ image, alt, foil, accent, flipped }: { image?: string; alt: string; foil: boolean; accent: string; flipped?: boolean }) {
+function Face({
+  image,
+  alt,
+  foil,
+  accent,
+  flipped,
+  borderless,
+}: {
+  image?: string
+  alt: string
+  foil: boolean
+  accent: string
+  flipped?: boolean
+  borderless?: boolean
+}) {
   return (
     <div
-      className="absolute inset-0 overflow-hidden rounded-2xl border-2"
-      style={{ borderColor: accent, backfaceVisibility: 'hidden', transform: flipped ? 'rotateY(180deg)' : undefined }}
+      className={cx('absolute inset-0 overflow-hidden rounded-[4.5%/3.5%]', !borderless && 'rounded-2xl border-2')}
+      style={{
+        ...(borderless ? {} : { borderColor: accent }),
+        backfaceVisibility: 'hidden',
+        transform: flipped ? 'rotateY(180deg)' : undefined,
+      }}
     >
       {image ? (
         <img src={image} alt={alt} className="block size-full select-none object-cover" draggable={false} />
@@ -56,7 +76,7 @@ function Face({ image, alt, foil, accent, flipped }: { image?: string; alt: stri
  * over around the Y axis to reveal the reverse; single-image "rotate" cards
  * (`rotateDeg` supplied) spin in-plane — 180° for flip cards, 90° for split.
  */
-export function FlipCard({ frontImage, backImage, rotateDeg = 180, flipped, onToggle, alt, foil = false, accent = '#6d5efc', className }: FlipCardProps) {
+export function FlipCard({ frontImage, backImage, rotateDeg = 180, flipped, onToggle, alt, foil = false, accent = '#6d5efc', borderless = false, className }: FlipCardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const twoSided = Boolean(backImage)
   const settled = twoSided ? 180 : rotateDeg
@@ -118,11 +138,11 @@ export function FlipCard({ frontImage, backImage, rotateDeg = 180, flipped, onTo
       >
         {twoSided ? (
           <>
-            <Face image={frontImage} alt={alt} foil={foil} accent={accent} />
-            <Face image={backImage} alt={alt} foil={foil} accent={accent} flipped />
+            <Face image={frontImage} alt={alt} foil={foil} accent={accent} borderless={borderless} />
+            <Face image={backImage} alt={alt} foil={foil} accent={accent} flipped borderless={borderless} />
           </>
         ) : (
-          <Face image={frontImage} alt={alt} foil={foil} accent={accent} />
+          <Face image={frontImage} alt={alt} foil={foil} accent={accent} borderless={borderless} />
         )}
       </div>
     </div>

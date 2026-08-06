@@ -200,6 +200,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                   countryCode={sub.countryCode}
                   billingEmail={user?.email ?? ''}
                   confirmLabel="Save new payment method"
+                  layout="vault"
                   onTokenized={(p) => updatePaymentMutation.mutate(p)}
                 />
               ) : isDevBuild ? (

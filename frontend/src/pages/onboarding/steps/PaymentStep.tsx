@@ -87,6 +87,8 @@ export function PaymentStep({
           countryCode={config.countryCode}
           billingEmail={billingEmail}
           confirmLabel="Verify payment method"
+          paymentRequestLabel="Platform subscription"
+          layout="checkout"
           onTokenized={patchPayment}
         />
       ) : isDevBuild ? (

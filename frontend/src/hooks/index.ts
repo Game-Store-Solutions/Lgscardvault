@@ -20,6 +20,8 @@ export {
   useCustomerNotifications,
 } from './useCustomer'
 export { useCart } from './useCart'
+export { useGuestCart, guestCartKey, guestCartLines, resetGuestCart } from './useGuestCart'
+export { useStoreCart } from './useStoreCart'
 export {
   useCatalogGames,
   useStoreGames,

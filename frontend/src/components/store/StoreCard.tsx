@@ -29,9 +29,7 @@ export function StoreCard({ store, index = 0, className }: StoreCardProps) {
     <Link
       to={`/s/${store.slug}`}
       className={cx(
-        'group flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
-        'transition-[transform,box-shadow] duration-200 ease-out',
-        'hover:-translate-y-1 hover:shadow-[0_16px_40px_-16px_rgb(16_24_40_/0.28)]',
+        'group flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card dark:glass-card ui-lift',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
         className,
       )}
@@ -105,21 +103,21 @@ export function StoreCard({ store, index = 0, className }: StoreCardProps) {
 /** Skeleton placeholder matching StoreCard's footprint, for loading states. */
 export function StoreCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cx('overflow-hidden rounded-card border border-border bg-surface shadow-card', className)}>
-      <div className="h-1.5 w-full bg-border" />
+    <div className={cx('overflow-hidden rounded-card border border-border bg-surface shadow-card dark:glass-card', className)}>
+      <div className="h-1.5 w-full bg-border/80" />
       <div className="p-5">
         <div className="flex items-center gap-3">
-          <div className="size-12 animate-pulse rounded-btn bg-border" />
+          <div className="size-12 rounded-btn skeleton-shimmer" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-2/3 animate-pulse rounded bg-border" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-border" />
+            <div className="h-4 w-2/3 rounded skeleton-shimmer" />
+            <div className="h-3 w-1/3 rounded skeleton-shimmer" />
           </div>
         </div>
         <div className="mt-4 space-y-2">
-          <div className="h-3 w-full animate-pulse rounded bg-border" />
-          <div className="h-3 w-4/5 animate-pulse rounded bg-border" />
+          <div className="h-3 w-full rounded skeleton-shimmer" />
+          <div className="h-3 w-4/5 rounded skeleton-shimmer" />
         </div>
-        <div className="mt-6 h-4 w-1/2 animate-pulse rounded bg-border" />
+        <div className="mt-6 h-4 w-1/2 rounded skeleton-shimmer" />
       </div>
     </div>
   )

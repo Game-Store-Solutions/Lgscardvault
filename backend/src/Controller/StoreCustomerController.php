@@ -613,6 +613,16 @@ final class StoreCustomerController extends AbstractController
             return $this->json(['detail' => 'Your cart is empty.'], 422);
         }
 
+        $customerName = mb_substr(trim((string) ($payload['customerName'] ?? '')), 0, 255);
+        if ('' === $customerName) {
+            $customerName = $user->getDisplayName();
+        }
+        $customerEmail = $user->getEmail();
+        $overrideEmail = trim((string) ($payload['customerEmail'] ?? ''));
+        if ('' !== $overrideEmail && filter_var($overrideEmail, FILTER_VALIDATE_EMAIL)) {
+            $customerEmail = mb_substr($overrideEmail, 0, 255);
+        }
+
         try {
             $order = $this->orderBuilder->build(
                 $store,
@@ -620,8 +630,8 @@ final class StoreCustomerController extends AbstractController
                 $cartItems,
                 Order::CHANNEL_ONLINE,
                 $fulfillment,
-                $user->getDisplayName(),
-                $user->getEmail(),
+                $customerName,
+                $customerEmail,
                 (bool) ($payload['useStoreCredit'] ?? false),
             );
         } catch (OutOfStockException $e) {
@@ -678,6 +688,7 @@ final class StoreCustomerController extends AbstractController
 
     /** Public Square configuration the cart needs to render its payment form. */
     #[Route('/checkout/config', name: 'api_store_customer_checkout_config', methods: ['GET'])]
+    #[IsGranted('PUBLIC_ACCESS')]
     public function checkoutConfig(string $slug): JsonResponse
     {
         $store = $this->storeRepository->findOneBySlug($slug);

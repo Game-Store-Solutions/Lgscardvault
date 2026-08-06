@@ -24,8 +24,8 @@ export const FilterPill = forwardRef<HTMLButtonElement, FilterPillProps>(functio
         'border transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
         active
-          ? 'bg-brand-500 text-white border-brand-500'
-          : 'bg-surface text-fg-muted border-border hover:text-fg hover:border-brand-300',
+          ? 'bg-brand-500 text-white border-brand-500 shadow-sm dark:btn-glow'
+          : 'bg-surface text-fg-muted border-border hover:text-fg hover:border-brand-300 hover:bg-bg dark:glass-card dark:hover:border-brand-500/30 dark:hover:text-fg',
         className,
       )}
       {...props}

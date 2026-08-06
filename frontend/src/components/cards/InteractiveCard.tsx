@@ -13,6 +13,8 @@ export interface InteractiveCardProps {
   maxTilt?: number
   /** Drop shadow under the card (default true). */
   shadow?: boolean
+  /** Hide the rarity-colored frame (e.g. product details hero). */
+  borderless?: boolean
   className?: string
 }
 
@@ -22,14 +24,19 @@ export interface InteractiveCardProps {
  * in 3D, drifts a glare highlight, and — for foil cards — sweeps a rainbow
  * holo sheen. Falls back to a static image under reduced-motion.
  */
-export function InteractiveCard({ image, alt, foil = false, accent = '#6d5efc', maxTilt = 14, shadow = true, className }: InteractiveCardProps) {
+export function InteractiveCard({ image, alt, foil = false, accent = '#6d5efc', maxTilt = 14, shadow = true, borderless = false, className }: InteractiveCardProps) {
   const { ref, onPointerMove, onPointerLeave } = useTilt(maxTilt)
 
   return (
     <div ref={ref} className={cx('[perspective:1000px]', className)} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave}>
       <div
-        className={cx('tilt-card relative overflow-hidden rounded-2xl border-2', foil && 'foil-card', shadow && 'shadow-card')}
-        style={{ borderColor: accent }}
+        className={cx(
+          'tilt-card relative overflow-hidden rounded-[4.5%/3.5%]',
+          !borderless && 'rounded-2xl border-2',
+          foil && 'foil-card',
+          shadow && 'shadow-card',
+        )}
+        style={borderless ? undefined : { borderColor: accent }}
       >
         {image ? (
           <img src={image} alt={alt} loading="lazy" decoding="async" className="block w-full select-none" draggable={false} />

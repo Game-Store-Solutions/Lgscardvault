@@ -48,9 +48,12 @@ const SORTS: { value: SortKey; label: string }[] = [
 // are built.
 type QuickAction = { label: string; icon: typeof Search; path?: string; action?: 'search' }
 
+/** Canonical storefront copy — import instead of hardcoding strings. */
+export const CASE_CARDS_LABEL = 'Case Cards'
+
 const QUICK_ACTIONS: QuickAction[] = [
     { label: 'Search Cards', icon: Search, action: 'search' },
-    { label: 'Case cards', icon: GalleryHorizontalEnd, path: 'case-cards' },
+    { label: CASE_CARDS_LABEL, icon: GalleryHorizontalEnd, path: 'case-cards' },
     { label: 'Mass Search', icon: ClipboardList, path: 'mass-search' },
     { label: 'Deck Builder', icon: Package },
     { label: 'Sell/Trade', icon: WalletCards, path: 'sell' },

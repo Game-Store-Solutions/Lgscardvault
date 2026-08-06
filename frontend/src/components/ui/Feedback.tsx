@@ -41,7 +41,7 @@ export function LoadingPanel({ label = 'Loading…', className }: LoadingPanelPr
     <div
       className={cx(
         'flex flex-col items-center justify-center gap-3 py-16 px-6',
-        'bg-surface border border-border rounded-card',
+        'rounded-card border border-border bg-surface dark:glass-card',
         className,
       )}
     >

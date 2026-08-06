@@ -31,7 +31,7 @@ export function MarketplaceCard({
   const outOfStock = item.quantity < 1
 
   return (
-    <article className="group flex min-h-52 gap-4 rounded-card border border-border bg-surface p-3 shadow-card transition-[border-color,box-shadow] hover:border-brand-300 hover:shadow-[0_12px_28px_-18px_rgb(16_24_40/0.28)]">
+    <article className="group flex min-h-52 gap-4 rounded-card border border-border bg-surface p-3 shadow-card dark:glass-card ui-lift hover:border-brand-500/30">
       <Link
         to={`/s/${slug}/cards/${item.id}`}
         className="w-24 shrink-0 self-center sm:w-28"
@@ -68,7 +68,7 @@ export function MarketplaceCard({
           <p className="text-sm font-medium text-fg">{copiesLabel}</p>
           <p className="font-display text-2xl font-extrabold leading-none text-fg">{formatPrice(item.priceCents)}</p>
           <p className="mt-2 text-sm font-bold text-fg">
-            Market Price: <span className="text-success-700">{marketPrice}</span>
+            Market Price: <span className="text-success-500 dark:text-success-500">{marketPrice}</span>
           </p>
           <p className="mt-1 text-xs font-medium text-fg-muted">
             {item.condition} / {finishName(item.card, item.isFoil, item.finish)}

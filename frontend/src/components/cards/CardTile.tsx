@@ -29,14 +29,13 @@ export function CardTile({ item, slug }: CardTileProps) {
     <Link
       to={`/s/${slug}/cards/${item.id}`}
       className={cx(
-        'group flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
-        'transition-shadow duration-200 ease-out hover:shadow-[0_16px_40px_-16px_rgb(16_24_40_/0.30)]',
+        'group flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card dark:glass-card ui-lift',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
       )}
     >
       {/* Card art with holographic tilt */}
       <div ref={ref} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} className="perspective-[900px]">
-        <div className={cx('tilt-card relative aspect-5/7 overflow-hidden bg-black/90', item.isFoil && 'foil-card')}>
+        <div className={cx('tilt-card relative aspect-5/7 overflow-hidden bg-surface-elevated dark:bg-[#18181B]', item.isFoil && 'foil-card')}>
           {image ? (
             <CardImage src={image} alt={item.card.name} fit="contain" className="size-full" />
           ) : (

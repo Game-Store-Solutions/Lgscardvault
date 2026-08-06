@@ -58,6 +58,9 @@ export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<str
   const primary = norm(p.primaryColor)
   if (primary) {
     vars['--color-brand-500'] = primary
+    vars['--store-glow'] = `color-mix(in srgb, ${primary} 14%, transparent)`
+    vars['--store-glow-strong'] = `color-mix(in srgb, ${primary} ${dark ? 28 : 22}%, transparent)`
+    vars['--ambient-brand'] = `color-mix(in srgb, ${primary} 16%, var(--color-bg))`
     if (dark) {
       // Dark theme: tints go darker, shades go lighter so on-surface text/pills stay legible.
       vars['--color-brand-50'] = mix(primary, 24, 'black')
@@ -75,7 +78,11 @@ export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<str
   }
 
   const accent = norm(p.accentColor)
-  if (accent) vars['--color-accent-500'] = accent
+  if (accent) {
+    vars['--color-accent-500'] = accent
+    vars['--store-glow-accent'] = `color-mix(in srgb, ${accent} 18%, transparent)`
+    vars['--ambient-accent'] = `color-mix(in srgb, ${accent} 6%, var(--color-bg))`
+  }
 
   if (bg) vars['--color-bg'] = bg
 

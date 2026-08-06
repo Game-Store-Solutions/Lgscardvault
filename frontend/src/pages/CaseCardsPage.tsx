@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, ChevronDown, GalleryHorizontalEnd } from 'lucide-react'
+import { ChevronDown, GalleryHorizontalEnd } from 'lucide-react'
 import { cardImage, formatPrice } from '../api/client'
 import { useStore, useStoreCases, useStoreTheme } from '../hooks'
-import { Card, CardBody, EmptyState, buttonVariants } from '../components/ui'
+import { BackButton, Card, CardBody, EmptyState } from '../components/ui'
 import type { StoreSectionCard } from '../api/types'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { finishName } from '../lib/finishes'
+import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
 /**
  * Storefront Case Cards page (/s/:slug/case-cards). Deliberately restrained:
@@ -39,13 +40,10 @@ export default function CaseCardsPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft aria-hidden className="size-4" />
-          Back to {store?.name ?? 'store'}
-        </Link>
+        <BackButton to={`/s/${slug}`}>Back to {store?.name ?? 'store'}</BackButton>
 
         <div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg">Case cards</h1>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg">{CASE_CARDS_LABEL}</h1>
           <div className="mt-2 h-1 w-12 rounded-full bg-brand-500" aria-hidden />
           <p className="mt-3 max-w-xl text-sm text-fg-muted">
             The singles in {store?.name ?? 'the store'}'s display cases — hand-picked and ready to go.
@@ -54,11 +52,11 @@ export default function CaseCardsPage() {
       </div>
 
       {isLoading ? (
-        <StorePageLoader label="Loading case cards…" />
+        <StorePageLoader label={`Loading ${CASE_CARDS_LABEL.toLowerCase()}…`} />
       ) : isError ? (
         <EmptyState
           icon={GalleryHorizontalEnd}
-          title="Could not load case cards"
+          title={`Could not load ${CASE_CARDS_LABEL.toLowerCase()}`}
           description="Please try again in a moment."
         />
       ) : visibleCases.length === 0 ? (

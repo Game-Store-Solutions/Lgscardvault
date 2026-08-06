@@ -44,6 +44,8 @@ security:
         - { path: ^/api/integrations/square/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/integrations/square/webhook, roles: PUBLIC_ACCESS }
         - { path: ^/api/stores, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/stores/.+/customer/checkout/config, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/stores/.+/guest/checkout, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/catalog, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/admin, roles: ROLE_SUPER_ADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

@@ -15,6 +15,7 @@ import StorePage from './pages/StorePage'
 import MassSearchPage from './pages/MassSearchPage'
 import CartPage from './pages/CartPage'
 import CardDetailsPage from './pages/CardDetailsPage'
+import SetBrowsePage from './pages/SetBrowsePage'
 import CaseCardsPage from './pages/CaseCardsPage'
 import CustomerProfilePage from './pages/CustomerProfilePage'
 import StoreAdminPage from './pages/StoreAdminPage'
@@ -57,6 +58,7 @@ export default function App() {
               <Route path="s/:slug/mass-search" element={<MassSearchPage />} />
               <Route path="s/:slug/sell" element={<SellTradePage />} />
               <Route path="s/:slug/cart" element={<CartPage />} />
+              <Route path="s/:slug/sets/:setCode" element={<SetBrowsePage />} />
               <Route path="s/:slug/cards/:id" element={<CardDetailsPage />} />
               <Route path="s/:slug/case-cards" element={<CaseCardsPage />} />
               <Route

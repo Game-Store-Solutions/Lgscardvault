@@ -20,6 +20,7 @@ import {
 } from '../hooks'
 import {
   Avatar,
+  BackButton,
   Badge,
   Button,
   Card,
@@ -97,11 +98,7 @@ export default function CustomerProfilePage() {
       <PageHeader
         title="My account"
         subtitle={storeQuery.data ? `Your profile at ${storeQuery.data.name}` : 'Your store profile'}
-        actions={
-          <Link to={`/s/${slug}`} className="text-sm font-medium text-brand-600 hover:text-brand-700">
-            ← Back to store
-          </Link>
-        }
+        actions={<BackButton to={`/s/${slug}`}>Back to store</BackButton>}
       />
 
       <Card>

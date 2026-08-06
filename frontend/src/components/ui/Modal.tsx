@@ -61,7 +61,7 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
         >
           {title != null && (
             <div className="flex shrink-0 items-center justify-between gap-4 px-5 py-4 border-b border-border">
-              <h2 id={titleId} className="text-base font-bold text-fg">
+              <h2 id={titleId} className="font-display text-lg font-bold text-fg">
                 {title}
               </h2>
               <button

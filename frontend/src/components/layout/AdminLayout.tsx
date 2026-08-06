@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useOrders, useStore, useStoreTheme } from '../../hooks'
-import { Avatar, Button, buttonVariants } from '../ui'
+import { Avatar, BackButton, Button, buttonVariants } from '../ui'
 import {
   Boxes,
   ExternalLink,
@@ -24,6 +24,7 @@ import {
   WalletCards,
   X,
 } from 'lucide-react'
+import { CASE_CARDS_LABEL } from '../../pages/utils/actionsUtil'
 
 interface NavItem {
   to: string
@@ -72,7 +73,7 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
         items: [
           { to: base, label: 'Singles', icon: Boxes, end: true },
           { to: `${base}/sealed`, label: 'Sealed', icon: Package },
-          { to: `${base}/case-cards`, label: 'Case cards', icon: GalleryHorizontalEnd },
+          { to: `${base}/case-cards`, label: CASE_CARDS_LABEL, icon: GalleryHorizontalEnd },
           { to: `${base}/csv`, label: 'Imports', icon: FileSpreadsheet },
         ],
       },
@@ -99,6 +100,7 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
 
 export default function AdminLayout() {
   const { user, logout } = useAuth()
+  const location = useLocation()
   const { context, sections } = useAdminNav()
   const params = useParams()
   // Theme the owner admin portal with the store's branding (no-op for platform admin).
@@ -109,6 +111,9 @@ export default function AdminLayout() {
     order.status === 'pending' || order.status === 'received' || order.status === 'paid' || order.status === 'shipped',
   ).length
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isPlatformAdmin = location.pathname.startsWith('/platform/admin')
+  const isStoreAdmin = /\/s\/[^/]+\/admin/.test(location.pathname)
+  const fullWidthAdmin = isStoreAdmin && !isPlatformAdmin
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     [
@@ -193,13 +198,9 @@ export default function AdminLayout() {
         </nav>
 
         <div className="border-t border-border p-3">
-          <Link
-            to="/"
-            className="flex items-center gap-3 rounded-btn px-3 py-2 text-sm font-medium text-fg-muted hover:bg-bg hover:text-fg"
-          >
-            <ExternalLink aria-hidden className="size-4" />
+          <BackButton to="/" tone="soft" className="w-full justify-start rounded-btn px-3 shadow-none">
             Back to public site
-          </Link>
+          </BackButton>
         </div>
       </aside>
 
@@ -241,7 +242,13 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-8">
+        <main
+          className={
+            fullWidthAdmin
+              ? 'w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8'
+              : 'mx-auto max-w-7xl px-4 py-8'
+          }
+        >
           <Outlet />
         </main>
       </div>

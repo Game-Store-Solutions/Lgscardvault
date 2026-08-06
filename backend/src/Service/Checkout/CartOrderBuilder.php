@@ -40,7 +40,7 @@ final readonly class CartOrderBuilder
      */
     public function build(
         Store $store,
-        User $user,
+        ?User $user,
         array $cartItems,
         string $channel,
         string $fulfillment,
@@ -68,7 +68,7 @@ final readonly class CartOrderBuilder
         // Store credit: signed-in (non-kiosk) customers can put their balance
         // toward the order. The ledger entry joins the caller's flush, so the
         // spend lands atomically with the order or not at all.
-        if ($useStoreCredit && Order::CHANNEL_KIOSK !== $channel) {
+        if ($useStoreCredit && $user instanceof User && Order::CHANNEL_KIOSK !== $channel) {
             $applied = min($this->creditLedger->balance($user, $store), $total);
             if ($applied > 0) {
                 $this->creditLedger->spend($store, $user, $applied, $order);
@@ -79,7 +79,9 @@ final readonly class CartOrderBuilder
         $this->entityManager->persist($order);
 
         foreach ($cartItems as $cartItem) {
-            $this->entityManager->remove($cartItem);
+            if (null !== $cartItem->getId()) {
+                $this->entityManager->remove($cartItem);
+            }
         }
 
         return $order;

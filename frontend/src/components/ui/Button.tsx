@@ -8,21 +8,22 @@ import { cx } from '../../lib/cx'
 export const buttonVariants = tv({
   base: cx(
     'inline-flex items-center justify-center gap-2 rounded-btn font-bold',
-    'whitespace-nowrap select-none transition-colors',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+    'whitespace-nowrap select-none transition-[color,background-color,box-shadow,transform] duration-300 ease-out',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
     'disabled:pointer-events-none disabled:opacity-50',
+    'active:scale-[0.98]',
   ),
   variants: {
     variant: {
-      primary: 'bg-brand-500 text-white shadow-sm hover:bg-brand-600',
-      secondary: 'bg-surface text-fg border border-border hover:bg-bg',
-      ghost: 'bg-transparent text-fg hover:bg-border/60',
+      primary: 'bg-brand-500 text-white shadow-sm hover:bg-brand-600 hover:shadow-md dark:btn-glow',
+      secondary: 'bg-surface text-fg border border-border shadow-sm hover:bg-bg hover:border-border',
+      ghost: 'bg-transparent text-fg hover:bg-bg',
       danger: 'bg-danger-500 text-white shadow-sm hover:bg-danger-700',
     },
     size: {
-      sm: 'h-8 px-3 text-xs',
+      sm: 'h-9 px-3.5 text-xs',
       md: 'h-10 px-4 text-sm',
-      lg: 'h-12 px-6 text-base',
+      lg: 'h-11 px-5 text-base',
     },
   },
   defaultVariants: {

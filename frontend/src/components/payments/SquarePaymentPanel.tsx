@@ -4,7 +4,9 @@ import { CreditCard, Loader2 } from 'lucide-react'
 import type { PaymentMethodType } from '../../api/types'
 import { Button } from '../ui'
 import { isDevBuild } from '../../lib/runtimeEnv'
+import { useDarkMode } from '../../hooks/useDarkMode'
 import { useSquarePayments } from './useSquarePayments'
+import { squareCardStyle } from './squareCardStyle'
 
 export type TokenizedPayment = {
   methodType: PaymentMethodType
@@ -20,6 +22,16 @@ const METHOD_BY_SDK: Record<string, PaymentMethodType> = {
   'Google Pay': 'google_pay',
 }
 
+function PaymentDivider({ label = 'Or pay with card' }: { label?: string }) {
+  return (
+    <div className="flex items-center gap-3 text-xs font-medium text-fg-muted">
+      <span className="h-px flex-1 bg-border" />
+      <span>{label}</span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
 export function SquarePaymentPanel({
   applicationId,
   locationId,
@@ -29,6 +41,8 @@ export function SquarePaymentPanel({
   countryCode,
   billingEmail = '',
   confirmLabel = 'Save payment method',
+  paymentRequestLabel = 'Total',
+  layout = 'checkout',
   onTokenized,
 }: {
   applicationId: string
@@ -39,9 +53,13 @@ export function SquarePaymentPanel({
   countryCode: string
   billingEmail?: string
   confirmLabel?: string
+  paymentRequestLabel?: string
+  /** checkout = wallets first (cart); vault = card form only (admin subscription). */
+  layout?: 'checkout' | 'vault'
   onTokenized: (payment: TokenizedPayment) => void
 }) {
-  const { payments, loading, error: loadError } = useSquarePayments(applicationId, locationId)
+  const { payments, loading, error: loadError } = useSquarePayments(applicationId, locationId, environment)
+  const darkMode = useDarkMode()
 
   const cardRef = useRef<HTMLDivElement>(null)
   const googlePayRef = useRef<HTMLDivElement>(null)
@@ -50,11 +68,12 @@ export function SquarePaymentPanel({
   const [applePay, setApplePay] = useState<ApplePay | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [walletsChecked, setWalletsChecked] = useState(false)
 
-  // Wallets need a non-zero total, so they only appear when money moves.
-  // Updating a stored card is a card-only flow.
-  const walletsEnabled = priceCents > 0
+  const walletsEnabled = priceCents > 0 && layout === 'checkout'
   const amount = (priceCents / 100).toFixed(2)
+  const showExpress = walletsEnabled && (googlePay || applePay)
+  const showWalletDivider = showExpress
 
   useEffect(() => {
     if (!payments) return
@@ -63,7 +82,7 @@ export function SquarePaymentPanel({
     let instance: Card | null = null
 
     void payments
-      .card()
+      .card({ style: squareCardStyle(darkMode) })
       .then(async (created) => {
         instance = created
         if (cancelled || !cardRef.current) return
@@ -79,11 +98,12 @@ export function SquarePaymentPanel({
       setCard(null)
       if (instance) void instance.destroy()
     }
-  }, [payments])
+  }, [payments, darkMode])
 
   useEffect(() => {
     if (!payments || !walletsEnabled) return
 
+    setWalletsChecked(false)
     let cancelled = false
     let google: GooglePay | null = null
     let apple: ApplePay | null = null
@@ -93,15 +113,13 @@ export function SquarePaymentPanel({
       request = payments.paymentRequest({
         countryCode,
         currencyCode: currency,
-        total: { amount, label: 'Subscription' },
+        total: { amount, label: paymentRequestLabel },
       })
     } catch {
+      if (!cancelled) setWalletsChecked(true)
       return
     }
 
-    // Either wallet can legitimately be unavailable (unsupported browser, no
-    // verified domain, merchant not enabled) — hide it rather than surfacing
-    // an error the owner cannot act on.
     void payments
       .googlePay(request)
       .then(async (created) => {
@@ -111,6 +129,9 @@ export function SquarePaymentPanel({
         if (!cancelled) setGooglePay(created)
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setWalletsChecked(true)
+      })
 
     void payments
       .applePay(request)
@@ -119,6 +140,9 @@ export function SquarePaymentPanel({
         if (!cancelled) setApplePay(created)
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setWalletsChecked(true)
+      })
 
     return () => {
       cancelled = true
@@ -127,13 +151,8 @@ export function SquarePaymentPanel({
       if (google) void google.destroy()
       if (apple) void apple.destroy()
     }
-  }, [payments, walletsEnabled, amount, currency, countryCode])
+  }, [payments, walletsEnabled, amount, currency, countryCode, paymentRequestLabel])
 
-  /**
-   * Strong Customer Authentication. Optional in the US, required in the UK/EU,
-   * so a failure here must not block signup — Square declines the payment
-   * later if verification was actually mandatory.
-   */
   async function verify(token: string): Promise<string> {
     if (!payments) return ''
 
@@ -158,7 +177,6 @@ export function SquarePaymentPanel({
       const result = await tokenize()
 
       if (result.status !== 'OK') {
-        // The buyer closing a wallet sheet is not an error worth shouting about.
         if ('Cancel' === result.status || 'Abort' === result.status) return
         const detail = 'errors' in result ? result.errors.map((e) => e.message).join(' ') : ''
         throw new Error(detail || 'Your payment details could not be verified.')
@@ -185,64 +203,82 @@ export function SquarePaymentPanel({
     )
   }
 
-  return (
-    <div className="space-y-4">
-      {environment === 'sandbox' && (
-        <p className="rounded-btn bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
-          {isDevBuild ? (
-            <>
-              Test mode — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry, CVV{' '}
-              <span className="font-mono">111</span>, postal <span className="font-mono">94103</span>.
-            </>
-          ) : (
-            <>Test mode — cards are not charged. Use Square sandbox test card numbers.</>
-          )}
-        </p>
-      )}
+  const sandboxBanner =
+    environment === 'sandbox' ? (
+      <p className="rounded-btn bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
+        {isDevBuild ? (
+          <>
+            Test mode — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry, CVV{' '}
+            <span className="font-mono">111</span>, postal <span className="font-mono">94103</span>.
+          </>
+        ) : (
+          <>Test mode — cards are not charged. Use Square sandbox test card numbers.</>
+        )}
+      </p>
+    ) : null
 
-      <div className="relative min-h-[110px] rounded-card border border-border bg-surface p-4">
+  const expressCheckout =
+    walletsEnabled && layout === 'checkout' ? (
+      <div className="space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Express checkout</p>
+        <div className="flex flex-col gap-2">
+          {applePay && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void submit(() => applePay.tokenize(), 'apple_pay')}
+              className="flex h-12 w-full items-center justify-center rounded-btn bg-black px-4 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              Apple&nbsp;Pay
+            </button>
+          )}
+          <div
+            ref={googlePayRef}
+            className={googlePay ? 'min-h-12 w-full [&>button]:!w-full' : 'hidden'}
+            onClick={() => {
+              if (googlePay && !busy) void submit(() => googlePay.tokenize(), 'google_pay')
+            }}
+          />
+        </div>
+        {walletsChecked && !googlePay && !applePay && (
+          <p className="text-xs leading-5 text-fg-muted">Wallets aren&apos;t available in this browser — use your card below.</p>
+        )}
+      </div>
+    ) : null
+
+  const cardBlock = (
+    <div className="space-y-3">
+      <p className="text-sm font-semibold text-fg">{layout === 'checkout' ? 'Card information' : 'Payment method'}</p>
+      <div className="relative min-h-[7.5rem] rounded-btn border border-border bg-bg px-2 py-2">
         {loading && (
           <p className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-fg-muted">
             <Loader2 aria-hidden className="size-4 animate-spin" />
             Loading secure payment form…
           </p>
         )}
-        <div ref={cardRef} className={loading ? 'invisible' : undefined} />
+        <div ref={cardRef} className={`sq-card-host min-h-[6.5rem] ${loading ? 'invisible' : ''}`} />
       </div>
-
-      <Button loading={busy} disabled={!card} onClick={() => void submit(() => card!.tokenize(), 'card')}>
+      <Button className="w-full" size="lg" loading={busy} disabled={!card} onClick={() => void submit(() => card!.tokenize(), 'card')}>
         <CreditCard aria-hidden className="size-4" />
         {confirmLabel}
       </Button>
+    </div>
+  )
 
-      {walletsEnabled && (googlePay || applePay) && (
+  return (
+    <div className="space-y-4">
+      {sandboxBanner}
+
+      {layout === 'checkout' ? (
         <>
-          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-fg-muted">
-            <span className="h-px flex-1 bg-border" />
-            or pay with
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div
-              ref={googlePayRef}
-              hidden={!googlePay}
-              onClick={() => {
-                if (googlePay && !busy) void submit(() => googlePay.tokenize(), 'google_pay')
-              }}
-            />
-
-            {applePay && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void submit(() => applePay.tokenize(), 'apple_pay')}
-                className="flex h-11 items-center justify-center rounded-card bg-black px-4 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                 Pay
-              </button>
-            )}
-          </div>
+          {expressCheckout}
+          {showWalletDivider && <PaymentDivider />}
+          {cardBlock}
+        </>
+      ) : (
+        <>
+          {cardBlock}
+          {expressCheckout}
         </>
       )}
 

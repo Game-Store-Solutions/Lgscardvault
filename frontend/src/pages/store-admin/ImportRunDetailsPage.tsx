@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router'
-import { ArrowLeft, Search } from 'lucide-react'
+import { useParams } from 'react-router'
+import { Search } from 'lucide-react'
 import api, { cardImage, formatScryfallPrice } from '../../api/client'
 import { inventoryKey } from '../../hooks'
 import type { CardSummary, CsvImportJob, CsvImportRow } from '../../api/types'
 import {
+  BackButton,
   Card,
   CardHeader,
   CardBody,
@@ -123,13 +124,7 @@ export default function ImportRunDetailsPage() {
       <Card>
         <CardHeader>
           <div className="min-w-0">
-            <Link
-              to={`/s/${slug}/admin`}
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-brand-600 hover:text-brand-700"
-            >
-              <ArrowLeft className="size-4" aria-hidden />
-              Back to admin
-            </Link>
+            <BackButton to={`/s/${slug}/admin`}>Back to admin</BackButton>
             <h1 className="mt-2 font-display text-2xl font-bold text-fg">Import run #{job?.id ?? importId}</h1>
             <p className="mt-1 text-sm text-fg-muted">{job?.originalFilename ?? 'Loading import run...'}</p>
           </div>

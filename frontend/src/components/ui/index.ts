@@ -1,3 +1,6 @@
+export { BackButton, backButtonVariants } from './BackButton'
+export type { BackButtonProps } from './BackButton'
+
 export { Button, buttonVariants } from './Button'
 export type { ButtonProps } from './Button'
 
@@ -27,6 +30,9 @@ export type { ModalProps } from './Modal'
 
 export { Spinner, LoadingPanel, EmptyState, ErrorState } from './Feedback'
 export type { SpinnerProps, LoadingPanelProps, EmptyStateProps, ErrorStateProps } from './Feedback'
+
+export { Skeleton, InventoryGridSkeleton } from './Skeleton'
+export type { SkeletonProps } from './Skeleton'
 
 export { PageHeader } from './PageHeader'
 export type { PageHeaderProps } from './PageHeader'

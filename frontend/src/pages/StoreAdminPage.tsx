@@ -12,6 +12,7 @@ import PaymentsTab from './store-admin/PaymentsTab'
 import PatchNotesTab from './store-admin/PatchNotesTab'
 import SellTradeTab from './store-admin/SellTradeTab'
 import SealedTab from './store-admin/SealedTab'
+import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
 type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade'
 
@@ -20,7 +21,7 @@ const SECTIONS: Record<Section, { label: string; render: (slug: string) => React
   sealed: { label: 'Sealed', render: (slug) => <SealedTab slug={slug} /> },
   branding: { label: 'Branding', render: (slug) => <BrandingTab slug={slug} /> },
   spotlight: { label: 'Spotlight', render: (slug) => <SpotlightTab slug={slug} /> },
-  'case-cards': { label: 'Case cards', render: (slug) => <CaseCardsTab slug={slug} /> },
+  'case-cards': { label: CASE_CARDS_LABEL, render: (slug) => <CaseCardsTab slug={slug} /> },
   payments: { label: 'Payments', render: (slug) => <PaymentsTab slug={slug} /> },
   orders: { label: 'Orders', render: (slug) => <OrdersTab slug={slug} /> },
   reports: { label: 'Reports', render: (slug) => <ReportsTab slug={slug} /> },
@@ -37,21 +38,22 @@ export default function StoreAdminPage() {
   const { slug = '', section } = useParams()
   const active = resolveSection(section)
   const { data: store } = useStore(slug)
+  const hidePageHeader = active === 'orders'
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={store?.name ?? slug}
-        subtitle={`${SECTIONS[active].label}${store?.slug ? ` · /${store.slug}` : ''}`}
-        actions={
-          <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            View storefront
-          </Link>
-        }
-      />
+    <div className={hidePageHeader ? '' : 'space-y-6'}>
+      {!hidePageHeader && (
+        <PageHeader
+          title={store?.name ?? slug}
+          subtitle={`${SECTIONS[active].label}${store?.slug ? ` · /${store.slug}` : ''}`}
+          actions={
+            <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              View storefront
+            </Link>
+          }
+        />
+      )}
 
-      {/* Only the active section is mounted, so heavy-polling sections (CSV, Reports)
-          don't fire queries/intervals until selected. */}
       {SECTIONS[active].render(slug)}
     </div>
   )

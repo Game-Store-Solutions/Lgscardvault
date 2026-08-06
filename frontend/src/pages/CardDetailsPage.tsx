@@ -1,39 +1,49 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation, useParams } from 'react-router'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import {
-  ArrowLeft,
-  ExternalLink,
+  ChevronRight,
   Heart,
   ListPlus,
   RefreshCw,
   RotateCw,
   Settings,
+  ShieldCheck,
   ShoppingCart,
-  Sparkles,
   UserCircle,
 } from 'lucide-react'
-import api, { cardImage, formatPrice, formatScryfallPrice } from '../api/client'
+import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../api/client'
 import type { CardFace, CustomerFavorite, InventoryItem } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import {
   customerKeys,
+  inventoryKey,
   useCanManageStore,
-  useCart,
+  useStoreCart,
   useCustomerFavorites,
   useCustomerWantList,
   useInventory,
   useStore,
   useStoreTheme,
 } from '../hooks'
-import { Badge, Button, buttonVariants, ErrorState } from '../components/ui'
+import { Badge, BackButton, Button, buttonVariants, ErrorState, TabPanel, Tabs } from '../components/ui'
 import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
-import { FOIL_GRADIENT, rarityAccent, rarityLabel } from '../lib/mtg'
+import { rarityAccent, rarityLabel } from '../lib/mtg'
 import { finishName } from '../lib/finishes'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { CardText, ManaCost } from '../components/mtg/ManaSymbol'
 import { plainCardText } from '../lib/cardText'
+import { cx } from '../lib/cx'
+import { buildMarketFinishRows, listingMarketSummary, MARKET_NO_DATA, MARKET_NOT_PRINTED } from '../lib/marketFinishes'
+import {
+  hasNonLegalScryfallEntries,
+  legalFormatsFromScryfall,
+  scryfallLegalityCount,
+} from '../lib/cardLegalities'
+import { EditInventoryModal, type InventoryEditPayload } from './store-admin/search'
+import { CASE_CARDS_LABEL } from './utils/actionsUtil'
+import { setBrowsePath } from '../lib/setBrowse'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -52,27 +62,30 @@ function faceImage(face: CardFace): string | undefined {
   return face.imageUrl ?? face.imageUris?.normal ?? face.imageUris?.small
 }
 
-function legalities(card: InventoryItem['card']) {
-  return Object.entries(card.legalities ?? {})
-    .filter(([, value]) => value === 'legal')
-    .slice(0, 12)
-}
-
 export default function CardDetailsPage() {
   const { slug = '', id = '' } = useParams()
   const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const manageListing = searchParams.get('manage') === '1'
   // Pages that link here can pass `state.from` so "back" returns to where the
   // shopper actually came from (e.g. the case cards page) instead of always
   // landing on the storefront.
   const cameFromCaseCards = (location.state as { from?: string } | null)?.from === 'case-cards'
-  const backTo = cameFromCaseCards ? `/s/${slug}/case-cards` : `/s/${slug}`
-  const backLabel = cameFromCaseCards ? 'case cards' : null
+  const setNavState = location.state as { from?: string; setCode?: string } | null
+  const cameFromSet = setNavState?.from === 'set' && Boolean(setNavState.setCode)
+  const backTo = cameFromCaseCards
+    ? `/s/${slug}/case-cards`
+    : cameFromSet && setNavState?.setCode
+      ? setBrowsePath(slug, setNavState.setCode)
+      : `/s/${slug}`
+  const backLabel = cameFromCaseCards ? CASE_CARDS_LABEL : cameFromSet ? 'Set' : null
   const { user } = useAuth()
   const canManage = useCanManageStore(slug)
   const queryClient = useQueryClient()
 
   // Which face of a multi-faced card is currently shown (0 = front).
   const [faceIndex, setFaceIndex] = useState(0)
+  const [infoTab, setInfoTab] = useState<'details' | 'legality'>('details')
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -95,7 +108,7 @@ export default function CardDetailsPage() {
 
   const { data: favorites = [] } = useCustomerFavorites(slug, Boolean(user))
   const { data: wantList = [] } = useCustomerWantList(slug, Boolean(user))
-  const { query: cartQuery, setItem: cartSetItem } = useCart(slug, Boolean(user))
+  const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
 
   const favoriteMutation = useMutation({
     mutationFn: async ({ inventoryItem, favorite }: { inventoryItem: InventoryItem; favorite: boolean }) => {
@@ -149,6 +162,42 @@ export default function CardDetailsPage() {
     },
   })
 
+  const updateListingMutation = useMutation({
+    mutationFn: async (payload: InventoryEditPayload) => {
+      const { data } = await api.patch<InventoryItem>(`/stores/${slug}/inventory/${payload.itemId}`, {
+        cardId: payload.cardId,
+        quantity: payload.quantity,
+        priceCents: parsePriceInput(payload.priceText) ?? 0,
+        acquisitionCostCents: parsePriceInput(payload.costText),
+        condition: payload.condition,
+        finish: payload.finish,
+      })
+      return data
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['inventory-item', slug, id], updated)
+      queryClient.setQueryData<InventoryItem[]>(inventoryKey(slug), (old = []) =>
+        old.map((it) => (it.id === updated.id ? { ...it, ...updated } : it)),
+      )
+      void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+      closeManageListing()
+    },
+    onError: (err) => {
+      window.alert(extractErrorMessage(err, 'Could not save listing changes.'))
+    },
+  })
+
+  function closeManageListing() {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('manage')
+        return next
+      },
+      { replace: true },
+    )
+  }
+
   if (isLoading) {
     return <StorePageLoader label="Loading card details…" />
   }
@@ -162,7 +211,6 @@ export default function CardDetailsPage() {
   }
 
   const card = item.card
-  const finish = item.isFoil ? 'foil' : 'nonfoil'
 
   // Multi-faced cards carry per-face art and text, but they come in two flavors:
   //  • Two-sided (transform / modal_dfc / …): each face has its own art, so the
@@ -188,7 +236,9 @@ export default function CardDetailsPage() {
   const flavorText = activeFace?.flavorText ?? card.flavorText
   const typeLine = activeFace?.typeLine ?? card.typeLine
   const accent = rarityAccent(card.rarity)
-  const legalFormats = legalities(card)
+  const legalFormats = legalFormatsFromScryfall(card.legalities)
+  const legalityTotal = scryfallLegalityCount(card.legalities)
+  const legalityHasHidden = hasNonLegalScryfallEntries(card.legalities)
   const isFavorite = favorites.some((favorite) => favorite.inventoryItem?.id === item.id)
   const isWanted = wantList.some(
     (entry) =>
@@ -217,327 +267,526 @@ export default function CardDetailsPage() {
     ] as { label: string; value?: string; capitalize?: boolean }[]
   ).filter((spec): spec is { label: string; value: string; capitalize?: boolean } => Boolean(spec.value))
 
-  const priceRows = (
-    [
-      { label: finishName(card, false), value: formatScryfallPrice(card, 'nonfoil') },
-      { label: finishName(card, true), value: formatScryfallPrice(card, 'foil') },
-      { label: 'Etched', value: formatScryfallPrice(card, 'etched') },
-    ] as { label: string; value: string }[]
-  ).filter((row, index) => index === 0 || row.value !== '-')
+  const priceRows = buildMarketFinishRows(card)
+  const listingMarket = listingMarketSummary(card, item.isFoil, item.finish)
+  const marketCents = listingMarket.priceCents
+  const marketLabel = listingMarket.display
+  const storeVsMarketCents =
+    marketCents != null && listingMarket.display !== MARKET_NOT_PRINTED && listingMarket.display !== MARKET_NO_DATA
+      ? item.priceCents - marketCents
+      : null
+
+  const samePrintListings = inventory.filter(
+    (row) =>
+      row.card.id === card.id ||
+      (row.card.name === card.name &&
+        row.card.setCode === card.setCode &&
+        row.card.collectorNumber === card.collectorNumber),
+  )
+  const alternateListings = samePrintListings.filter((row) => row.id !== item.id)
+  const lowestAlternateCents =
+    alternateListings.length > 0 ? Math.min(...alternateListings.map((row) => row.priceCents)) : null
+
+  const gameLabel =
+    card.gameCode === 'mtg'
+      ? 'Magic: The Gathering'
+      : card.gameCode === 'pokemon'
+        ? 'Pokémon'
+        : card.gameCode === 'onepiece'
+          ? 'One Piece'
+          : card.gameCode === 'fab'
+            ? 'Flesh and Blood'
+            : card.gameCode === 'riftbound'
+              ? 'Riftbound'
+              : 'Singles'
+
+  const bleed = '-mx-4 sm:-mx-6 lg:-mx-10'
+  const inset = 'px-4 sm:px-6 lg:px-10'
+  const setDisplay = card.setName ?? (card.setCode ? card.setCode.toUpperCase() : '')
+  const setPageUrl = card.setCode ? setBrowsePath(slug, card.setCode) : null
+  const productTitle = setDisplay ? `${card.name} - ${setDisplay}` : card.name
+  const colPad = 'px-5 py-8 sm:px-8 lg:px-10'
 
   return (
-    <div className="space-y-8">
-      {/* Immersive art hero */}
-      <section className="relative overflow-hidden rounded-card border border-border">
-        {image && (
-          <img src={image} alt="" aria-hidden className="absolute inset-0 size-full scale-125 object-cover opacity-40 blur-2xl" />
-        )}
-        <div aria-hidden className="absolute inset-0 bg-linear-to-t from-surface via-surface/88 to-surface/55" />
-        <div className="relative flex flex-col gap-4 p-6 sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link to={backTo} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline">
-              <ArrowLeft aria-hidden className="size-4" />
-              Back to {backLabel ?? store?.name ?? 'store'}
-            </Link>
-            <div className="flex flex-wrap items-center gap-2">
-              {user && (
-                <Link to={`/s/${slug}/account`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                  <UserCircle aria-hidden className="size-4" />
-                  My account
+    <div className={cx(bleed, 'pb-12')}>
+      <div className={cx(inset, 'flex flex-wrap items-center justify-between gap-3 py-4')}>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
+          <BackButton to={backTo} tone="soft" className="shrink-0">
+            {backLabel ? `Back to ${backLabel}` : store?.name ?? 'Store'}
+          </BackButton>
+          <span aria-hidden className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
+          <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1.5 text-sm text-fg-muted sm:flex">
+            <span className="truncate">{gameLabel}</span>
+            {setDisplay && setPageUrl && (
+              <>
+                <ChevronSep />
+                <Link to={setPageUrl} className="truncate text-fg hover:text-brand-600 hover:underline">
+                  {setDisplay}
                 </Link>
-              )}
-              {canManage && (
-                <Link to={`/s/${slug}/admin`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                  <Settings aria-hidden className="size-4" />
-                  Manage listing
-                </Link>
-              )}
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.15em] text-brand-600">
-              {(card.setCode ?? '—').toUpperCase()} · #{card.collectorNumber ?? '—'}
-            </p>
-            <h1 className="mt-1 max-w-3xl font-display text-4xl font-bold tracking-tight text-fg sm:text-5xl">{card.name}</h1>
-            {typeLine && <p className="mt-2 text-lg text-fg-muted">{typeLine}</p>}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {card.rarity && (
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold capitalize text-fg"
-                >
-                  <span className="size-2.5 rounded-full" style={{ backgroundColor: accent }} />
-                  {rarityLabel(card.rarity)}
-                </span>
-              )}
-              {item.isFoil && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border border-white/60 px-2.5 py-1 text-xs font-bold text-black/80"
-                  style={{ backgroundImage: FOIL_GRADIENT }}
-                >
-                  <Sparkles aria-hidden className="size-3.5" />
-                  Foil
-                </span>
-              )}
-              <Badge>{item.condition}</Badge>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="grid gap-8 lg:grid-cols-[22rem_minmax(0,1fr)]">
-        {/* LEFT: image + sticky buy box */}
-        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          {multiFace ? (
-            <FlipCard
-              frontImage={faceImage(faces[0]) ?? cardImage(card)}
-              backImage={twoSided ? faceImage(faces[1]) : undefined}
-              rotateDeg={rotateDeg}
-              flipped={flipped}
-              onToggle={() => setFaceIndex((index) => (index + 1) % faces.length)}
-              alt={card.name}
-              foil={item.isFoil}
-              accent={accent}
-            />
-          ) : (
-            <InteractiveCard image={image} alt={activeFace?.name ?? card.name} foil={item.isFoil} accent={accent} />
-          )}
-          {multiFace && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => setFaceIndex((index) => (index + 1) % faces.length)}
-            >
-              {twoSided ? <RefreshCw aria-hidden className="size-4" /> : <RotateCw aria-hidden className="size-4" />}
-              {twoSided ? `Flip to ${nextFace?.name ?? 'back'}` : `Rotate to ${nextFace?.name ?? 'other side'}`}
-            </Button>
-          )}
-          <p className="text-center text-xs text-fg-muted">
-            {multiFace
-              ? twoSided
-                ? 'Press and slide the card, or tap Flip, to see the back. '
-                : 'Press and slide the card, or tap Rotate, to read the other side. '
-              : `Move your cursor over the card${item.isFoil ? ' to see the foil shine' : ''}.`}
-          </p>
-
-          {/* Buy box */}
-          <div className="rounded-card border border-border bg-surface p-5 shadow-card">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Store price</p>
-              <Badge tone={item.isFoil ? 'brand' : 'neutral'}>{finishName(item.card, item.isFoil, item.finish)}</Badge>
-            </div>
-            <p className="mt-1 font-display text-4xl font-bold text-fg">{formatPrice(item.priceCents)}</p>
-            <p className="mt-1 text-sm font-bold text-fg">
-              Market price: <span className="text-success-700">{formatScryfallPrice(card, finish)}</span>
-            </p>
-
-            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4">
-              <Fact label="Condition" value={item.condition} />
-              <Fact label="Available" value={String(item.quantity)} />
-              <Fact label="Set" value={card.setCode?.toUpperCase() ?? '—'} />
-              <Fact label="Collector" value={`#${card.collectorNumber ?? '—'}`} />
-            </dl>
-
-            <div className="mt-5 space-y-2">
-              {user ? (
-                <>
-                  {inCart ? (
-                    <Link to={`/s/${slug}/cart`} className={`${buttonVariants({ variant: 'primary', size: 'lg' })} w-full`}>
-                      <ShoppingCart aria-hidden className="size-4" />
-                      In cart ({cartEntry?.quantity}) — view cart
-                    </Link>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      className="w-full"
-                      loading={cartSetItem.isPending}
-                      disabled={cartSetItem.isPending || outOfStock}
-                      onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
-                    >
-                      <ShoppingCart aria-hidden className="size-4" />
-                      {outOfStock ? 'Out of stock' : 'Add to cart'}
-                    </Button>
-                  )}
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    className="w-full"
-                    loading={favoriteMutation.isPending}
-                    disabled={favoriteMutation.isPending}
-                    onClick={() => favoriteMutation.mutate({ inventoryItem: item, favorite: isFavorite })}
-                  >
-                    <Heart aria-hidden className={`size-4 ${isFavorite ? 'fill-current' : ''}`} />
-                    {isFavorite ? 'Saved to favorites' : 'Save favorite'}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    className="w-full"
-                    loading={wantListMutation.isPending}
-                    disabled={wantListMutation.isPending || isWanted}
-                    onClick={() => wantListMutation.mutate(item)}
-                  >
-                    {isWanted ? <ShoppingCart aria-hidden className="size-4" /> : <ListPlus aria-hidden className="size-4" />}
-                    {isWanted ? 'On want list' : 'Add to want list'}
-                  </Button>
-                  {cartSetItem.isError && (
-                    <p role="alert" className="text-xs font-medium text-danger-700">
-                      Could not add this card to your cart. Please try again.
-                    </p>
-                  )}
-                  {favoriteMutation.isError && (
-                    <p role="alert" className="text-xs font-medium text-danger-700">
-                      Could not update your favorites. Please try again.
-                    </p>
-                  )}
-                  {wantListMutation.isError && (
-                    <p role="alert" className="text-xs font-medium text-danger-700">
-                      Could not update your want list. Please try again.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <Link to="/login" className={`${buttonVariants({ variant: 'primary', size: 'lg' })} w-full`}>
-                  Sign in to save cards
-                </Link>
-              )}
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-4">
-              {card.scryfallUri && (
-                <a
-                  href={card.scryfallUri}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline"
-                >
-                  <ExternalLink aria-hidden className="size-4" />
-                  Scryfall
-                </a>
-              )}
-              <a
-                href={edhrecUrl(card.name)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline"
-              >
-                <ExternalLink aria-hidden className="size-4" />
-                EDHREC
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT: card text + specs + prices + legalities */}
-        <div className="min-w-0 space-y-6">
-          {oracleText && (
-            <section className="rounded-card border border-border bg-surface p-6 shadow-card">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">Card text</h2>
-                {activeFace?.name && <span className="text-xs font-bold text-brand-600">{activeFace.name}</span>}
-              </div>
-              <p className="mt-3 whitespace-pre-line text-lg leading-8 text-fg">
-                <CardText text={oracleText} symbolClassName="size-[1.15em]" />
-              </p>
-              {flavorText && (
-                <p className="mt-4 whitespace-pre-line border-t border-border pt-4 font-display italic leading-7 text-fg-muted">
-                  {flavorText}
-                </p>
-              )}
-            </section>
-          )}
-
-          {specs.length > 0 && (
-            <section className="rounded-card border border-border bg-surface p-6 shadow-card">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">Card details</h2>
-              <dl className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-                {card.manaCost && (
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-fg-muted">Mana cost</dt>
-                    <dd className="mt-1">
-                      <ManaCost cost={card.manaCost} className="size-5" />
-                    </dd>
-                  </div>
-                )}
-                {specs.map((spec) => (
-                  <Spec key={spec.label} label={spec.label} value={spec.value} capitalize={spec.capitalize} />
-                ))}
-              </dl>
-            </section>
-          )}
-
-          <div className="grid gap-6 sm:grid-cols-2">
-            <section className="rounded-card border border-border bg-surface p-6 shadow-card">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">
-                {isMagic ? 'Scryfall prices' : 'Market prices'}
-              </h2>
-              <div className="mt-3 space-y-2">
-                {priceRows.map((row) => (
-                  <PriceRow key={row.label} label={row.label} value={row.value} />
-                ))}
-              </div>
-            </section>
-
-            {legalFormats.length > 0 && (
-              <section className="rounded-card border border-border bg-surface p-6 shadow-card">
-                <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">Legal formats</h2>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {legalFormats.map(([format]) => (
-                    <Badge key={format} tone="success" className="uppercase">
-                      {format}
-                    </Badge>
-                  ))}
-                </div>
-              </section>
+              </>
             )}
-          </div>
+            {setDisplay && !setPageUrl && (
+              <>
+                <ChevronSep />
+                <span className="truncate text-fg">{setDisplay}</span>
+              </>
+            )}
+          </nav>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {user && (
+            <Link to={`/s/${slug}/account`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              <UserCircle aria-hidden className="size-4" />
+              <span className="hidden sm:inline">Account</span>
+            </Link>
+          )}
+          {canManage && (
+            <Link
+              to={`/s/${slug}/cards/${item.id}?manage=1`}
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              <Settings aria-hidden className="size-4" />
+              <span className="hidden sm:inline">Manage</span>
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* More from this store */}
-      {related.length > 0 && (
-        <section>
-          <div className="mb-4 flex items-end justify-between">
-            <h2 className="font-display text-2xl font-bold tracking-tight text-fg">More from {store?.name ?? 'this store'}</h2>
-            <Link to={`/s/${slug}`} className="text-sm font-bold text-brand-600 hover:underline">
-              View all →
-            </Link>
+      <div className={inset}>
+        <article className="product-detail-sheet">
+        <div className="flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(15rem,19rem)_minmax(0,1fr)_minmax(22rem,28rem)] xl:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)_minmax(24rem,32rem)] lg:items-start lg:gap-0">
+          {/* Card art — left */}
+          <div className={cx(colPad, 'order-1 lg:col-start-1 lg:row-start-1')}>
+            <div className="mx-auto w-full max-w-[19rem] lg:mx-0 lg:max-w-none">
+              {multiFace ? (
+                <FlipCard
+                  frontImage={faceImage(faces[0]) ?? cardImage(card)}
+                  backImage={twoSided ? faceImage(faces[1]) : undefined}
+                  rotateDeg={rotateDeg}
+                  flipped={flipped}
+                  onToggle={() => setFaceIndex((index) => (index + 1) % faces.length)}
+                  alt={card.name}
+                  foil={item.isFoil}
+                  accent={accent}
+                  borderless
+                  className="w-full"
+                />
+              ) : (
+                <InteractiveCard
+                  image={image}
+                  alt={activeFace?.name ?? card.name}
+                  foil={item.isFoil}
+                  accent={accent}
+                  borderless
+                  shadow={false}
+                  className="w-full"
+                />
+              )}
+            </div>
+            {multiFace && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3 w-full"
+                onClick={() => setFaceIndex((index) => (index + 1) % faces.length)}
+              >
+                {twoSided ? <RefreshCw aria-hidden className="size-4" /> : <RotateCw aria-hidden className="size-4" />}
+                {twoSided ? `Flip to ${nextFace?.name ?? 'back'}` : `Rotate face`}
+              </Button>
+            )}
+            <p className="mt-2 text-center text-xs text-fg-muted lg:text-left">
+              {multiFace
+                ? 'Drag to tilt · tap to flip'
+                : item.isFoil
+                  ? 'Hover for foil shine'
+                  : 'Drag to tilt the card'}
+            </p>
           </div>
-          <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {related.map((rel) => (
-              <SpotlightCard key={rel.id} item={rel} slug={slug} />
-            ))}
+
+          {/* Details + market — center */}
+          <div className={cx(colPad, 'order-2 min-w-0 lg:col-start-2 lg:row-start-1')}>
+            <header className="mb-5 max-w-3xl">
+              <h1 className="text-2xl font-bold leading-snug text-fg lg:text-[1.65rem]">{productTitle}</h1>
+              {setDisplay && setPageUrl && (
+                <Link
+                  to={setPageUrl}
+                  className="mt-1 inline-block text-sm text-brand-600 underline-offset-2 hover:underline"
+                >
+                  {setDisplay}
+                </Link>
+              )}
+              {setDisplay && !setPageUrl && (
+                <p className="mt-1 text-sm text-brand-600">{setDisplay}</p>
+              )}
+              {(card.setCode ?? card.collectorNumber) && (
+                <p className="mt-1 text-sm text-fg-muted">
+                  {[card.setCode?.toUpperCase(), card.collectorNumber ? `#${card.collectorNumber}` : null]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
+              {typeLine && <p className="mt-2 text-sm text-fg-muted">{typeLine}</p>}
+            </header>
+
+            <Tabs
+              aria-label="Card information"
+              value={infoTab}
+              onChange={(id) => setInfoTab(id as 'details' | 'legality')}
+              tabs={[
+                { id: 'details', label: 'Product Details' },
+                { id: 'legality', label: 'Legality' },
+              ]}
+            >
+              <TabPanel when="details" value={infoTab} className="pt-5">
+                {oracleText ? (
+                  <div className="space-y-4">
+                    <p className="whitespace-pre-line text-base leading-relaxed text-fg">
+                      <CardText text={oracleText} symbolClassName="size-[1.1em]" />
+                    </p>
+                    {flavorText && (
+                      <p className="pt-4 text-sm italic leading-relaxed text-fg-muted">{flavorText}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-fg-muted">No rules text for this card.</p>
+                )}
+
+                <dl className="mt-8 space-y-2.5 text-sm">
+                  {card.rarity && <DetailRow label="Rarity" value={rarityLabel(card.rarity)} />}
+                  {card.collectorNumber && <DetailRow label="#" value={card.collectorNumber} />}
+                  {typeLine && <DetailRow label="Card type" value={typeLine} />}
+                  {powerToughness && <DetailRow label="P / T" value={powerToughness} />}
+                  {card.manaCost && (
+                    <div className="flex gap-4">
+                      <dt className="w-32 shrink-0 text-fg-muted">Mana cost</dt>
+                      <dd>
+                        <ManaCost cost={card.manaCost} className="size-5" />
+                      </dd>
+                    </div>
+                  )}
+                  {card.artist && (
+                    <DetailRow
+                      label="Artist"
+                      value={
+                        card.scryfallUri ? (
+                          <a
+                            href={card.scryfallUri}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-bold text-brand-600 hover:underline"
+                          >
+                            {card.artist}
+                          </a>
+                        ) : (
+                          card.artist
+                        )
+                      }
+                    />
+                  )}
+                  {specs
+                    .filter((s) => !['Rarity', 'Power / Toughness'].includes(s.label))
+                    .map((spec) => (
+                      <DetailRow
+                        key={spec.label}
+                        label={spec.label}
+                        value={spec.value}
+                        capitalize={spec.capitalize}
+                      />
+                    ))}
+                </dl>
+              </TabPanel>
+
+              <TabPanel when="legality" value={infoTab} className="pt-5">
+                {!isMagic ? (
+                  <p className="text-sm text-fg-muted">Format legality is available for Magic: The Gathering printings.</p>
+                ) : legalityTotal === 0 ? (
+                  <p className="text-sm text-fg-muted">
+                    No legality data on file for this printing.{' '}
+                    {card.scryfallUri ? (
+                      <a href={card.scryfallUri} target="_blank" rel="noreferrer" className="font-bold text-brand-600 hover:underline">
+                        View on Scryfall
+                      </a>
+                    ) : (
+                      'Try refreshing catalog sync from Scryfall.'
+                    )}
+                  </p>
+                ) : legalFormats.length > 0 ? (
+                  <>
+                    <p className="text-sm text-fg-muted">
+                      Formats where this printing is{' '}
+                      <span className="font-bold text-success-700">legal</span>, from Scryfall data stored on this card.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {legalFormats.map(({ key, label }) => (
+                        <Badge key={key} tone="success" className="uppercase tracking-wide">
+                          {label}
+                        </Badge>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-fg-muted">
+                    This printing is not legal in any tracked format. See Scryfall for restricted, banned, and format-specific rules.
+                  </p>
+                )}
+                {isMagic && legalityHasHidden && (
+                  <p className="mt-4 border border-border bg-bg/50 px-3 py-2.5 text-sm text-fg-muted">
+                    Restricted, banned, and not-legal formats are not listed here.{' '}
+                    {card.scryfallUri ? (
+                      <a
+                        href={card.scryfallUri}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-brand-600 hover:underline"
+                      >
+                        See the full list on Scryfall
+                      </a>
+                    ) : (
+                      'See Scryfall for the full list'
+                    )}
+                    .
+                  </p>
+                )}
+              </TabPanel>
+            </Tabs>
+
+            <section className="mt-10 border-t border-border pt-6">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-fg">Market Price History</h2>
+                  <p className="mt-0.5 text-sm text-fg-muted">
+                    {item.condition} · {finishName(card, item.isFoil, item.finish)}
+                    {marketCents != null && (
+                      <>
+                        {' '}
+                        · Market <span className="font-bold text-fg">{marketLabel}</span>
+                      </>
+                    )}
+                    {marketCents === null && marketLabel !== MARKET_NO_DATA && (
+                      <>
+                        {' '}
+                        · <span className="text-fg-muted">{marketLabel}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+                {storeVsMarketCents != null && storeVsMarketCents !== 0 && (
+                  <span
+                    className={cx(
+                      'rounded-full px-2.5 py-1 text-xs font-bold',
+                      storeVsMarketCents < 0 ? 'bg-success-50 text-success-700' : 'bg-warning-50 text-warning-700',
+                    )}
+                  >
+                    {storeVsMarketCents < 0
+                      ? `${formatPrice(Math.abs(storeVsMarketCents))} below market`
+                      : `${formatPrice(storeVsMarketCents)} above market`}
+                  </span>
+                )}
+              </div>
+
+              {marketCents != null && (
+                <div className="mt-6 max-w-md">
+                  <div className="mb-2 flex justify-between text-xs font-bold text-fg-muted">
+                    <span>Store price</span>
+                    <span>Market ({finishName(card, item.isFoil, item.finish)})</span>
+                  </div>
+                  <div className="relative h-3 overflow-hidden rounded-full bg-bg">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full bg-brand-500/90"
+                      style={{
+                        width: `${Math.min(100, Math.round((item.priceCents / Math.max(item.priceCents, marketCents, 1)) * 100))}%`,
+                      }}
+                    />
+                    <div
+                      className="absolute inset-y-0 rounded-full bg-fg-muted/35"
+                      style={{
+                        left: `${Math.min(100, Math.round((marketCents / Math.max(item.priceCents, marketCents, 1)) * 100))}%`,
+                        width: '3px',
+                      }}
+                    />
+                  </div>
+                  <div className="mt-2 flex justify-between text-sm font-bold">
+                    <span className="text-brand-600">{formatPrice(item.priceCents)}</span>
+                    <span className="text-fg-muted">{marketLabel}</span>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
-        </section>
-      )}
+
+          {/* Buy column — TCGplayer Direct-style stacked modules */}
+          <aside className={cx(colPad, 'order-3 space-y-3 lg:col-start-3 lg:row-start-1')}>
+            <div className="space-y-3 lg:sticky lg:top-16">
+              <div className="tcg-buy-box overflow-hidden">
+                <div className="flex items-center gap-2 border-b border-brand-200/90 bg-brand-50 px-3 py-2.5 dark:border-brand-500/25 dark:bg-brand-500/10">
+                  <ShieldCheck aria-hidden className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                  <span className="text-sm font-bold text-brand-700 dark:text-brand-300">{store?.name ?? 'This store'}</span>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-fg-muted">{item.condition}</p>
+                  <p className="mt-1 text-3xl font-bold tabular-nums leading-none text-fg">{formatPrice(item.priceCents)}</p>
+                  {marketCents != null && (
+                    <p className="mt-2 text-xs text-fg-muted">
+                      Market price{' '}
+                      <span className="font-semibold text-success-600 dark:text-success-500">{marketLabel}</span>
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-fg-muted underline decoration-border underline-offset-2">
+                    Sold by {store?.name ?? 'this store'}
+                  </p>
+
+                  <div className="mt-4 flex">
+                    <div className="flex h-11 shrink-0 items-center gap-1 rounded-l-md border border-r-0 border-border bg-bg px-3 text-sm text-fg-muted">
+                      <span className="font-semibold text-fg">1</span>
+                      <span className="text-xs">of {Math.max(1, item.quantity)}</span>
+                    </div>
+                    {user ? (
+                      inCart ? (
+                        <Link
+                          to={`/s/${slug}/cart`}
+                          className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md px-4 shadow-none`}
+                        >
+                          <ShoppingCart aria-hidden className="size-4" />
+                          Checkout ({cartEntry?.quantity})
+                        </Link>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          size="lg"
+                          className="h-11 flex-1 rounded-l-none rounded-r-md shadow-none"
+                          loading={cartSetItem.isPending}
+                          disabled={cartSetItem.isPending || outOfStock}
+                          onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
+                        >
+                          {outOfStock ? 'Out of stock' : 'Add to Cart'}
+                        </Button>
+                      )
+                    ) : (
+                      <Link
+                        to="/login"
+                        className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md shadow-none`}
+                      >
+                        Sign in to buy
+                      </Link>
+                    )}
+                  </div>
+
+                  {user && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={favoriteMutation.isPending}
+                        disabled={favoriteMutation.isPending}
+                        onClick={() => favoriteMutation.mutate({ inventoryItem: item, favorite: isFavorite })}
+                      >
+                        <Heart aria-hidden className={`size-4 ${isFavorite ? 'fill-current' : ''}`} />
+                        Save
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={wantListMutation.isPending}
+                        disabled={wantListMutation.isPending || isWanted}
+                        onClick={() => wantListMutation.mutate(item)}
+                      >
+                        <ListPlus aria-hidden className="size-4" />
+                        Want list
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {alternateListings.length > 0 && lowestAlternateCents != null && (
+                <Link
+                  to={setPageUrl ?? `/s/${slug}#store-search`}
+                  className="tcg-buy-box block p-4 text-center text-sm transition-colors hover:bg-bg/50"
+                >
+                  <span className="font-semibold text-brand-600 underline-offset-2 hover:underline">
+                    View {alternateListings.length} Other Listing{alternateListings.length === 1 ? '' : 's'}
+                  </span>
+                  <span className="mt-1 block text-fg-muted">As low as {formatPrice(lowestAlternateCents)}</span>
+                </Link>
+              )}
+
+              <div className="tcg-buy-box p-4">
+                <h3 className="text-sm font-bold text-fg">
+                  {item.condition} Comparison Prices
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {priceRows.map((row) => (
+                    <li key={row.key} className="flex items-baseline justify-between gap-3">
+                      <span className="text-fg-muted">{row.label}</span>
+                      <span className={cx('font-semibold tabular-nums', row.muted ? 'text-fg-muted' : 'text-fg')}>
+                        {row.display}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs text-fg-muted">
+                {card.scryfallUri && (
+                  <a href={card.scryfallUri} target="_blank" rel="noreferrer" className="hover:text-brand-600 hover:underline">
+                    Scryfall
+                  </a>
+                )}
+                <a href={edhrecUrl(card.name)} target="_blank" rel="noreferrer" className="hover:text-brand-600 hover:underline">
+                  EDHREC
+                </a>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {related.length > 0 && (
+          <section className="border-t border-border/40 px-5 py-8 sm:px-8 lg:px-10">
+            <div className="mb-4 flex items-end justify-between">
+              <h2 className="font-display text-xl font-bold tracking-tight text-fg">More from {store?.name ?? 'this store'}</h2>
+              <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                View all
+              </Link>
+            </div>
+            <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {related.map((rel) => (
+                <SpotlightCard key={rel.id} item={rel} slug={slug} />
+              ))}
+            </div>
+          </section>
+        )}
+      </article>
+      </div>
+
+      <EditInventoryModal
+        slug={slug}
+        item={manageListing ? item : null}
+        inventory={inventory}
+        pending={updateListingMutation.isPending}
+        onClose={closeManageListing}
+        onSave={(payload) => updateListingMutation.mutate(payload)}
+      />
     </div>
   )
 }
 
-function Spec({ label, value, capitalize = false }: { label: string; value: string; capitalize?: boolean }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-fg-muted">{label}</dt>
-      <dd className={`mt-0.5 font-medium text-fg ${capitalize ? 'capitalize' : ''}`}>{value}</dd>
-    </div>
-  )
+function ChevronSep() {
+  return <ChevronRight aria-hidden className="size-3 shrink-0 text-fg-muted/50" />
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+  capitalize = false,
+}: {
+  label: string
+  value: ReactNode
+  capitalize?: boolean
+}) {
   return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-fg-muted">{label}</dt>
-      <dd className="mt-0.5 font-bold text-fg">{value}</dd>
-    </div>
-  )
-}
-
-function PriceRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-fg-muted">{label}</span>
-      <span className="font-bold text-fg">{value}</span>
+    <div className="flex gap-6 py-0.5">
+      <dt className="w-32 shrink-0 text-fg-muted">{label}</dt>
+      <dd className={cx('min-w-0 text-fg', capitalize && 'capitalize')}>{value}</dd>
     </div>
   )
 }

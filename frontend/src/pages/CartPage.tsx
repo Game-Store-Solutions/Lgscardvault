@@ -2,9 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
-  ArrowLeft,
-  BadgeCheck,
-  Boxes,
   CreditCard,
   Minus,
   PackageCheck,
@@ -18,9 +15,10 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { CartItem, InventoryItem, Order, OrderFulfillment, SealedInventoryLine, StoreCreditSummary } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { inventoryKey, ordersKey, useCart, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreTheme } from '../hooks'
+import { inventoryKey, ordersKey, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreCart, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
-import { Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
+import { guestCartKey, guestCartLines, resetGuestCart } from '../hooks/useGuestCart'
+import { BackButton, Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
 import { CheckoutPanel } from '../components/payments/CheckoutPanel'
 import { CardImage, SpotlightCard } from '../components/cards'
 import { cx } from '../lib/cx'
@@ -48,11 +46,14 @@ export default function CartPage() {
   const { data: store } = useStore(slug)
   useStoreTheme(store)
 
-  const { query, setItem, removeItem, setSealedItem, removeSealedItem, clear } = useCart(slug, Boolean(user))
+  const isGuest = !user
+  const { query, setItem, removeItem, setSealedItem, removeSealedItem, clear } = useStoreCart(slug, Boolean(user))
   const { data: cart = [], isLoading } = query
   const [removed, setRemoved] = useState<RemovedLine | null>(null)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>('pickup')
+  const [contactName, setContactName] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
   const { kioskMode } = useKioskMode()
   const [kioskCustomerName, setKioskCustomerName] = useState('')
   const [useCredit, setUseCredit] = useState(false)
@@ -68,9 +69,16 @@ export default function CartPage() {
   })
   const creditBalanceCents = creditQuery.data?.balanceCents ?? 0
 
+  useEffect(() => {
+    if (user) {
+      setContactName(user.displayName ?? '')
+      setContactEmail(user.email ?? '')
+    }
+  }, [user])
+
   const checkoutConfigQuery = useQuery({
     queryKey: ['store-checkout-config', slug],
-    enabled: Boolean(slug && user && !kioskMode),
+    enabled: Boolean(slug && !kioskMode),
     queryFn: async () => {
       const { data } = await api.get<{ enabled: boolean }>(`/stores/${slug}/customer/checkout/config`)
       return data
@@ -83,17 +91,22 @@ export default function CartPage() {
     async (order: Order) => {
       setCreatedOrder(order)
       setKioskCustomerName('')
-      queryClient.setQueryData(customerKeys.cart(slug), [])
+      if (isGuest) {
+        resetGuestCart(slug)
+        queryClient.setQueryData(guestCartKey(slug), [])
+        await queryClient.invalidateQueries({ queryKey: guestCartKey(slug) })
+      } else {
+        queryClient.setQueryData(customerKeys.cart(slug), [])
+        await queryClient.invalidateQueries({ queryKey: customerKeys.cart(slug) })
+      }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: customerKeys.cart(slug) }),
         queryClient.invalidateQueries({ queryKey: customerKeys.orders(slug) }),
         queryClient.invalidateQueries({ queryKey: ordersKey(slug) }),
-        // Checkout consumes stock — refresh listings so counts are current.
         queryClient.invalidateQueries({ queryKey: inventoryKey(slug) }),
         queryClient.invalidateQueries({ queryKey: ['store-credit', slug] }),
       ])
     },
-    [queryClient, slug],
+    [queryClient, slug, isGuest],
   )
 
   const testOrder = useMutation({
@@ -114,24 +127,32 @@ export default function CartPage() {
     return () => clearTimeout(timer)
   }, [removed])
 
-  const { itemCount, subtotalCents, uniqueSets } = useMemo(() => {
+  const { itemCount, subtotalCents } = useMemo(() => {
     let itemCount = 0
     let subtotalCents = 0
-    const sets = new Set<string>()
 
     for (const entry of cart) {
       itemCount += entry.quantity
-      const setCode = entry.inventoryItem?.card.setCode
-      if (setCode) sets.add(setCode.toUpperCase())
-
       const unit = lineUnitCents(entry)
       subtotalCents += unit * entry.quantity
     }
 
-    return { itemCount, subtotalCents, uniqueSets: sets.size }
+    return { itemCount, subtotalCents }
   }, [cart])
 
   const subtotalLabel = formatPrice(subtotalCents)
+
+  const checkoutPath = isGuest ? `/stores/${slug}/guest/checkout` : `/stores/${slug}/customer/checkout`
+  const checkoutBody = useMemo(
+    () => ({
+      fulfillment: kioskMode ? 'pickup' : fulfillment,
+      customerName: (kioskMode ? kioskCustomerName : contactName).trim(),
+      customerEmail: contactEmail.trim() || undefined,
+      ...(isGuest ? { lines: guestCartLines(cart) } : { useStoreCredit: useCredit }),
+    }),
+    [cart, contactEmail, contactName, fulfillment, isGuest, kioskCustomerName, kioskMode, slug, useCredit],
+  )
+  const paymentReady = Boolean((kioskMode ? kioskCustomerName : contactName).trim())
 
   const { data: inventory = [] } = useInventory(slug)
   const picks = useMemo(
@@ -164,13 +185,13 @@ export default function CartPage() {
     setRemoved(null)
   }
 
-  if (!user) {
+  if (!user && kioskMode) {
     return (
       <div className="mx-auto max-w-xl rounded-card border border-border bg-surface shadow-card">
         <EmptyState
           icon={ShoppingCart}
-          title="Sign in to view your cart"
-          description="Your cart is saved to your account so it is here whenever you come back."
+          title="Sign in for kiosk mode"
+          description="Kiosk checkout is only available on a signed-in store terminal."
           action={
             <Link to="/login" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
               Sign in
@@ -182,31 +203,88 @@ export default function CartPage() {
   }
 
   return (
-    <div className="space-y-8 pb-24 lg:pb-0">
+    <div className="space-y-6 pb-24 lg:pb-8">
       <p role="status" aria-live="polite" className="sr-only">
         {itemCount === 0
           ? 'Your cart is empty.'
           : `Cart updated. ${itemCount} item${itemCount === 1 ? '' : 's'}, estimated total ${subtotalLabel}.`}
       </p>
 
-      <CartHeader
-        slug={slug}
-        storeName={store?.name ?? 'this store'}
-        cartLength={cart.length}
-        itemCount={itemCount}
-        subtotalLabel={subtotalLabel}
-        uniqueSets={uniqueSets}
-        onClear={() => clear.mutate()}
-        clearPending={clear.isPending}
-      />
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+        <div className="min-w-0">
+          <BackButton to={`/s/${slug}`}>Continue shopping</BackButton>
+          <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Checkout</h1>
+          <p className="mt-1 text-sm text-fg-muted">{store?.name ?? 'Store'}</p>
+        </div>
+        {cart.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => clear.mutate()} loading={clear.isPending} className="text-fg-muted">
+            <Trash2 aria-hidden className="size-4" />
+            Clear cart
+          </Button>
+        )}
+      </header>
 
       {isLoading ? (
         <StorePageLoader label="Loading your cart…" />
       ) : cart.length === 0 ? (
         <EmptyCart slug={slug} storeName={store?.name ?? 'the store'} picks={picks} />
       ) : (
-        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_23rem]">
-          <ul className="space-y-3">
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="space-y-8">
+            {!kioskMode && (
+              <section className="rounded-card border border-border bg-surface p-5 shadow-card">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-base font-bold text-fg">Contact</h2>
+                  {isGuest && (
+                    <Link to="/login" className="text-sm font-medium text-brand-600 hover:underline">
+                      Log in
+                    </Link>
+                  )}
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Name"
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder="For pickup or your order"
+                    maxLength={255}
+                    required
+                  />
+                  <Input
+                    label="Email"
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder={isGuest ? 'Receipt & updates (optional)' : 'Receipt email'}
+                    maxLength={255}
+                  />
+                </div>
+              </section>
+            )}
+
+            {!kioskMode && (
+              <fieldset className="rounded-card border border-border bg-surface p-5 shadow-card">
+                <legend className="px-1 text-base font-bold text-fg">Delivery</legend>
+                <div className="mt-4 space-y-2">
+                  <FulfillmentOption
+                    checked={fulfillment === 'pickup'}
+                    onSelect={() => setFulfillment('pickup')}
+                    title="Pick up in store"
+                    text={`Free — grab it at ${store?.name ?? 'the store'}.`}
+                  />
+                  <FulfillmentOption
+                    checked={fulfillment === 'shipping'}
+                    onSelect={() => setFulfillment('shipping')}
+                    title="Ship to me"
+                    text="Shipping calculated at checkout."
+                  />
+                </div>
+              </fieldset>
+            )}
+
+            <section>
+              <h2 className="mb-3 text-base font-bold text-fg">Items</h2>
+              <ul className="space-y-3">
             {cart.map((entry) =>
               entry.sealedItem ? (
                 <SealedCartLine
@@ -229,15 +307,15 @@ export default function CartPage() {
                 />
               ) : null,
             )}
-          </ul>
+              </ul>
+            </section>
+          </div>
 
           <OrderSummary
             slug={slug}
             storeName={store?.name ?? 'the store'}
             itemCount={itemCount}
             subtotalLabel={subtotalLabel}
-            fulfillment={fulfillment}
-            onFulfillmentChange={setFulfillment}
             kioskMode={kioskMode}
             creditBalanceCents={creditBalanceCents}
             useCredit={useCredit}
@@ -245,7 +323,12 @@ export default function CartPage() {
             subtotalCents={subtotalCents}
             kioskCustomerName={kioskCustomerName}
             onKioskCustomerNameChange={setKioskCustomerName}
-            buyerEmail={user?.email ?? ''}
+            buyerEmail={contactEmail.trim() || user?.email || ''}
+            checkoutPath={checkoutPath}
+            checkoutBody={checkoutBody}
+            paymentReady={paymentReady}
+            fulfillment={fulfillment}
+            isGuest={isGuest}
             testCheckoutEnabled={TEST_CHECKOUT_ENABLED && !squareCheckoutEnabled}
             testOrderPending={testOrder.isPending}
             testOrderError={testOrder.error}
@@ -296,81 +379,6 @@ export default function CartPage() {
   )
 }
 
-function CartHeader({
-  slug,
-  storeName,
-  cartLength,
-  itemCount,
-  subtotalLabel,
-  uniqueSets,
-  onClear,
-  clearPending,
-}: {
-  slug: string
-  storeName: string
-  cartLength: number
-  itemCount: number
-  subtotalLabel: string
-  uniqueSets: number
-  onClear: () => void
-  clearPending: boolean
-}) {
-  return (
-    <section className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
-      <div className="flex flex-col gap-6 p-5 sm:p-7">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link to={`/s/${slug}`} className="inline-flex items-center gap-1 text-sm font-bold text-brand-600 hover:underline">
-            <ArrowLeft aria-hidden className="size-4" />
-            Continue shopping
-          </Link>
-          {cartLength > 0 && (
-            <Button variant="ghost" size="sm" onClick={onClear} loading={clearPending} className="text-danger-700">
-              <Trash2 aria-hidden className="size-4" />
-              Clear cart
-            </Button>
-          )}
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-600">Secure checkout</p>
-            <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-fg sm:text-5xl">Your cart</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-muted sm:text-base">
-              Review your items before you pay.
-            </p>
-          </div>
-
-          <div className="rounded-card border border-border bg-bg p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Estimated total</p>
-            <p className="mt-1 font-display text-3xl font-extrabold text-fg">{subtotalLabel}</p>
-            <p className="mt-1 text-xs text-fg-muted">Shipping and tax are calculated at checkout.</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid border-t border-border bg-bg/70 sm:grid-cols-3">
-        <CartMetric icon={ShoppingCart} label="Cards" value={String(itemCount)} />
-        <CartMetric icon={Boxes} label="Sets" value={String(uniqueSets)} />
-        <CartMetric icon={BadgeCheck} label="Store" value={storeName} />
-      </div>
-    </section>
-  )
-}
-
-function CartMetric({ icon: Icon, label, value }: { icon: typeof ShoppingCart; label: string; value: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3 border-b border-border px-5 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <span className="grid size-10 shrink-0 place-items-center rounded-btn bg-surface text-brand-600">
-        <Icon aria-hidden className="size-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{label}</p>
-        <p className="truncate font-display text-lg font-bold text-fg">{value}</p>
-      </div>
-    </div>
-  )
-}
-
 function EmptyCart({ slug, storeName, picks }: { slug: string; storeName: string; picks: InventoryItem[] }) {
   return (
     <div className="space-y-10">
@@ -414,11 +422,9 @@ function EmptyCart({ slug, storeName, picks }: { slug: string; storeName: string
 
 function OrderSummary({
   slug,
-  storeName,
   itemCount,
   subtotalLabel,
   fulfillment,
-  onFulfillmentChange,
   kioskMode = false,
   creditBalanceCents = 0,
   useCredit = false,
@@ -427,6 +433,10 @@ function OrderSummary({
   kioskCustomerName = '',
   onKioskCustomerNameChange,
   buyerEmail,
+  checkoutPath,
+  checkoutBody,
+  paymentReady,
+  isGuest = false,
   testCheckoutEnabled,
   testOrderPending,
   testOrderError,
@@ -439,7 +449,6 @@ function OrderSummary({
   itemCount: number
   subtotalLabel: string
   fulfillment: OrderFulfillment
-  onFulfillmentChange: (value: OrderFulfillment) => void
   kioskMode?: boolean
   creditBalanceCents?: number
   useCredit?: boolean
@@ -448,6 +457,10 @@ function OrderSummary({
   kioskCustomerName?: string
   onKioskCustomerNameChange?: (value: string) => void
   buyerEmail: string
+  checkoutPath: string
+  checkoutBody: Record<string, unknown>
+  paymentReady: boolean
+  isGuest?: boolean
   testCheckoutEnabled: boolean
   testOrderPending: boolean
   testOrderError: unknown
@@ -455,20 +468,15 @@ function OrderSummary({
   onCreateTestOrder: () => void
   onOrderPlaced: (order: Order) => void
 }) {
-  const creditApplied = !kioskMode && useCredit ? Math.min(creditBalanceCents, subtotalCents) : 0
+  const creditApplied = !kioskMode && !isGuest && useCredit ? Math.min(creditBalanceCents, subtotalCents) : 0
   return (
-    <aside id="order-summary" className="scroll-mt-20 rounded-card border border-border bg-surface p-5 shadow-card lg:sticky lg:top-20">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display text-xl font-bold text-fg">Order summary</h2>
-          <p className="mt-1 text-sm text-fg-muted">{itemCount} {itemCount === 1 ? 'card' : 'cards'} saved</p>
-        </div>
-        <span className="grid size-11 place-items-center rounded-btn bg-brand-50 text-brand-700">
-          <PackageCheck aria-hidden className="size-5" />
-        </span>
-      </div>
+    <aside id="order-summary" className="scroll-mt-20 rounded-card border border-border bg-bg/80 p-5 shadow-card lg:sticky lg:top-20">
+      <h2 className="font-display text-lg font-bold text-fg">Order summary</h2>
+      <p className="mt-1 text-sm text-fg-muted">
+        {itemCount} {itemCount === 1 ? 'item' : 'items'}
+      </p>
 
-      {kioskMode ? (
+      {kioskMode && (
         <div className="mt-5">
           <Input
             label="Your name"
@@ -478,22 +486,6 @@ function OrderSummary({
             maxLength={255}
           />
         </div>
-      ) : (
-        <fieldset className="mt-5 space-y-2">
-          <legend className="text-xs font-bold uppercase tracking-wide text-fg-muted">How would you like to get it?</legend>
-          <FulfillmentOption
-            checked={fulfillment === 'pickup'}
-            onSelect={() => onFulfillmentChange('pickup')}
-            title="Pick up in store"
-            text={`Free — grab it at ${storeName}.`}
-          />
-          <FulfillmentOption
-            checked={fulfillment === 'shipping'}
-            onSelect={() => onFulfillmentChange('shipping')}
-            title="Ship to me"
-            text="Shipping calculated at checkout."
-          />
-        </fieldset>
       )}
 
       <dl className="mt-5 space-y-3 text-sm">
@@ -502,14 +494,14 @@ function OrderSummary({
         <SummaryRow label="Taxes" value="Calculated at checkout" />
         {creditApplied > 0 && <SummaryRow label="Store credit" value={`−${formatPrice(creditApplied)}`} />}
         <div className="flex items-baseline justify-between border-t border-border pt-4">
-          <dt className="font-bold text-fg">Estimated total</dt>
+          <dt className="font-bold text-fg">Total due today</dt>
           <dd className="font-display text-3xl font-extrabold text-fg">
             {creditApplied > 0 ? formatPrice(Math.max(0, subtotalCents - creditApplied)) : subtotalLabel}
           </dd>
         </div>
       </dl>
 
-      {!kioskMode && creditBalanceCents > 0 && (
+      {!kioskMode && !isGuest && creditBalanceCents > 0 && (
         <label className="mt-4 flex items-center justify-between gap-3 rounded-btn border border-success-500/30 bg-success-50 px-3 py-2 text-sm">
           <span className="flex items-center gap-2 font-medium text-success-700">
             <input
@@ -543,9 +535,10 @@ function OrderSummary({
         <CheckoutPanel
           slug={slug}
           amountDueCents={subtotalCents - creditApplied}
-          fulfillment={fulfillment}
-          useStoreCredit={useCredit}
           buyerEmail={buyerEmail}
+          checkoutPath={checkoutPath}
+          checkoutBody={checkoutBody}
+          paymentReady={paymentReady}
           onPlaced={onOrderPlaced}
         />
       )}
@@ -584,7 +577,7 @@ function OrderSummary({
       </Link>
 
       <div className="mt-5 grid gap-3 border-t border-border pt-5">
-        <TrustNote icon={ShieldCheck} title="Live inventory" text={`Stock counts come from ${storeName}'s current listings.`} />
+        <TrustNote icon={ShieldCheck} title="Live inventory" text="Stock is reserved when you pay." />
         <TrustNote icon={CreditCard} title="Secure payments" text="Card details go straight to Square and never reach our servers." />
       </div>
     </aside>

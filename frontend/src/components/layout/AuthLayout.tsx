@@ -1,5 +1,6 @@
-import { Link, Outlet } from 'react-router'
-import { ArrowLeft, Moon, Sun } from 'lucide-react'
+import { Outlet } from 'react-router'
+import { Moon, Sun } from 'lucide-react'
+import { BackButton } from '../ui'
 import { useTheme } from '../../hooks'
 
 /**
@@ -13,13 +14,9 @@ export default function AuthLayout() {
   return (
     <div className="min-h-screen bg-bg text-fg">
       <div className="pointer-events-none fixed right-4 top-4 z-30 flex items-center gap-2">
-        <Link
-          to="/"
-          className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/85 px-3.5 py-2 text-sm font-medium text-fg-muted shadow-sm backdrop-blur transition-colors hover:text-brand-600"
-        >
-          <ArrowLeft aria-hidden className="size-4" />
+        <BackButton to="/" tone="overlay" className="pointer-events-auto">
           Marketplace
-        </Link>
+        </BackButton>
         <button
           type="button"
           onClick={toggleTheme}
