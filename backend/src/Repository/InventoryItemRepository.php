@@ -2,9 +2,11 @@
 
 namespace App\Repository;
 
+use App\Entity\Card;
 use App\Entity\InventoryItem;
 use App\Entity\Game;
 use App\Entity\Store;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -238,5 +240,102 @@ class InventoryItemRepository extends ServiceEntityRepository
             ->setParameter('id', $id)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * Best storefront listing to open for a want-list row at this store.
+     * Prefers exact finish, in-stock copies, then lowest price.
+     */
+    public function findListingForWantEntry(
+        Store $store,
+        ?Card $card,
+        string $cardName,
+        ?string $setCode,
+        string $wantFinish,
+        bool $wantFoil,
+    ): ?InventoryItem {
+        $candidates = $this->wantEntryListingQuery($store, $card, $cardName, $setCode, inStockOnly: true)
+            ->setMaxResults(40)
+            ->getQuery()
+            ->getResult();
+
+        $best = $this->pickBestWantListing($candidates, $wantFinish, $wantFoil);
+        if ($best instanceof InventoryItem) {
+            return $best;
+        }
+
+        $fallback = $this->wantEntryListingQuery($store, $card, $cardName, $setCode, inStockOnly: false)
+            ->setMaxResults(40)
+            ->getQuery()
+            ->getResult();
+
+        return $this->pickBestWantListing($fallback, $wantFinish, $wantFoil);
+    }
+
+    /**
+     * @param list<InventoryItem> $items
+     */
+    private function pickBestWantListing(array $items, string $wantFinish, bool $wantFoil): ?InventoryItem
+    {
+        $wantFinishCanon = FinishVocabulary::canonical($wantFinish);
+        $best = null;
+        $bestScore = -1;
+        $bestPrice = PHP_INT_MAX;
+
+        foreach ($items as $item) {
+            if (!FinishVocabulary::isFoil($item->getFinish()) === $wantFoil) {
+                continue;
+            }
+
+            $score = 0;
+            if ('' !== $wantFinishCanon && 0 === strcasecmp(FinishVocabulary::canonical($item->getFinish()), $wantFinishCanon)) {
+                $score += 20;
+            }
+            if ($item->getQuantity() > 0) {
+                $score += 10;
+            }
+
+            $price = $item->getPriceCents();
+            if ($score > $bestScore || ($score === $bestScore && $price < $bestPrice)) {
+                $best = $item;
+                $bestScore = $score;
+                $bestPrice = $price;
+            }
+        }
+
+        return $best;
+    }
+
+    private function wantEntryListingQuery(
+        Store $store,
+        ?Card $card,
+        string $cardName,
+        ?string $setCode,
+        bool $inStockOnly,
+    ): QueryBuilder {
+        $qb = $this->createQueryBuilder('i')
+            ->join('i.card', 'c')
+            ->addSelect('c')
+            ->andWhere('i.store = :store')
+            ->setParameter('store', $store)
+            ->orderBy('i.priceCents', 'ASC')
+            ->addOrderBy('i.id', 'ASC');
+
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
+
+        if ($card instanceof Card && null !== $card->getId() && '' !== $card->getId()) {
+            $qb->andWhere('c.id = :cardId')->setParameter('cardId', $card->getId());
+        } else {
+            $qb->andWhere('LOWER(c.name) = :cardName')->setParameter('cardName', mb_strtolower(trim($cardName)));
+        }
+
+        $set = null !== $setCode ? trim($setCode) : '';
+        if ('' !== $set) {
+            $qb->andWhere('LOWER(c.setCode) = :setCode')->setParameter('setCode', mb_strtolower($set));
+        }
+
+        return $qb;
     }
 }

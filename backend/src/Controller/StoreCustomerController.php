@@ -213,7 +213,7 @@ final class StoreCustomerController extends AbstractController
         }
 
         return $this->json(array_map(
-            $this->serializeWantListEntry(...),
+            fn (CustomerWantListEntry $entry) => $this->serializeWantListEntry($store, $entry),
             $this->wantListRepository->findForCustomer($customer),
         ));
     }
@@ -247,7 +247,7 @@ final class StoreCustomerController extends AbstractController
         $this->entityManager->persist($entry);
         $this->entityManager->flush();
 
-        return $this->json($this->serializeWantListEntry($entry), 201);
+        return $this->json($this->serializeWantListEntry($store, $entry), 201);
     }
 
     #[Route('/want-list/{id}', name: 'api_store_customer_want_list_remove', methods: ['DELETE'])]
@@ -1077,8 +1077,17 @@ final class StoreCustomerController extends AbstractController
         return FinishVocabulary::resolveForCard($card, $requested, $foilHint);
     }
 
-    private function serializeWantListEntry(CustomerWantListEntry $entry): array
+    private function serializeWantListEntry(Store $store, CustomerWantListEntry $entry): array
     {
+        $listing = $this->inventoryRepository->findListingForWantEntry(
+            $store,
+            $entry->getCard(),
+            $entry->getCardName(),
+            $entry->getSetCode(),
+            $entry->getFinish(),
+            $entry->isFoil(),
+        );
+
         return [
             'id' => $entry->getId(),
             'card' => $this->serializeCard($entry->getCard()),
@@ -1088,6 +1097,7 @@ final class StoreCustomerController extends AbstractController
             'isFoil' => $entry->isFoil(),
             'quantity' => $entry->getQuantity(),
             'notes' => $entry->getNotes(),
+            'inventoryItemId' => $listing?->getId(),
             'createdAt' => $entry->getCreatedAt()->format(DATE_ATOM),
         ];
     }
