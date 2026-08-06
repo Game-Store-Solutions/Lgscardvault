@@ -159,6 +159,19 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private string $cardDisplayStyle = 'gallery';
 
+    #[ORM\Column(length: 32, options: ['default' => 'cinematic'])]
+    #[Assert\Choice(choices: [
+        'cinematic', 'living-inventory', 'trading-table', 'event-board', 'floating-cards',
+        'floating-collection', 'store-story-hero', 'collectors-shelf', 'open-binder',
+        'store-counter', 'planeswalkers-desk', 'shipping-station', 'trophy-wall',
+        'convention-booth', 'library-shelf', 'world-map', 'gallery-wall', 'vault',
+        'command-center', 'guild-hall', 'mosaic-hero', 'store-window', 'day-night-hero',
+        'storefront', 'featured-card', 'collection', 'full-art', 'trading-desk',
+        'mascot', 'dynamic', 'video', 'minimal', 'banner', 'spotlight',
+    ])]
+    #[Groups(['store:read', 'store:admin'])]
+    private string $heroLayout = 'cinematic';
+
     /**
      * Optional dark-mode palette: the same seven branding color keys
      * (primaryColor … borderColor), applied INSTEAD of the base palette when
@@ -215,6 +228,17 @@ class Store
     #[ORM\Column(length: 1024, nullable: true)]
     #[Groups(['store:read', 'store:admin'])]
     private ?string $discordUrl = null;
+
+    /**
+     * Community events for the event-board hero and /events calendar page.
+     * Keys: boardHeading, boardIntro, calendarUrl (https), items[] with id, title,
+     * startsAt (ISO-8601), description, location, externalUrl, pinned.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?array $communityEvents = null;
 
     // --- Enterprise onboarding: application status ---
 
@@ -584,6 +608,18 @@ class Store
         return $this;
     }
 
+    public function getHeroLayout(): string
+    {
+        return $this->heroLayout;
+    }
+
+    public function setHeroLayout(string $heroLayout): static
+    {
+        $this->heroLayout = $heroLayout;
+
+        return $this;
+    }
+
     /** @return array<string, string>|null */
     public function getDarkColors(): ?array
     {
@@ -692,6 +728,20 @@ class Store
     public function setDiscordUrl(?string $discordUrl): static
     {
         $this->discordUrl = $discordUrl;
+
+        return $this;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getCommunityEvents(): ?array
+    {
+        return $this->communityEvents;
+    }
+
+    /** @param array<string, mixed>|null $communityEvents */
+    public function setCommunityEvents(?array $communityEvents): static
+    {
+        $this->communityEvents = $communityEvents;
 
         return $this;
     }

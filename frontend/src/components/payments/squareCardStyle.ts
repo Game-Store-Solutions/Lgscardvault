@@ -1,4 +1,4 @@
-/** Square CardClassSelectors — aligned with app tokens in index.css (.dark). */
+/** Square CardClassSelectors — only properties the Web Payments SDK accepts (see Square docs). */
 export function squareCardStyle(dark: boolean): Record<string, Record<string, string>> {
   if (dark) {
     return {

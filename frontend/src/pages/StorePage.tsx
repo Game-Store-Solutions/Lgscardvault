@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
+  Calendar,
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
@@ -20,6 +21,8 @@ import { useCanManageStore, useInventory, useStore, useStoreCart, useStoreGames,
 import { GameSelector } from '../components/catalog'
 import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
+import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
+import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
 import { StoreHero } from '../components/store/StoreHero'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
@@ -178,6 +181,9 @@ export default function StorePage() {
   }, [inventory, store?.spotlightMinPriceCents])
 
   const totalCards = inventory.reduce((sum, item) => sum + item.quantity, 0)
+  const heroShowcaseCards = useMemo(() => buildHeroCardPool(allInventory, 20), [allInventory])
+  const heroLayout = normalizeHeroLayout(store?.heroLayout ?? 'cinematic')
+  const locationLabel = [store?.city, store?.region].filter(Boolean).join(', ') || null
 
   // Pure navigation — no counts on the pills. A number there can't say what
   // it counts (listings? copies? sealed?), same reason it came off the
@@ -390,6 +396,7 @@ export default function StorePage() {
     <div className="storefront-atmosphere relative space-y-10">
       <StoreHero
         name={store?.name ?? slug}
+        slug={slug}
         tagline={store?.tagline}
         heroHeading={store?.heroHeading}
         heroSubheading={
@@ -400,8 +407,22 @@ export default function StorePage() {
         logoUrl={store?.logoUrl}
         primaryColor={store?.primaryColor}
         accentColor={store?.accentColor}
+        layout={heroLayout}
+        communityEvents={store?.communityEvents}
+        locationLabel={locationLabel}
+        verified={store?.status === 'approved'}
+        stats={{
+          listings: inventory.length,
+          cards: totalCards,
+          sets: availableSets.length,
+        }}
+        showcaseCards={heroShowcaseCards}
         actions={
           <>
+            <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Calendar aria-hidden className="size-4" />
+              Event calendar
+            </Link>
             {user && (
               <Link to={`/s/${slug}/account`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
                 <UserCircle aria-hidden className="size-4" />
@@ -424,7 +445,13 @@ export default function StorePage() {
       <p className="text-sm text-fg-muted">
         <span className="font-bold text-fg">{inventory.length}</span> listings ·{' '}
         <span className="font-bold text-fg">{totalCards}</span> cards ·{' '}
-        <span className="font-bold text-fg">{availableSets.length}</span> sets
+        <span className="font-bold text-fg">{availableSets.length}</span> sets ·{' '}
+        <Link
+          to={`/s/${slug}/events`}
+          className="font-bold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
+        >
+          Event calendar
+        </Link>
       </p>
 
       {/* Quick actions — themed shortcut tiles over the spotlight */}
@@ -432,7 +459,7 @@ export default function StorePage() {
         <p className="mx-auto max-w-2xl text-center text-sm text-fg/75 sm:text-base">
           Browse thousands of in-stock singles, build decks, sell or trade your collection.
         </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
               'group flex flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface px-4 py-8 text-fg shadow-card ui-lift hover:border-brand-500/40 dark:border-white/10 dark:bg-white/[0.04]'

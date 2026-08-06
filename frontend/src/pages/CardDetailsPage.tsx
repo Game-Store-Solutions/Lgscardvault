@@ -354,10 +354,10 @@ export default function CardDetailsPage() {
 
       <div className={inset}>
         <article className="product-detail-sheet">
-        <div className="flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(15rem,19rem)_minmax(0,1fr)_minmax(22rem,28rem)] xl:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)_minmax(24rem,32rem)] lg:items-start lg:gap-0">
+        <div className="flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)_minmax(20rem,28rem)] xl:grid-cols-[minmax(17rem,24rem)_minmax(0,1fr)_minmax(22rem,30rem)] lg:items-start lg:gap-0">
           {/* Card art — left */}
           <div className={cx(colPad, 'order-1 lg:col-start-1 lg:row-start-1')}>
-            <div className="mx-auto w-full max-w-[19rem] lg:mx-0 lg:max-w-none">
+            <div className="mx-auto w-full max-w-[20rem] sm:max-w-[22rem] lg:mx-0 lg:max-w-none">
               {multiFace ? (
                 <FlipCard
                   frontImage={faceImage(faces[0]) ?? cardImage(card)}

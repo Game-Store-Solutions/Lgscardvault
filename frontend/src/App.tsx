@@ -18,6 +18,7 @@ import CardDetailsPage from './pages/CardDetailsPage'
 import SetBrowsePage from './pages/SetBrowsePage'
 import CaseCardsPage from './pages/CaseCardsPage'
 import CustomerProfilePage from './pages/CustomerProfilePage'
+import StoreEventsPage from './pages/StoreEventsPage'
 import StoreAdminPage from './pages/StoreAdminPage'
 import ImportRunDetailsPage from './pages/store-admin/ImportRunDetailsPage'
 import PlatformAdminPage from './pages/PlatformAdminPage'
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="s/:slug/sets/:setCode" element={<SetBrowsePage />} />
               <Route path="s/:slug/cards/:id" element={<CardDetailsPage />} />
               <Route path="s/:slug/case-cards" element={<CaseCardsPage />} />
+              <Route path="s/:slug/events" element={<StoreEventsPage />} />
               <Route
                 path="s/:slug/account"
                 element={

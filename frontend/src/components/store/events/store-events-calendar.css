@@ -1,0 +1,75 @@
+/** FullCalendar theming — uses storefront design tokens (including `.dark`). */
+.store-events-calendar .fc {
+  --fc-border-color: var(--color-border);
+  --fc-page-bg-color: var(--color-surface);
+  --fc-neutral-bg-color: color-mix(in srgb, var(--color-border) 35%, transparent);
+  --fc-neutral-text-color: var(--color-fg-muted);
+  --fc-button-text-color: #fff;
+  --fc-button-bg-color: var(--color-brand-600);
+  --fc-button-border-color: var(--color-brand-600);
+  --fc-button-hover-bg-color: var(--color-brand-700);
+  --fc-button-hover-border-color: var(--color-brand-700);
+  --fc-button-active-bg-color: var(--color-brand-700);
+  --fc-button-active-border-color: var(--color-brand-700);
+  --fc-event-bg-color: var(--color-brand-500);
+  --fc-event-border-color: var(--color-brand-600);
+  --fc-event-text-color: #fff;
+  --fc-today-bg-color: color-mix(in srgb, var(--color-brand-500) 12%, var(--color-surface));
+  --fc-now-indicator-color: var(--color-accent-500);
+  font-family: inherit;
+}
+
+.store-events-calendar .fc .fc-toolbar-title {
+  font-family: var(--font-display, inherit);
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.store-events-calendar .fc .fc-col-header-cell-cushion,
+.store-events-calendar .fc .fc-daygrid-day-number {
+  color: var(--color-fg-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.store-events-calendar .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: var(--color-brand-600);
+}
+
+.dark .store-events-calendar .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: var(--color-brand-300);
+}
+
+.store-events-calendar .fc .fc-event {
+  border-radius: 0.375rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.store-events-calendar .fc .fc-event.fc-event-pinned {
+  --fc-event-bg-color: var(--color-warning-500);
+  --fc-event-border-color: var(--color-warning-700);
+}
+
+.store-events-calendar .fc .fc-list-event:hover td {
+  background: color-mix(in srgb, var(--color-brand-500) 8%, var(--color-surface));
+}
+
+.store-events-calendar .fc .fc-list-day-cushion {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-weight: 700;
+}
+
+.store-events-calendar .fc-theme-standard td,
+.store-events-calendar .fc-theme-standard th {
+  border-color: var(--color-border);
+}
+
+.store-events-calendar .fc-theme-standard .fc-scrollgrid {
+  border-color: var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}

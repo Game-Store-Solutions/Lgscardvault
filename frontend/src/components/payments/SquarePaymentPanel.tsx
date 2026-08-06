@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApplePay, Card, GooglePay, TokenResult } from '@square/web-sdk'
 import { CreditCard, Loader2 } from 'lucide-react'
 import type { PaymentMethodType } from '../../api/types'
@@ -24,12 +24,23 @@ const METHOD_BY_SDK: Record<string, PaymentMethodType> = {
 
 function PaymentDivider({ label = 'Or pay with card' }: { label?: string }) {
   return (
-    <div className="flex items-center gap-3 text-xs font-medium text-fg-muted">
-      <span className="h-px flex-1 bg-border" />
+    <div className="my-6 flex items-center gap-3 text-xs font-medium text-fg-muted">
+      <span className="h-px flex-1 bg-border/70" />
       <span>{label}</span>
-      <span className="h-px flex-1 bg-border" />
+      <span className="h-px flex-1 bg-border/70" />
     </div>
   )
+}
+
+/** Primary pay CTA — strongest visual weight on checkout surfaces. */
+export const checkoutPayButtonClass =
+  '!h-12 w-full text-base font-extrabold shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/35 active:scale-[0.99]'
+
+export type SquareCardPayAction = {
+  payWithCard: () => void
+  busy: boolean
+  cardReady: boolean
+  label: string
 }
 
 export function SquarePaymentPanel({
@@ -44,6 +55,8 @@ export function SquarePaymentPanel({
   paymentRequestLabel = 'Total',
   layout = 'checkout',
   saveOnly = false,
+  payButtonPlacement = 'inline',
+  onPayActionChange,
   onTokenized,
 }: {
   applicationId: string
@@ -59,6 +72,9 @@ export function SquarePaymentPanel({
   layout?: 'checkout' | 'vault'
   /** Save card/wallet without charging — enables express checkout at $0.01 for the wallet SDK. */
   saveOnly?: boolean
+  /** When external, card pay button is omitted — parent renders it (e.g. below an accordion). */
+  payButtonPlacement?: 'inline' | 'external'
+  onPayActionChange?: (action: SquareCardPayAction | null) => void
   onTokenized: (payment: TokenizedPayment) => void
 }) {
   const { payments, loading, error: loadError } = useSquarePayments(applicationId, locationId, environment)
@@ -80,6 +96,28 @@ export function SquarePaymentPanel({
   const showExpress = walletsEnabled && (googlePay || applePay)
   const showWalletDivider = showExpress
 
+  /** Square Card fails if attach runs while the host is display:none or zero-size. */
+  async function attachCardWhenReady(created: Card): Promise<void> {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const host = cardRef.current
+      if (!host) {
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve())
+        })
+        continue
+      }
+      const visible = host.offsetWidth > 0 && host.offsetHeight > 0
+      if (visible) {
+        await created.attach(host)
+        return
+      }
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+    }
+    throw new Error('Payment form is not visible yet. Expand the payment section and try again.')
+  }
+
   useEffect(() => {
     if (!payments) return
 
@@ -90,12 +128,14 @@ export function SquarePaymentPanel({
       .card({ style: squareCardStyle(darkMode) })
       .then(async (created) => {
         instance = created
-        if (cancelled || !cardRef.current) return
-        await created.attach(cardRef.current)
+        if (cancelled) return
+        await attachCardWhenReady(created)
         if (!cancelled) setCard(created)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load the card form.')
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load the card form.')
+        }
       })
 
     return () => {
@@ -175,30 +215,51 @@ export function SquarePaymentPanel({
     }
   }
 
-  async function submit(tokenize: () => Promise<TokenResult>, fallback: PaymentMethodType) {
-    setError('')
-    setBusy(true)
-    try {
-      const result = await tokenize()
+  const submit = useCallback(
+    async (tokenize: () => Promise<TokenResult>, fallback: PaymentMethodType) => {
+      setError('')
+      setBusy(true)
+      try {
+        const result = await tokenize()
 
-      if (result.status !== 'OK') {
-        if ('Cancel' === result.status || 'Abort' === result.status) return
-        const detail = 'errors' in result ? result.errors.map((e) => e.message).join(' ') : ''
-        throw new Error(detail || 'Your payment details could not be verified.')
+        if (result.status !== 'OK') {
+          if ('Cancel' === result.status || 'Abort' === result.status) return
+          const detail = 'errors' in result ? result.errors.map((e) => e.message).join(' ') : ''
+          throw new Error(detail || 'Your payment details could not be verified.')
+        }
+
+        onTokenized({
+          methodType: METHOD_BY_SDK[result.details?.method ?? ''] ?? fallback,
+          token: result.token,
+          last4: result.details?.card?.last4 ?? '',
+          verificationToken: await verify(result.token),
+        })
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Your payment details could not be verified.')
+      } finally {
+        setBusy(false)
       }
+    },
+    [onTokenized, payments, amount, currency, billingEmail, countryCode, vaultIntent],
+  )
 
-      onTokenized({
-        methodType: METHOD_BY_SDK[result.details?.method ?? ''] ?? fallback,
-        token: result.token,
-        last4: result.details?.card?.last4 ?? '',
-        verificationToken: await verify(result.token),
-      })
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Your payment details could not be verified.')
-    } finally {
-      setBusy(false)
+  const payWithCard = useCallback(() => {
+    if (!card) return
+    void submit(() => card.tokenize(), 'card')
+  }, [card, submit])
+
+  useEffect(() => {
+    if (payButtonPlacement !== 'external') {
+      onPayActionChange?.(null)
+      return
     }
-  }
+    onPayActionChange?.({
+      payWithCard,
+      busy,
+      cardReady: Boolean(card),
+      label: confirmLabel,
+    })
+  }, [payButtonPlacement, onPayActionChange, payWithCard, busy, card, confirmLabel])
 
   if (loadError) {
     return (
@@ -224,9 +285,9 @@ export function SquarePaymentPanel({
 
   const expressCheckout =
     walletsEnabled && layout === 'checkout' ? (
-      <div className="space-y-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Express checkout</p>
-        <div className="flex flex-col gap-2">
+      <div className="mt-2 space-y-3 rounded-xl bg-bg/90 px-4 py-4 dark:bg-bg/50">
+        <p className="text-sm font-bold text-fg">Express checkout</p>
+        <div className="flex flex-col gap-2.5">
           {applePay && (
             <button
               type="button"
@@ -252,21 +313,29 @@ export function SquarePaymentPanel({
     ) : null
 
   const cardBlock = (
-    <div className="space-y-3">
+    <div className="space-y-3 pt-1">
       <p className="text-sm font-semibold text-fg">{layout === 'checkout' ? 'Card information' : 'Payment method'}</p>
-      <div className="relative min-h-[7.5rem] rounded-btn border border-border bg-bg px-2 py-2">
+      <div className="relative min-h-[7.75rem] rounded-xl bg-bg/60 px-2 py-3 dark:bg-bg/40">
         {loading && (
           <p className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-fg-muted">
             <Loader2 aria-hidden className="size-4 animate-spin" />
             Loading secure payment form…
           </p>
         )}
-        <div ref={cardRef} className={`sq-card-host min-h-[6.5rem] ${loading ? 'invisible' : ''}`} />
+        <div ref={cardRef} className={`sq-card-host min-h-[7rem] ${loading ? 'invisible' : ''}`} />
       </div>
-      <Button className="w-full" size="lg" loading={busy} disabled={!card} onClick={() => void submit(() => card!.tokenize(), 'card')}>
-        <CreditCard aria-hidden className="size-4" />
-        {confirmLabel}
-      </Button>
+      {payButtonPlacement === 'inline' ? (
+        <Button
+          className={checkoutPayButtonClass}
+          size="lg"
+          loading={busy}
+          disabled={!card}
+          onClick={payWithCard}
+        >
+          <CreditCard aria-hidden className="size-4" />
+          {confirmLabel}
+        </Button>
+      ) : null}
     </div>
   )
 

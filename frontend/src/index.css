@@ -495,6 +495,69 @@ textarea {
   color-scheme: light dark;
 }
 
+.sq-card-host {
+  min-height: 7.25rem;
+}
+
 .dark .sq-card-host .sq-card-iframe-container {
   color-scheme: dark;
+}
+
+@keyframes hero-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -14px;
+  }
+}
+
+@keyframes hero-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes hero-fan {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -6px;
+  }
+}
+
+.hero-foil-shimmer {
+  position: relative;
+}
+
+.hero-foil-shimmer::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 65%
+  );
+  background-size: 200% 100%;
+  animation: foil-sweep 4s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+}
+
+.hero-snow {
+  background-image: radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(2px 2px at 60% 70%, white, transparent),
+    radial-gradient(1px 1px at 50% 50%, white, transparent);
+  background-size: 200% 200%;
+  animation: hero-float 8s ease-in-out infinite;
+  opacity: 0.35;
 }

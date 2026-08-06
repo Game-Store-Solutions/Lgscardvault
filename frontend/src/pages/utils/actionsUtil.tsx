@@ -1,4 +1,4 @@
-import {ClipboardList, GalleryHorizontalEnd, Package, Search, WalletCards} from "lucide-react";
+import { Calendar, ClipboardList, GalleryHorizontalEnd, Package, Search, WalletCards } from 'lucide-react'
 
 type FinishFilter = 'all' | 'foil' | 'nonfoil'
 type SortKey = 'featured' | 'price-desc' | 'price-asc' | 'name' | 'newest'
@@ -55,6 +55,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     { label: 'Search Cards', icon: Search, action: 'search' },
     { label: CASE_CARDS_LABEL, icon: GalleryHorizontalEnd, path: 'case-cards' },
     { label: 'Mass Search', icon: ClipboardList, path: 'mass-search' },
+    { label: 'Event calendar', icon: Calendar, path: 'events' },
     { label: 'Deck Builder', icon: Package },
     { label: 'Sell/Trade', icon: WalletCards, path: 'sell' },
 ]

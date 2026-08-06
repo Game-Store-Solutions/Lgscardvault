@@ -15,6 +15,7 @@ import {
   Menu,
   Package,
   Palette,
+  Calendar,
   CreditCard,
   ReceiptText,
   RefreshCw,
@@ -90,6 +91,7 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
         heading: 'Storefront',
         items: [
           { to: `${base}/branding`, label: 'Branding', icon: Palette },
+          { to: `${base}/events`, label: 'Events', icon: Calendar },
           { to: `${base}/spotlight`, label: 'Spotlight', icon: Sparkles },
           { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
         ],

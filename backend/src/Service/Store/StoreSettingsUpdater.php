@@ -17,6 +17,48 @@ final readonly class StoreSettingsUpdater
     private const HEX = '/^#[0-9a-fA-F]{6}$/';
     private const URL = '#^(https?://|/)#';
     private const CARD_DISPLAY_STYLES = ['gallery', 'marketplace'];
+    private const HERO_LAYOUTS = [
+        'cinematic', 'living-inventory', 'trading-table', 'event-board', 'floating-cards',
+        'floating-collection', 'store-story-hero', 'collectors-shelf', 'open-binder',
+        'store-counter', 'planeswalkers-desk', 'shipping-station', 'trophy-wall',
+        'convention-booth', 'library-shelf', 'world-map', 'gallery-wall', 'vault',
+        'command-center', 'guild-hall', 'mosaic-hero', 'store-window', 'day-night-hero',
+        'storefront', 'featured-card', 'collection', 'full-art', 'trading-desk',
+        'mascot', 'dynamic', 'video', 'minimal', 'banner', 'spotlight',
+    ];
+
+    private const HERO_LAYOUT_ALIASES = [
+        'floating-collection' => 'floating-cards',
+        'trading-desk' => 'trading-table',
+        'storefront' => 'cinematic',
+        'featured-card' => 'cinematic',
+        'full-art' => 'cinematic',
+        'collection' => 'living-inventory',
+        'minimal' => 'cinematic',
+        'banner' => 'cinematic',
+        'cinematic' => 'cinematic',
+        'mascot' => 'cinematic',
+        'dynamic' => 'cinematic',
+        'video' => 'cinematic',
+        'spotlight' => 'cinematic',
+        'store-story-hero' => 'cinematic',
+        'collectors-shelf' => 'cinematic',
+        'open-binder' => 'cinematic',
+        'store-counter' => 'cinematic',
+        'planeswalkers-desk' => 'trading-table',
+        'shipping-station' => 'living-inventory',
+        'trophy-wall' => 'cinematic',
+        'convention-booth' => 'cinematic',
+        'library-shelf' => 'living-inventory',
+        'world-map' => 'cinematic',
+        'gallery-wall' => 'cinematic',
+        'vault' => 'cinematic',
+        'command-center' => 'cinematic',
+        'guild-hall' => 'cinematic',
+        'mosaic-hero' => 'living-inventory',
+        'store-window' => 'cinematic',
+        'day-night-hero' => 'cinematic',
+    ];
 
     /** Branding color fields → entity setter. */
     private const COLOR_FIELDS = [
@@ -93,6 +135,15 @@ final readonly class StoreSettingsUpdater
             $store->setCardDisplayStyle($style);
         }
 
+        if (array_key_exists('heroLayout', $payload)) {
+            $layout = $this->stringValue($payload['heroLayout']);
+            if (!in_array($layout, self::HERO_LAYOUTS, true)) {
+                throw new \InvalidArgumentException('heroLayout is not a supported storefront hero style.');
+            }
+            $layout = self::HERO_LAYOUT_ALIASES[$layout] ?? $layout;
+            $store->setHeroLayout($layout);
+        }
+
         foreach (self::COLOR_FIELDS as $key => $setter) {
             if (!array_key_exists($key, $payload)) {
                 continue;
@@ -155,6 +206,10 @@ final readonly class StoreSettingsUpdater
             $store->setTradeRates($this->cleanTradeRates($payload['tradeRates']));
         }
 
+        if (array_key_exists('communityEvents', $payload)) {
+            $store->setCommunityEvents($this->cleanCommunityEvents($payload['communityEvents']));
+        }
+
         if (array_key_exists('contactEmail', $payload)) {
             $value = $this->stringValue($payload['contactEmail']);
             if ('' === $value) {
@@ -188,6 +243,7 @@ final readonly class StoreSettingsUpdater
             'heroSubheading' => $store->getHeroSubheading(),
             'tagline' => $store->getTagline(),
             'cardDisplayStyle' => $store->getCardDisplayStyle(),
+            'heroLayout' => $store->getHeroLayout(),
             'darkColors' => $store->getDarkColors(),
             'tradeRates' => $store->getTradeRates(),
             'hoursText' => $store->getHoursText(),
@@ -197,7 +253,96 @@ final readonly class StoreSettingsUpdater
             'instagramUrl' => $store->getInstagramUrl(),
             'twitterUrl' => $store->getTwitterUrl(),
             'discordUrl' => $store->getDiscordUrl(),
+            'communityEvents' => $store->getCommunityEvents(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function cleanCommunityEvents(mixed $raw): ?array
+    {
+        if (null === $raw || [] === $raw) {
+            return null;
+        }
+        if (!is_array($raw)) {
+            throw new \InvalidArgumentException('communityEvents must be an object.');
+        }
+
+        $clean = [];
+        $heading = $this->stringValue($raw['boardHeading'] ?? '');
+        if ('' !== $heading) {
+            $clean['boardHeading'] = mb_substr($heading, 0, 120);
+        }
+        $intro = $this->stringValue($raw['boardIntro'] ?? '');
+        if ('' !== $intro) {
+            $clean['boardIntro'] = mb_substr($intro, 0, 500);
+        }
+        $calendarUrl = $this->stringValue($raw['calendarUrl'] ?? '');
+        if ('' !== $calendarUrl) {
+            if (1 !== preg_match(self::URL, $calendarUrl)) {
+                throw new \InvalidArgumentException('communityEvents.calendarUrl must be an http(s) URL or a path starting with "/".');
+            }
+            $clean['calendarUrl'] = mb_substr($calendarUrl, 0, self::URL_MAX);
+        }
+
+        $items = $raw['items'] ?? [];
+        if (!is_array($items)) {
+            throw new \InvalidArgumentException('communityEvents.items must be an array.');
+        }
+        if (count($items) > 50) {
+            throw new \InvalidArgumentException('communityEvents.items cannot exceed 50 events.');
+        }
+
+        $cleanItems = [];
+        foreach ($items as $index => $item) {
+            if (!is_array($item)) {
+                throw new \InvalidArgumentException(sprintf('communityEvents.items[%d] must be an object.', $index));
+            }
+            $title = $this->stringValue($item['title'] ?? '');
+            if ('' === $title) {
+                continue;
+            }
+            $startsAt = $this->stringValue($item['startsAt'] ?? '');
+            if ('' === $startsAt) {
+                throw new \InvalidArgumentException(sprintf('communityEvents.items[%d].startsAt is required.', $index));
+            }
+            try {
+                new \DateTimeImmutable($startsAt);
+            } catch (\Exception) {
+                throw new \InvalidArgumentException(sprintf('communityEvents.items[%d].startsAt must be a valid date/time.', $index));
+            }
+            $row = [
+                'id' => mb_substr($this->stringValue($item['id'] ?? bin2hex(random_bytes(8))), 0, 64),
+                'title' => mb_substr($title, 0, 160),
+                'startsAt' => $startsAt,
+            ];
+            $description = $this->stringValue($item['description'] ?? '');
+            if ('' !== $description) {
+                $row['description'] = mb_substr($description, 0, 500);
+            }
+            $location = $this->stringValue($item['location'] ?? '');
+            if ('' !== $location) {
+                $row['location'] = mb_substr($location, 0, 160);
+            }
+            $externalUrl = $this->stringValue($item['externalUrl'] ?? '');
+            if ('' !== $externalUrl) {
+                if (1 !== preg_match(self::URL, $externalUrl)) {
+                    throw new \InvalidArgumentException(sprintf('communityEvents.items[%d].externalUrl must be http(s) or a / path.', $index));
+                }
+                $row['externalUrl'] = mb_substr($externalUrl, 0, self::URL_MAX);
+            }
+            if (!empty($item['pinned'])) {
+                $row['pinned'] = true;
+            }
+            $cleanItems[] = $row;
+        }
+
+        if ([] !== $cleanItems) {
+            $clean['items'] = $cleanItems;
+        }
+
+        return [] === $clean ? null : $clean;
     }
 
     /**

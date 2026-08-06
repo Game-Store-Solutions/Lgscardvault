@@ -4,8 +4,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import api, { cardImage, formatPrice, formatScryfallPrice, httpStatus } from '../api/client'
-import type { CardSummary, SellSubmission, StoreCheckoutConfig, StoreCreditSummary, StoreCustomer } from '../api/types'
+import api, { cardImage, formatPrice, formatScryfallPrice } from '../api/client'
+import type { CardSummary, SellSubmission, StoreCreditSummary, StoreCustomer } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import {
   customerKeys,
@@ -19,7 +19,6 @@ import {
   useStoreTheme,
 } from '../hooks'
 import {
-  Avatar,
   BackButton,
   Badge,
   Button,
@@ -28,43 +27,37 @@ import {
   CardHeader,
   EmptyState,
   ErrorState,
-  Field,
   Input,
   LoadingPanel,
-  PageHeader,
   Spinner,
-  Tabs,
   TabPanel,
   Textarea,
 } from '../components/ui'
-import { BellRing, CheckCircle2, CreditCard, HandCoins, Heart, ImageOff, ListPlus, PackageOpen, PiggyBank, Plus, ReceiptText, Save, Search, Smile, Sparkles, Trash2, WalletCards, X } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import {
+  ProfileAsideCard,
+  ProfileAsideLink,
+  ProfileHero,
+  ProfileLayout,
+  ProfileSection,
+  ProfileSideNav,
+  ProfileStatistics,
+  storeActivityIcons,
+  storeAsideIcons,
+} from '../components/profile'
+import {
+  IconHeartCrystal,
+  IconMagicBell,
+  IconTreasureChest,
+} from '../components/profile/ProfileNavIcons'
+import { ImageOff, Plus, ReceiptText, Save, Search, Trash2, WalletCards, X } from 'lucide-react'
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
-import { SquarePaymentPanel, type TokenizedPayment } from '../components/payments/SquarePaymentPanel'
-import { isDevBuild } from '../lib/runtimeEnv'
 import { METHOD_LABELS } from './onboarding/config'
+import { formatDate } from '../lib/format'
 
 type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade' | 'credit' | 'notifications'
 const TAB_IDS: TabId[] = ['profile', 'orders', 'favorites', 'wantlist', 'selltrade', 'credit', 'notifications']
-
-/** Wrap a lucide icon with a fixed playful tint (and fill, where it reads well). */
-function tinted(Icon: LucideIcon, tintClasses: string) {
-  return function TintedIcon({ className }: { className?: string }) {
-    return <Icon aria-hidden className={`${className ?? ''} ${tintClasses}`} />
-  }
-}
-
-const TAB_ICONS = {
-  profile: tinted(Smile, 'text-amber-500'),
-  orders: tinted(PackageOpen, 'text-sky-500'),
-  favorites: tinted(Heart, 'fill-pink-400 text-pink-500'),
-  wantlist: tinted(Sparkles, 'fill-amber-300 text-amber-500'),
-  selltrade: tinted(HandCoins, 'text-emerald-600'),
-  credit: tinted(PiggyBank, 'text-rose-500'),
-  notifications: tinted(BellRing, 'fill-violet-200 text-violet-500'),
-}
 
 export default function CustomerProfilePage() {
   const { slug = '' } = useParams()
@@ -91,49 +84,126 @@ export default function CustomerProfilePage() {
       return data
     },
   })
+  const profileQuery = useCustomerProfile(slug)
   const unreadCount = (notificationsQuery.data ?? []).filter((n) => !n.readAt).length
   const favoritesCount = favoritesQuery.data?.length ?? 0
   const wantListCount = wantListQuery.data?.length ?? 0
   const ordersCount = ordersQuery.data?.length ?? 0
+  const creditBalance = creditQuery.data?.balanceCents ?? 0
+  const store = storeQuery.data
+
+  const navItems = [
+    { id: 'profile', label: 'Profile', icon: storeActivityIcons.profile },
+    { id: 'orders', label: 'Orders', icon: storeActivityIcons.orders, badge: ordersCount ? <span className="text-xs">{ordersCount}</span> : null },
+    { id: 'favorites', label: 'Favorites', icon: storeActivityIcons.favorites, badge: favoritesCount ? <span className="text-xs">{favoritesCount}</span> : null },
+    { id: 'wantlist', label: 'Want list', icon: storeActivityIcons.wantlist, badge: wantListCount ? <span className="text-xs">{wantListCount}</span> : null },
+    { id: 'selltrade', label: 'Sell / Trade', icon: storeActivityIcons.selltrade },
+    {
+      id: 'credit',
+      label: 'Store credit',
+      icon: storeActivityIcons.credit,
+      badge: creditBalance > 0 ? <span className="text-xs font-bold">{formatPrice(creditBalance)}</span> : null,
+    },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      icon: storeActivityIcons.notifications,
+      badge: unreadCount ? <span className="text-xs">{unreadCount}</span> : null,
+    },
+  ]
+
+  const joinedLabel = profileQuery.data?.createdAt
+    ? `Member since ${formatDate(profileQuery.data.createdAt)}`
+    : store
+      ? `Shopping at ${store.name}`
+      : undefined
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="My account"
-        subtitle={storeQuery.data ? `Your profile at ${storeQuery.data.name}` : 'Your store profile'}
-        actions={<BackButton to={`/s/${slug}`}>Back to store</BackButton>}
+    <ProfileLayout
+      nav={
+        <div className="space-y-3">
+          <BackButton to={`/s/${slug}`} tone="soft" className="w-full justify-start">
+            Back to store
+          </BackButton>
+          <ProfileSideNav title="My activity" items={navItems} value={tab} onChange={(id) => setTab(id as TabId)} />
+        </div>
+      }
+      aside={
+        <>
+          <ProfileAsideCard title="At this store">
+            <ProfileAsideLink to={`/s/${slug}`} icon={storeAsideIcons.browse} label="Browse shop" meta={store?.name ?? 'Storefront'} />
+            <ProfileAsideLink to={`/s/${slug}/sell`} icon={storeAsideIcons.sellTrade} label="Sell / trade" meta="View buy list" />
+            <ProfileAsideLink to={`/s/${slug}/cart`} icon={storeAsideIcons.cart} label="Cart" meta="Checkout" />
+          </ProfileAsideCard>
+          <ProfileAsideCard title="Account">
+            <ProfileAsideLink to="/account" icon={storeAsideIcons.account} label="My account" meta="Profile & payment" />
+            <ProfileAsideLink to="/account?section=payment" icon={storeAsideIcons.payments} label="Payment method" meta="Marketplace wallet" />
+          </ProfileAsideCard>
+          {unreadCount > 0 ? (
+            <ProfileAsideCard title="Unread">
+              <button
+                type="button"
+                onClick={() => setTab('notifications')}
+                className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-brand-600 hover:bg-bg"
+              >
+                {unreadCount} notification{unreadCount === 1 ? '' : 's'} →
+              </button>
+            </ProfileAsideCard>
+          ) : null}
+        </>
+      }
+    >
+      <ProfileHero
+        displayName={user?.displayName ?? 'Signed-in customer'}
+        avatarUrl={user?.avatarUrl}
+        handle={user?.email}
+        joinedLabel={joinedLabel}
+        coverStyle={
+          store?.primaryColor
+            ? {
+                background: `linear-gradient(180deg, color-mix(in srgb, ${store.primaryColor} 28%, transparent) 0%, color-mix(in srgb, ${store.primaryColor} 8%, transparent) 100%)`,
+              }
+            : undefined
+        }
+        badge={
+          store?.logoUrl ? (
+            <img src={store.logoUrl} alt="" className="size-10 rounded-full border-2 border-surface object-cover shadow-sm" />
+          ) : null
+        }
+        footer={
+          store ? (
+            <Link
+              to={`/s/${slug}`}
+              className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-bold text-fg shadow-sm hover:bg-bg"
+            >
+              Visit {store.name}
+            </Link>
+          ) : null
+        }
       />
 
-      <Card>
-        <CardBody className="flex items-center gap-4">
-          <Avatar name={user?.displayName ?? '?'} src={user?.avatarUrl ?? undefined} size="lg" />
-          <div className="min-w-0">
-            <p className="truncate font-bold text-fg">{user?.displayName ?? 'Signed-in customer'}</p>
-            <p className="truncate text-sm text-fg-muted">{user?.email}</p>
-          </div>
-        </CardBody>
-      </Card>
-
-      <NotificationsPanel slug={slug} query={notificationsQuery} />
-
-      <Tabs
-        aria-label="Account sections"
-        value={tab}
-        onChange={(id) => setTab(id as TabId)}
-        tabs={[
-          { id: 'profile', label: 'Profile', icon: TAB_ICONS.profile },
-          { id: 'orders', label: `Orders (${ordersCount})`, icon: TAB_ICONS.orders },
-          { id: 'favorites', label: `Favorites (${favoritesCount})`, icon: TAB_ICONS.favorites },
-          { id: 'wantlist', label: `Want list (${wantListCount})`, icon: TAB_ICONS.wantlist },
-          { id: 'selltrade', label: 'Sell / Trade', icon: TAB_ICONS.selltrade },
-          { id: 'credit', label: creditQuery.data && creditQuery.data.balanceCents > 0 ? `Store credit (${formatPrice(creditQuery.data.balanceCents)})` : 'Store credit', icon: TAB_ICONS.credit },
-          { id: 'notifications', label: unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications', icon: TAB_ICONS.notifications },
-        ]}
-      />
+      {tab === 'profile' ? (
+        <ProfileSection title="Statistics">
+          <ProfileStatistics
+            stats={[
+              { id: 'orders', label: 'Orders', value: ordersCount, icon: storeActivityIcons.orders, iconClassName: '' },
+              { id: 'favorites', label: 'Favorites', value: favoritesCount, icon: storeActivityIcons.favorites, iconClassName: '' },
+              { id: 'want', label: 'Want list', value: wantListCount, icon: storeActivityIcons.wantlist, iconClassName: '' },
+              {
+                id: 'credit',
+                label: 'Store credit',
+                value: formatPrice(creditBalance),
+                icon: storeActivityIcons.credit,
+                iconClassName: '',
+              },
+            ]}
+          />
+        </ProfileSection>
+      ) : null}
 
       <TabPanel when="profile" value={tab}>
         <ProfilePanel slug={slug} />
-        <Card className="mt-6">
+        <Card className="mt-6 rounded-2xl">
           <CardBody className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-fg-muted">
               Your name, profile image, and password are platform-wide — manage them once for every store.
@@ -157,12 +227,12 @@ export default function CustomerProfilePage() {
         <SellTradeHistoryPanel slug={slug} />
       </TabPanel>
       <TabPanel when="credit" value={tab}>
-        <StoreCreditPanel slug={slug} query={creditQuery} storeName={storeQuery.data?.name ?? 'this store'} />
+        <StoreCreditPanel slug={slug} query={creditQuery} storeName={store?.name ?? 'this store'} />
       </TabPanel>
       <TabPanel when="notifications" value={tab}>
         <NotificationsTabPanel slug={slug} query={notificationsQuery} />
       </TabPanel>
-    </div>
+    </ProfileLayout>
   )
 }
 
@@ -235,42 +305,6 @@ function SellTradeHistoryPanel({ slug }: { slug: string }) {
   )
 }
 
-function NotificationsPanel({
-  slug,
-  query,
-}: {
-  slug: string
-  query: ReturnType<typeof useCustomerNotifications>
-}) {
-  const queryClient = useQueryClient()
-  const notifications = (query.data ?? []).filter((notification) => !notification.readAt)
-
-  const markRead = useMutation({
-    mutationFn: async (id: number) => {
-      await api.patch(`/stores/${slug}/customer/notifications/${id}/read`)
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.notifications(slug) }),
-  })
-
-  if (query.isLoading || notifications.length === 0) return null
-
-  return (
-    <Card>
-      <CardBody className="space-y-3">
-        <div>
-          <p className="font-bold text-fg">Notifications</p>
-          <p className="text-sm text-fg-muted">Order updates from this store.</p>
-        </div>
-        <NotificationList
-          notifications={notifications}
-          pendingId={markRead.variables}
-          onMarkRead={(id) => markRead.mutate(id)}
-        />
-      </CardBody>
-    </Card>
-  )
-}
-
 /** Full notification history: unread up top with mark-read, earlier ones dimmed. */
 function NotificationsTabPanel({
   slug,
@@ -294,7 +328,7 @@ function NotificationsTabPanel({
       <Card className="mt-6">
         <CardBody>
           <EmptyState
-            icon={BellRing}
+            icon={IconMagicBell}
             title="No notifications yet"
             description="Order updates and want-list matches from this store will show up here."
           />
@@ -359,7 +393,7 @@ function StoreCreditPanel({
         <CardBody className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="grid size-12 place-items-center rounded-full bg-rose-100 text-rose-500">
-              <PiggyBank aria-hidden className="size-6" />
+              <IconTreasureChest className="size-6" />
             </span>
             <div>
               <p className="text-sm text-fg-muted">Your credit at {storeName}</p>
@@ -377,7 +411,7 @@ function StoreCreditPanel({
         <CardBody>
           {transactions.length === 0 ? (
             <EmptyState
-              icon={PiggyBank}
+              icon={IconTreasureChest}
               title="No credit yet"
               description="Choose the store-credit payout when you sell cards and your balance will grow here."
               action={
@@ -435,18 +469,9 @@ const EMPTY_PROFILE: ProfileForm = {
  */
 function ProfilePanel({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
   const [saved, setSaved] = useState(false)
 
   const profileQuery = useCustomerProfile(slug)
-
-  const checkoutConfigQuery = useQuery({
-    queryKey: ['store-checkout-config', slug],
-    queryFn: async () => {
-      const { data } = await api.get<StoreCheckoutConfig>(`/stores/${slug}/customer/checkout/config`)
-      return data
-    },
-  })
 
   const {
     register,
@@ -482,28 +507,12 @@ function ProfilePanel({ slug }: { slug: string }) {
     },
   })
 
-  const paymentMutation = useMutation({
-    mutationFn: async (payment: TokenizedPayment) => {
-      const { data } = await api.post<StoreCustomer>(`/stores/${slug}/customer/payment-method`, {
-        methodType: payment.methodType,
-        token: payment.token,
-        verificationToken: payment.verificationToken,
-      })
-      return data
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData(customerKeys.profile(slug), data)
-    },
-  })
-
   if (profileQuery.isLoading) return <StorePageLoader label="Loading your profile…" />
   if (profileQuery.isError) {
     return <ErrorState title="Could not load your profile." onRetry={() => void profileQuery.refetch()} />
   }
 
   const profile = profileQuery.data
-  const checkout = checkoutConfigQuery.data
-  const squareReady = Boolean(checkout?.enabled)
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -548,11 +557,7 @@ function ProfilePanel({ slug }: { slug: string }) {
       <Card>
         <CardHeader
           title="Payment method"
-          subtitle={
-            squareReady
-              ? 'Save a card or wallet with this store for faster checkout.'
-              : 'This store has not enabled Square checkout yet.'
-          }
+          subtitle="Managed on your marketplace account — the same method follows you to every store."
         />
         <CardBody className="space-y-4">
           {profile?.paymentConfigured && profile.paymentLast4 ? (
@@ -567,57 +572,11 @@ function ProfilePanel({ slug }: { slug: string }) {
               {profile.paymentExpires ? ` · exp ${profile.paymentExpires}` : ''}
             </p>
           ) : (
-            <p className="text-sm text-fg-muted">No payment method saved for this store yet.</p>
+            <p className="text-sm text-fg-muted">No payment method saved yet.</p>
           )}
-
-          {checkoutConfigQuery.isLoading ? (
-            <p className="text-sm text-fg-muted">Loading payment options…</p>
-          ) : squareReady && checkout ? (
-            <SquarePaymentPanel
-              applicationId={checkout.applicationId}
-              locationId={checkout.locationId}
-              environment={checkout.environment}
-              priceCents={0}
-              currency={checkout.currency}
-              countryCode={checkout.countryCode}
-              billingEmail={user?.email ?? ''}
-              confirmLabel="Save payment method"
-              paymentRequestLabel="Save payment method"
-              layout="checkout"
-              saveOnly
-              onTokenized={(p) => paymentMutation.mutate(p)}
-            />
-          ) : isDevBuild ? (
-            <Button
-              variant="secondary"
-              loading={paymentMutation.isPending}
-              onClick={() =>
-                paymentMutation.mutate({
-                  methodType: 'card',
-                  token: `mock-card-${Date.now().toString(36)}`,
-                  last4: '4242',
-                  verificationToken: '',
-                })
-              }
-            >
-              <CreditCard aria-hidden className="size-4" />
-              Simulate save (dev — store needs Square)
-            </Button>
-          ) : null}
-
-          {paymentMutation.isSuccess && (
-            <p className="flex items-center gap-2 text-sm font-medium text-success-700">
-              <CheckCircle2 aria-hidden className="size-4" />
-              Payment method saved.
-            </p>
-          )}
-          {paymentMutation.isError && (
-            <p role="alert" className="text-sm font-medium text-danger-700">
-              {httpStatus(paymentMutation.error) === 402
-                ? 'Your payment could not be verified. Try again or use another method.'
-                : 'Could not save your payment method. Please try again.'}
-            </p>
-          )}
+          <Link to="/account" className="inline-flex text-sm font-bold text-brand-600 hover:underline">
+            Update payment on My account →
+          </Link>
         </CardBody>
       </Card>
     </div>
@@ -696,7 +655,7 @@ function FavoritesPanel({
   if (favorites.length === 0) {
     return (
       <EmptyState
-        icon={Heart}
+        icon={IconHeartCrystal}
         title="No favorites yet"
         description="Save cards you love from this store and they'll show up here."
         action={
@@ -779,65 +738,80 @@ function WantListPanel({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.wantList(slug) }),
   })
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-      <div>
-        {query.isLoading ? (
-          <LoadingPanel label="Loading want list…" />
-        ) : query.isError ? (
-          <ErrorState title="Could not load your want list." onRetry={() => void query.refetch()} />
-        ) : (query.data ?? []).length === 0 ? (
-          <EmptyState
-            icon={ListPlus}
-            title="Your want list is empty"
-            description="Search for cards you're hunting for so this store knows what you're after."
-          />
-        ) : (
-          <ul className="space-y-3">
-            {(query.data ?? []).map((entry) => (
-              <li key={entry.id}>
-                <Card>
-                  <CardBody className="flex items-center justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      {entry.card && cardImage(entry.card) && (
-                        <img
-                          src={cardImage(entry.card)}
-                          alt=""
-                          className="h-14 w-10 flex-shrink-0 rounded-btn border border-border object-cover"
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate font-bold text-fg">{entry.cardName}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-fg-muted">
-                          {entry.setCode && <Badge>{entry.setCode.toUpperCase()}</Badge>}
-                          <Badge tone={entry.isFoil ? 'brand' : 'neutral'}>
-                            {entry.finish}
-                          </Badge>
-                          <span>Qty {entry.quantity}</span>
-                        </div>
-                        {entry.notes && <p className="mt-1 truncate text-sm text-fg-muted">{entry.notes}</p>}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-danger-700"
-                      loading={removeMutation.isPending && removeMutation.variables === entry.id}
-                      onClick={() => removeMutation.mutate(entry.id)}
-                      aria-label={`Remove ${entry.cardName} from want list`}
-                    >
-                      <Trash2 aria-hidden className="size-4" />
-                    </Button>
-                  </CardBody>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+  const entries = query.data ?? []
 
+  return (
+    <ProfileSection title="Want list">
       <WantListAddForm slug={slug} />
-    </div>
+
+      {query.isLoading ? (
+        <LoadingPanel label="Loading want list…" />
+      ) : query.isError ? (
+        <ErrorState title="Could not load your want list." onRetry={() => void query.refetch()} />
+      ) : entries.length === 0 ? (
+        <p className="rounded-2xl bg-bg/80 px-4 py-8 text-center text-sm text-fg-muted">
+          Nothing on your list yet — search above to tell the store what you&apos;re looking for.
+        </p>
+      ) : (
+        <ul className="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border/80">
+          {entries.map((entry) => {
+            const detailHref = entry.inventoryItemId ? `/s/${slug}/cards/${entry.inventoryItemId}` : null
+            const main = (
+              <>
+                <div className="grid h-[4.25rem] w-[3.1rem] shrink-0 place-items-center overflow-hidden rounded-lg bg-bg ring-1 ring-border/60">
+                  {entry.card && cardImage(entry.card) ? (
+                    <img src={cardImage(entry.card)} alt="" className="size-full object-cover" />
+                  ) : (
+                    <ImageOff aria-hidden className="size-5 text-fg-muted" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-fg group-hover:text-brand-600">{entry.cardName}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-fg-muted">
+                    {entry.setCode ? <Badge>{entry.setCode.toUpperCase()}</Badge> : null}
+                    <Badge tone={entry.isFoil ? 'brand' : 'neutral'}>{entry.finish}</Badge>
+                    <span className="font-medium">Qty {entry.quantity}</span>
+                  </div>
+                  {entry.notes ? <p className="mt-1 line-clamp-2 text-xs text-fg-muted">{entry.notes}</p> : null}
+                  {detailHref ? (
+                    <p className="mt-1 text-xs font-semibold text-brand-600">View in store →</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-fg-muted">Not listed at this store yet</p>
+                  )}
+                </div>
+              </>
+            )
+
+            return (
+              <li key={entry.id} className="border-b border-border/70 last:border-b-0">
+                <div className="flex items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4">
+                  {detailHref ? (
+                    <Link
+                      to={detailHref}
+                      className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl py-0.5 transition-colors hover:bg-bg/60 sm:gap-4"
+                    >
+                      {main}
+                    </Link>
+                  ) : (
+                    <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">{main}</div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-fg-muted hover:text-danger-700"
+                    loading={removeMutation.isPending && removeMutation.variables === entry.id}
+                    onClick={() => removeMutation.mutate(entry.id)}
+                    aria-label={`Remove ${entry.cardName} from want list`}
+                  >
+                    <Trash2 aria-hidden className="size-4" />
+                  </Button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </ProfileSection>
   )
 }
 
@@ -907,135 +881,136 @@ function WantListAddForm({ slug }: { slug: string }) {
   }
 
   return (
-    <Card className="h-fit">
-      <CardHeader title="Add a card" subtitle="Search the catalog so the store knows the exact printing." />
-      <CardBody>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (cardName.length > 0) addMutation.mutate()
-          }}
-          className="space-y-4"
-        >
-          <Field label="Card" htmlFor="wantlist-card-search">
-            <div ref={boxRef} className="relative">
-              <div className="relative">
-                <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
-                <input
-                  id="wantlist-card-search"
-                  type="text"
-                  autoComplete="off"
-                  value={term}
-                  placeholder="Search cards (e.g. Sol Ring)"
-                  onChange={(event) => {
-                    setTerm(event.target.value)
-                    if (selected) setSelected(null)
-                    setOpen(true)
-                  }}
-                  onFocus={() => setOpen(true)}
-                  className="w-full rounded-btn border border-border bg-surface py-2 pl-9 pr-9 text-sm text-fg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                />
-                {searchQuery.isFetching && (
-                  <Spinner size="sm" className="absolute right-3 top-1/2 -translate-y-1/2" />
-                )}
-                {!searchQuery.isFetching && term && (
-                  <button
-                    type="button"
-                    onClick={clearSelection}
-                    aria-label="Clear search"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-btn p-1 text-fg-muted hover:bg-bg"
-                  >
-                    <X aria-hidden className="size-4" />
-                  </button>
-                )}
-              </div>
-
-              {open && !selected && debouncedTerm.length >= 2 && (
-                <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-card border border-border bg-surface p-1 shadow-card">
-                  {results.length === 0 ? (
-                    <p className="px-3 py-2 text-sm text-fg-muted">
-                      {searchQuery.isFetching ? 'Searching…' : 'No matching cards.'}
-                    </p>
-                  ) : (
-                    results.map((card) => (
-                      <button
-                        type="button"
-                        key={card.id}
-                        onClick={() => pickCard(card)}
-                        className="flex w-full items-center gap-3 rounded-btn px-2 py-1.5 text-left hover:bg-bg"
-                      >
-                        <span className="grid h-12 w-9 flex-shrink-0 place-items-center overflow-hidden rounded border border-border bg-bg">
-                          {cardImage(card) ? (
-                            <img src={cardImage(card)} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <ImageOff aria-hidden className="size-4 text-fg-muted" />
-                          )}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-fg">{card.name}</span>
-                          <span className="block truncate text-xs text-fg-muted">
-                            {(card.setCode ?? '—').toUpperCase()} · {card.rarity ?? 'unknown'}
-                          </span>
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </Field>
-
-          {selected && (
-            <div className="flex items-center gap-2 rounded-card border border-border bg-bg px-3 py-2 text-sm">
-              <Badge tone="brand">{selected.setCode?.toUpperCase() ?? '—'}</Badge>
-              <span className="min-w-0 flex-1 truncate font-medium text-fg">{selected.name}</span>
-              <button type="button" onClick={clearSelection} aria-label="Remove selected card" className="text-fg-muted hover:text-fg">
+    <div className="mb-5 rounded-2xl bg-bg/70 p-4 ring-1 ring-border/70 sm:p-5">
+      <p className="text-sm font-bold text-fg">Add a card</p>
+      <p className="mt-0.5 text-xs text-fg-muted">Search the catalog so the store knows the exact printing.</p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (cardName.length > 0) addMutation.mutate()
+        }}
+        className="mt-4 space-y-3"
+      >
+        <div ref={boxRef} className="relative">
+          <label htmlFor="wantlist-card-search" className="sr-only">
+            Search for a card
+          </label>
+          <div className="relative">
+            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+            <input
+              id="wantlist-card-search"
+              type="text"
+              autoComplete="off"
+              value={term}
+              placeholder="Search cards (e.g. Sol Ring)"
+              onChange={(event) => {
+                setTerm(event.target.value)
+                if (selected) setSelected(null)
+                setOpen(true)
+              }}
+              onFocus={() => setOpen(true)}
+              className="w-full rounded-xl border-0 bg-surface py-2.5 pl-9 pr-9 text-sm text-fg shadow-sm ring-1 ring-border/80 outline-none focus:ring-2 focus:ring-brand-500/35"
+            />
+            {searchQuery.isFetching && <Spinner size="sm" className="absolute right-3 top-1/2 -translate-y-1/2" />}
+            {!searchQuery.isFetching && term ? (
+              <button
+                type="button"
+                onClick={clearSelection}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-fg-muted hover:bg-bg"
+              >
                 <X aria-hidden className="size-4" />
               </button>
-            </div>
-          )}
+            ) : null}
+          </div>
 
+          {open && !selected && debouncedTerm.length >= 2 ? (
+            <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl bg-surface p-1 shadow-lg ring-1 ring-border/80">
+              {results.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-fg-muted">
+                  {searchQuery.isFetching ? 'Searching…' : 'No matching cards.'}
+                </p>
+              ) : (
+                results.map((card) => (
+                  <button
+                    type="button"
+                    key={card.id}
+                    onClick={() => pickCard(card)}
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-bg"
+                  >
+                    <span className="grid h-12 w-9 shrink-0 place-items-center overflow-hidden rounded bg-bg ring-1 ring-border/60">
+                      {cardImage(card) ? (
+                        <img src={cardImage(card)} alt="" className="size-full object-cover" />
+                      ) : (
+                        <ImageOff aria-hidden className="size-4 text-fg-muted" />
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-fg">{card.name}</span>
+                      <span className="block truncate text-xs text-fg-muted">
+                        {(card.setCode ?? '—').toUpperCase()} · {card.rarity ?? 'unknown'}
+                      </span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {selected ? (
+          <div className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm ring-1 ring-border/70">
+            <Badge tone="brand">{selected.setCode?.toUpperCase() ?? '—'}</Badge>
+            <span className="min-w-0 flex-1 truncate font-medium text-fg">{selected.name}</span>
+            <button type="button" onClick={clearSelection} aria-label="Remove selected card" className="text-fg-muted hover:text-fg">
+              <X aria-hidden className="size-4" />
+            </button>
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 sm:grid-cols-[5rem_1fr_auto] sm:items-end">
           <Input
-            label="Quantity"
+            label="Qty"
             type="number"
             min={1}
             max={999}
             value={quantity}
             onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))}
           />
-
-          <Field label="Foil">
-            <label className="flex items-center gap-2 text-sm text-fg">
-              <input
-                type="checkbox"
-                className="size-4 rounded border-border"
-                checked={isFoil}
-                onChange={(event) => setIsFoil(event.target.checked)}
-              />
-              Looking for a foil copy
-            </label>
-          </Field>
-
-          <Textarea
-            label="Notes"
-            rows={2}
-            placeholder="Condition, budget, etc."
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-          />
-
-          {addMutation.isError && (
-            <p role="alert" className="text-sm font-medium text-danger-700">
-              Could not add to your want list. Please try again.
-            </p>
-          )}
-
-          <Button type="submit" loading={addMutation.isPending} disabled={cardName.length === 0} className="w-full">
+          <label className="flex h-10 items-center gap-2 rounded-xl bg-surface px-3 text-sm text-fg ring-1 ring-border/70 sm:mb-0 sm:mt-6">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-border accent-brand-500"
+              checked={isFoil}
+              onChange={(event) => setIsFoil(event.target.checked)}
+            />
+            Foil
+          </label>
+          <Button
+            type="submit"
+            loading={addMutation.isPending}
+            disabled={cardName.length === 0}
+            className="sm:mt-6"
+          >
             <Plus aria-hidden className="size-4" />
-            Add to want list
+            Add
           </Button>
-        </form>
-      </CardBody>
-    </Card>
+        </div>
+
+        <Textarea
+          label="Notes (optional)"
+          rows={2}
+          placeholder="Condition, budget, language…"
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+        />
+
+        {addMutation.isError ? (
+          <p role="alert" className="text-sm font-medium text-danger-700">
+            Could not add to your want list. Please try again.
+          </p>
+        ) : null}
+      </form>
+    </div>
   )
 }

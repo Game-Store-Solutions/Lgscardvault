@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
+  ArrowLeft,
   CreditCard,
   Minus,
   PackageCheck,
@@ -488,14 +489,16 @@ function OrderSummary({
         </div>
       )}
 
-      <dl className="mt-5 space-y-3 text-sm">
-        <SummaryRow label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={subtotalLabel} strong />
-        <SummaryRow label="Shipping" value={fulfillment === 'pickup' ? 'Free — in-store pickup' : 'Calculated at checkout'} />
-        <SummaryRow label="Taxes" value="Calculated at checkout" />
-        {creditApplied > 0 && <SummaryRow label="Store credit" value={`−${formatPrice(creditApplied)}`} />}
-        <div className="flex items-baseline justify-between border-t border-border pt-4">
-          <dt className="font-bold text-fg">Total due today</dt>
-          <dd className="font-display text-3xl font-extrabold text-fg">
+      <dl className="mt-5 text-sm">
+        <div className="space-y-1">
+          <SummaryRow label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={subtotalLabel} strong />
+          <SummaryRow label="Shipping" value={fulfillment === 'pickup' ? 'Free — in-store pickup' : 'Calculated at checkout'} />
+          <SummaryRow label="Taxes" value="Calculated at checkout" />
+          {creditApplied > 0 && <SummaryRow label="Store credit" value={`−${formatPrice(creditApplied)}`} />}
+        </div>
+        <div className="mt-6 flex items-baseline justify-between gap-3 border-t border-border/80 pt-5">
+          <dt className="text-xs font-bold uppercase tracking-wide text-fg-muted">Total</dt>
+          <dd className="font-display text-3xl font-extrabold tracking-tight text-fg">
             {creditApplied > 0 ? formatPrice(Math.max(0, subtotalCents - creditApplied)) : subtotalLabel}
           </dd>
         </div>
@@ -539,6 +542,7 @@ function OrderSummary({
           checkoutPath={checkoutPath}
           checkoutBody={checkoutBody}
           paymentReady={paymentReady}
+          isGuest={isGuest}
           onPlaced={onOrderPlaced}
         />
       )}
@@ -572,7 +576,11 @@ function OrderSummary({
         </Link>
       )}
 
-      <Link to={`/s/${slug}`} className={`${buttonVariants({ variant: 'secondary', size: 'md' })} mt-2 w-full`}>
+      <Link
+        to={`/s/${slug}`}
+        className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-fg-muted transition-colors hover:text-brand-600"
+      >
+        <ArrowLeft aria-hidden className="size-4 shrink-0" />
         Continue shopping
       </Link>
 

@@ -12,9 +12,10 @@ import PaymentsTab from './store-admin/PaymentsTab'
 import PatchNotesTab from './store-admin/PatchNotesTab'
 import SellTradeTab from './store-admin/SellTradeTab'
 import SealedTab from './store-admin/SealedTab'
+import EventsTab from './store-admin/EventsTab'
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
-type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade'
+type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade' | 'events'
 
 const SECTIONS: Record<Section, { label: string; render: (slug: string) => React.ReactNode }> = {
   inventory: { label: 'Singles', render: (slug) => <SearchTab slug={slug} /> },
@@ -28,6 +29,7 @@ const SECTIONS: Record<Section, { label: string; render: (slug: string) => React
   csv: { label: 'Imports', render: (slug) => <CsvTab slug={slug} /> },
   'sell-trade': { label: 'Sell / Trade', render: (slug) => <SellTradeTab slug={slug} /> },
   'patch-notes': { label: 'Patch notes', render: () => <PatchNotesTab /> },
+  events: { label: 'Events', render: (slug) => <EventsTab slug={slug} /> },
 }
 
 function resolveSection(value?: string): Section {

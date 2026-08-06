@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { tv, type VariantProps } from 'tailwind-variants'
-import { Loader2, TriangleAlert, Inbox, type LucideIcon } from 'lucide-react'
+import { Loader2, TriangleAlert, Inbox } from 'lucide-react'
 import { cx } from '../../lib/cx'
 import { Button } from './Button'
 
@@ -52,7 +52,7 @@ export function LoadingPanel({ label = 'Loading…', className }: LoadingPanelPr
 }
 
 export interface EmptyStateProps {
-  icon?: LucideIcon
+  icon?: ComponentType<{ className?: string }>
   title: ReactNode
   description?: ReactNode
   action?: ReactNode
