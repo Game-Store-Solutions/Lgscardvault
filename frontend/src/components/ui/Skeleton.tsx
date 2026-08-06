@@ -1,0 +1,32 @@
+import { cx } from '../../lib/cx'
+
+export interface SkeletonProps {
+  className?: string
+}
+
+/** Block placeholder with dark-tinted shimmer (see index.css `.skeleton-shimmer`). */
+export function Skeleton({ className }: SkeletonProps) {
+  return <div aria-hidden className={cx('rounded-md skeleton-shimmer', className)} />
+}
+
+/** Grid of card-shaped skeletons for inventory loading. */
+export function InventoryGridSkeleton({ count = 10 }: { count?: number }) {
+  return (
+    <div
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+      aria-busy="true"
+      aria-label="Loading inventory"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="glass-card overflow-hidden rounded-card">
+          <Skeleton className="aspect-5/7 w-full rounded-none" />
+          <div className="space-y-2 p-3">
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}

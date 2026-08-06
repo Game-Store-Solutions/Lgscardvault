@@ -29,6 +29,8 @@ use App\Service\Checkout\CartOrderBuilder;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
 use App\Service\Payments\CheckoutGatewayInterface;
+use App\Service\Payments\CustomerPaymentProfileSync;
+use App\Service\Payments\SubscriptionBillingInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -57,6 +59,7 @@ final class StoreCustomerController extends AbstractController
         private readonly CartOrderBuilder $orderBuilder,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly CheckoutGatewayInterface $checkoutGateway,
+        private readonly CustomerPaymentProfileSync $paymentProfileSync,
         private readonly EntityManagerInterface $entityManager,
         private readonly KernelInterface $kernel,
     ) {
@@ -74,7 +77,26 @@ final class StoreCustomerController extends AbstractController
         // return a default/empty representation instead of persisting one.
         $customer = $this->findCustomer($store);
         if (!$customer instanceof StoreCustomer) {
+            $user = $this->getUser();
+            if ($user instanceof User && null !== $user->getPaymentLast4() && '' !== $user->getPaymentLast4()) {
+                return $this->json([
+                    ...$this->emptyCustomer(),
+                    'paymentBrand' => $user->getPaymentBrand(),
+                    'paymentLast4' => $user->getPaymentLast4(),
+                    'paymentExpires' => $user->getPaymentExpires(),
+                    'paymentMethodType' => $user->getPaymentMethodType(),
+                    'paymentConfigured' => true,
+                    'savedCardReady' => false,
+                ]);
+            }
+
             return $this->json($this->emptyCustomer());
+        }
+
+        $user = $this->getUser();
+        if ($user instanceof User) {
+            $this->paymentProfileSync->applyUserPaymentToStoreCustomer($user, $customer);
+            $this->entityManager->flush();
         }
 
         return $this->json($this->serializeCustomer($customer));
@@ -191,7 +213,7 @@ final class StoreCustomerController extends AbstractController
         }
 
         return $this->json(array_map(
-            $this->serializeWantListEntry(...),
+            fn (CustomerWantListEntry $entry) => $this->serializeWantListEntry($store, $entry),
             $this->wantListRepository->findForCustomer($customer),
         ));
     }
@@ -225,7 +247,7 @@ final class StoreCustomerController extends AbstractController
         $this->entityManager->persist($entry);
         $this->entityManager->flush();
 
-        return $this->json($this->serializeWantListEntry($entry), 201);
+        return $this->json($this->serializeWantListEntry($store, $entry), 201);
     }
 
     #[Route('/want-list/{id}', name: 'api_store_customer_want_list_remove', methods: ['DELETE'])]
@@ -613,6 +635,16 @@ final class StoreCustomerController extends AbstractController
             return $this->json(['detail' => 'Your cart is empty.'], 422);
         }
 
+        $customerName = mb_substr(trim((string) ($payload['customerName'] ?? '')), 0, 255);
+        if ('' === $customerName) {
+            $customerName = $user->getDisplayName();
+        }
+        $customerEmail = $user->getEmail();
+        $overrideEmail = trim((string) ($payload['customerEmail'] ?? ''));
+        if ('' !== $overrideEmail && filter_var($overrideEmail, FILTER_VALIDATE_EMAIL)) {
+            $customerEmail = mb_substr($overrideEmail, 0, 255);
+        }
+
         try {
             $order = $this->orderBuilder->build(
                 $store,
@@ -620,8 +652,8 @@ final class StoreCustomerController extends AbstractController
                 $cartItems,
                 Order::CHANNEL_ONLINE,
                 $fulfillment,
-                $user->getDisplayName(),
-                $user->getEmail(),
+                $customerName,
+                $customerEmail,
                 (bool) ($payload['useStoreCredit'] ?? false),
             );
         } catch (OutOfStockException $e) {
@@ -639,31 +671,37 @@ final class StoreCustomerController extends AbstractController
             return $this->json($this->serializeOrder($order), 201);
         }
 
+        $useSavedCard = filter_var($payload['useSavedCard'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $sourceId = trim((string) ($payload['token'] ?? ''));
-        if ('' === $sourceId) {
-            return $this->json(['detail' => 'A payment method is required.'], 422);
-        }
+        $verificationToken = $this->nullableString($payload['verificationToken'] ?? null, 1024);
+        $methodType = (string) ($payload['methodType'] ?? '');
 
         $this->entityManager->flush();
 
         try {
-            // The order reference is the idempotency key, so a retried request
-            // for the same order can never charge the shopper twice.
-            $payment = $this->checkoutGateway->charge(
+            $payment = $this->captureCheckoutPayment(
                 $store,
+                $user,
+                $customer,
                 $amountDue,
+                $order->getReference(),
+                $useSavedCard,
                 $sourceId,
-                $order->getReference(),
-                trim((string) ($payload['verificationToken'] ?? '')) ?: null,
-                $order->getReference(),
-                $user->getEmail(),
+                $verificationToken,
+                $methodType,
             );
         } catch (\RuntimeException $e) {
             $this->stockReleaser->release($order);
             $order->setStatus(OrderStatus::CANCELLED);
             $this->entityManager->flush();
 
-            return $this->json(['detail' => $e->getMessage()], 402);
+            $message = $e->getMessage();
+            $status = in_array($message, [
+                'A payment method is required.',
+                'No saved card for this store yet. Pay below once to link your account card here.',
+            ], true) ? 422 : 402;
+
+            return $this->json(['detail' => $message], $status);
         }
 
         $order
@@ -676,8 +714,98 @@ final class StoreCustomerController extends AbstractController
         return $this->json($this->serializeOrder($order) + ['receiptUrl' => $payment['receiptUrl']], 201);
     }
 
+    /**
+     * @return array{paymentId: string, status: string, receiptUrl: string|null}
+     */
+    private function captureCheckoutPayment(
+        Store $store,
+        User $user,
+        StoreCustomer $customer,
+        int $amountDue,
+        string $orderReference,
+        bool $useSavedCard,
+        string $sourceId,
+        ?string $verificationToken,
+        string $methodType,
+    ): array {
+        $this->paymentProfileSync->applyUserPaymentToStoreCustomer($user, $customer);
+
+        if ($useSavedCard) {
+            $cardId = $customer->getPaymentCardId();
+            $squareCustomerId = $customer->getPaymentCustomerId();
+            if (null === $cardId || '' === $cardId || null === $squareCustomerId || '' === $squareCustomerId) {
+                throw new \RuntimeException('No saved card for this store yet. Pay below once to link your account card here.');
+            }
+
+            return $this->checkoutGateway->chargeVaultedCard(
+                $store,
+                $amountDue,
+                $squareCustomerId,
+                $cardId,
+                $orderReference,
+                $orderReference,
+                $user->getEmail(),
+            );
+        }
+
+        if ('' === $sourceId) {
+            throw new \RuntimeException('A payment method is required.');
+        }
+
+        $squareCustomerId = $customer->getPaymentCustomerId();
+
+        // First purchase at this store: vault on the store's Square account, then charge the card id.
+        if (null === $customer->getPaymentCardId() || '' === $customer->getPaymentCardId()) {
+            $vault = $this->checkoutGateway->vaultPaymentMethod(
+                $store,
+                $sourceId,
+                $verificationToken,
+                [
+                    'email' => $user->getEmail(),
+                    'name' => $user->getDisplayName(),
+                    'reference' => 'cust-'.$user->getId(),
+                ],
+                $squareCustomerId,
+                null,
+            );
+
+            $customer
+                ->setPaymentCustomerId($vault['customerId'])
+                ->setPaymentCardId($vault['cardId'])
+                ->setPaymentBrand($vault['brand'] ?? $customer->getPaymentBrand())
+                ->setPaymentLast4($vault['last4'] ?? $customer->getPaymentLast4())
+                ->setPaymentExpires($this->formatCardExpiry($vault['expMonth'], $vault['expYear']) ?? $customer->getPaymentExpires());
+
+            if ('' !== $methodType && in_array($methodType, SubscriptionBillingInterface::METHODS, true)) {
+                $customer->setPaymentMethodType($methodType);
+            }
+
+            return $this->checkoutGateway->chargeVaultedCard(
+                $store,
+                $amountDue,
+                $vault['customerId'],
+                $vault['cardId'],
+                $orderReference,
+                $orderReference,
+                $user->getEmail(),
+            );
+        }
+
+        return $this->checkoutGateway->charge(
+            $store,
+            $amountDue,
+            $sourceId,
+            $orderReference,
+            $verificationToken,
+            $orderReference,
+            $user->getEmail(),
+            $squareCustomerId,
+        );
+    }
+
     /** Public Square configuration the cart needs to render its payment form. */
     #[Route('/checkout/config', name: 'api_store_customer_checkout_config', methods: ['GET'])]
+    #[IsGranted('PUBLIC_ACCESS')]
     public function checkoutConfig(string $slug): JsonResponse
     {
         $store = $this->storeRepository->findOneBySlug($slug);
@@ -686,6 +814,86 @@ final class StoreCustomerController extends AbstractController
         }
 
         return $this->json($this->checkoutGateway->checkoutConfig($store));
+    }
+
+    /** Vault Google Pay, Apple Pay, or card on the store's Square account for this shopper. */
+    #[Route('/payment-method', name: 'api_store_customer_payment_method', methods: ['POST'])]
+    public function savePaymentMethod(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        if (!$this->checkoutGateway->isReady($store)) {
+            return $this->json(['detail' => 'This store is not accepting online payments yet.'], 422);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $methodType = (string) ($payload['methodType'] ?? '');
+        $sourceId = trim((string) ($payload['token'] ?? ''));
+        $verificationToken = $this->nullableString($payload['verificationToken'] ?? null, 1024);
+
+        if (!in_array($methodType, SubscriptionBillingInterface::METHODS, true)) {
+            return $this->json(['detail' => 'Choose a valid payment method.'], 422);
+        }
+        if ('' === $sourceId) {
+            return $this->json(['detail' => 'Payment could not be verified. Please try again.'], 422);
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $customer = $this->getOrCreateCustomer($store);
+
+        try {
+            $vault = $this->checkoutGateway->vaultPaymentMethod(
+                $store,
+                $sourceId,
+                $verificationToken,
+                [
+                    'email' => $user->getEmail(),
+                    'name' => $user->getDisplayName(),
+                    'reference' => 'cust-'.$user->getId(),
+                ],
+                $customer->getPaymentCustomerId(),
+                $customer->getPaymentCardId(),
+            );
+        } catch (\RuntimeException $e) {
+            return $this->json(['detail' => $e->getMessage()], 402);
+        }
+
+        $customer
+            ->setPaymentCustomerId($vault['customerId'])
+            ->setPaymentCardId($vault['cardId'])
+            ->setPaymentMethodType($methodType)
+            ->setPaymentBrand($vault['brand'])
+            ->setPaymentLast4($vault['last4'])
+            ->setPaymentExpires($this->formatCardExpiry($vault['expMonth'], $vault['expYear']));
+
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeCustomer($customer));
+    }
+
+    private function formatCardExpiry(?string $month, ?string $year): ?string
+    {
+        if (null === $month || '' === $month || null === $year || '' === $year) {
+            return null;
+        }
+
+        $monthInt = (int) $month;
+        if ($monthInt < 1 || $monthInt > 12) {
+            return null;
+        }
+
+        $yearStr = (string) $year;
+        $yy = strlen($yearStr) <= 2 ? $yearStr : substr($yearStr, -2);
+
+        return sprintf('%02d/%s', $monthInt, $yy);
     }
 
     private function resolveStore(string $slug): ?Store
@@ -723,6 +931,8 @@ final class StoreCustomerController extends AbstractController
             $this->entityManager->persist($customer);
         }
 
+        $this->paymentProfileSync->applyUserPaymentToStoreCustomer($user, $customer);
+
         return $customer;
     }
 
@@ -759,6 +969,9 @@ final class StoreCustomerController extends AbstractController
             'paymentBrand' => null,
             'paymentLast4' => null,
             'paymentExpires' => null,
+            'paymentMethodType' => null,
+            'paymentConfigured' => false,
+            'savedCardReady' => false,
             'createdAt' => null,
             'updatedAt' => null,
         ];
@@ -820,6 +1033,10 @@ final class StoreCustomerController extends AbstractController
             'paymentBrand' => $customer->getPaymentBrand(),
             'paymentLast4' => $customer->getPaymentLast4(),
             'paymentExpires' => $customer->getPaymentExpires(),
+            'paymentMethodType' => $customer->getPaymentMethodType(),
+            'paymentConfigured' => (null !== $customer->getPaymentCardId() && '' !== $customer->getPaymentCardId())
+                || (null !== $customer->getPaymentLast4() && '' !== $customer->getPaymentLast4()),
+            'savedCardReady' => null !== $customer->getPaymentCardId() && '' !== $customer->getPaymentCardId(),
             'createdAt' => $customer->getCreatedAt()->format(DATE_ATOM),
             'updatedAt' => $customer->getUpdatedAt()->format(DATE_ATOM),
         ];
@@ -860,8 +1077,17 @@ final class StoreCustomerController extends AbstractController
         return FinishVocabulary::resolveForCard($card, $requested, $foilHint);
     }
 
-    private function serializeWantListEntry(CustomerWantListEntry $entry): array
+    private function serializeWantListEntry(Store $store, CustomerWantListEntry $entry): array
     {
+        $listing = $this->inventoryRepository->findListingForWantEntry(
+            $store,
+            $entry->getCard(),
+            $entry->getCardName(),
+            $entry->getSetCode(),
+            $entry->getFinish(),
+            $entry->isFoil(),
+        );
+
         return [
             'id' => $entry->getId(),
             'card' => $this->serializeCard($entry->getCard()),
@@ -871,6 +1097,7 @@ final class StoreCustomerController extends AbstractController
             'isFoil' => $entry->isFoil(),
             'quantity' => $entry->getQuantity(),
             'notes' => $entry->getNotes(),
+            'inventoryItemId' => $listing?->getId(),
             'createdAt' => $entry->getCreatedAt()->format(DATE_ATOM),
         ];
     }

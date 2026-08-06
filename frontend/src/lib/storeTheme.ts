@@ -58,24 +58,35 @@ export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<str
   const primary = norm(p.primaryColor)
   if (primary) {
     vars['--color-brand-500'] = primary
+    vars['--store-glow'] = `color-mix(in srgb, ${primary} 14%, transparent)`
+    vars['--store-glow-strong'] = `color-mix(in srgb, ${primary} ${dark ? 28 : 22}%, transparent)`
+    vars['--ambient-brand'] = `color-mix(in srgb, ${primary} 16%, var(--color-bg))`
     if (dark) {
       // Dark theme: tints go darker, shades go lighter so on-surface text/pills stay legible.
       vars['--color-brand-50'] = mix(primary, 24, 'black')
       vars['--color-brand-100'] = mix(primary, 34, 'black')
+      vars['--color-brand-200'] = mix(primary, 42, 'black')
       vars['--color-brand-300'] = mix(primary, 52, 'black')
+      vars['--color-brand-400'] = mix(primary, 68, 'white')
       vars['--color-brand-600'] = mix(primary, 78, 'white')
       vars['--color-brand-700'] = mix(primary, 62, 'white')
     } else {
       vars['--color-brand-50'] = mix(primary, 12, 'white')
       vars['--color-brand-100'] = mix(primary, 22, 'white')
+      vars['--color-brand-200'] = mix(primary, 38, 'white')
       vars['--color-brand-300'] = mix(primary, 55, 'white')
+      vars['--color-brand-400'] = mix(primary, 72, 'white')
       vars['--color-brand-600'] = mix(primary, 85, 'black')
       vars['--color-brand-700'] = mix(primary, 72, 'black')
     }
   }
 
   const accent = norm(p.accentColor)
-  if (accent) vars['--color-accent-500'] = accent
+  if (accent) {
+    vars['--color-accent-500'] = accent
+    vars['--store-glow-accent'] = `color-mix(in srgb, ${accent} 18%, transparent)`
+    vars['--ambient-accent'] = `color-mix(in srgb, ${accent} 6%, var(--color-bg))`
+  }
 
   if (bg) vars['--color-bg'] = bg
 

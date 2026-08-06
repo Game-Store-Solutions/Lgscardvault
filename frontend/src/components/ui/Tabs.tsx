@@ -46,7 +46,7 @@ export function Tabs({ tabs, value, onChange, children, className, ...rest }: Ta
                 'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold -mb-px border-b-2',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset',
                 selected
-                  ? 'border-brand-500 text-brand-700'
+                  ? 'border-brand-500 text-brand-600 dark:text-brand-400'
                   : 'border-transparent text-fg-muted hover:text-fg',
               )}
             >

@@ -37,10 +37,42 @@ interface CheckoutGatewayInterface
         ?string $verificationToken = null,
         ?string $referenceId = null,
         ?string $buyerEmail = null,
+        ?string $customerId = null,
+    ): array;
+
+    /**
+     * @return array{paymentId: string, status: string, receiptUrl: string|null}
+     */
+    public function chargeVaultedCard(
+        Store $store,
+        int $amountCents,
+        string $customerId,
+        string $cardId,
+        string $idempotencyKey,
+        ?string $referenceId = null,
+        ?string $buyerEmail = null,
     ): array;
 
     /**
      * @return array{refundId: string, status: string}
      */
     public function refund(Store $store, string $paymentId, int $amountCents, string $idempotencyKey, ?string $reason = null): array;
+
+    /**
+     * Save a tokenized payment method on the store's Square account for faster checkout.
+     *
+     * @param array{email?: string, name?: string, reference?: string} $buyer
+     *
+     * @return array{customerId: string, cardId: string, last4: string|null, brand: string|null, expMonth: string|null, expYear: string|null}
+     *
+     * @throws \RuntimeException when the store is not connected or Square declines
+     */
+    public function vaultPaymentMethod(
+        Store $store,
+        string $sourceId,
+        ?string $verificationToken,
+        array $buyer,
+        ?string $existingCustomerId,
+        ?string $previousCardId,
+    ): array;
 }

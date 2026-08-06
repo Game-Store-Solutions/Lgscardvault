@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, BellPlus, Check, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, Search, ShoppingCart, XCircle } from 'lucide-react'
+import { BellPlus, Check, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, Search, ShoppingCart, XCircle } from 'lucide-react'
 import api, { cardImage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
-import { useCart, useInventory, useStore, useStoreTheme } from '../hooks'
+import { useInventory, useStore, useStoreCart, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
 import { useAuth } from '../context/AuthContext'
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Textarea } from '../components/ui'
+import { Badge, BackButton, Button, Card, CardBody, CardHeader, EmptyState, Textarea } from '../components/ui'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { finishName } from '../lib/finishes'
@@ -106,7 +106,7 @@ export default function MassSearchPage() {
   const { data: inventory = [], isLoading } = useInventory(slug)
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const { query: cartQuery, setItem: cartSetItem } = useCart(slug, Boolean(user))
+  const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
   const [carted, setCarted] = useState<Set<string>>(new Set())
   const [wanted, setWanted] = useState<Set<string>>(new Set())
 
@@ -199,10 +199,7 @@ export default function MassSearchPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link to={`/s/${slug}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline">
-          <ArrowLeft aria-hidden className="size-4" />
-          Back to {store?.name ?? 'store'}
-        </Link>
+        <BackButton to={`/s/${slug}`}>Back to {store?.name ?? 'store'}</BackButton>
       </div>
 
       <div>

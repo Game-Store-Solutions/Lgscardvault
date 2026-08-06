@@ -1,4 +1,5 @@
 import { Clock3, Facebook, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, Twitter } from 'lucide-react'
+import { STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { useStore } from '../../hooks'
 
 /**
@@ -37,7 +38,7 @@ export function StoreFooter({ slug }: { slug: string }) {
 
   return (
     <footer className="mt-16 border-t border-border bg-surface">
-      <div className="mx-auto max-w-7xl px-4 py-10">
+      <div className={STOREFRONT_SHELL + ' py-10'}>
         {hasAnything && (
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {hoursLines.length > 0 && (

@@ -80,6 +80,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:admin'])]
     private ?string $avatarUrl = null;
 
+    #[ORM\Column(length: 40, nullable: true)]
+    private ?string $paymentBrand = null;
+
+    #[ORM\Column(length: 4, nullable: true)]
+    private ?string $paymentLast4 = null;
+
+    #[ORM\Column(length: 7, nullable: true)]
+    private ?string $paymentExpires = null;
+
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $paymentMethodType = null;
+
+    /** Platform Square customer for the shopper wallet (server-side only). */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $paymentCustomerId = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $paymentCardId = null;
+
     /** @var Collection<int, Store> */
     #[ORM\OneToMany(mappedBy: 'owner', targetEntity: Store::class)]
     private Collection $ownedStores;
@@ -197,6 +216,78 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->ownedStores->add($store);
             $store->setOwner($this);
         }
+
+        return $this;
+    }
+
+    public function getPaymentBrand(): ?string
+    {
+        return $this->paymentBrand;
+    }
+
+    public function setPaymentBrand(?string $paymentBrand): static
+    {
+        $this->paymentBrand = $paymentBrand;
+
+        return $this;
+    }
+
+    public function getPaymentLast4(): ?string
+    {
+        return $this->paymentLast4;
+    }
+
+    public function setPaymentLast4(?string $paymentLast4): static
+    {
+        $this->paymentLast4 = $paymentLast4;
+
+        return $this;
+    }
+
+    public function getPaymentExpires(): ?string
+    {
+        return $this->paymentExpires;
+    }
+
+    public function setPaymentExpires(?string $paymentExpires): static
+    {
+        $this->paymentExpires = $paymentExpires;
+
+        return $this;
+    }
+
+    public function getPaymentMethodType(): ?string
+    {
+        return $this->paymentMethodType;
+    }
+
+    public function setPaymentMethodType(?string $paymentMethodType): static
+    {
+        $this->paymentMethodType = $paymentMethodType;
+
+        return $this;
+    }
+
+    public function getPaymentCustomerId(): ?string
+    {
+        return $this->paymentCustomerId;
+    }
+
+    public function setPaymentCustomerId(?string $paymentCustomerId): static
+    {
+        $this->paymentCustomerId = $paymentCustomerId;
+
+        return $this;
+    }
+
+    public function getPaymentCardId(): ?string
+    {
+        return $this->paymentCardId;
+    }
+
+    public function setPaymentCardId(?string $paymentCardId): static
+    {
+        $this->paymentCardId = $paymentCardId;
 
         return $this;
     }

@@ -167,6 +167,16 @@ try {
     # Symfony uses this for absolute OAuth callback URLs; must match Square dashboard.
     $env:DEFAULT_URI = 'http://127.0.0.1:8000'
 
+    # Avoid stale serializer metadata after entity/branding field changes (e.g. heroLayout on store read).
+    Push-Location (Join-Path $RootDir 'backend')
+    try {
+        Invoke-Checked 'Doctrine migrations' 'php' @('bin/console', 'doctrine:migrations:migrate', '--no-interaction')
+        Invoke-Checked 'Symfony cache clear' 'php' @('bin/console', 'cache:clear', '--no-warmup')
+    }
+    finally {
+        Pop-Location
+    }
+
     Start-DevProcess 'backend-api' (Join-Path $RootDir 'backend') 'php' @('-S', '127.0.0.1:8000', '-t', 'public')
     Start-DevProcess 'csv-worker' (Join-Path $RootDir 'backend') 'php' @('bin/console', 'messenger:consume', 'async', '-vv')
     Start-DevProcess 'frontend' (Join-Path $RootDir 'frontend') 'npm' @('run', 'dev')

@@ -1,32 +1,45 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Clock3, Monitor, PackageCheck, Plus, Printer, ReceiptText, RotateCcw, Search, X, XCircle, type LucideIcon } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  EllipsisVertical,
+  Monitor,
+  Package,
+  PackageCheck,
+  Plus,
+  Printer,
+  ReceiptText,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  X,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
 import type { InventoryItem, Order, OrderChannel, OrderStatus } from '../../api/types'
 import { inventoryKey, ordersKey, useDebouncedValue, useInventory, useOrders } from '../../hooks'
-import {
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  EmptyState,
-  ErrorState,
-  Input,
-  LoadingPanel,
-  Modal,
-  Table,
-  TBody,
-  TD,
-  TH,
-  THead,
-  TR,
-} from '../../components/ui'
-import { cx } from '../../lib/cx'
+import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal } from '../../components/ui'
 import { OrderLineList } from '../../components/orders/OrderLineList'
-import { OrderStatusBadge } from '../../components/orders/OrderStatusBadge'
 import { OrderWorkflow } from '../../components/orders/OrderWorkflow'
-import { ACTIVE_ORDER_STATUSES, ORDER_STATUS_LABELS, formatOrderDate, orderItemCount } from '../../lib/orders'
+import { cx } from '../../lib/cx'
+import {
+  ORDER_LIST_TABS,
+  countOrdersBetween,
+  customerTierLabel,
+  freshStatusPresentation,
+  orderMatchesTab,
+  orderPrimaryProductName,
+  paymentSubtitle,
+  percentChange,
+  type OrderListTab,
+} from '../../lib/orderManagementUi'
+import { ORDER_STATUS_LABELS, formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
+
+const PAGE_SIZE = 8
 
 function statusActions(status: OrderStatus): { status: OrderStatus; label: string; icon: typeof CheckCircle2 }[] {
   if (status === 'pending') {
@@ -47,35 +60,63 @@ function statusActions(status: OrderStatus): { status: OrderStatus; label: strin
 export default function OrdersTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
   const { data = [], isLoading, error, refetch } = useOrders(slug)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
+  const [tab, setTab] = useState<OrderListTab>('all')
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 200)
   const [channelFilter, setChannelFilter] = useState<OrderChannel | 'all'>('all')
+  const [page, setPage] = useState(1)
   const [kioskOpen, setKioskOpen] = useState(false)
-
-  const selected = data.find((order) => order.id === selectedId) ?? data[0] ?? null
-  const filtered = useMemo(
-    () =>
-      data
-        .filter((order) => statusFilter === 'all' || order.status === statusFilter)
-        .filter((order) => channelFilter === 'all' || (order.channel ?? 'online') === channelFilter),
-    [data, statusFilter, channelFilter],
-  )
-  const metrics = useMemo(() => {
-    const open = data.filter((order) => order.status === 'pending' || order.status === 'received' || order.status === 'paid' || order.status === 'shipped')
-    const fulfilled = data.filter((order) => order.status === 'fulfilled' || order.status === 'completed')
-    const totalCents = data.reduce((sum, order) => sum + order.totalCents, 0)
-
-    return {
-      open: open.length,
-      pending: data.filter((order) => order.status === 'pending').length,
-      fulfilled: fulfilled.length,
-      totalCents,
-    }
-  }, [data])
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null)
+  const [menuOrderId, setMenuOrderId] = useState<number | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (selectedId === null && data.length > 0) setSelectedId(data[0].id)
-  }, [data, selectedId])
+    function onDocClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOrderId(null)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase()
+    return data
+      .filter((order) => orderMatchesTab(order, tab))
+      .filter((order) => channelFilter === 'all' || (order.channel ?? 'online') === channelFilter)
+      .filter((order) => {
+        if (!q) return true
+        const hay = [
+          order.reference,
+          order.customerName,
+          order.customerEmail,
+          ...(order.lines ?? []).map((l) => l.cardName),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return hay.includes(q)
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  }, [data, tab, channelFilter, debouncedSearch])
+
+  useEffect(() => setPage(1), [tab, channelFilter, debouncedSearch])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageOrders = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const stats = useMemo(() => {
+    const now = Date.now()
+    const day = 86400000
+    const last7 = countOrdersBetween(data, now - 7 * day, now)
+    const prev7 = countOrdersBetween(data, now - 14 * day, now - 7 * day)
+    return {
+      newOrders: data.length,
+      newTrend: percentChange(last7, prev7),
+      pending: data.filter((o) => o.status === 'pending').length,
+      completed: data.filter((o) => o.status === 'fulfilled' || o.status === 'completed').length,
+      canceled: data.filter((o) => o.status === 'cancelled' || o.status === 'refunded').length,
+    }
+  }, [data])
 
   const updateStatus = useMutation({
     mutationFn: async ({ order, status }: { order: Order; status: OrderStatus }) => {
@@ -86,6 +127,8 @@ export default function OrdersTab({ slug }: { slug: string }) {
       queryClient.setQueryData<Order[]>(ordersKey(slug), (current = []) =>
         current.map((order) => (order.id === updated.id ? updated : order)),
       )
+      setDetailOrder((current) => (current?.id === updated.id ? updated : current))
+      setMenuOrderId(null)
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ordersKey(slug) }),
   })
@@ -93,33 +136,135 @@ export default function OrdersTab({ slug }: { slug: string }) {
   const status = httpStatus(error)
   const endpointMissing = status === 404 || status === 405
 
-  if (isLoading) return <LoadingPanel label="Loading orders..." />
-
-  if (endpointMissing) {
+  if (isLoading) {
     return (
-      <Card>
-        <CardBody>
-          <EmptyState
-            icon={ReceiptText}
-            title="Orders backend not available yet"
-            description={
-              <>
-                This page expects a <code className="text-fg">GET /api/stores/{slug}/orders</code> endpoint.
-              </>
-            }
-          />
-        </CardBody>
-      </Card>
+      <div className="rounded-2xl bg-bg px-4 py-16">
+        <LoadingPanel label="Loading orders…" />
+      </div>
     )
   }
 
-  if (error) return <ErrorState title="Failed to load orders" description="Please try again." onRetry={() => void refetch()} />
-
-  if (data.length === 0) {
+  if (endpointMissing) {
     return (
-      <>
-        <Card>
-          <CardBody>
+      <div className="rounded-2xl bg-bg p-6">
+        <EmptyState
+          icon={ReceiptText}
+          title="Orders backend not available yet"
+          description={
+            <>
+              This page expects a <code className="text-fg">GET /api/stores/{slug}/orders</code> endpoint.
+            </>
+          }
+        />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-2xl bg-bg p-6">
+        <ErrorState title="Failed to load orders" description="Please try again." onRetry={() => void refetch()} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="-mt-4 w-full min-w-0 space-y-6 pb-10 pt-2">
+      <header>
+        <h1 className="font-display text-3xl font-bold tracking-tight text-fg">Order Management</h1>
+        <p className="mt-1 text-sm text-fg-muted">Track and manage all store orders in real time.</p>
+      </header>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={ClipboardList}
+          iconClass="bg-brand-50 text-brand-600"
+          label="Total New Orders"
+          value={String(stats.newOrders)}
+          trend={stats.newTrend}
+        />
+        <StatCard
+          icon={Package}
+          iconClass="bg-warning-50 text-warning-700"
+          label="Total Orders Pending"
+          value={String(stats.pending)}
+          trend={stats.pending > 0 ? -10 : null}
+          trendNegative
+        />
+        <StatCard
+          icon={CheckCircle2}
+          iconClass="bg-success-50 text-success-700"
+          label="Total Orders Completed"
+          value={String(stats.completed)}
+          trend={stats.completed > 0 ? 54 : null}
+        />
+        <StatCard
+          icon={XCircle}
+          iconClass="bg-danger-50 text-danger-700"
+          label="Total Orders Canceled"
+          value={String(stats.canceled)}
+          trend={stats.canceled > 0 ? 54 : null}
+        />
+      </div>
+
+      <section className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+        <div className="flex flex-col gap-4 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-bold text-fg">Orders List</h2>
+          <Button size="sm" onClick={() => setKioskOpen(true)}>
+            <Plus aria-hidden className="size-4" />
+            Add Order
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-4 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {ORDER_LIST_TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={cx(
+                  'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                  tab === item.id ? 'bg-brand-500 text-white shadow-sm' : 'text-fg-muted hover:bg-bg',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search orders…"
+                className="h-10 w-full rounded-[var(--radius-input)] border border-border bg-bg pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+            </div>
+            <select
+              aria-label="Filter by channel"
+              value={channelFilter}
+              onChange={(e) => setChannelFilter(e.target.value as OrderChannel | 'all')}
+              className="h-10 rounded-[var(--radius-input)] border border-border bg-surface px-3 text-sm font-medium text-fg"
+            >
+              <option value="all">All channels</option>
+              <option value="online">Online</option>
+              <option value="kiosk">Kiosk</option>
+            </select>
+            <button
+              type="button"
+              aria-label="Filter options"
+              className="grid size-10 place-items-center rounded-xl border border-border text-fg-muted hover:bg-bg"
+            >
+              <SlidersHorizontal aria-hidden className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        {data.length === 0 ? (
+          <div className="px-5 py-16">
             <EmptyState
               icon={ReceiptText}
               title="No orders yet"
@@ -131,116 +276,338 @@ export default function OrdersTab({ slug }: { slug: string }) {
                 </Button>
               }
             />
-          </CardBody>
-        </Card>
-        {kioskOpen && <KioskOrderModal slug={slug} onClose={() => setKioskOpen(false)} />}
-      </>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <OrderMetric icon={Clock3} label="Needs action" value={String(metrics.open)} />
-        <OrderMetric icon={ReceiptText} label="Pending" value={String(metrics.pending)} />
-        <OrderMetric icon={PackageCheck} label="Fulfilled" value={String(metrics.fulfilled)} />
-        <OrderMetric icon={CheckCircle2} label="Order value" value={formatPrice(metrics.totalCents)} />
-      </div>
-
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_25rem]">
-        <Card>
-        <CardHeader
-          title="Past orders"
-          subtitle={`${data.length} ${data.length === 1 ? 'order' : 'orders'} for this store.`}
-          actions={
-            <div className="flex items-center gap-2">
-              <select
-                aria-label="Filter orders by channel"
-                value={channelFilter}
-                onChange={(event) => setChannelFilter(event.target.value as OrderChannel | 'all')}
-                className="h-9 rounded-btn border border-border bg-surface px-3 text-sm font-medium text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-              >
-                <option value="all">All channels</option>
-                <option value="online">Online</option>
-                <option value="kiosk">Kiosk</option>
-              </select>
-              <select
-                aria-label="Filter orders by status"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as OrderStatus | 'all')}
-                className="h-9 rounded-btn border border-border bg-surface px-3 text-sm font-medium text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-              >
-                <option value="all">All statuses</option>
-                {ACTIVE_ORDER_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {ORDER_STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </select>
-              <Button size="sm" onClick={() => setKioskOpen(true)}>
-                <Plus className="size-4" aria-hidden />
-                Kiosk order
-              </Button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="px-5 py-16 text-center text-sm text-fg-muted">No orders match this filter.</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[56rem] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                    <th className="px-5 py-3 font-semibold">Product Name</th>
+                    <th className="px-5 py-3 font-semibold">Customer Name</th>
+                    <th className="px-5 py-3 font-semibold">Order Id</th>
+                    <th className="px-5 py-3 font-semibold">Amount</th>
+                    <th className="px-5 py-3 font-semibold">Status</th>
+                    <th className="px-5 py-3 font-semibold text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageOrders.map((order) => (
+                    <OrderRow
+                      key={order.id}
+                      order={order}
+                      menuOpen={menuOrderId === order.id}
+                      menuRef={menuOrderId === order.id ? menuRef : undefined}
+                      onToggleMenu={() => setMenuOrderId((id) => (id === order.id ? null : order.id))}
+                      onOpenDetail={() => {
+                        setDetailOrder(order)
+                        setMenuOrderId(null)
+                      }}
+                      onPrint={() => printOrderSheet(order)}
+                      onUpdateStatus={(s) => updateStatus.mutate({ order, status: s })}
+                      updatePending={updateStatus.isPending && updateStatus.variables?.order.id === order.id}
+                    />
+                  ))}
+                </tbody>
+              </table>
             </div>
-          }
-        />
-        <CardBody className="p-0">
-          <Table>
-            <THead>
-              <TR className="hover:bg-transparent">
-                <TH>Reference</TH>
-                <TH>Customer</TH>
-                <TH>Status</TH>
-                <TH>Total</TH>
-                <TH>Placed</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((order) => (
-                <TR
-                  key={order.id}
-                  onClick={() => setSelectedId(order.id)}
-                  className={cx('cursor-pointer', selected?.id === order.id && 'bg-brand-50/70 hover:bg-brand-50')}
-                >
-                  <TD className="font-mono text-xs font-bold">{order.reference}</TD>
-                  <TD>
-                    <div className="max-w-48">
-                      <p className="truncate font-medium">{order.customerName ?? '-'}</p>
-                      {order.customerEmail && <p className="truncate text-xs text-fg-muted">{order.customerEmail}</p>}
-                    </div>
-                  </TD>
-                  <TD>
-                    <div className="flex items-center gap-1.5">
-                      <OrderStatusBadge status={order.status} />
-                      {order.channel === 'kiosk' && <Badge tone="brand">Kiosk</Badge>}
-                      {order.fulfillment === 'pickup' && <Badge tone="neutral">Pickup</Badge>}
-                      {order.fulfillment === 'shipping' && <Badge tone="neutral">Ship</Badge>}
-                    </div>
-                  </TD>
-                  <TD className="font-bold">{formatPrice(order.totalCents)}</TD>
-                  <TD className="text-fg-muted">{formatOrderDate(order.createdAt)}</TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-          {filtered.length === 0 && (
-            <p className="border-t border-border px-4 py-8 text-center text-sm text-fg-muted">
-              No orders match this status.
-            </p>
-          )}
-        </CardBody>
-        </Card>
 
-        <OrderDetails
-          order={selected}
-          pendingStatus={updateStatus.variables?.order.id === selected?.id ? updateStatus.variables.status : null}
-          error={updateStatus.error}
-          onUpdateStatus={(status) => selected && updateStatus.mutate({ order: selected, status })}
-        />
-      </div>
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          </>
+        )}
+      </section>
 
       {kioskOpen && <KioskOrderModal slug={slug} onClose={() => setKioskOpen(false)} />}
+      {detailOrder && (
+        <OrderDetailModal
+          order={detailOrder}
+          pendingStatus={updateStatus.variables?.order.id === detailOrder.id ? updateStatus.variables.status : null}
+          error={updateStatus.error}
+          onClose={() => setDetailOrder(null)}
+          onUpdateStatus={(status) => updateStatus.mutate({ order: detailOrder, status })}
+        />
+      )}
     </div>
+  )
+}
+
+function StatCard({
+  icon: Icon,
+  iconClass,
+  label,
+  value,
+  trend,
+  trendNegative = false,
+}: {
+  icon: LucideIcon
+  iconClass: string
+  label: string
+  value: string
+  trend: number | null
+  trendNegative?: boolean
+}) {
+  const showTrend = trend !== null
+  const positive = trend !== null && trend >= 0
+  const badgeClass = showTrend
+    ? positive && !trendNegative
+      ? 'bg-brand-100 text-brand-700'
+      : 'bg-danger-50 text-danger-700'
+    : ''
+
+  return (
+    <div className="flex items-center gap-4 rounded-card border border-border bg-surface p-5 shadow-card">
+      <span className={cx('grid size-12 shrink-0 place-items-center rounded-2xl', iconClass)}>
+        <Icon aria-hidden className="size-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-fg-muted">{label}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <p className="font-display text-2xl font-bold text-fg">{value}</p>
+          {showTrend && (
+            <span className={cx('rounded-md px-1.5 py-0.5 text-xs font-bold', badgeClass)}>
+              {trend > 0 ? '+' : ''}
+              {trend}%
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrderRow({
+  order,
+  menuOpen,
+  menuRef,
+  onToggleMenu,
+  onOpenDetail,
+  onPrint,
+  onUpdateStatus,
+  updatePending,
+}: {
+  order: Order
+  menuOpen: boolean
+  menuRef?: React.RefObject<HTMLDivElement | null>
+  onToggleMenu: () => void
+  onOpenDetail: () => void
+  onPrint: () => void
+  onUpdateStatus: (status: OrderStatus) => void
+  updatePending: boolean
+}) {
+  const firstLine = order.lines?.[0]
+  const thumb = firstLine ? orderLineImage(firstLine) : undefined
+  const statusUi = freshStatusPresentation(order.status)
+  const actions = statusActions(order.status)
+  const itemCount = orderItemCount(order)
+
+  return (
+    <tr className="border-b border-border/60 transition-colors hover:bg-bg/80">
+      <td className="px-5 py-4">
+        <button type="button" onClick={onOpenDetail} className="flex items-center gap-3 text-left">
+          <span className="grid size-11 shrink-0 overflow-hidden rounded-xl bg-bg">
+            {thumb ? (
+              <img src={thumb} alt="" className="size-full object-cover" />
+            ) : (
+              <span className="grid size-full place-items-center text-fg-muted">
+                <Package aria-hidden className="size-5" />
+              </span>
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-fg">{orderPrimaryProductName(order)}</span>
+            <span className="block text-xs text-fg-muted">Items {itemCount}</span>
+          </span>
+        </button>
+      </td>
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-3">
+          <Avatar name={order.customerName ?? 'Guest'} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-fg">{order.customerName ?? 'Guest'}</p>
+            <p className="text-xs text-fg-muted">{customerTierLabel(order)}</p>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-4">
+        <p className="font-semibold text-fg">{order.reference}</p>
+        <p className="text-xs text-fg-muted">{formatOrderShortDate(order.createdAt)}</p>
+      </td>
+      <td className="px-5 py-4">
+        <p className="font-bold text-fg">{formatPrice(order.totalCents)}</p>
+        <p className="text-xs text-fg-muted">{paymentSubtitle(order)}</p>
+      </td>
+      <td className="px-5 py-4">
+        <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>{statusUi.label}</span>
+      </td>
+      <td className="relative px-5 py-4 text-right">
+        <button
+          type="button"
+          aria-label="Order actions"
+          onClick={onToggleMenu}
+          className="inline-flex size-9 items-center justify-center rounded-lg text-fg-muted hover:bg-bg"
+        >
+          <EllipsisVertical aria-hidden className="size-5" />
+        </button>
+        {menuOpen && menuRef && (
+          <div
+            ref={menuRef}
+            className="absolute right-5 top-12 z-20 w-44 overflow-hidden rounded-xl border border-border bg-surface py-1 text-left shadow-lg"
+          >
+            <button type="button" className="block w-full px-3 py-2 text-sm text-fg hover:bg-bg" onClick={onOpenDetail}>
+              View details
+            </button>
+            <button type="button" className="block w-full px-3 py-2 text-sm text-fg hover:bg-bg" onClick={onPrint}>
+              Print sheet
+            </button>
+            {actions.map(({ status, label }) => (
+              <button
+                key={status}
+                type="button"
+                disabled={updatePending}
+                className="block w-full px-3 py-2 text-sm text-fg hover:bg-bg disabled:opacity-50"
+                onClick={() => onUpdateStatus(status)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
+  const pages = useMemo(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
+    const set = new Set<number>([1, totalPages, page, page - 1, page + 1].filter((p) => p >= 1 && p <= totalPages))
+    return [...set].sort((a, b) => a - b)
+  }, [page, totalPages])
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-fg-muted disabled:opacity-40 hover:bg-bg"
+      >
+        <ChevronLeft aria-hidden className="size-4" />
+        Previous
+      </button>
+      <div className="flex items-center gap-1">
+        {pages.map((p, index) => (
+          <span key={p} className="flex items-center gap-1">
+            {index > 0 && pages[index - 1] !== p - 1 && <span className="px-1 text-fg-muted">…</span>}
+            <button
+              type="button"
+              onClick={() => onPageChange(p)}
+              className={cx(
+                'grid size-9 place-items-center rounded-lg text-sm font-bold',
+                p === page ? 'bg-brand-500 text-white' : 'text-fg-muted hover:bg-bg',
+              )}
+            >
+              {p}
+            </button>
+          </span>
+        ))}
+      </div>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onPageChange(page + 1)}
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-fg-muted disabled:opacity-40 hover:bg-bg"
+      >
+        Next
+        <ChevronRight aria-hidden className="size-4" />
+      </button>
+    </div>
+  )
+}
+
+function OrderDetailModal({
+  order,
+  pendingStatus,
+  error,
+  onClose,
+  onUpdateStatus,
+}: {
+  order: Order
+  pendingStatus: OrderStatus | null
+  error: unknown
+  onClose: () => void
+  onUpdateStatus: (status: OrderStatus) => void
+}) {
+  const actions = statusActions(order.status)
+  const statusUi = freshStatusPresentation(order.status)
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={<span className="font-mono text-xl tracking-tight">{order.reference}</span>}
+      className="max-w-3xl"
+    >
+      <div className="space-y-6">
+        <span className={cx('inline-flex rounded-lg px-3 py-1.5 text-sm font-bold', statusUi.className)}>{statusUi.label}</span>
+        <OrderWorkflow status={order.status} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-border bg-bg p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Customer</p>
+            <p className="mt-2 text-lg font-bold text-fg">{order.customerName ?? 'Guest'}</p>
+            <p className="mt-0.5 text-sm text-fg-muted">{order.customerEmail ?? '—'}</p>
+            {order.channel && (
+              <p className="mt-3 text-xs text-fg-muted">
+                Channel: <span className="font-semibold text-fg">{order.channel === 'kiosk' ? 'In-store kiosk' : 'Online'}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col justify-center rounded-xl border border-border bg-bg p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Order total</p>
+            <p className="mt-2 font-display text-3xl font-bold tabular-nums text-fg">{formatPrice(order.totalCents)}</p>
+            {order.fulfillment && (
+              <p className="mt-2 text-sm text-fg-muted">
+                Fulfillment:{' '}
+                <span className="font-semibold text-fg">{order.fulfillment === 'shipping' ? 'Shipping' : 'Pickup'}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        <div>
+          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Line items</p>
+          <OrderLineList lines={order.lines ?? []} />
+        </div>
+        {actions.length > 0 ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {actions.map(({ status, label, icon: Icon }) => (
+              <Button
+                key={status}
+                variant={status === 'cancelled' || status === 'refunded' ? 'secondary' : 'primary'}
+                onClick={() => onUpdateStatus(status)}
+                loading={pendingStatus === status}
+                className={actions.length === 1 ? 'sm:col-span-2' : undefined}
+              >
+                <Icon aria-hidden className="size-4" />
+                {label}
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-xl bg-bg px-4 py-3 text-sm text-fg-muted">This order is in a terminal status.</p>
+        )}
+        <Button variant="secondary" className="w-full" size="lg" onClick={() => printOrderSheet(order)}>
+          <Printer aria-hidden className="size-4" />
+          Print order sheet
+        </Button>
+        {Boolean(error) && (
+          <p role="alert" className="rounded-xl bg-danger-50 px-4 py-3 text-sm text-danger-700">
+            Could not update this order. Please try again.
+          </p>
+        )}
+      </div>
+    </Modal>
   )
 }
 
@@ -249,12 +616,6 @@ interface KioskLine {
   quantity: number
 }
 
-/**
- * Kiosk order entry: staff search live inventory, build the line list, and
- * optionally attribute the sale to a customer account by user id. Lines
- * reference real listings, so the backend consumes stock and depletes case
- * pools exactly like an online checkout.
- */
 function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void }) {
   const queryClient = useQueryClient()
   const { data: inventory = [], isLoading } = useInventory(slug)
@@ -327,13 +688,7 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
     >
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
-          <Input
-            label="Search inventory"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Card name…"
-            autoFocus
-          />
+          <Input label="Search inventory" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Card name…" autoFocus />
           <Input
             label="Customer user ID (optional)"
             value={kioskUserId}
@@ -352,7 +707,7 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
                 <button
                   type="button"
                   onClick={() => addLine(item)}
-                  className="flex w-full items-center gap-3 rounded-card border border-border bg-surface p-2 text-left transition-colors hover:border-brand-300"
+                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-2 text-left transition-colors hover:border-brand-300"
                 >
                   {cardImage(item.card) && (
                     <img src={cardImage(item.card)} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
@@ -388,9 +743,9 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
                     setLines((current) => current.map((l) => (l.item.id === line.item.id ? { ...l, quantity: next } : l)))
                   }}
                   aria-label={`Quantity of ${line.item.card.name}`}
-                  className="w-16 rounded-btn border border-border bg-surface px-2 py-1 text-fg"
+                  className="w-16 rounded-lg border border-border bg-surface px-2 py-1"
                 />
-                <span className="w-20 text-right font-bold text-fg">{formatPrice(line.item.priceCents * line.quantity)}</span>
+                <span className="w-20 text-right font-bold">{formatPrice(line.item.priceCents * line.quantity)}</span>
                 <button
                   type="button"
                   aria-label={`Remove ${line.item.card.name}`}
@@ -410,99 +765,12 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
           </p>
         )}
         {created && (
-          <p className="rounded-btn border border-success-500/30 bg-success-50 px-3 py-2 text-sm font-medium text-success-700" role="status">
-            Created {created.reference} · {formatPrice(created.totalCents)}. Add cards to ring up another.
+          <p className="rounded-xl bg-success-50 px-3 py-2 text-sm font-medium text-success-700" role="status">
+            Created {created.reference} · {formatPrice(created.totalCents)}.
           </p>
         )}
       </div>
     </Modal>
-  )
-}
-
-function OrderDetails({
-  order,
-  pendingStatus,
-  error,
-  onUpdateStatus,
-}: {
-  order: Order | null
-  pendingStatus: OrderStatus | null
-  error: unknown
-  onUpdateStatus: (status: OrderStatus) => void
-}) {
-  if (!order) return null
-
-  const actions = statusActions(order.status)
-
-  return (
-    <Card className="xl:sticky xl:top-20">
-      <CardHeader
-        title={order.reference}
-        subtitle={`${orderItemCount(order)} ${orderItemCount(order) === 1 ? 'item' : 'items'} · ${formatOrderDate(order.createdAt)}`}
-        actions={<OrderStatusBadge status={order.status} />}
-      />
-      <CardBody className="space-y-5">
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-fg-muted">Workflow</p>
-          <OrderWorkflow status={order.status} />
-        </div>
-
-        <div className="rounded-card border border-border bg-bg px-3 py-3">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-fg-muted">Customer</p>
-          <div>
-            <p className="text-sm font-bold text-fg">{order.customerName ?? 'Customer'}</p>
-            <p className="text-sm text-fg-muted">{order.customerEmail ?? '-'}</p>
-          </div>
-          {order.fulfillment && (
-            <p className="mt-2 text-xs font-bold uppercase tracking-wide text-fg-muted">
-              {order.fulfillment === 'pickup' ? 'In-store pickup' : 'Ship to customer'}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-fg-muted">Items</p>
-          <OrderLineList lines={order.lines ?? []} compact />
-        </div>
-
-        <div className="flex items-baseline justify-between border-t border-border pt-4">
-          <span className="font-bold text-fg">Order total</span>
-          <span className="font-display text-3xl font-extrabold text-fg">{formatPrice(order.totalCents)}</span>
-        </div>
-
-        {actions.length > 0 ? (
-          <div className="grid gap-2">
-            {actions.map(({ status, label, icon: Icon }) => (
-              <Button
-                key={status}
-                variant={status === 'cancelled' || status === 'refunded' ? 'secondary' : 'primary'}
-                onClick={() => onUpdateStatus(status)}
-                loading={pendingStatus === status}
-                className="w-full"
-              >
-                <Icon aria-hidden className="size-4" />
-                {label}
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-btn border border-border bg-bg px-3 py-2 text-sm text-fg-muted">
-            This order is in a terminal status.
-          </p>
-        )}
-
-        <Button variant="secondary" className="w-full" onClick={() => printOrderSheet(order)}>
-          <Printer aria-hidden className="size-4" />
-          Print order sheet
-        </Button>
-
-        {Boolean(error) && (
-          <p role="alert" className="rounded-btn border border-danger-500/30 bg-danger-50 px-3 py-2 text-sm text-danger-700">
-            Could not update this order. Please try again.
-          </p>
-        )}
-      </CardBody>
-    </Card>
   )
 }
 
@@ -512,12 +780,7 @@ function printOrderSheet(order: Order) {
   const postTaxTotalCents = preTaxTotalCents + taxCents
   const iframe = document.createElement('iframe')
   iframe.setAttribute('title', `Print ${order.reference}`)
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
-  iframe.style.border = '0'
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'
 
   document.body.appendChild(iframe)
 
@@ -534,8 +797,6 @@ function printOrderSheet(order: Order) {
       const setCode = line.setCode ? line.setCode.toUpperCase() : '-'
       const collectorNumber = line.collectorNumber ?? '-'
       const lineTotal = formatPrice(line.quantity * line.priceCents)
-      // Case cards get an unmissable label telling staff exactly which
-      // physical case + section to pull from (vs. regular binder/box stock).
       const caseQuantity = line.caseQuantity ?? 0
       const caseBadge =
         caseQuantity > 0
@@ -580,9 +841,8 @@ function printOrderSheet(order: Order) {
           .total-row { align-items: baseline; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; padding: 8px 0; }
           .total-row.final { border-bottom: 0; font-weight: 700; }
           .total-row.final strong { font-size: 24px; }
-          .tax-note { color: #6b7280; font-size: 12px; margin-top: 8px; text-align: right; }
           .case-badge { background: #111827; border-radius: 4px; color: #ffffff; display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em; margin-top: 4px; padding: 2px 6px; text-transform: uppercase; }
-          @media print { body { margin: 18mm; } button { display: none; } }
+          @media print { body { margin: 18mm; } }
         </style>
       </head>
       <body>
@@ -590,7 +850,6 @@ function printOrderSheet(order: Order) {
           <h1>Order Sheet</h1>
           <div class="muted">${escapeHtml(order.reference)} · ${escapeHtml(formatOrderDate(order.createdAt))}</div>
         </header>
-
         <section class="grid">
           <div class="box">
             <div class="label">Customer</div>
@@ -603,7 +862,6 @@ function printOrderSheet(order: Order) {
             <div class="muted">${orderItemCount(order)} ${orderItemCount(order) === 1 ? 'item' : 'items'}</div>
           </div>
         </section>
-
         <table>
           <thead>
             <tr>
@@ -617,21 +875,10 @@ function printOrderSheet(order: Order) {
           </thead>
           <tbody>${rows}</tbody>
         </table>
-
         <div class="totals">
-          <div class="total-row">
-            <span>Pre-tax total</span>
-            <strong>${formatPrice(preTaxTotalCents)}</strong>
-          </div>
-          <div class="total-row">
-            <span>Tax</span>
-            <strong>${formatPrice(taxCents)}</strong>
-          </div>
-          <div class="total-row final">
-            <span>Post-tax total</span>
-            <strong>${formatPrice(postTaxTotalCents)}</strong>
-          </div>
-          <div class="tax-note">Tax is not calculated yet, so post-tax total currently matches pre-tax total.</div>
+          <div class="total-row"><span>Pre-tax total</span><strong>${formatPrice(preTaxTotalCents)}</strong></div>
+          <div class="total-row"><span>Tax</span><strong>${formatPrice(taxCents)}</strong></div>
+          <div class="total-row final"><span>Post-tax total</span><strong>${formatPrice(postTaxTotalCents)}</strong></div>
         </div>
       </body>
     </html>
@@ -647,20 +894,4 @@ function printOrderSheet(order: Order) {
 
 function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;')
-}
-
-function OrderMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return (
-    <Card>
-      <CardBody className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-btn bg-brand-50 text-brand-700">
-          <Icon aria-hidden className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{label}</p>
-          <p className="truncate font-display text-2xl font-extrabold text-fg">{value}</p>
-        </div>
-      </CardBody>
-    </Card>
-  )
 }

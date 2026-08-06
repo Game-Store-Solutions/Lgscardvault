@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { tv, type VariantProps } from 'tailwind-variants'
-import { Loader2, TriangleAlert, Inbox, type LucideIcon } from 'lucide-react'
+import { Loader2, TriangleAlert, Inbox } from 'lucide-react'
 import { cx } from '../../lib/cx'
 import { Button } from './Button'
 
@@ -41,7 +41,7 @@ export function LoadingPanel({ label = 'Loading…', className }: LoadingPanelPr
     <div
       className={cx(
         'flex flex-col items-center justify-center gap-3 py-16 px-6',
-        'bg-surface border border-border rounded-card',
+        'rounded-card border border-border bg-surface dark:glass-card',
         className,
       )}
     >
@@ -52,7 +52,7 @@ export function LoadingPanel({ label = 'Loading…', className }: LoadingPanelPr
 }
 
 export interface EmptyStateProps {
-  icon?: LucideIcon
+  icon?: ComponentType<{ className?: string }>
   title: ReactNode
   description?: ReactNode
   action?: ReactNode

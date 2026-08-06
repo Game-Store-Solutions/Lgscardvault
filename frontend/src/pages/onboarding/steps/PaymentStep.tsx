@@ -50,7 +50,7 @@ export function PaymentStep({
 
   if (configQuery.isError || !configQuery.data) {
     return (
-      <div className="max-w-xl space-y-3">
+      <div className="mx-auto w-full max-w-xl space-y-3">
         <p role="alert" className="rounded-btn bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
           {extractErrorMessage(configQuery.error, 'Payment options could not be loaded.')}
         </p>
@@ -65,7 +65,7 @@ export function PaymentStep({
   const priceCents = plan?.priceCents ?? 0
 
   return (
-    <div className="max-w-xl space-y-5">
+    <div className="mx-auto w-full max-w-xl space-y-5">
       <div className="flex items-center justify-between rounded-card border border-border bg-bg p-4">
         <div>
           <p className="text-sm text-fg-muted">You're subscribing to</p>
@@ -87,6 +87,8 @@ export function PaymentStep({
           countryCode={config.countryCode}
           billingEmail={billingEmail}
           confirmLabel="Verify payment method"
+          paymentRequestLabel="Platform subscription"
+          layout="checkout"
           onTokenized={patchPayment}
         />
       ) : isDevBuild ? (

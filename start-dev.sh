@@ -118,6 +118,12 @@ wait_for_postgres
 
 export DEFAULT_URI="${DEFAULT_URI:-http://127.0.0.1:8000}"
 
+(
+  cd "$ROOT_DIR/backend"
+  php bin/console doctrine:migrations:migrate --no-interaction
+  php bin/console cache:clear --no-warmup
+)
+
 start_service "backend API" "$ROOT_DIR/backend" php -S 127.0.0.1:8000 -t public
 start_service "CSV import worker" "$ROOT_DIR/backend" php bin/console messenger:consume async -vv
 start_service "frontend" "$ROOT_DIR/frontend" npm run dev

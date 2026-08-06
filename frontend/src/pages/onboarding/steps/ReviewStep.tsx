@@ -18,7 +18,7 @@ export function ReviewStep({
 }) {
   const a = data.address
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <ReviewRow title="Account" onEdit={() => onJump(stepIndex('account'))}>
         {data.displayName} · {data.email}
       </ReviewRow>
@@ -40,7 +40,7 @@ export function ReviewStep({
           : 'No payment required (free plan)'}
       </ReviewRow>
 
-      <p className="rounded-btn bg-bg px-3 py-3 text-sm text-fg-muted">
+      <p className="rounded-btn bg-bg px-4 py-4 text-sm leading-relaxed text-fg-muted sm:text-base">
         When you submit, your store is created in a <span className="font-bold text-fg">pending</span> state. A platform admin
         reviews it and, once approved, your storefront goes live.
       </p>
@@ -50,10 +50,10 @@ export function ReviewStep({
 
 function ReviewRow({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-card border border-border bg-surface p-4">
+    <div className="flex items-start justify-between gap-4 rounded-card border border-border bg-surface p-5 sm:p-6">
       <div className="min-w-0">
         <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{title}</p>
-        <p className="mt-1 break-words text-sm text-fg">{children}</p>
+        <p className="mt-1.5 break-words text-sm text-fg sm:text-base">{children}</p>
       </div>
       <Button variant="ghost" size="sm" onClick={onEdit}>
         Edit

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowLeft,
   BadgeCheck,
   ClipboardList,
   Repeat,
@@ -17,6 +16,7 @@ import type { BuylistEntry, CardSummary, SellPayoutMethod, SellSubmission, Trade
 import { useAuth } from '../context/AuthContext'
 import { useDebouncedValue, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import {
+  BackButton,
   Badge,
   Button,
   buttonVariants,
@@ -321,10 +321,7 @@ export default function SellTradePage() {
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
-      <Link to={`/s/${slug}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline">
-        <ArrowLeft aria-hidden className="size-4" />
-        Back to {store?.name ?? 'store'}
-      </Link>
+      <BackButton to={`/s/${slug}`}>Back to {store?.name ?? 'store'}</BackButton>
 
       <div>
         <h1 className="inline-flex items-center gap-3 font-display text-3xl font-bold tracking-tight text-fg">

@@ -67,6 +67,27 @@ final class FakeSubscriptionBilling implements SubscriptionBillingInterface
         return ['cardId' => 'ccof:CARD2', 'last4' => '4242', 'brand' => 'VISA'];
     }
 
+    public function vaultShopperPaymentMethod(
+        string $sourceId,
+        array $buyer = [],
+        ?string $existingCustomerId = null,
+        ?string $previousCardId = null,
+        ?string $verificationToken = null,
+    ): array {
+        if (null !== $this->declineWith) {
+            throw new \RuntimeException($this->declineWith);
+        }
+
+        return [
+            'customerId' => $existingCustomerId ?? 'CUST1',
+            'cardId' => 'ccof:WALLET1',
+            'last4' => '4242',
+            'brand' => 'VISA',
+            'expMonth' => '12',
+            'expYear' => '2030',
+        ];
+    }
+
     public function chargeVaultedCard(string $customerId, string $cardId, int $priceCents, ?string $idempotencyKey = null): array
     {
         if (null !== $this->declineWith) {

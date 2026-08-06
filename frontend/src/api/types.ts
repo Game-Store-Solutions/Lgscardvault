@@ -7,6 +7,60 @@ export interface ApiError {
 
 export type CardDisplayStyle = 'gallery' | 'marketplace'
 
+export interface StoreCommunityEventItem {
+  id: string
+  title: string
+  startsAt: string
+  description?: string
+  location?: string
+  externalUrl?: string
+  pinned?: boolean
+}
+
+export interface StoreCommunityEvents {
+  boardHeading?: string
+  boardIntro?: string
+  calendarUrl?: string
+  items: StoreCommunityEventItem[]
+}
+
+export type HeroLayout =
+  | 'cinematic'
+  | 'living-inventory'
+  | 'trading-table'
+  | 'event-board'
+  | 'floating-cards'
+  // Deprecated / legacy (normalized client-side)
+  | 'floating-collection'
+  | 'store-story-hero'
+  | 'collectors-shelf'
+  | 'open-binder'
+  | 'store-counter'
+  | 'planeswalkers-desk'
+  | 'shipping-station'
+  | 'trophy-wall'
+  | 'convention-booth'
+  | 'library-shelf'
+  | 'world-map'
+  | 'gallery-wall'
+  | 'vault'
+  | 'command-center'
+  | 'guild-hall'
+  | 'mosaic-hero'
+  | 'store-window'
+  | 'day-night-hero'
+  | 'storefront'
+  | 'featured-card'
+  | 'collection'
+  | 'full-art'
+  | 'trading-desk'
+  | 'mascot'
+  | 'dynamic'
+  | 'video'
+  | 'minimal'
+  | 'banner'
+  | 'spotlight'
+
 export interface Store {
   id: number
   name: string
@@ -28,6 +82,7 @@ export interface Store {
   heroSubheading?: string | null
   tagline?: string | null
   cardDisplayStyle?: CardDisplayStyle
+  heroLayout?: HeroLayout
   /** Optional dark-mode palette (same keys as the base colors); used when the shopper's theme is dark. */
   darkColors?: Partial<Record<'primaryColor' | 'accentColor' | 'backgroundColor' | 'surfaceColor' | 'textColor' | 'mutedColor' | 'borderColor', string>> | null
   /** Raw sell/trade rate settings; resolve effective rates via GET /stores/{slug}/trade-rates. */
@@ -40,6 +95,7 @@ export interface Store {
   instagramUrl?: string | null
   twitterUrl?: string | null
   discordUrl?: string | null
+  communityEvents?: StoreCommunityEvents | null
   // Enterprise onboarding (status/planKey in store:read; rest in store:admin)
   status?: 'pending' | 'approved' | 'rejected'
   rejectionReason?: string | null
@@ -428,6 +484,10 @@ export interface StoreCustomer {
   paymentBrand?: string | null
   paymentLast4?: string | null
   paymentExpires?: string | null
+  paymentMethodType?: PaymentMethodType | null
+  paymentConfigured?: boolean
+  /** True when this store can charge a card on file (one-click checkout). */
+  savedCardReady?: boolean
   createdAt: string | null
   updatedAt: string | null
 }
@@ -461,6 +521,8 @@ export interface CustomerWantListEntry {
   isFoil: boolean
   quantity: number
   notes?: string | null
+  /** Store listing to open on the storefront, when one matches this want. */
+  inventoryItemId?: number | null
   createdAt: string
 }
 
@@ -536,6 +598,11 @@ export interface UserProfile {
   avatarUrl?: string | null
   roles: string[]
   ownedStores: Pick<Store, 'id' | 'name' | 'slug'>[]
+  paymentBrand?: string | null
+  paymentLast4?: string | null
+  paymentExpires?: string | null
+  paymentMethodType?: PaymentMethodType | null
+  paymentConfigured?: boolean
 }
 
 export interface AdminUser {

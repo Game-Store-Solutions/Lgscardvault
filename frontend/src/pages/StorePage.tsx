@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
+  Calendar,
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
@@ -16,10 +17,12 @@ import {
 import { formatPrice, parsePriceInput, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { useCanManageStore, useCart, useInventory, useStore, useStoreGames, useStoreTheme } from '../hooks'
+import { useCanManageStore, useInventory, useStore, useStoreCart, useStoreGames, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
-import { Button, buttonVariants, EmptyState, Input, LoadingPanel, Pagination, Select } from '../components/ui'
+import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
+import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
+import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
 import { StoreHero } from '../components/store/StoreHero'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
@@ -85,7 +88,7 @@ export default function StorePage() {
     () => (gameFilter ? allInventory.filter((item) => (item.card.gameCode ?? 'mtg') === gameFilter) : allInventory),
     [allInventory, gameFilter],
   )
-  const { query: cartQuery, setItem: cartSetItem } = useCart(slug, Boolean(user))
+  const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
   const cartByItemId = useMemo(() => {
     const map = new Map<number, number>()
     for (const entry of cartQuery.data ?? []) {
@@ -178,6 +181,9 @@ export default function StorePage() {
   }, [inventory, store?.spotlightMinPriceCents])
 
   const totalCards = inventory.reduce((sum, item) => sum + item.quantity, 0)
+  const heroShowcaseCards = useMemo(() => buildHeroCardPool(allInventory, 20), [allInventory])
+  const heroLayout = normalizeHeroLayout(store?.heroLayout ?? 'cinematic')
+  const locationLabel = [store?.city, store?.region].filter(Boolean).join(', ') || null
 
   // Pure navigation — no counts on the pills. A number there can't say what
   // it counts (listings? copies? sealed?), same reason it came off the
@@ -253,6 +259,13 @@ export default function StorePage() {
 
   if (search.trim()) chips.push({ label: `“${search.trim()}”`, onClear: () => setSearch('') })
 
+  if (gameOptions.length > 1 && gameFilter) {
+    chips.push({
+      label: gameOptions.find((g) => g.code === gameFilter)?.name ?? gameFilter,
+      onClear: () => setGameFilter(gameOptions[0]?.code ?? ''),
+    })
+  }
+
   if (setFilter)
     chips.push({
       label: `Set: ${availableSets.find((s) => s.code === setFilter)?.name ?? setFilter.toUpperCase()}`,
@@ -275,6 +288,16 @@ export default function StorePage() {
   function renderFilterControls(searchId: string) {
     return (
       <div className="space-y-6">
+        {gameOptions.length > 1 && (
+          <Select label="Game" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}>
+            {gameOptions.map((game) => (
+              <option key={game.code} value={game.code}>
+                {game.name}
+              </option>
+            ))}
+          </Select>
+        )}
+
         <div>
           <label htmlFor={searchId} className="text-sm font-bold text-fg">
             Search
@@ -370,9 +393,10 @@ export default function StorePage() {
   }
 
   return (
-    <div className="relative space-y-10">
+    <div className="storefront-atmosphere relative space-y-10">
       <StoreHero
         name={store?.name ?? slug}
+        slug={slug}
         tagline={store?.tagline}
         heroHeading={store?.heroHeading}
         heroSubheading={
@@ -383,8 +407,22 @@ export default function StorePage() {
         logoUrl={store?.logoUrl}
         primaryColor={store?.primaryColor}
         accentColor={store?.accentColor}
+        layout={heroLayout}
+        communityEvents={store?.communityEvents}
+        locationLabel={locationLabel}
+        verified={store?.status === 'approved'}
+        stats={{
+          listings: inventory.length,
+          cards: totalCards,
+          sets: availableSets.length,
+        }}
+        showcaseCards={heroShowcaseCards}
         actions={
           <>
+            <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Calendar aria-hidden className="size-4" />
+              Event calendar
+            </Link>
             {user && (
               <Link to={`/s/${slug}/account`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
                 <UserCircle aria-hidden className="size-4" />
@@ -407,21 +445,29 @@ export default function StorePage() {
       <p className="text-sm text-fg-muted">
         <span className="font-bold text-fg">{inventory.length}</span> listings ·{' '}
         <span className="font-bold text-fg">{totalCards}</span> cards ·{' '}
-        <span className="font-bold text-fg">{availableSets.length}</span> sets
+        <span className="font-bold text-fg">{availableSets.length}</span> sets ·{' '}
+        <Link
+          to={`/s/${slug}/events`}
+          className="font-bold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
+        >
+          Event calendar
+        </Link>
       </p>
 
       {/* Quick actions — themed shortcut tiles over the spotlight */}
       <section className="space-y-5">
-        <p className="mx-auto max-w-2xl text-center text-sm text-fg-muted sm:text-base">
+        <p className="mx-auto max-w-2xl text-center text-sm text-fg/75 sm:text-base">
           Browse thousands of in-stock singles, build decks, sell or trade your collection.
         </p>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'flex flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface px-4 py-8 text-fg shadow-card transition-colors hover:border-brand-500 hover:bg-bg'
+              'group flex flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface px-4 py-8 text-fg shadow-card ui-lift hover:border-brand-500/40 dark:border-white/10 dark:bg-white/[0.04]'
             const content = (
               <>
-                <Icon aria-hidden className="size-6 text-fg-muted" />
+                <span className="grid size-12 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] dark:text-brand-300">
+                  <Icon aria-hidden className="size-6" />
+                </span>
                 <span className="text-sm font-bold">{label}</span>
               </>
             )
@@ -456,7 +502,7 @@ export default function StorePage() {
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <h2 className="inline-flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-fg">
-                <span className="grid size-8 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
+                <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
                   <Sparkles aria-hidden className="size-4" />
                 </span>
                 Spotlight{gameFilter ? ` · ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''}` : ''}
@@ -502,7 +548,7 @@ export default function StorePage() {
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-20 rounded-card border border-border bg-surface p-5 shadow-card">
+          <div className="sticky top-20 rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
@@ -547,6 +593,20 @@ export default function StorePage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {gameOptions.length > 1 && (
+                <Select
+                  aria-label="Filter by game"
+                  value={gameFilter}
+                  onChange={(e) => setGameFilter(e.target.value)}
+                  className="w-full min-w-[10rem] sm:w-44 lg:hidden"
+                >
+                  {gameOptions.map((game) => (
+                    <option key={game.code} value={game.code}>
+                      {game.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
               <Button variant="secondary" size="md" className="lg:hidden" onClick={() => setAdvancedOpen(true)}>
                 <SlidersHorizontal aria-hidden className="size-4" />
                 Filters{advancedCount > 0 || chips.length > 0 ? ` (${chips.length})` : ''}
@@ -589,9 +649,9 @@ export default function StorePage() {
           </div>
 
           {isLoading ? (
-            <LoadingPanel label="Loading inventory…" />
+            <InventoryGridSkeleton count={12} />
           ) : sorted.length === 0 ? (
-            <div className="rounded-card border border-border bg-surface">
+            <div className="rounded-card border border-border bg-surface dark:glass-card">
               <EmptyState
                 icon={Search}
                 title="No matching cards"
@@ -606,7 +666,7 @@ export default function StorePage() {
           ) : (
             <div className="space-y-6">
               {cardDisplayStyle === 'marketplace' ? (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
                   {visibleResults.map((item) => (
                     <MarketplaceCard
                       key={item.id}
@@ -642,7 +702,7 @@ export default function StorePage() {
       {advancedOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" aria-hidden onClick={() => setAdvancedOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-card border-t border-border bg-surface p-5 shadow-xl">
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-card border-t border-border bg-surface p-5 shadow-xl dark:glass-card-elevated">
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border" aria-hidden />
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-fg">Filters</h2>

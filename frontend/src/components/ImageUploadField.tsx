@@ -12,12 +12,15 @@ export function ImageUploadField({
   label,
   value,
   onChange,
+  onUploadComplete,
   placeholder,
   hint,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
+  /** Fires after a successful file upload (in addition to onChange). */
+  onUploadComplete?: (value: string) => void
   placeholder?: string
   hint?: string
 }) {
@@ -37,6 +40,7 @@ export function ImageUploadField({
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       onChange(data.url)
+      onUploadComplete?.(data.url)
     } catch (uploadError) {
       setError(extractErrorMessage(uploadError, 'Could not upload the image.'))
     } finally {

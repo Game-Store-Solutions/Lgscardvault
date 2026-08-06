@@ -1,21 +1,13 @@
 @import "tailwindcss";
-@import "@fontsource/lato/400.css";
-@import "@fontsource/lato/700.css";
-@import "@fontsource/lato/900.css";
-@import "@fontsource/manrope/600.css";
-@import "@fontsource/manrope/700.css";
-@import "@fontsource/manrope/800.css";
+@import "@fontsource-variable/plus-jakarta-sans/wght.css";
 
 /* Class-based dark mode: toggled by adding `.dark` on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Fonts: bundled (self-hosted) via @fontsource — no Google CDN.
- * Lato    = UI body sans-serif (approachable, trustworthy — a proven ecommerce
- *           body face).
- * Manrope = modern geometric sans for display/headings & card titles — clean
- *           and highly scannable, a top marketplace/product-card recommendation.
- * A 2-font system (heading + body) per typography best practice.
+ * Typography — Plus Jakarta Sans (variable, self-hosted).
+ * One family for UI + headings: smooth curves, strong screen rendering,
+ * weight 400–800 without swapping faces.
  */
 @property --rx {
   syntax: "<angle>";
@@ -66,6 +58,7 @@
   --color-fg-muted: #64748b; /* secondary text */
   --color-bg: #f7f8fa; /* app background */
   --color-surface: #ffffff; /* cards / panels */
+  --color-surface-elevated: #ffffff;
   --color-border: #e7e9ee; /* hairline borders */
 
   /* Status */
@@ -79,14 +72,15 @@
   --color-danger-500: #f04438;
   --color-danger-700: #b42318;
 
-  /* Radii / shadows */
-  --radius-card: 16px;
-  --radius-btn: 10px;
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  /* Radii / shadows — soft dashboard feel (orders-style) */
+  --radius-card: 1.25rem;
+  --radius-btn: 0.75rem;
+  --radius-input: 0.75rem;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.05), 0 4px 14px rgb(16 24 40 / 0.06);
 
   /* Fonts */
-  --font-sans: "Lato", "Aller", system-ui, -apple-system, sans-serif;
-  --font-display: "Manrope", "Lato", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-display: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
 }
 
 /*
@@ -110,12 +104,13 @@
 
   --color-accent-500: #ff9573;
 
-  /* Neutrals */
-  --color-fg: #e7e9f0;
-  --color-fg-muted: #9aa1b4;
-  --color-bg: #0e1017;
-  --color-surface: #171a22;
-  --color-border: #2a2f3a;
+  /* Neutrals — depth + soft ambient lift (Finotive-style, brand-tinted) */
+  --color-fg: #ffffff;
+  --color-fg-muted: #a1a1aa;
+  --color-bg: #09090b;
+  --color-surface: #121215;
+  --color-surface-elevated: #18181b;
+  --color-border: rgb(255 255 255 / 0.08);
 
   /* Status — lifted 700s so text-*-700 reads on dark */
   --color-success-50: #0f2419;
@@ -128,11 +123,225 @@
   --color-danger-500: #f04438;
   --color-danger-700: #fca5a5;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.45);
+  --shadow-card:
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 0 40px -12px var(--store-glow, color-mix(in srgb, var(--color-brand-500) 14%, transparent));
+  --shadow-glow:
+    0 0 30px -10px var(--store-glow-strong, color-mix(in srgb, var(--color-brand-500) 30%, transparent));
+  --shadow-glow-lg:
+    0 0 48px -8px var(--store-glow-strong, color-mix(in srgb, var(--color-brand-500) 38%, transparent)),
+    0 0 80px -24px var(--store-glow-accent, color-mix(in srgb, var(--color-accent-500) 18%, transparent));
+
+  /* Ambient page wash — mixed into canvas (smoother than transparent stops) */
+  --ambient-brand: color-mix(in srgb, var(--color-brand-500) 18%, var(--color-bg));
+  --ambient-accent: color-mix(in srgb, var(--color-accent-500) 7%, var(--color-bg));
 }
 
 body {
-  @apply min-h-screen bg-bg text-fg font-sans antialiased;
+  @apply min-h-screen bg-bg text-fg font-sans text-[0.9375rem] leading-relaxed antialiased;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body {
+  background-color: var(--color-bg);
+  isolation: isolate;
+}
+
+/*
+ * One fixed ambient layer (blurred blobs) — avoids banding from stacked
+ * sharp radials + the hard cutoff from a short .storefront-atmosphere strip.
+ */
+.dark body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-color: var(--color-bg);
+}
+
+.dark body::after {
+  content: '';
+  position: fixed;
+  inset: -30% -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 120% 90% at 92% -8%, var(--ambient-brand) 0%, transparent 62%),
+    radial-gradient(ellipse 100% 85% at 8% 108%, var(--ambient-accent) 0%, transparent 65%),
+    radial-gradient(ellipse 70% 50% at 50% 40%, color-mix(in srgb, var(--ambient-brand) 35%, transparent) 0%, transparent 70%);
+  filter: blur(72px) saturate(1.12);
+  opacity: 0.92;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dark body::after {
+    animation: ambient-drift 90s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes ambient-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(1.5%, -1%, 0) scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dark body::after {
+    animation: none;
+  }
+}
+
+@layer components {
+  .dark .surface-glow {
+    background: linear-gradient(165deg, rgb(255 255 255 / 0.05) 0%, transparent 48%), var(--color-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Glass panels — premium dark storefront */
+  .glass-card {
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background: rgb(255 255 255 / 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .dark .glass-card {
+    background:
+      linear-gradient(165deg, rgb(255 255 255 / 0.045) 0%, rgb(255 255 255 / 0.015) 55%, transparent 100%),
+      var(--color-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .dark .glass-card-elevated {
+    background:
+      linear-gradient(160deg, rgb(255 255 255 / 0.06) 0%, transparent 45%),
+      var(--color-surface-elevated);
+    border: 1px solid rgb(255 255 255 / 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Silky hover — scale + ambient glow (respect reduced motion below) */
+  .ui-lift {
+    transition:
+      transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.3s ease-out,
+      border-color 0.25s ease-out;
+    will-change: transform;
+  }
+
+  .dark .ui-lift:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-glow);
+  }
+
+  :not(.dark) .ui-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-lift:hover {
+      transform: none;
+    }
+  }
+
+  /* Dark skeleton pulse — zinc-tinted, no harsh flash */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgb(39 39 42 / 0.45) 0%,
+      rgb(63 63 70 / 0.55) 50%,
+      rgb(39 39 42 / 0.45) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-pulse {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+
+  .dark .btn-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .dark .btn-glow:hover {
+    box-shadow: var(--shadow-glow-lg);
+  }
+
+  /* Storefront pages — stacking context only; ambient lives on body::after */
+  .storefront-atmosphere {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .panel-brand-pop {
+    box-shadow:
+      var(--shadow-card),
+      0 0 0 1px color-mix(in srgb, var(--color-brand-500) 18%, transparent),
+      0 0 36px var(--store-glow, color-mix(in srgb, var(--color-brand-500) 10%, transparent));
+  }
+
+  .dark .panel-brand-pop {
+    background:
+      linear-gradient(165deg, rgb(255 255 255 / 0.04) 0%, transparent 50%),
+      var(--color-surface);
+    border-color: rgb(255 255 255 / 0.1);
+  }
+
+  .card-showcase-halo {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-brand-500) 35%, transparent),
+      0 0 28px var(--store-glow-strong, color-mix(in srgb, var(--color-brand-500) 28%, transparent)),
+      0 0 64px var(--store-glow-accent, color-mix(in srgb, var(--color-accent-500) 16%, transparent));
+  }
+
+  /* TCGplayer-style product sheet + buy modules */
+  .product-detail-sheet {
+    background: var(--color-surface);
+    border-radius: 0.375rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 100%, transparent);
+    overflow: hidden;
+    box-shadow: none;
+  }
+
+  .tcg-buy-box {
+    border-radius: 0.375rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+    letter-spacing: -0.02em;
+  }
+
+  label,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
 }
 
 @layer components {
@@ -279,4 +488,76 @@ input,
 select,
 textarea {
   @apply transition;
+}
+
+/* Square Web Payments card iframe — match host dark mode. */
+.sq-card-host .sq-card-iframe-container {
+  color-scheme: light dark;
+}
+
+.sq-card-host {
+  min-height: 7.25rem;
+}
+
+.dark .sq-card-host .sq-card-iframe-container {
+  color-scheme: dark;
+}
+
+@keyframes hero-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -14px;
+  }
+}
+
+@keyframes hero-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes hero-fan {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -6px;
+  }
+}
+
+.hero-foil-shimmer {
+  position: relative;
+}
+
+.hero-foil-shimmer::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 65%
+  );
+  background-size: 200% 100%;
+  animation: foil-sweep 4s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+}
+
+.hero-snow {
+  background-image: radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(2px 2px at 60% 70%, white, transparent),
+    radial-gradient(1px 1px at 50% 50%, white, transparent);
+  background-size: 200% 200%;
+  animation: hero-float 8s ease-in-out infinite;
+  opacity: 0.35;
 }

@@ -8,7 +8,7 @@ import type { Payments } from '@square/web-sdk'
  * The loader injects Square's script tag, so the promise is cached by the SDK
  * itself; re-renders are cheap and StrictMode's double-invoke is harmless.
  */
-export function useSquarePayments(applicationId: string, locationId: string) {
+export function useSquarePayments(applicationId: string, locationId: string, environment?: string) {
   const [payments, setPayments] = useState<Payments | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -23,7 +23,12 @@ export function useSquarePayments(applicationId: string, locationId: string) {
     setLoading(true)
     setError('')
 
-    void loadPayments(applicationId, locationId)
+    const scriptSrc =
+      environment === 'production'
+        ? undefined
+        : 'https://sandbox.web.squarecdn.com/v1/square.js'
+
+    void loadPayments(applicationId, locationId, scriptSrc ? { scriptSrc } : undefined)
       .then((instance) => {
         if (cancelled) return
         if (!instance) {
@@ -42,7 +47,7 @@ export function useSquarePayments(applicationId: string, locationId: string) {
     return () => {
       cancelled = true
     }
-  }, [applicationId, locationId])
+  }, [applicationId, locationId, environment])
 
   return { payments, loading, error }
 }

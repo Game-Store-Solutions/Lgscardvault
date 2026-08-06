@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LayoutGrid, Palette, Rows3, type LucideIcon } from 'lucide-react'
-import api, { httpStatus } from '../../api/client'
-import type { ApiError, CardDisplayStyle, Store } from '../../api/types'
+import { LayoutGrid, Palette, Rows3 } from 'lucide-react'
+import { HeroLayoutPicker } from '../../components/store/hero/HeroLayoutPicker'
+import { normalizeHeroLayout } from '../../components/store/hero/heroLayouts'
+import api, { extractErrorMessage, httpStatus } from '../../api/client'
+import type { ApiError, CardDisplayStyle, HeroLayout, Store } from '../../api/types'
 import { useStore } from '../../hooks'
 import { Button, Card, CardBody, CardHeader, Input, Textarea } from '../../components/ui'
 import { StorePreview } from '../../components/store'
@@ -10,8 +12,12 @@ import { ImageUploadField } from '../../components/ImageUploadField'
 import {
   ColorField,
   PALETTE_DEFAULTS as DEFAULTS,
-  THEME_PRESETS,
-  ThemePresetButton,
+  DARK_THEME_PRESET_CATEGORIES,
+  mergeDarkThemePreset,
+  mergeThemePreset,
+  ThemePresetPicker,
+  pickHeroBrandingPayload,
+  sanitizeBrandingPayload,
   type ThemePreset,
 } from '../../components/store/branding'
 
@@ -29,6 +35,7 @@ interface BrandingForm {
   heroSubheading: string
   tagline: string
   cardDisplayStyle: CardDisplayStyle
+  heroLayout: HeroLayout
   hoursText: string
   contactEmail: string
   websiteUrl: string
@@ -73,6 +80,7 @@ const EMPTY: BrandingForm = {
   heroSubheading: '',
   tagline: '',
   cardDisplayStyle: 'gallery',
+  heroLayout: 'cinematic',
   hoursText: '',
   contactEmail: '',
   websiteUrl: '',
@@ -98,6 +106,7 @@ function fromStore(store: Store): BrandingForm {
     heroSubheading: store.heroSubheading ?? '',
     tagline: store.tagline ?? '',
     cardDisplayStyle: store.cardDisplayStyle ?? 'gallery',
+    heroLayout: store.heroLayout ?? 'cinematic',
     hoursText: store.hoursText ?? '',
     contactEmail: store.contactEmail ?? '',
     websiteUrl: store.websiteUrl ?? '',
@@ -114,32 +123,85 @@ export default function BrandingTab({ slug }: { slug: string }) {
   const { data: store, isLoading } = useStore(slug)
   const [form, setForm] = useState<BrandingForm>(EMPTY)
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null)
+  const [formDirty, setFormDirty] = useState(false)
+  const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light')
+  const formRef = useRef(form)
+  formRef.current = form
 
   useEffect(() => {
-    if (store && store.slug !== loadedSlug) {
-      setForm(fromStore(store))
-      setLoadedSlug(store.slug)
-    }
-  }, [loadedSlug, store])
+    if (isLoading || !store?.slug) return
+    if (loadedSlug === store.slug) return
+    setForm(fromStore(store))
+    setLoadedSlug(store.slug)
+    setFormDirty(false)
+  }, [isLoading, loadedSlug, store])
 
-  const set = <K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) =>
+  const set = <K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) => {
+    setFormDirty(true)
     setForm((current) => ({ ...current, [key]: value }))
+  }
 
-  const setDark = (key: keyof DarkColorsForm, value: string) =>
+  const setDark = (key: keyof DarkColorsForm, value: string) => {
+    setFormDirty(true)
     setForm((current) => ({ ...current, darkColors: { ...current.darkColors, [key]: value } }))
+  }
 
-  const applyPreset = (preset: ThemePreset) => setForm((current) => ({ ...current, ...preset.palette }))
+  const applyPreset = (preset: ThemePreset) => {
+    setFormDirty(true)
+    setForm((current) => mergeThemePreset(current, preset, EMPTY_DARK))
+    if (preset.darkPalette) setPreviewMode('dark')
+    else setPreviewMode('light')
+  }
+
+  const applyDarkPreset = (preset: ThemePreset) => {
+    setFormDirty(true)
+    setForm((current) => mergeDarkThemePreset(current, preset, EMPTY_DARK))
+    setPreviewMode('dark')
+  }
+
+  const mergeSavedStore = (saved: Store) => {
+    queryClient.setQueryData<Store>(['store', slug], (current) => ({ ...(current ?? {}), ...saved } as Store))
+    const merged = { ...(queryClient.getQueryData<Store>(['store', slug]) ?? {}), ...saved } as Store
+    setForm(fromStore(merged))
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const { data } = await api.patch<Store>(`/stores/${slug}/settings`, form)
+      const payload = sanitizeBrandingPayload({ ...form })
+      const { data } = await api.patch<Store>(`/stores/${slug}/settings`, payload)
       return data
     },
     onSuccess: async (saved) => {
-      queryClient.setQueryData<Store>(['store', slug], (current) => ({ ...current, ...saved }))
+      mergeSavedStore(saved)
+      setFormDirty(false)
       await queryClient.invalidateQueries({ queryKey: ['store', slug] })
     },
   })
+
+  const heroBrandingMutation = useMutation({
+    mutationFn: async (payload: ReturnType<typeof pickHeroBrandingPayload>) => {
+      const { data } = await api.patch<Store>(`/stores/${slug}/settings`, payload)
+      return data
+    },
+    onSuccess: async (saved) => {
+      mergeSavedStore(saved)
+      setFormDirty(false)
+      await queryClient.invalidateQueries({ queryKey: ['store', slug] })
+    },
+  })
+
+  function saveHeroBranding(overrides?: Partial<BrandingForm>) {
+    const snapshot = { ...formRef.current, ...overrides }
+    heroBrandingMutation.mutate(pickHeroBrandingPayload(snapshot))
+  }
+
+  function onHeroImageChange(value: string) {
+    set('heroImageUrl', value)
+  }
+
+  function onLogoChange(value: string) {
+    set('logoUrl', value)
+  }
 
   const displayMutation = useMutation({
     mutationFn: async (cardDisplayStyle: CardDisplayStyle) => {
@@ -174,16 +236,135 @@ export default function BrandingTab({ slug }: { slug: string }) {
     displayMutation.mutate(cardDisplayStyle)
   }
 
+  const heroLayoutMutation = useMutation({
+    mutationFn: async (heroLayout: HeroLayout) => {
+      const { data } = await api.patch<Store>(`/stores/${slug}/settings`, { heroLayout })
+      return data
+    },
+    onMutate: async (heroLayout) => {
+      await queryClient.cancelQueries({ queryKey: ['store', slug] })
+      const previous = queryClient.getQueryData<Store>(['store', slug])
+      queryClient.setQueryData<Store>(['store', slug], (current) =>
+        current ? { ...current, heroLayout } : current,
+      )
+      return { previous }
+    },
+    onError: (_error, _heroLayout, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['store', slug], context.previous)
+        set('heroLayout', context.previous.heroLayout ?? 'cinematic')
+      }
+    },
+    onSuccess: async (saved, heroLayout) => {
+      queryClient.setQueryData<Store>(['store', slug], (current) => ({
+        ...(current ?? {}),
+        ...saved,
+        heroLayout,
+      } as Store))
+      setFormDirty(false)
+      await queryClient.invalidateQueries({ queryKey: ['store', slug] })
+    },
+  })
+
+  function chooseHeroLayout(heroLayout: HeroLayout) {
+    setForm((current) => ({ ...current, heroLayout }))
+    heroLayoutMutation.mutate(heroLayout)
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="space-y-6">
         <Card>
-          <CardHeader title="Theme presets" subtitle="One click to apply a curated palette — then fine-tune below." />
-          <CardBody>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {THEME_PRESETS.map((preset) => (
-                <ThemePresetButton key={preset.name} preset={preset} onSelect={() => applyPreset(preset)} />
-              ))}
+          <CardHeader
+            title="Brand colors"
+            subtitle="Pick a curated theme, then fine-tune primary, accent, surfaces, and text."
+          />
+          <CardBody className="space-y-6">
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Store theme library</p>
+              <ThemePresetPicker instanceId="light" onSelect={applyPreset} />
+            </div>
+            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
+              <ColorField label="Primary / button color" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
+              <ColorField label="Accent color" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Surface & text" subtitle="Theme the page background, cards, text, and borders." />
+          <CardBody className="grid gap-5 sm:grid-cols-2">
+            <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
+            <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
+            <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
+            <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
+            <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Hero banner"
+            subtitle="Layout, images, and headline copy for your storefront header. Layout and uploads save automatically."
+            actions={
+              <DisplaySaveStatus
+                saving={heroLayoutMutation.isPending || heroBrandingMutation.isPending}
+                saved={heroLayoutMutation.isSuccess || heroBrandingMutation.isSuccess}
+                error={heroLayoutMutation.isError || heroBrandingMutation.isError}
+              />
+            }
+          />
+          <CardBody className="space-y-8">
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Banner layout</p>
+              <HeroLayoutPicker
+                selectedLayout={normalizeHeroLayout(form.heroLayout)}
+                disabled={heroLayoutMutation.isPending}
+                onSelect={chooseHeroLayout}
+              />
+            </div>
+
+            <div className="space-y-4 border-t border-border pt-6">
+              <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Logo & hero image</p>
+              <ImageUploadField
+                label="Logo / icon"
+                placeholder="https://…/logo.png"
+                value={form.logoUrl}
+                onChange={onLogoChange}
+                onUploadComplete={(url) => saveHeroBranding({ logoUrl: url })}
+                hint="Upload an image or paste a URL — also used by the loading screen."
+              />
+              <ImageUploadField
+                label="Hero banner image"
+                placeholder="https://…/banner.jpg"
+                value={form.heroImageUrl}
+                onChange={onHeroImageChange}
+                onUploadComplete={(url) => saveHeroBranding({ heroImageUrl: url })}
+                hint="Background on most layouts (not cinematic classic). Upload shop photos or art."
+              />
+            </div>
+
+            <div className="space-y-4 border-t border-border pt-6">
+              <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Messaging</p>
+              <Input label="Tagline" placeholder="Your local Magic singles shop" maxLength={160} value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
+              <Input label="Hero heading" placeholder="Defaults to your store name" maxLength={160} value={form.heroHeading} onChange={(e) => set('heroHeading', e.target.value)} />
+              <Textarea label="Hero subheading" rows={3} placeholder="A sentence or two about your store, shipping, or specialties." value={form.heroSubheading} onChange={(e) => set('heroSubheading', e.target.value)} />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => saveHeroBranding()}
+                  loading={heroBrandingMutation.isPending}
+                  disabled={isLoading}
+                >
+                  Save hero copy
+                </Button>
+                {heroBrandingMutation.isError ? (
+                  <span role="alert" className="text-sm font-medium text-danger-700">
+                    {extractErrorMessage(heroBrandingMutation.error, 'Could not save hero banner.')}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </CardBody>
         </Card>
@@ -221,30 +402,20 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </Card>
 
         <Card>
-          <CardHeader title="Brand colors" subtitle="Primary drives buttons, links, and accents across your store." />
-          <CardBody className="grid gap-5 sm:grid-cols-2">
-            <ColorField label="Primary / button color" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
-            <ColorField label="Accent color" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title="Surface & text" subtitle="Theme the page background, cards, text, and borders." />
-          <CardBody className="grid gap-5 sm:grid-cols-2">
-            <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
-            <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
-            <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
-            <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
-            <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
-          </CardBody>
-        </Card>
-
-        <Card>
           <CardHeader
             title="Dark mode palette"
-            subtitle="Optional: shown when shoppers use the dark theme toggle. Leave blank to auto-derive a dark look from your main colors."
+            subtitle="Optional: shown when shoppers use the dark theme toggle. Pick a dark library theme or fine-tune below."
           />
-          <CardBody className="grid gap-5 sm:grid-cols-2">
+          <CardBody className="space-y-6">
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Dark theme library</p>
+              <ThemePresetPicker
+                instanceId="dark"
+                categories={DARK_THEME_PRESET_CATEGORIES}
+                onSelect={applyDarkPreset}
+              />
+            </div>
+            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
             <ColorField label="Primary / button color" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
             <ColorField label="Accent color" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
             <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
@@ -252,35 +423,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
             <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
             <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
             <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title="Logo & hero image" subtitle="Paste hosted image URLs (https:// or a /path)." />
-          <CardBody className="space-y-4">
-            <ImageUploadField
-              label="Logo / icon"
-              placeholder="https://…/logo.png"
-              value={form.logoUrl}
-              onChange={(value) => set('logoUrl', value)}
-              hint="Upload an image or paste a URL — also used by the loading screen."
-            />
-            <ImageUploadField
-              label="Hero banner image"
-              placeholder="https://…/banner.jpg"
-              value={form.heroImageUrl}
-              onChange={(value) => set('heroImageUrl', value)}
-              hint="Upload an image or paste a URL."
-            />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title="Messaging" subtitle="Headline and supporting copy for your storefront banner." />
-          <CardBody className="space-y-4">
-            <Input label="Tagline" placeholder="Your local Magic singles shop" maxLength={160} value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
-            <Input label="Hero heading" placeholder="Defaults to your store name" maxLength={160} value={form.heroHeading} onChange={(e) => set('heroHeading', e.target.value)} />
-            <Textarea label="Hero subheading" rows={3} placeholder="A sentence or two about your store, shipping, or specialties." value={form.heroSubheading} onChange={(e) => set('heroSubheading', e.target.value)} />
+            </div>
           </CardBody>
         </Card>
 
@@ -323,15 +466,23 @@ export default function BrandingTab({ slug }: { slug: string }) {
               {readError(mutation.error)}
             </span>
           )}
+          {formDirty && !mutation.isPending && !mutation.isSuccess && (
+            <span className="text-sm text-fg-muted">Unsaved changes</span>
+          )}
         </div>
       </div>
 
       {/* Live preview */}
       <div className="xl:sticky xl:top-8 xl:self-start">
         <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Live store preview</p>
-        <StorePreview branding={form} storeName={store?.name ?? slug} />
+        <StorePreview
+          branding={form}
+          storeName={store?.name ?? slug}
+          previewMode={previewMode}
+          onPreviewModeChange={setPreviewMode}
+        />
         <p className="mt-3 text-xs text-fg-muted">
-          A live preview of your storefront — background, cards, text, buttons, and accents update as you edit.
+          Toggle Light or Dark above the mockup to preview each palette. Dark uses your dark theme library and color fields.
         </p>
       </div>
     </div>
@@ -346,7 +497,7 @@ function DisplayChoice({
   disabled = false,
   onClick,
 }: {
-  icon: LucideIcon
+  icon: import('lucide-react').LucideIcon
   title: string
   description: string
   selected: boolean

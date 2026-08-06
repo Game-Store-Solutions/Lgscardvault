@@ -27,14 +27,13 @@ export function MarketplaceCard({
   const image = cardImage(item.card)
   const accent = rarityAccent(item.card.rarity)
   const marketPrice = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
-  const copiesLabel = `${item.quantity} ${item.quantity === 1 ? 'listing' : 'listings'} from`
   const outOfStock = item.quantity < 1
 
   return (
-    <article className="group flex min-h-52 gap-4 rounded-card border border-border bg-surface p-3 shadow-card transition-[border-color,box-shadow] hover:border-brand-300 hover:shadow-[0_12px_28px_-18px_rgb(16_24_40/0.28)]">
+    <article className="@container/market-card group flex min-h-56 min-w-0 gap-4 rounded-card border border-border bg-surface p-4 shadow-card dark:glass-card ui-lift hover:border-brand-500/30 sm:gap-5 sm:p-5">
       <Link
         to={`/s/${slug}/cards/${item.id}`}
-        className="w-24 shrink-0 self-center sm:w-28"
+        className="w-[5.25rem] shrink-0 self-center sm:w-24"
         aria-label={item.card.name}
       >
         <InteractiveCard
@@ -48,33 +47,37 @@ export function MarketplaceCard({
         />
       </Link>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center py-1">
-        <div className="min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col py-0.5">
+        <div className="min-w-0 space-y-1">
           <Link
             to={`/s/${slug}/cards/${item.id}`}
-            className="block overflow-hidden font-display text-base font-extrabold leading-snug tracking-tight text-fg hover:text-brand-600 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [overflow-wrap:anywhere]"
+            className="block overflow-hidden text-lg font-semibold leading-snug text-fg hover:text-brand-600 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [overflow-wrap:anywhere]"
           >
             {item.card.name}
           </Link>
-          <p className="mt-1 text-sm leading-5 text-fg-muted">
+          <p className="text-sm leading-snug text-fg-muted [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [overflow-wrap:anywhere]">
             {item.card.setName ?? item.card.setCode?.toUpperCase() ?? 'Unknown set'}
-            <br />
-            {item.card.rarity ? `${rarityLabel(item.card.rarity)}, ` : ''}
-            #{item.card.collectorNumber ?? '-'}
+          </p>
+          <p className="text-[13px] leading-snug text-fg-muted">
+            {item.card.rarity ? `${rarityLabel(item.card.rarity)} · ` : ''}#{item.card.collectorNumber ?? '—'}
           </p>
         </div>
 
-        <div className="mt-4">
-          <p className="text-sm font-medium text-fg">{copiesLabel}</p>
-          <p className="font-display text-2xl font-extrabold leading-none text-fg">{formatPrice(item.priceCents)}</p>
-          <p className="mt-2 text-sm font-bold text-fg">
-            Market Price: <span className="text-success-700">{marketPrice}</span>
+        <div className="mt-4 flex min-w-0 flex-1 flex-col gap-1">
+          <p className="text-xs text-fg-muted">
+            {item.quantity} {item.quantity === 1 ? 'listing' : 'listings'}
           </p>
-          <p className="mt-1 text-xs font-medium text-fg-muted">
+          <p className="max-w-full font-display text-xl font-bold tabular-nums leading-none tracking-tight text-fg @xs/market-card:text-2xl @md/market-card:text-[2.125rem]">
+            {formatPrice(item.priceCents)}
+          </p>
+          <p className="text-[13px] font-medium leading-snug text-success-600 dark:text-success-500">
+            Market {marketPrice}
+          </p>
+          <p className="text-xs leading-snug text-fg-muted">
             {item.condition} / {finishName(item.card, item.isFoil, item.finish)}
           </p>
 
-          <div className="mt-3 max-w-36">
+          <div className="mt-auto w-full max-w-[10.5rem] pt-4">
             {!signedIn ? (
               <Link to="/login" className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} w-full`}>
                 Sign in to add

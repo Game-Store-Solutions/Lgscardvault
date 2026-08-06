@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import {
+  BackButton,
   Badge,
   buttonVariants,
   Card,
@@ -68,13 +69,7 @@ export default function PlatformStoreImportsPage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        to="/platform/admin"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-600"
-      >
-        <ArrowLeft aria-hidden className="size-4" />
-        Back to platform admin
-      </Link>
+      <BackButton to="/platform/admin">Back to platform admin</BackButton>
 
       <PageHeader
         title={`${store?.name ?? 'Store'} import runs`}

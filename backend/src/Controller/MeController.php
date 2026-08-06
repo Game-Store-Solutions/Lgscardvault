@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\StoreRepository;
+use App\Service\Payments\CustomerPaymentProfileSync;
+use App\Service\Payments\SubscriptionBillingInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +29,8 @@ class MeController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly StoreRepository $storeRepository,
+        private readonly SubscriptionBillingInterface $billing,
+        private readonly CustomerPaymentProfileSync $paymentProfileSync,
     ) {
     }
 
@@ -81,6 +85,67 @@ class MeController extends AbstractController
     public function myStores(): JsonResponse
     {
         return $this->json($this->storeRepository->findWithActivityForUser($this->requireUser()));
+    }
+
+    #[Route('/me/payment-config', name: 'api_me_payment_config', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function paymentConfig(): JsonResponse
+    {
+        return $this->json($this->billing->clientConfig());
+    }
+
+    #[Route('/me/payment-method', name: 'api_me_payment_method', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function savePaymentMethod(Request $request): JsonResponse
+    {
+        $user = $this->requireUser();
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->json(['detail' => 'Request body must be a JSON object.'], 400);
+        }
+
+        $methodType = (string) ($payload['methodType'] ?? '');
+        $sourceId = trim((string) ($payload['token'] ?? ''));
+        $verificationToken = trim((string) ($payload['verificationToken'] ?? ''));
+        if ('' === $verificationToken) {
+            $verificationToken = null;
+        }
+
+        if (!in_array($methodType, SubscriptionBillingInterface::METHODS, true)) {
+            return $this->json(['detail' => 'Choose a valid payment method.'], 422);
+        }
+        if ('' === $sourceId) {
+            return $this->json(['detail' => 'Payment could not be verified. Please try again.'], 422);
+        }
+
+        try {
+            $vault = $this->billing->vaultShopperPaymentMethod(
+                $sourceId,
+                [
+                    'email' => $user->getEmail(),
+                    'name' => $user->getDisplayName(),
+                    'reference' => 'user-'.$user->getId(),
+                ],
+                $user->getPaymentCustomerId(),
+                $user->getPaymentCardId(),
+                $verificationToken,
+            );
+        } catch (\RuntimeException $e) {
+            return $this->json(['detail' => $e->getMessage()], 402);
+        }
+
+        $user
+            ->setPaymentCustomerId($vault['customerId'])
+            ->setPaymentCardId($vault['cardId'])
+            ->setPaymentMethodType($methodType)
+            ->setPaymentBrand($vault['brand'])
+            ->setPaymentLast4($vault['last4'])
+            ->setPaymentExpires($this->formatCardExpiry($vault['expMonth'], $vault['expYear']));
+
+        $this->paymentProfileSync->syncUserToAllStoreProfiles($user);
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeMe($user));
     }
 
     /** Change own password; requires the current password. */
@@ -168,6 +233,28 @@ class MeController extends AbstractController
             'avatarUrl' => $user->getAvatarUrl(),
             'roles' => $user->getRoles(),
             'ownedStores' => $ownedStores,
+            'paymentBrand' => $user->getPaymentBrand(),
+            'paymentLast4' => $user->getPaymentLast4(),
+            'paymentExpires' => $user->getPaymentExpires(),
+            'paymentMethodType' => $user->getPaymentMethodType(),
+            'paymentConfigured' => null !== $user->getPaymentCardId() && '' !== $user->getPaymentCardId(),
         ];
+    }
+
+    private function formatCardExpiry(?string $month, ?string $year): ?string
+    {
+        if (null === $month || '' === $month || null === $year || '' === $year) {
+            return null;
+        }
+
+        $monthInt = (int) $month;
+        if ($monthInt < 1 || $monthInt > 12) {
+            return null;
+        }
+
+        $yearStr = (string) $year;
+        $yy = strlen($yearStr) <= 2 ? $yearStr : substr($yearStr, -2);
+
+        return sprintf('%02d/%s', $monthInt, $yy);
     }
 }

@@ -24,7 +24,7 @@ export default function OwnerOnboardingWizard() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
+    <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
       <header className="mb-8 text-center">
         <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-brand-600">
           <Sparkles aria-hidden className="size-4" />
@@ -42,8 +42,20 @@ export default function OwnerOnboardingWizard() {
       <Stepper current={o.step} />
 
       <Card className="mt-8">
-        <CardHeader title={STEPS[o.step].title} subtitle={STEP_SUBTITLE[o.currentKey]} />
-        <CardBody>
+        <CardHeader
+          className={o.currentKey === 'review' ? 'px-6 py-5 sm:px-8 [&_h3]:text-xl sm:[&_h3]:text-2xl' : undefined}
+          title={STEPS[o.step].title}
+          subtitle={STEP_SUBTITLE[o.currentKey]}
+        />
+        <CardBody
+          className={
+            o.currentKey === 'review'
+              ? 'px-6 py-6 sm:px-8 sm:py-7'
+              : o.currentKey === 'payment'
+                ? 'flex justify-center px-6 py-6 sm:px-8'
+                : undefined
+          }
+        >
           {o.currentKey === 'account' && <AccountStep data={o.data} patch={o.patch} locked={o.accountCreated} />}
           {o.currentKey === 'address' && (
             <AddressStep data={o.data} patch={o.patch} patchAddress={o.patchAddress} applyAddress={o.applyAddress} />

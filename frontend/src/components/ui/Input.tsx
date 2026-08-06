@@ -38,8 +38,8 @@ function Caption({ id, error, hint }: { id?: string; error?: ReactNode; hint?: R
 }
 
 const controlBase = cx(
-  'w-full rounded-btn border bg-surface text-fg placeholder:text-fg-muted',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-0',
+  'w-full rounded-[var(--radius-input)] border bg-bg text-fg placeholder:text-fg-muted',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:border-brand-400',
   'disabled:cursor-not-allowed disabled:opacity-60',
 )
 

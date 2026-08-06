@@ -114,6 +114,16 @@ export function scryfallPriceCents(
   return parseScryfallPrice(card.prices?.usd)
 }
 
+/** Market price for one finish only — no cross-finish fallback (for accurate PDP tiles). */
+export function strictScryfallPriceCents(
+  card: { prices?: { usd?: string | null; usd_foil?: string | null; usd_etched?: string | null } },
+  finish: 'nonfoil' | 'foil' | 'etched',
+): number | null {
+  if (finish === 'foil') return parseScryfallPrice(card.prices?.usd_foil)
+  if (finish === 'etched') return parseScryfallPrice(card.prices?.usd_etched)
+  return parseScryfallPrice(card.prices?.usd)
+}
+
 export function formatScryfallPrice(
   card: { prices?: { usd?: string | null; usd_foil?: string | null; usd_etched?: string | null } },
   finish: 'nonfoil' | 'foil' | 'etched' = 'nonfoil',
