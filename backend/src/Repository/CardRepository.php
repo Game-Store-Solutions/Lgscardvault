@@ -48,6 +48,51 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * All catalog printings credited to an artist (exact name match).
+     *
+     * @return list<Card>
+     */
+    public function findByArtistForGame(Game $game, string $artist, int $limit = 80, int $offset = 0): array
+    {
+        $needle = trim($artist);
+        if ('' === $needle) {
+            return [];
+        }
+
+        $limit = min(120, max(1, $limit));
+        $offset = max(0, $offset);
+
+        return $this->scopedToGame($game)
+            ->andWhere('c.artist IS NOT NULL')
+            ->andWhere('LOWER(TRIM(c.artist)) = LOWER(TRIM(:artist))')
+            ->setParameter('artist', $needle)
+            ->orderBy('c.releasedAt', 'DESC')
+            ->addOrderBy('c.name', 'ASC')
+            ->addOrderBy('c.setCode', 'ASC')
+            ->addOrderBy('c.collectorNumber', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function countByArtistForGame(Game $game, string $artist): int
+    {
+        $needle = trim($artist);
+        if ('' === $needle) {
+            return 0;
+        }
+
+        return (int) $this->scopedToGame($game)
+            ->select('COUNT(c.id)')
+            ->andWhere('c.artist IS NOT NULL')
+            ->andWhere('LOWER(TRIM(c.artist)) = LOWER(TRIM(:artist))')
+            ->setParameter('artist', $needle)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * @return list<Card>
      */
     private function searchByNameLike(QueryBuilder $scoped, string $query, int $limit): array

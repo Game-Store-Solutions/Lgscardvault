@@ -185,6 +185,39 @@ class CardSearchController extends AbstractController
         ));
     }
 
+    #[Route('/by-artist', name: 'api_catalog_by_artist', methods: ['GET'])]
+    public function byArtist(Request $request): JsonResponse
+    {
+        if (null !== $response = ApiRateLimit::enforce($this->catalogSearchLimiter, $this->rateLimitKey($request))) {
+            return $response;
+        }
+
+        $artist = trim((string) $request->query->get('artist', ''));
+        if ('' === $artist) {
+            return $this->json(['detail' => 'Artist name is required.'], 400);
+        }
+
+        $gameCode = trim((string) $request->query->get('game', Game::CODE_MTG));
+        $game = $this->gameRepository->findOneByCode('' !== $gameCode ? $gameCode : Game::CODE_MTG);
+        if (null === $game) {
+            return $this->json(['detail' => 'Unknown game.'], 404);
+        }
+
+        $limit = min(120, max(1, $request->query->getInt('limit', 60)));
+        $offset = max(0, $request->query->getInt('offset', 0));
+
+        $cards = $this->cardRepository->findByArtistForGame($game, $artist, $limit, $offset);
+
+        return $this->json([
+            'artist' => $artist,
+            'gameCode' => $game->getCode(),
+            'total' => $this->cardRepository->countByArtistForGame($game, $artist),
+            'offset' => $offset,
+            'limit' => $limit,
+            'items' => array_map($this->catalogCardResolver->serializeCard(...), $cards),
+        ]);
+    }
+
     /**
      * Rate-limit bucket key: the authenticated user id (the endpoint requires
      * ROLE_USER), falling back to client IP defensively.
