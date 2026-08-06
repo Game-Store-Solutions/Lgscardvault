@@ -429,16 +429,16 @@ export default function StorePage() {
 
       {/* Quick actions — themed shortcut tiles over the spotlight */}
       <section className="space-y-5">
-        <p className="mx-auto max-w-2xl text-center text-sm text-fg-muted sm:text-base">
+        <p className="mx-auto max-w-2xl text-center text-sm text-fg/75 sm:text-base">
           Browse thousands of in-stock singles, build decks, sell or trade your collection.
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'group flex flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface px-4 py-8 text-fg shadow-card dark:glass-card ui-lift hover:border-brand-500/35'
+              'group flex flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface px-4 py-8 text-fg shadow-card ui-lift hover:border-brand-500/40 dark:border-white/10 dark:bg-white/[0.04]'
             const content = (
               <>
-                <span className="grid size-12 place-items-center rounded-xl border border-brand-500/20 bg-brand-500/10 text-brand-500 shadow-sm transition-all duration-300 group-hover:border-brand-500/35 group-hover:bg-brand-500/15 group-hover:shadow-[var(--shadow-glow)] dark:text-brand-400">
+                <span className="grid size-12 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] dark:text-brand-300">
                   <Icon aria-hidden className="size-6" />
                 </span>
                 <span className="text-sm font-bold">{label}</span>

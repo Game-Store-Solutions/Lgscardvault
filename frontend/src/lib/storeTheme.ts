@@ -65,13 +65,17 @@ export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<str
       // Dark theme: tints go darker, shades go lighter so on-surface text/pills stay legible.
       vars['--color-brand-50'] = mix(primary, 24, 'black')
       vars['--color-brand-100'] = mix(primary, 34, 'black')
+      vars['--color-brand-200'] = mix(primary, 42, 'black')
       vars['--color-brand-300'] = mix(primary, 52, 'black')
+      vars['--color-brand-400'] = mix(primary, 68, 'white')
       vars['--color-brand-600'] = mix(primary, 78, 'white')
       vars['--color-brand-700'] = mix(primary, 62, 'white')
     } else {
       vars['--color-brand-50'] = mix(primary, 12, 'white')
       vars['--color-brand-100'] = mix(primary, 22, 'white')
+      vars['--color-brand-200'] = mix(primary, 38, 'white')
       vars['--color-brand-300'] = mix(primary, 55, 'white')
+      vars['--color-brand-400'] = mix(primary, 72, 'white')
       vars['--color-brand-600'] = mix(primary, 85, 'black')
       vars['--color-brand-700'] = mix(primary, 72, 'black')
     }

@@ -544,28 +544,50 @@ function OrderDetailModal({
   const statusUi = freshStatusPresentation(order.status)
 
   return (
-    <Modal open onClose={onClose} title={order.reference} className="max-w-lg">
-      <div className="space-y-5">
-        <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>{statusUi.label}</span>
+    <Modal
+      open
+      onClose={onClose}
+      title={<span className="font-mono text-xl tracking-tight">{order.reference}</span>}
+      className="max-w-3xl"
+    >
+      <div className="space-y-6">
+        <span className={cx('inline-flex rounded-lg px-3 py-1.5 text-sm font-bold', statusUi.className)}>{statusUi.label}</span>
         <OrderWorkflow status={order.status} />
-        <div className="rounded-xl border border-border bg-bg p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Customer</p>
-          <p className="mt-1 font-bold text-fg">{order.customerName ?? 'Guest'}</p>
-          <p className="text-sm text-fg-muted">{order.customerEmail ?? '—'}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-border bg-bg p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Customer</p>
+            <p className="mt-2 text-lg font-bold text-fg">{order.customerName ?? 'Guest'}</p>
+            <p className="mt-0.5 text-sm text-fg-muted">{order.customerEmail ?? '—'}</p>
+            {order.channel && (
+              <p className="mt-3 text-xs text-fg-muted">
+                Channel: <span className="font-semibold text-fg">{order.channel === 'kiosk' ? 'In-store kiosk' : 'Online'}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col justify-center rounded-xl border border-border bg-bg p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Order total</p>
+            <p className="mt-2 font-display text-3xl font-bold tabular-nums text-fg">{formatPrice(order.totalCents)}</p>
+            {order.fulfillment && (
+              <p className="mt-2 text-sm text-fg-muted">
+                Fulfillment:{' '}
+                <span className="font-semibold text-fg">{order.fulfillment === 'shipping' ? 'Shipping' : 'Pickup'}</span>
+              </p>
+            )}
+          </div>
         </div>
-        <OrderLineList lines={order.lines ?? []} compact />
-        <div className="flex items-baseline justify-between border-t border-border pt-4">
-          <span className="font-bold text-fg">Total</span>
-          <span className="font-display text-2xl font-bold text-fg">{formatPrice(order.totalCents)}</span>
+        <div>
+          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Line items</p>
+          <OrderLineList lines={order.lines ?? []} />
         </div>
         {actions.length > 0 ? (
-          <div className="grid gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {actions.map(({ status, label, icon: Icon }) => (
               <Button
                 key={status}
                 variant={status === 'cancelled' || status === 'refunded' ? 'secondary' : 'primary'}
                 onClick={() => onUpdateStatus(status)}
                 loading={pendingStatus === status}
+                className={actions.length === 1 ? 'sm:col-span-2' : undefined}
               >
                 <Icon aria-hidden className="size-4" />
                 {label}
@@ -573,14 +595,14 @@ function OrderDetailModal({
             ))}
           </div>
         ) : (
-          <p className="rounded-xl bg-bg px-3 py-2 text-sm text-fg-muted">This order is in a terminal status.</p>
+          <p className="rounded-xl bg-bg px-4 py-3 text-sm text-fg-muted">This order is in a terminal status.</p>
         )}
-        <Button variant="secondary" className="w-full" onClick={() => printOrderSheet(order)}>
+        <Button variant="secondary" className="w-full" size="lg" onClick={() => printOrderSheet(order)}>
           <Printer aria-hidden className="size-4" />
           Print order sheet
         </Button>
         {Boolean(error) && (
-          <p role="alert" className="rounded-xl bg-danger-50 px-3 py-2 text-sm text-danger-700">
+          <p role="alert" className="rounded-xl bg-danger-50 px-4 py-3 text-sm text-danger-700">
             Could not update this order. Please try again.
           </p>
         )}

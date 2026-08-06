@@ -15,6 +15,7 @@ export interface ModalProps {
 export function Modal({ open, onClose, title, children, footer, className }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
+  const hasMaxWidth = className != null && /\bmax-w-/.test(className)
 
   useEffect(() => {
     if (!open) return
@@ -53,15 +54,16 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
           aria-labelledby={title != null ? titleId : undefined}
           tabIndex={-1}
           className={cx(
-            'relative z-10 my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col',
+            'relative z-10 my-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col',
             'bg-surface border border-border rounded-card shadow-card',
             'focus-visible:outline-none',
+            !hasMaxWidth && 'max-w-lg',
             className,
           )}
         >
           {title != null && (
-            <div className="flex shrink-0 items-center justify-between gap-4 px-5 py-4 border-b border-border">
-              <h2 id={titleId} className="font-display text-lg font-bold text-fg">
+            <div className="flex shrink-0 items-center justify-between gap-4 px-6 py-4 sm:px-8 border-b border-border">
+              <h2 id={titleId} className="font-display text-lg font-bold text-fg sm:text-xl">
                 {title}
               </h2>
               <button
@@ -75,9 +77,9 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
             </div>
           )}
           {/* Body scrolls; header/footer stay pinned. min-h-0 lets it shrink in the flex column. */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sm:px-8 sm:py-6">{children}</div>
           {footer != null && (
-            <div className="flex shrink-0 items-center justify-end gap-2 px-5 py-4 border-t border-border">
+            <div className="flex shrink-0 items-center justify-end gap-2 px-6 py-4 sm:px-8 border-t border-border">
               {footer}
             </div>
           )}

@@ -334,6 +334,13 @@ class Order
         return $this->createdAt;
     }
 
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
     /** @return Collection<int, OrderLine> */
     public function getLines(): Collection
     {
