@@ -664,14 +664,7 @@ export default function CardDetailsPage() {
 
                   {!user && (
                     <p className="mt-2 text-center text-xs text-fg-muted">
-                      <Link
-                        to="/login"
-                        state={{ from: location.pathname }}
-                        className="font-semibold text-brand-600 hover:underline dark:text-brand-300"
-                      >
-                        Sign in
-                      </Link>{' '}
-                      to save favorites and one-click pay at stores you shop often.
+                      No account needed — add to cart and pay in store at pickup.
                     </p>
                   )}
 

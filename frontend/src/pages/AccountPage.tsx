@@ -4,7 +4,6 @@ import { Settings, Store as StoreIcon, ArrowRight } from 'lucide-react'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { AccountSettingsPanel } from '../components/account/AccountSettingsPanel'
-import { AccountPaymentPanel } from '../components/account/AccountPaymentPanel'
 import { DecksPanel } from '../components/account/DecksPanel'
 import {
   ProfileAsideCard,
@@ -16,7 +15,6 @@ import {
   ProfileSideNav,
   ProfileStatistics,
   accountNavIcons,
-  storeAsideIcons,
 } from '../components/profile'
 import { CardBody, CardHeader, EmptyState, LoadingPanel } from '../components/ui'
 import { formatDate } from '../lib/format'
@@ -31,8 +29,8 @@ interface MyStore {
   lastActivityAt: string
 }
 
-type AccountSection = 'overview' | 'stores' | 'decks' | 'payment' | 'settings'
-const SECTIONS: AccountSection[] = ['overview', 'stores', 'decks', 'payment', 'settings']
+type AccountSection = 'overview' | 'stores' | 'decks' | 'settings'
+const SECTIONS: AccountSection[] = ['overview', 'stores', 'decks', 'settings']
 
 /**
  * Global account page: one identity across the whole marketplace. The
@@ -76,7 +74,6 @@ export default function AccountPage() {
     { id: 'overview', label: 'Overview', icon: accountNavIcons.overview },
     { id: 'stores', label: 'Your stores', icon: accountNavIcons.stores, badge: stores.length ? <span className="text-xs">{stores.length}</span> : null },
     { id: 'decks', label: 'Decks', icon: accountNavIcons.decks, badge: deckCount ? <span className="text-xs">{deckCount}</span> : null },
-    { id: 'payment', label: 'Payment', icon: accountNavIcons.payment },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
 
@@ -128,7 +125,6 @@ export default function AccountPage() {
           </ProfileAsideCard>
           <ProfileAsideCard title="Quick links">
             <ProfileAsideLink to="/" icon={accountNavIcons.stores} label="Marketplace" meta="Find a store" />
-            <ProfileAsideLink to="/account?section=payment" icon={storeAsideIcons.payments} label="Payment method" meta="Saved for checkout" />
           </ProfileAsideCard>
         </>
       }
@@ -137,7 +133,7 @@ export default function AccountPage() {
         displayName={user?.displayName ?? 'Your account'}
         avatarUrl={user?.avatarUrl}
         handle={user?.email}
-        joinedLabel={user?.paymentConfigured ? 'Payment saved on account' : undefined}
+        joinedLabel={undefined}
         footer={
           <Link
             to="/account?section=settings"
@@ -154,13 +150,6 @@ export default function AccountPage() {
             { id: 'stores', label: 'Stores', value: stores.length, icon: accountNavIcons.stores, iconClassName: '' },
             { id: 'orders', label: 'Orders', value: totalOrders, icon: accountNavIcons.orders, iconClassName: '' },
             { id: 'decks', label: 'Decks', value: deckCount, icon: accountNavIcons.decks, iconClassName: '' },
-            {
-              id: 'payment',
-              label: 'Wallet',
-              value: user?.paymentConfigured ? 'On' : 'Off',
-              icon: accountNavIcons.payment,
-              iconClassName: '',
-            },
           ]}
         />
       </ProfileSection>
@@ -172,11 +161,6 @@ export default function AccountPage() {
               title="Your stores"
               text={`${stores.length} store${stores.length === 1 ? '' : 's'} · ${totalOrders} order${totalOrders === 1 ? '' : 's'}${totalSubmissions ? ` · ${totalSubmissions} sell/trade` : ''}`}
               onClick={() => setSection('stores')}
-            />
-            <OverviewTile
-              title="Payment method"
-              text={user?.paymentConfigured ? `Saved · •••• ${user.paymentLast4 ?? '····'}` : 'Add a card for faster checkout everywhere.'}
-              onClick={() => setSection('payment')}
             />
           </div>
         </ProfileSection>
@@ -255,12 +239,6 @@ export default function AccountPage() {
       {section === 'decks' && (
         <ProfileSection title="Decks">
           <DecksPanel stores={stores.map((store) => ({ slug: store.slug, name: store.name }))} />
-        </ProfileSection>
-      )}
-
-      {section === 'payment' && (
-        <ProfileSection title="Payment">
-          <AccountPaymentPanel />
         </ProfileSection>
       )}
 

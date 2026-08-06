@@ -79,6 +79,12 @@ export default function CartPage() {
     }
   }, [user])
 
+  useEffect(() => {
+    if (isGuest && fulfillment !== 'pickup') {
+      setFulfillment('pickup')
+    }
+  }, [isGuest, fulfillment])
+
   const checkoutConfigQuery = useQuery({
     queryKey: ['store-checkout-config', slug],
     enabled: Boolean(slug && !kioskMode),
@@ -240,16 +246,16 @@ export default function CartPage() {
                   <h2 className="text-base font-bold text-fg">Contact</h2>
                   {isGuest && (
                     <Link to="/login" className="text-sm font-medium text-brand-600 hover:underline">
-                      Log in
+                      Log in for order history
                     </Link>
                   )}
                 </div>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <Input
-                    label="Name"
+                    label={isGuest ? 'Your name (required)' : 'Name'}
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
-                    placeholder="For pickup or your order"
+                    placeholder="For pickup at the store"
                     maxLength={255}
                     required
                   />
@@ -268,20 +274,26 @@ export default function CartPage() {
             {!kioskMode && (
               <fieldset className="rounded-card border border-border bg-surface p-5 shadow-card">
                 <legend className="px-1 text-base font-bold text-fg">Delivery</legend>
-                <div className="mt-4 space-y-2">
-                  <FulfillmentOption
-                    checked={fulfillment === 'pickup'}
-                    onSelect={() => setFulfillment('pickup')}
-                    title="Pick up in store"
-                    text={`Free — grab it at ${store?.name ?? 'the store'}.`}
-                  />
-                  <FulfillmentOption
-                    checked={fulfillment === 'shipping'}
-                    onSelect={() => setFulfillment('shipping')}
-                    title="Ship to me"
-                    text="Shipping calculated at checkout."
-                  />
-                </div>
+                {isGuest ? (
+                  <p className="mt-4 text-sm text-fg-muted">
+                    Guest checkout is <span className="font-semibold text-fg">pickup only</span> — reserve your order and pay at the counter when you arrive.
+                  </p>
+                ) : (
+                  <div className="mt-4 space-y-2">
+                    <FulfillmentOption
+                      checked={fulfillment === 'pickup'}
+                      onSelect={() => setFulfillment('pickup')}
+                      title="Pick up in store"
+                      text={`Free — grab it at ${store?.name ?? 'the store'}.`}
+                    />
+                    <FulfillmentOption
+                      checked={fulfillment === 'shipping'}
+                      onSelect={() => setFulfillment('shipping')}
+                      title="Ship to me"
+                      text="Shipping calculated at checkout."
+                    />
+                  </div>
+                )}
               </fieldset>
             )}
 

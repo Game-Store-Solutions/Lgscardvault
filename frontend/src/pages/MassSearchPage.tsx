@@ -352,7 +352,6 @@ function LineActions({
   onCart: () => void
   onWant: () => void
 }) {
-  if (!signedIn) return null
   const missing = result.quantity - result.fillable
 
   return (
@@ -368,7 +367,8 @@ function LineActions({
             Add {result.fillable} to cart
           </Button>
         ))}
-      {missing > 0 &&
+      {signedIn &&
+        missing > 0 &&
         (wanted ? (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-success-700">
             <Check aria-hidden className="size-3.5" />

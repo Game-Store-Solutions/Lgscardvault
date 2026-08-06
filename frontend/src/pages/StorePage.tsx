@@ -672,7 +672,6 @@ export default function StorePage() {
                       key={item.id}
                       item={item}
                       slug={slug}
-                      signedIn={Boolean(user)}
                       inCartQuantity={cartByItemId.get(item.id)}
                       adding={cartSetItem.isPending && cartSetItem.variables?.item.id === item.id}
                       onAddToCart={() => cartSetItem.mutate({ item, quantity: 1 })}

@@ -242,23 +242,6 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertSame(['enabled', 'applicationId', 'locationId', 'environment', 'currency', 'countryCode'], array_keys($config));
     }
 
-    public function testCustomerCanSaveWalletPaymentMethodForStore(): void
-    {
-        [$store, , $customer] = $this->storeWithStockedListing();
-        $this->authenticate($customer);
-
-        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/payment-method", [
-            'methodType' => 'google_pay',
-            'token' => 'cnon:card-nonce-ok',
-            'verificationToken' => 'verf:test',
-        ]);
-
-        self::assertResponseIsSuccessful();
-        self::assertTrue($body['paymentConfigured']);
-        self::assertSame('google_pay', $body['paymentMethodType']);
-        self::assertSame('4242', $body['paymentLast4']);
-    }
-
     private function grantCredit(Store $store, User $customer, int $amountCents): void
     {
         static::getContainer()->get(\App\Service\Credit\StoreCreditLedger::class)->grant(

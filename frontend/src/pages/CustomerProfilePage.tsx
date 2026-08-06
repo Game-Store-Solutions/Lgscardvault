@@ -53,7 +53,6 @@ import { ImageOff, Plus, ReceiptText, Save, Search, Trash2, WalletCards, X } fro
 import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
-import { METHOD_LABELS } from './onboarding/config'
 import { formatDate } from '../lib/format'
 
 type TabId = 'profile' | 'orders' | 'favorites' | 'wantlist' | 'selltrade' | 'credit' | 'notifications'
@@ -136,8 +135,7 @@ export default function CustomerProfilePage() {
             <ProfileAsideLink to={`/s/${slug}/cart`} icon={storeAsideIcons.cart} label="Cart" meta="Checkout" />
           </ProfileAsideCard>
           <ProfileAsideCard title="Account">
-            <ProfileAsideLink to="/account" icon={storeAsideIcons.account} label="My account" meta="Profile & payment" />
-            <ProfileAsideLink to="/account?section=payment" icon={storeAsideIcons.payments} label="Payment method" meta="Marketplace wallet" />
+            <ProfileAsideLink to="/account" icon={storeAsideIcons.account} label="My account" meta="Profile & settings" />
           </ProfileAsideCard>
           {unreadCount > 0 ? (
             <ProfileAsideCard title="Unread">
@@ -512,8 +510,6 @@ function ProfilePanel({ slug }: { slug: string }) {
     return <ErrorState title="Could not load your profile." onRetry={() => void profileQuery.refetch()} />
   }
 
-  const profile = profileQuery.data
-
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <form
@@ -553,32 +549,6 @@ function ProfilePanel({ slug }: { slug: string }) {
           </CardBody>
         </Card>
       </form>
-
-      <Card>
-        <CardHeader
-          title="Payment method"
-          subtitle="Managed on your marketplace account — the same method follows you to every store."
-        />
-        <CardBody className="space-y-4">
-          {profile?.paymentConfigured && profile.paymentLast4 ? (
-            <p className="rounded-btn border border-border bg-bg px-3 py-2 text-sm text-fg">
-              <span className="font-semibold">
-                {profile.paymentMethodType
-                  ? METHOD_LABELS[profile.paymentMethodType]
-                  : profile.paymentBrand ?? 'Card'}
-              </span>
-              {' · '}
-              <span className="font-mono">•••• {profile.paymentLast4}</span>
-              {profile.paymentExpires ? ` · exp ${profile.paymentExpires}` : ''}
-            </p>
-          ) : (
-            <p className="text-sm text-fg-muted">No payment method saved yet.</p>
-          )}
-          <Link to="/account" className="inline-flex text-sm font-bold text-brand-600 hover:underline">
-            Update payment on My account →
-          </Link>
-        </CardBody>
-      </Card>
     </div>
   )
 }

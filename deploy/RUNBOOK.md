@@ -4,6 +4,11 @@ Operational reference for running the MTG Store platform in production. Pairs
 with the README's [Production configuration](../README.md#production-configuration)
 section (secrets, container images, health probes).
 
+**First time going live?** Start with [`LAUNCH.md`](LAUNCH.md) (DNS, secrets
+template, JWT volume, Square production, smoke tests). Use this runbook for
+ongoing releases and operations.
+
+- Secrets template: [`prod.env.example`](prod.env.example)
 - Backend image: [`backend/Dockerfile`](../backend/Dockerfile) (FrankenPHP)
 - Frontend image: [`frontend/Dockerfile`](../frontend/Dockerfile) (nginx)
 - Worker supervision: [`deploy/systemd/`](systemd/) · [`deploy/supervisor/`](supervisor/)

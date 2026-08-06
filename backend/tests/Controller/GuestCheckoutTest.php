@@ -82,6 +82,22 @@ final class GuestCheckoutTest extends WebTestCase
         self::assertSame($beforeStock - 2, $item->getQuantity());
     }
 
+    public function testGuestPayInStoreWhenSquareIsReady(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing(stock: 2, priceCents: 500);
+        $this->gateway->ready = true;
+
+        $response = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout/pay-in-store", [
+            'customerName' => 'Guest Shopper',
+            'fulfillment' => Order::FULFILLMENT_PICKUP,
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+        ]);
+
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertSame('Guest Shopper', $response['customerName'] ?? null);
+        self::assertNotSame('paid', $response['status'] ?? null);
+    }
+
     /** @return array{Store, InventoryItem} */
     private function storeWithStockedListing(int $stock = 5, int $priceCents = 2500): array
     {

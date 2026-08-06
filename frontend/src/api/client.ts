@@ -16,16 +16,13 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response interceptor: on 401, clear the stored token and bounce to /login.
-// Uses window.location (no router dependency) so it works from anywhere.
+// On 401, drop a stale token so public pages (cart, storefront) keep working as a guest.
+// Protected routes send users to login via ProtectedRoute — no global redirect here.
 api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     if (httpStatus(error) === 401) {
       localStorage.removeItem('token')
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.assign('/login')
-      }
     }
     return Promise.reject(error)
   },

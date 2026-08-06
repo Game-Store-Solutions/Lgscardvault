@@ -739,24 +739,21 @@ final class StoreCustomerController extends AbstractController
             return $this->json($this->serializeOrder($order), 201);
         }
 
-        $useSavedCard = filter_var($payload['useSavedCard'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $useSavedCard = false;
         $sourceId = trim((string) ($payload['token'] ?? ''));
         $verificationToken = $this->nullableString($payload['verificationToken'] ?? null, 1024);
-        $methodType = (string) ($payload['methodType'] ?? '');
 
         $this->entityManager->flush();
 
         try {
             $payment = $this->captureCheckoutPayment(
                 $store,
-                $user,
-                $customer,
                 $amountDue,
                 $order->getReference(),
-                $useSavedCard,
                 $sourceId,
                 $verificationToken,
-                $methodType,
+                $user->getEmail(),
+                $customer->getPaymentCustomerId(),
             );
         } catch (\RuntimeException $e) {
             $this->stockReleaser->release($order);
@@ -764,10 +761,7 @@ final class StoreCustomerController extends AbstractController
             $this->entityManager->flush();
 
             $message = $e->getMessage();
-            $status = in_array($message, [
-                'A payment method is required.',
-                'No saved card for this store yet. Pay below once to link your account card here.',
-            ], true) ? 422 : 402;
+            $status = 'A payment method is required.' === $message ? 422 : 402;
 
             return $this->json(['detail' => $message], $status);
         }
@@ -787,76 +781,15 @@ final class StoreCustomerController extends AbstractController
      */
     private function captureCheckoutPayment(
         Store $store,
-        User $user,
-        StoreCustomer $customer,
         int $amountDue,
         string $orderReference,
-        bool $useSavedCard,
         string $sourceId,
         ?string $verificationToken,
-        string $methodType,
+        string $buyerEmail,
+        ?string $squareCustomerId,
     ): array {
-        $this->paymentProfileSync->applyUserPaymentToStoreCustomer($user, $customer);
-
-        if ($useSavedCard) {
-            $cardId = $customer->getPaymentCardId();
-            $squareCustomerId = $customer->getPaymentCustomerId();
-            if (null === $cardId || '' === $cardId || null === $squareCustomerId || '' === $squareCustomerId) {
-                throw new \RuntimeException('No saved card for this store yet. Pay below once to link your account card here.');
-            }
-
-            return $this->checkoutGateway->chargeVaultedCard(
-                $store,
-                $amountDue,
-                $squareCustomerId,
-                $cardId,
-                $orderReference,
-                $orderReference,
-                $user->getEmail(),
-            );
-        }
-
         if ('' === $sourceId) {
             throw new \RuntimeException('A payment method is required.');
-        }
-
-        $squareCustomerId = $customer->getPaymentCustomerId();
-
-        // First purchase at this store: vault on the store's Square account, then charge the card id.
-        if (null === $customer->getPaymentCardId() || '' === $customer->getPaymentCardId()) {
-            $vault = $this->checkoutGateway->vaultPaymentMethod(
-                $store,
-                $sourceId,
-                $verificationToken,
-                [
-                    'email' => $user->getEmail(),
-                    'name' => $user->getDisplayName(),
-                    'reference' => 'cust-'.$user->getId(),
-                ],
-                $squareCustomerId,
-                null,
-            );
-
-            $customer
-                ->setPaymentCustomerId($vault['customerId'])
-                ->setPaymentCardId($vault['cardId'])
-                ->setPaymentBrand($vault['brand'] ?? $customer->getPaymentBrand())
-                ->setPaymentLast4($vault['last4'] ?? $customer->getPaymentLast4())
-                ->setPaymentExpires($this->formatCardExpiry($vault['expMonth'], $vault['expYear']) ?? $customer->getPaymentExpires());
-
-            if ('' !== $methodType && in_array($methodType, SubscriptionBillingInterface::METHODS, true)) {
-                $customer->setPaymentMethodType($methodType);
-            }
-
-            return $this->checkoutGateway->chargeVaultedCard(
-                $store,
-                $amountDue,
-                $vault['customerId'],
-                $vault['cardId'],
-                $orderReference,
-                $orderReference,
-                $user->getEmail(),
-            );
         }
 
         return $this->checkoutGateway->charge(
@@ -866,7 +799,7 @@ final class StoreCustomerController extends AbstractController
             $orderReference,
             $verificationToken,
             $orderReference,
-            $user->getEmail(),
+            $buyerEmail,
             $squareCustomerId,
         );
     }

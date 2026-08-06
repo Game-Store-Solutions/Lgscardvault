@@ -501,9 +501,10 @@ The frontend has its own production image (`frontend/Dockerfile`): a Node build
 served by nginx with SPA fallback, long-cached fingerprinted assets, and an
 `/api` proxy to the backend.
 
-> **Full deploy, worker supervision, backups/DR, log rotation, and monitoring
-> are documented in [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md)**, with reference
-> systemd/supervisor units and a `deploy/docker-compose.prod.yml` composition.
+> **Going live:** follow [`deploy/LAUNCH.md`](deploy/LAUNCH.md) (DNS, secrets,
+> first boot, Square production). **Day-two ops:** [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md)
+> (releases, workers, backups, monitoring), with [`deploy/prod.env.example`](deploy/prod.env.example)
+> and `deploy/docker-compose.prod.yml`.
 
 ### Workers
 

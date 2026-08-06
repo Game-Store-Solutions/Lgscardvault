@@ -31,6 +31,8 @@ services:
     env_file: [/etc/mtgstore/prod.env]   # APP_SECRET, JWT_PASSPHRASE, DATABASE_URL, …
     environment:
       APP_ENV: prod
+    volumes:
+      - jwt_keys:/app/config/jwt
     depends_on:
       db:
         condition: service_healthy
@@ -85,3 +87,4 @@ services:
 
 volumes:
   db_data:
+  jwt_keys:

@@ -135,10 +135,6 @@ final class StoreGuestCheckoutController extends AbstractController
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        if ($this->checkoutGateway->isReady($store)) {
-            return $this->json(['detail' => 'Online card checkout is available — use Pay with card instead.'], 422);
-        }
-
         /** @var array<string, mixed> $payload */
         $payload = json_decode($request->getContent(), true) ?? [];
 

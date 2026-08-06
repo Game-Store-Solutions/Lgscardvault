@@ -10,7 +10,6 @@ import { InteractiveCard } from './InteractiveCard'
 export interface MarketplaceCardProps {
   item: InventoryItem
   slug: string
-  signedIn: boolean
   inCartQuantity?: number
   adding?: boolean
   onAddToCart: () => void
@@ -19,7 +18,6 @@ export interface MarketplaceCardProps {
 export function MarketplaceCard({
   item,
   slug,
-  signedIn,
   inCartQuantity,
   adding = false,
   onAddToCart,
@@ -78,11 +76,7 @@ export function MarketplaceCard({
           </p>
 
           <div className="mt-auto w-full max-w-[10.5rem] pt-4">
-            {!signedIn ? (
-              <Link to="/login" className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} w-full`}>
-                Sign in to add
-              </Link>
-            ) : inCartQuantity ? (
+            {inCartQuantity ? (
               <Link to={`/s/${slug}/cart`} className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} w-full`}>
                 <Check aria-hidden className="size-4" />
                 In cart ({inCartQuantity})

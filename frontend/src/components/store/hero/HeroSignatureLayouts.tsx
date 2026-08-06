@@ -202,14 +202,27 @@ export function FloatingCardsHero({ props, tokens }: { props: StoreHeroProps; to
 
 export function LivingInventoryHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
   const cards = props.showcaseCards ?? []
+  const loopTrack =
+    cards.length > 0
+      ? (() => {
+          let base = [...cards]
+          while (base.length < 10) {
+            base = [...base, ...cards]
+          }
+          return [...base, ...base]
+        })()
+      : []
+
   return (
     <HeroShell props={props} tokens={tokens} layout="living-inventory" minClass="min-h-[20rem]">
       <div className="overflow-hidden py-4">
-        <div className="flex gap-3 motion-safe:animate-[hero-scroll_28s_linear_infinite]">
-          {[...cards, ...cards].slice(0, 16).map((card, i) => (
-            <HeroCardImg key={`${card.imageUrl}-${i}`} card={card} className="aspect-[5/7] w-24 shrink-0" />
-          ))}
-        </div>
+        {loopTrack.length > 0 ? (
+          <div className="flex w-max gap-3 motion-safe:animate-[hero-scroll_28s_linear_infinite] motion-reduce:animate-none">
+            {loopTrack.map((card, i) => (
+              <HeroCardImg key={`${card.imageUrl}-${i}`} card={card} className="aspect-[5/7] w-24 shrink-0" />
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="border-t border-border bg-surface/95 p-6">
         <IdentityHeader props={props} tokens={tokens} />

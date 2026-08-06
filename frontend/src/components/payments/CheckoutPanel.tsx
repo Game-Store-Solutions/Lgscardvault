@@ -1,130 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, CreditCard, Lock, PackageCheck, ShieldCheck, Sparkles, Store, Wallet } from 'lucide-react'
-import { useId, useState, type ReactNode } from 'react'
+import { Lock, PackageCheck, ShieldCheck, Store } from 'lucide-react'
 import { Link } from 'react-router'
 import api, { extractErrorMessage, formatPrice } from '../../api/client'
-import type { Order, OrderFulfillment, StoreCheckoutConfig, StoreCustomer } from '../../api/types'
-import { customerKeys } from '../../hooks'
-import { METHOD_LABELS } from '../../pages/onboarding/config'
+import type { Order, OrderFulfillment, StoreCheckoutConfig } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { Button } from '../ui'
-import { checkoutPayButtonClass, SquarePaymentPanel, type SquareCardPayAction, type TokenizedPayment } from './SquarePaymentPanel'
-import { PaymentBrandMark } from './PaymentBrandMark'
-
-type CheckoutInput = { useSavedCard: true } | TokenizedPayment | null
-
-function paymentDisplayLabel(profile: StoreCustomer): string {
-  if (profile.paymentMethodType) return METHOD_LABELS[profile.paymentMethodType]
-  if (profile.paymentBrand) return profile.paymentBrand
-  return 'Card'
-}
-
-function SavedCardHero({
-  profile,
-  amountDueCents,
-  mode,
-  loading,
-  onPaySaved,
-  onBeginConfirm,
-}: {
-  profile: StoreCustomer
-  amountDueCents: number
-  mode: 'oneClick' | 'linkAtStore'
-  loading: boolean
-  onPaySaved?: () => void
-  onBeginConfirm?: () => void
-}) {
-  const label = paymentDisplayLabel(profile)
-  const last4 = profile.paymentLast4 ?? '····'
-  const heading = mode === 'oneClick' ? 'Saved card' : 'Account wallet'
-
-  return (
-    <div className="rounded-xl bg-brand-50/50 px-3.5 py-3 dark:bg-brand-950/25">
-      <div className="flex items-center gap-3">
-        <PaymentBrandMark brand={profile.paymentBrand ?? label} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-fg">{heading}</p>
-          <p className="truncate font-display text-lg font-bold tracking-tight text-fg">
-            {label} ···· {last4}
-          </p>
-          {profile.paymentExpires ? (
-            <p className="text-xs text-fg-muted">Expires {profile.paymentExpires}</p>
-          ) : null}
-        </div>
-        {mode === 'oneClick' ? (
-          <span className="hidden shrink-0 items-center gap-1 rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-bold text-success-800 dark:bg-success-950/60 dark:text-success-300 sm:inline-flex">
-            <Sparkles aria-hidden className="size-3" />
-            One-click
-          </span>
-        ) : null}
-      </div>
-
-      {mode === 'oneClick' ? (
-        <Button className={cx(checkoutPayButtonClass, 'mt-3')} size="lg" loading={loading} onClick={onPaySaved}>
-          <Wallet aria-hidden className="size-4" />
-          Pay {formatPrice(amountDueCents)} with saved card
-        </Button>
-      ) : (
-        <>
-          <p className="mt-2 text-xs leading-5 text-fg-muted">
-            This store needs a one-time Square confirmation (same card is fine). After that, one-click checkout works
-            here.
-          </p>
-          {onBeginConfirm ? (
-            <Button className={cx(checkoutPayButtonClass, 'mt-3')} size="lg" type="button" onClick={onBeginConfirm}>
-              <CreditCard aria-hidden className="size-4" />
-              Confirm &amp; pay {formatPrice(amountDueCents)}
-            </Button>
-          ) : null}
-        </>
-      )}
-    </div>
-  )
-}
-
-function AlternatePaymentAccordion({
-  open,
-  onOpenChange,
-  title,
-  subtitle,
-  children,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  title: string
-  subtitle?: string
-  children: ReactNode
-}) {
-  const panelId = useId()
-
-  return (
-    <div className="rounded-xl bg-bg/70 dark:bg-bg/30">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-bg/80 sm:px-4"
-        onClick={() => onOpenChange(!open)}
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-fg">{title}</span>
-          {subtitle ? <span className="mt-0.5 block text-xs leading-snug text-fg-muted">{subtitle}</span> : null}
-        </span>
-        <ChevronDown
-          aria-hidden
-          className={cx('size-4 shrink-0 text-fg-muted transition-transform duration-200', open && 'rotate-180')}
-        />
-      </button>
-      <div id={panelId} className="px-3.5 pb-3.5 pt-1 sm:px-4 sm:pb-4">
-        {open ? children : null}
-      </div>
-    </div>
-  )
-}
+import { checkoutPayButtonClass, SquarePaymentPanel, type TokenizedPayment } from './SquarePaymentPanel'
 
 /**
- * Real checkout: the shopper pays the STORE through that store's own connected
- * Square account.
+ * Store checkout: guests reserve pickup orders and pay in store; signed-in shoppers
+ * pay with Square per order (no saved wallet).
  */
 export function CheckoutPanel({
   slug,
@@ -148,45 +33,32 @@ export function CheckoutPanel({
   paymentReady: boolean
   isGuest?: boolean
   fulfillment?: OrderFulfillment
-  /** Store owners and platform admins see Square reconnect guidance. */
   showOwnerDiagnostics?: boolean
   paymentBlockedMessage?: string
-  /** When set, show a reconnect link for store owners when checkout is unavailable. */
   paymentsAdminHref?: string
   onPlaced: (order: Order) => void
 }) {
   const queryClient = useQueryClient()
+
   const configQuery = useQuery({
     queryKey: ['store-checkout-config', slug],
     queryFn: async () => {
       const { data } = await api.get<StoreCheckoutConfig>(`/stores/${slug}/customer/checkout/config`)
       return data
     },
-  })
-
-  const profileQuery = useQuery({
-    queryKey: customerKeys.profile(slug),
-    queryFn: async () => {
-      const { data } = await api.get<StoreCustomer>(`/stores/${slug}/customer`)
-      return data
-    },
     enabled: !isGuest,
   })
 
   const checkout = useMutation({
-    mutationFn: async (input: CheckoutInput) => {
+    mutationFn: async (payment: TokenizedPayment | null) => {
       const body =
-        input && 'useSavedCard' in input
-          ? { ...checkoutBody, useSavedCard: true }
+        payment === null
+          ? checkoutBody
           : {
               ...checkoutBody,
-              ...(input
-                ? {
-                    token: input.token,
-                    verificationToken: input.verificationToken,
-                    methodType: input.methodType,
-                  }
-                : {}),
+              token: payment.token,
+              verificationToken: payment.verificationToken,
+              methodType: payment.methodType,
             }
       const { data } = await api.post<Order>(checkoutPath, body)
       return data
@@ -215,18 +87,36 @@ export function CheckoutPanel({
     onSuccess: onPlaced,
   })
 
+  if (isGuest) {
+    return (
+      <div className="mt-5 space-y-3">
+        <p className="text-sm text-fg-muted">
+          We&apos;ll hold your items. Pay at the counter when you pick up — no card needed online.
+        </p>
+        {!paymentReady ? (
+          <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{paymentBlockedMessage}</p>
+        ) : (
+          <Button
+            className={checkoutPayButtonClass}
+            size="lg"
+            loading={payInStore.isPending}
+            onClick={() => payInStore.mutate()}
+          >
+            <Store aria-hidden className="size-4" />
+            Reserve order · pay in store {formatPrice(amountDueCents)}
+          </Button>
+        )}
+        {payInStore.isError ? (
+          <p role="alert" className="rounded-btn bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-700">
+            {extractErrorMessage(payInStore.error, 'Could not reserve your order.')}
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+
   const config = configQuery.data
-  const profile = profileQuery.data
   const loadingConfig = configQuery.isLoading
-  const checkingSaved = !isGuest && profileQuery.isLoading
-
-  const hasAccountCardEarly =
-    !isGuest && profile?.paymentConfigured && profile.paymentLast4 && !profile.savedCardReady
-
-  const [altPaymentOpen, setAltPaymentOpen] = useState(false)
-  const [cardPayAction, setCardPayAction] = useState<SquareCardPayAction | null>(null)
-
-  const beginStoreCardConfirm = () => setAltPaymentOpen(true)
 
   if (loadingConfig) {
     return (
@@ -303,36 +193,11 @@ export function CheckoutPanel({
     )
   }
 
-  const canUseSaved = !isGuest && profile?.savedCardReady && profile.paymentLast4
-  const hasAccountCard = hasAccountCardEarly
-  const hasAnySavedDisplay = Boolean(canUseSaved || hasAccountCard)
-  const needsStoreLink = Boolean(hasAccountCard && !canUseSaved)
-
-  const payButtonPlacement = canUseSaved && hasAnySavedDisplay ? 'external' : 'inline'
-  const showExternalCardPay = canUseSaved && altPaymentOpen && Boolean(cardPayAction)
   const payLabel = `Pay ${formatPrice(amountDueCents)}`
-
-  const squarePanel = (
-    <SquarePaymentPanel
-      applicationId={config.applicationId}
-      locationId={config.locationId}
-      environment={config.environment}
-      priceCents={amountDueCents}
-      currency={config.currency}
-      countryCode={config.countryCode}
-      billingEmail={buyerEmail}
-      confirmLabel={payLabel}
-      paymentRequestLabel="Order total"
-      layout="checkout"
-      payButtonPlacement={payButtonPlacement}
-      onPayActionChange={payButtonPlacement === 'external' ? setCardPayAction : undefined}
-      onTokenized={(payment) => checkout.mutate(payment)}
-    />
-  )
 
   return (
     <div className="mt-5 pt-5">
-      <p className="text-sm font-semibold text-fg">Payment method</p>
+      <p className="text-sm font-semibold text-fg">Payment</p>
 
       {fullyCovered ? (
         <Button
@@ -345,66 +210,21 @@ export function CheckoutPanel({
           Place order with store credit
         </Button>
       ) : (
-        <div className="mt-3 space-y-3">
-          {checkingSaved ? (
-            <div className="animate-pulse rounded-xl bg-bg/70 px-3.5 py-4">
-              <div className="h-4 w-32 rounded bg-border" />
-              <div className="mt-2 h-6 w-48 rounded bg-border" />
-            </div>
-          ) : null}
-
-          {!checkingSaved && canUseSaved && profile ? (
-            <SavedCardHero
-              profile={profile}
-              amountDueCents={amountDueCents}
-              mode="oneClick"
-              loading={checkout.isPending}
-              onPaySaved={() => checkout.mutate({ useSavedCard: true })}
-            />
-          ) : null}
-
-          {!checkingSaved && hasAccountCard && profile && !canUseSaved ? (
-            <SavedCardHero
-              profile={profile}
-              amountDueCents={amountDueCents}
-              mode="linkAtStore"
-              loading={false}
-              onBeginConfirm={!altPaymentOpen ? beginStoreCardConfirm : undefined}
-            />
-          ) : null}
-
-          {!checkingSaved && hasAnySavedDisplay ? (
-            <>
-              {(canUseSaved || needsStoreLink) && (canUseSaved || altPaymentOpen) ? (
-                <AlternatePaymentAccordion
-                  open={altPaymentOpen}
-                  onOpenChange={setAltPaymentOpen}
-                  title={canUseSaved ? 'Use a different card or wallet' : 'Confirm payment at this store'}
-                  subtitle={
-                    canUseSaved
-                      ? 'Google Pay, Apple Pay, or another card'
-                      : 'Enter your card once, or use Google Pay / Apple Pay'
-                  }
-                >
-                  {squarePanel}
-                </AlternatePaymentAccordion>
-              ) : null}
-              {showExternalCardPay && cardPayAction ? (
-                <Button
-                  className={checkoutPayButtonClass}
-                  size="lg"
-                  loading={checkout.isPending || cardPayAction.busy}
-                  disabled={!cardPayAction.cardReady}
-                  onClick={cardPayAction.payWithCard}
-                >
-                  <CreditCard aria-hidden className="size-4" />
-                  {cardPayAction.label}
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-
-          {!checkingSaved && !hasAnySavedDisplay ? squarePanel : null}
+        <div className="mt-3">
+          <SquarePaymentPanel
+            applicationId={config.applicationId}
+            locationId={config.locationId}
+            environment={config.environment}
+            priceCents={amountDueCents}
+            currency={config.currency}
+            countryCode={config.countryCode}
+            billingEmail={buyerEmail}
+            confirmLabel={payLabel}
+            paymentRequestLabel="Order total"
+            layout="checkout"
+            payButtonPlacement="inline"
+            onTokenized={(payment) => checkout.mutate(payment)}
+          />
         </div>
       )}
 
