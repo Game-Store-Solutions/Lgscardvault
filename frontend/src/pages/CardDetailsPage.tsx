@@ -640,36 +640,40 @@ export default function CardDetailsPage() {
                       <span className="font-semibold text-fg">1</span>
                       <span className="text-xs">of {Math.max(1, item.quantity)}</span>
                     </div>
-                    {user ? (
-                      inCart ? (
-                        <Link
-                          to={`/s/${slug}/cart`}
-                          className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md px-4 shadow-none`}
-                        >
-                          <ShoppingCart aria-hidden className="size-4" />
-                          Checkout ({cartEntry?.quantity})
-                        </Link>
-                      ) : (
-                        <Button
-                          variant="primary"
-                          size="lg"
-                          className="h-11 flex-1 rounded-l-none rounded-r-md shadow-none"
-                          loading={cartSetItem.isPending}
-                          disabled={cartSetItem.isPending || outOfStock}
-                          onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
-                        >
-                          {outOfStock ? 'Out of stock' : 'Add to Cart'}
-                        </Button>
-                      )
-                    ) : (
+                    {inCart ? (
                       <Link
-                        to="/login"
-                        className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md shadow-none`}
+                        to={`/s/${slug}/cart`}
+                        className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md px-4 shadow-none`}
                       >
-                        Sign in to buy
+                        <ShoppingCart aria-hidden className="size-4" />
+                        {user ? `Checkout (${cartEntry?.quantity})` : `View cart (${cartEntry?.quantity})`}
                       </Link>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="lg"
+                        className="h-11 flex-1 rounded-l-none rounded-r-md shadow-none"
+                        loading={cartSetItem.isPending}
+                        disabled={cartSetItem.isPending || outOfStock}
+                        onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
+                      >
+                        {outOfStock ? 'Out of stock' : 'Add to Cart'}
+                      </Button>
                     )}
                   </div>
+
+                  {!user && (
+                    <p className="mt-2 text-center text-xs text-fg-muted">
+                      <Link
+                        to="/login"
+                        state={{ from: location.pathname }}
+                        className="font-semibold text-brand-600 hover:underline dark:text-brand-300"
+                      >
+                        Sign in
+                      </Link>{' '}
+                      to save favorites and one-click pay at stores you shop often.
+                    </p>
+                  )}
 
                   {user && (
                     <div className="mt-3 grid grid-cols-2 gap-2">

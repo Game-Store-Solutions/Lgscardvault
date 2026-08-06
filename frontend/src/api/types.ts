@@ -186,6 +186,10 @@ export type PaymentMethodType = 'card' | 'apple_pay' | 'google_pay'
 /** Store-scoped Square config for shopper checkout; contains no secrets. */
 export interface StoreCheckoutConfig {
   enabled: boolean
+  /** Shopper-safe copy when `enabled` is false. */
+  message?: string | null
+  /** Store owner / platform admin diagnostic when checkout is disabled. */
+  ownerMessage?: string | null
   applicationId: string
   locationId: string
   environment: string

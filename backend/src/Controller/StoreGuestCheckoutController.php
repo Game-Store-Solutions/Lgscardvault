@@ -127,6 +127,56 @@ final class StoreGuestCheckoutController extends AbstractController
         return $this->json($this->serializeOrder($order) + ['receiptUrl' => $payment['receiptUrl'] ?? null], 201);
     }
 
+    #[Route('/checkout/pay-in-store', name: 'api_store_guest_checkout_pay_in_store', methods: ['POST'])]
+    public function payInStore(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        if ($this->checkoutGateway->isReady($store)) {
+            return $this->json(['detail' => 'Online card checkout is available — use Pay with card instead.'], 422);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+
+        $customerName = mb_substr(trim((string) ($payload['customerName'] ?? '')), 0, 255);
+        if ('' === $customerName) {
+            return $this->json(['detail' => 'Please enter your name for this order.'], 422);
+        }
+
+        $fulfillment = (string) ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP);
+        if (Order::FULFILLMENT_PICKUP !== $fulfillment) {
+            return $this->json(['detail' => 'Pay in store is only available for pickup orders. Choose in-store pickup above.'], 422);
+        }
+
+        $cartItems = $this->virtualCartFromPayload($store, $payload['lines'] ?? null);
+        if ([] === $cartItems) {
+            return $this->json(['detail' => 'Your cart is empty.'], 422);
+        }
+
+        try {
+            $order = $this->orderBuilder->build(
+                $store,
+                null,
+                $cartItems,
+                Order::CHANNEL_ONLINE,
+                $fulfillment,
+                $customerName,
+                $this->nullableEmail($payload['customerEmail'] ?? null),
+                false,
+            );
+        } catch (OutOfStockException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
+
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeOrder($order), 201);
+    }
+
     /**
      * @param mixed $lines
      *

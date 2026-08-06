@@ -32,12 +32,12 @@ final class CustomerPaymentProfileSync
             return;
         }
 
+        // Mirror marketplace wallet display on the store profile. Per-store Square
+        // vault ids (customer + card) are set at checkout and must never be cleared here.
         $customer
             ->setPaymentMethodType($user->getPaymentMethodType())
             ->setPaymentBrand($user->getPaymentBrand())
             ->setPaymentLast4($user->getPaymentLast4())
-            ->setPaymentExpires($user->getPaymentExpires())
-            ->setPaymentCustomerId(null)
-            ->setPaymentCardId(null);
+            ->setPaymentExpires($user->getPaymentExpires());
     }
 }

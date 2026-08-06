@@ -95,8 +95,7 @@ final class StoreCustomerController extends AbstractController
 
         $user = $this->getUser();
         if ($user instanceof User) {
-            $this->paymentProfileSync->applyUserPaymentToStoreCustomer($user, $customer);
-            $this->entityManager->flush();
+            return $this->json($this->serializeCustomerForRead($customer, $user));
         }
 
         return $this->json($this->serializeCustomer($customer));
@@ -592,6 +591,75 @@ final class StoreCustomerController extends AbstractController
     }
 
     /**
+     * Reserve stock for pickup and pay at the counter when online card checkout
+     * is unavailable. Only allowed while Square checkout is disabled.
+     */
+    #[Route('/checkout/pay-in-store', name: 'api_store_customer_checkout_pay_in_store', methods: ['POST'])]
+    public function payInStore(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        if ($this->checkoutGateway->isReady($store)) {
+            return $this->json(['detail' => 'Online card checkout is available — use Pay with card instead.'], 422);
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+
+        $fulfillment = (string) ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP);
+        if (Order::FULFILLMENT_PICKUP !== $fulfillment) {
+            return $this->json(['detail' => 'Pay in store is only available for pickup orders. Choose in-store pickup above.'], 422);
+        }
+
+        $customer = $this->findCustomer($store);
+        if (!$customer instanceof StoreCustomer) {
+            return $this->json(['detail' => 'Your cart is empty.'], 422);
+        }
+
+        $cartItems = $this->cartRepository->findForCustomer($customer);
+        if ([] === $cartItems) {
+            return $this->json(['detail' => 'Your cart is empty.'], 422);
+        }
+
+        $customerName = mb_substr(trim((string) ($payload['customerName'] ?? '')), 0, 255);
+        if ('' === $customerName) {
+            $customerName = $user->getDisplayName();
+        }
+        $customerEmail = $user->getEmail();
+        $overrideEmail = trim((string) ($payload['customerEmail'] ?? ''));
+        if ('' !== $overrideEmail && filter_var($overrideEmail, FILTER_VALIDATE_EMAIL)) {
+            $customerEmail = mb_substr($overrideEmail, 0, 255);
+        }
+
+        try {
+            $order = $this->orderBuilder->build(
+                $store,
+                $user,
+                $cartItems,
+                Order::CHANNEL_ONLINE,
+                $fulfillment,
+                $customerName,
+                $customerEmail,
+                (bool) ($payload['useStoreCredit'] ?? false),
+            );
+        } catch (OutOfStockException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
+
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeOrder($order), 201);
+    }
+
+    /**
      * Real card checkout: the shopper pays the STORE through the store's own
      * connected Square account. The platform never touches the funds.
      *
@@ -1021,6 +1089,30 @@ final class StoreCustomerController extends AbstractController
     private function generateOrderReference(): string
     {
         return 'ORD-'.strtoupper(bin2hex(random_bytes(4)));
+    }
+
+    /** @return array<string, mixed> */
+    private function serializeCustomerForRead(StoreCustomer $customer, User $user): array
+    {
+        $data = $this->serializeCustomer($customer);
+        if (true === $data['savedCardReady']) {
+            return $data;
+        }
+
+        $userLast4 = $user->getPaymentLast4();
+        if (null === $userLast4 || '' === $userLast4) {
+            return $data;
+        }
+
+        return [
+            ...$data,
+            'paymentBrand' => $user->getPaymentBrand() ?? $data['paymentBrand'],
+            'paymentLast4' => $userLast4,
+            'paymentExpires' => $user->getPaymentExpires() ?? $data['paymentExpires'],
+            'paymentMethodType' => $user->getPaymentMethodType() ?? $data['paymentMethodType'],
+            'paymentConfigured' => true,
+            'savedCardReady' => false,
+        ];
     }
 
     /** @return array<string, mixed> */

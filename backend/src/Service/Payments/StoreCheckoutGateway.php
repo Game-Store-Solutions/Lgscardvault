@@ -23,6 +23,10 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
     /** Refresh this far ahead of expiry so a live checkout never races the clock. */
     private const REFRESH_WINDOW = '+7 days';
 
+    /** Shown to shoppers when card checkout is disabled (owners get {@see ownerMessage}). */
+    private const SHOPPER_CHECKOUT_UNAVAILABLE =
+        'Online card checkout isn\'t available right now. Reserve your order and pay in store at pickup.';
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly SquareOAuthClient $oauth,
@@ -43,16 +47,17 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      */
     public function checkoutConfig(Store $store): array
     {
-        $account = $this->connectedAccount($store);
-        $locationId = $account?->getProviderLocationId();
-        // The browser SDK must be initialised with the app id for the same
-        // environment the store linked in, not whichever the platform runs now.
+        $readiness = $this->evaluateReadiness($store);
+        $account = $readiness['account'];
         $environment = $account?->getEnvironment() ?? $this->credentials->environment();
+        $locationId = (string) ($account?->getProviderLocationId() ?? '');
 
         return [
-            'enabled' => null !== $account && null !== $locationId && '' !== $locationId && $this->oauth->isConfigured(),
+            'enabled' => $readiness['ready'],
+            'message' => $readiness['message'],
+            'ownerMessage' => $readiness['ownerMessage'],
             'applicationId' => $this->credentials->applicationId($environment),
-            'locationId' => (string) $locationId,
+            'locationId' => $locationId,
             'environment' => $environment,
             'currency' => $this->credentials->currency(),
             'countryCode' => $this->credentials->countryCode(),
@@ -61,7 +66,81 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
 
     public function isReady(Store $store): bool
     {
-        return true === $this->checkoutConfig($store)['enabled'];
+        return $this->evaluateReadiness($store)['ready'];
+    }
+
+    /**
+     * @return array{ready: bool, message: string|null, ownerMessage: string|null, account: StorePaymentAccount|null}
+     */
+    private function evaluateReadiness(Store $store): array
+    {
+        if (!$this->oauth->isConfigured()) {
+            return $this->notReady('Platform Square credentials are not configured.');
+        }
+
+        $existing = $this->accounts->findOneBy([
+            'store' => $store,
+            'provider' => StorePaymentAccount::PROVIDER_SQUARE,
+        ]);
+        if ($existing instanceof StorePaymentAccount && StorePaymentAccount::STATUS_ERROR === $existing->getStatus()) {
+            return $this->notReady('Square rejected this store\'s credentials. Reconnect in Payments (admin).');
+        }
+
+        $account = $this->connectedAccount($store);
+        if (!$account instanceof StorePaymentAccount) {
+            return $this->notReady('This store has not connected Square for online checkout yet.');
+        }
+
+        $locationId = (string) ($account->getProviderLocationId() ?? '');
+        if ('' === $locationId) {
+            return $this->notReady('Square location is missing for this store.', $account);
+        }
+
+        try {
+            $this->accessToken($account);
+        } catch (\RuntimeException) {
+            return $this->notReady('Square access token is missing or expired. Reconnect in Payments (admin).', $account);
+        }
+
+        if (!$this->credentialsHealthy($account)) {
+            return $this->notReady('Square API probe failed. Reconnect in Payments (admin).', $account);
+        }
+
+        return ['ready' => true, 'message' => null, 'ownerMessage' => null, 'account' => $account];
+    }
+
+    /**
+     * @return array{ready: false, message: string, ownerMessage: string, account: StorePaymentAccount|null}
+     */
+    private function notReady(string $ownerMessage, ?StorePaymentAccount $account = null): array
+    {
+        return [
+            'ready' => false,
+            'message' => self::SHOPPER_CHECKOUT_UNAVAILABLE,
+            'ownerMessage' => $ownerMessage,
+            'account' => $account,
+        ];
+    }
+
+    private function credentialsHealthy(StorePaymentAccount $account): bool
+    {
+        $locationId = (string) ($account->getProviderLocationId() ?? '');
+        if ('' === $locationId) {
+            return false;
+        }
+
+        try {
+            $this->request($account, 'GET', '/v2/locations/'.rawurlencode($locationId));
+
+            return true;
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Square checkout readiness probe failed', [
+                'store' => $account->getStore()?->getSlug(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /**
@@ -378,19 +457,22 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      *
      * @return array<string, mixed>
      */
-    private function request(StorePaymentAccount $account, string $method, string $path, array $body): array
+    private function request(StorePaymentAccount $account, string $method, string $path, array $body = []): array
     {
         $accessToken = $this->accessToken($account);
 
         try {
-            $response = $this->httpClient->request($method, $this->apiBaseUrl($account).$path, [
+            $options = [
                 'headers' => [
                     'Authorization' => 'Bearer '.$accessToken,
                     'Square-Version' => $this->credentials->apiVersion(),
                     'Accept' => 'application/json',
                 ],
-                'json' => $body,
-            ]);
+            ];
+            if ('GET' !== strtoupper($method) && [] !== $body) {
+                $options['json'] = $body;
+            }
+            $response = $this->httpClient->request($method, $this->apiBaseUrl($account).$path, $options);
             $status = $response->getStatusCode();
             $decoded = json_decode($response->getContent(false), true);
         } catch (\Throwable $e) {

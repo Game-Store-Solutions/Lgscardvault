@@ -24,6 +24,8 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     {
         return [
             'enabled' => $this->ready,
+            'message' => $this->ready ? null : 'Checkout is disabled in this test environment.',
+            'ownerMessage' => $this->ready ? null : 'Fake checkout gateway disabled.',
             'applicationId' => 'sandbox-app-id',
             'locationId' => $this->ready ? 'LOCATION1' : '',
             'environment' => 'sandbox',

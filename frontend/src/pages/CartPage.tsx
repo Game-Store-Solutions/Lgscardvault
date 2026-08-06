@@ -16,7 +16,7 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { CartItem, InventoryItem, Order, OrderFulfillment, SealedInventoryLine, StoreCreditSummary } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { inventoryKey, ordersKey, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreCart, useStoreTheme } from '../hooks'
+import { inventoryKey, ordersKey, useCanManageStore, useDebouncedValue, useInventory, useKioskMode, useStore, useStoreCart, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
 import { guestCartKey, guestCartLines, resetGuestCart } from '../hooks/useGuestCart'
 import { BackButton, Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
@@ -42,7 +42,9 @@ interface RemovedLine {
 
 export default function CartPage() {
   const { slug = '' } = useParams()
-  const { user } = useAuth()
+  const { user, isSuperAdmin } = useAuth()
+  const canManage = useCanManageStore(slug)
+  const showOwnerCheckoutDiagnostics = canManage || isSuperAdmin
   const queryClient = useQueryClient()
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -314,7 +316,8 @@ export default function CartPage() {
 
           <OrderSummary
             slug={slug}
-            storeName={store?.name ?? 'the store'}
+            showOwnerCheckoutDiagnostics={showOwnerCheckoutDiagnostics}
+            paymentsAdminHref={showOwnerCheckoutDiagnostics ? `/s/${slug}/admin/payments` : undefined}
             itemCount={itemCount}
             subtotalLabel={subtotalLabel}
             kioskMode={kioskMode}
@@ -438,6 +441,8 @@ function OrderSummary({
   checkoutBody,
   paymentReady,
   isGuest = false,
+  paymentsAdminHref,
+  showOwnerCheckoutDiagnostics = false,
   testCheckoutEnabled,
   testOrderPending,
   testOrderError,
@@ -446,7 +451,6 @@ function OrderSummary({
   onOrderPlaced,
 }: {
   slug: string
-  storeName: string
   itemCount: number
   subtotalLabel: string
   fulfillment: OrderFulfillment
@@ -462,6 +466,8 @@ function OrderSummary({
   checkoutBody: Record<string, unknown>
   paymentReady: boolean
   isGuest?: boolean
+  paymentsAdminHref?: string
+  showOwnerCheckoutDiagnostics?: boolean
   testCheckoutEnabled: boolean
   testOrderPending: boolean
   testOrderError: unknown
@@ -542,7 +548,10 @@ function OrderSummary({
           checkoutPath={checkoutPath}
           checkoutBody={checkoutBody}
           paymentReady={paymentReady}
+          fulfillment={fulfillment}
           isGuest={isGuest}
+          showOwnerDiagnostics={showOwnerCheckoutDiagnostics}
+          paymentsAdminHref={paymentsAdminHref}
           onPlaced={onOrderPlaced}
         />
       )}
