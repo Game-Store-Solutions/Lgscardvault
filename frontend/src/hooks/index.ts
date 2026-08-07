@@ -23,6 +23,17 @@ export { useCart } from './useCart'
 export { useGuestCart, guestCartKey, guestCartLines, resetGuestCart } from './useGuestCart'
 export { useStoreCart } from './useStoreCart'
 export {
+  useCommanderSearch,
+  useCommanderRecommendations,
+  commanderSearchKey,
+  commanderRecommendKey,
+} from './useCommanderRecommend'
+export type {
+  CommanderSummary,
+  CommanderRecommendation,
+  CommanderRecommendResponse,
+} from './useCommanderRecommend'
+export {
   useCatalogGames,
   useStoreGames,
   useStoreGameStats,

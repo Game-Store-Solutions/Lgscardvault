@@ -13,6 +13,7 @@ import OwnerOnboardingWizard from './pages/OwnerOnboardingWizard'
 import SsoCallbackPage from './pages/SsoCallbackPage'
 import StorePage from './pages/StorePage'
 import MassSearchPage from './pages/MassSearchPage'
+import CommanderSynergyPage from './pages/CommanderSynergyPage'
 import CartPage from './pages/CartPage'
 import CardDetailsPage from './pages/CardDetailsPage'
 import SetBrowsePage from './pages/SetBrowsePage'
@@ -57,6 +58,7 @@ export default function App() {
               />
               <Route path="s/:slug" element={<StorePage />} />
               <Route path="s/:slug/mass-search" element={<MassSearchPage />} />
+              <Route path="s/:slug/deck-builder" element={<CommanderSynergyPage />} />
               <Route path="s/:slug/sell" element={<SellTradePage />} />
               <Route path="s/:slug/cart" element={<CartPage />} />
               <Route path="s/:slug/sets/:setCode" element={<SetBrowsePage />} />

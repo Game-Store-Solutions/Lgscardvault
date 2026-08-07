@@ -243,6 +243,30 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * In-stock Magic singles for a store — candidate pool for commander
+     * recommendations. Card is eagerly joined; capped so a huge inventory
+     * cannot blow the recommend request.
+     *
+     * @return list<InventoryItem>
+     */
+    public function findInStockMagicForStore(Store $store, int $limit = 2500): array
+    {
+        $qb = $this->createQueryBuilder('i')
+            ->join('i.card', 'c')
+            ->addSelect('c')
+            ->andWhere('i.store = :store')
+            ->andWhere('i.quantity > 0')
+            ->setParameter('store', $store)
+            ->orderBy('i.priceCents', 'ASC')
+            ->addOrderBy('i.id', 'ASC')
+            ->setMaxResults($limit);
+
+        $this->scopeToGame($qb, Game::CODE_MTG);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Best storefront listing to open for a want-list row at this store.
      * Prefers exact finish, in-stock copies, then lowest price.
      */
