@@ -19,6 +19,7 @@ export default function AppLayout() {
   const storeMatch = useMatch('/s/:slug/*')
   const exactStoreMatch = useMatch('/s/:slug')
   const cardDetailMatch = useMatch('/s/:slug/cards/:id')
+  const artistBrowseMatch = useMatch('/s/:slug/artists')
   const storeSlug = storeMatch?.params.slug ?? exactStoreMatch?.params.slug
   const pageShell = storeSlug ? STOREFRONT_SHELL : DEFAULT_APP_SHELL
 
@@ -126,7 +127,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className={cx(pageShell, 'flex-1', cardDetailMatch ? 'py-0' : 'py-8')}>
+        <main className={cx(pageShell, 'flex-1', cardDetailMatch || artistBrowseMatch ? 'py-0' : 'py-8')}>
           <Outlet />
         </main>
 
@@ -417,7 +418,7 @@ export default function AppLayout() {
         )}
       </header>
 
-      <main className={cx(pageShell, 'flex-1', cardDetailMatch ? 'py-0' : 'py-8')}>
+      <main className={cx(pageShell, 'flex-1', cardDetailMatch || artistBrowseMatch ? 'py-0' : 'py-8')}>
         <Outlet />
       </main>
 

@@ -8,7 +8,9 @@ use App\Entity\Store;
 use App\Repository\CardRepository;
 use App\Repository\CommanderRepository;
 use App\Repository\StoreRepository;
+use App\Service\Recommend\CommanderDeckAssembler;
 use App\Service\Recommend\CommanderRecommender;
+use App\Service\Recommend\StoreComboAnalyzer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,6 +22,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * Commander typeahead reads the weekly-synced `commanders` table (Scryfall
  * `is:commander`) — not store inventory — so shoppers can pick any legal
  * commander. Recommendations themselves still filter to in-stock listings.
+ * Combo sniffing proxies Commander Spellbook and intersects with stock.
  */
 #[Route('/api/stores/{slug}/recommend')]
 final class CommanderRecommendController extends AbstractController
@@ -29,6 +32,8 @@ final class CommanderRecommendController extends AbstractController
         private readonly CardRepository $cards,
         private readonly CommanderRepository $commanders,
         private readonly CommanderRecommender $recommender,
+        private readonly StoreComboAnalyzer $comboAnalyzer,
+        private readonly CommanderDeckAssembler $deckAssembler,
     ) {
     }
 
@@ -77,6 +82,77 @@ final class CommanderRecommendController extends AbstractController
         $limit = (int) $request->query->get('limit', 24);
 
         return $this->json($this->recommender->recommendForStore($store, $commanderCard, $limit));
+    }
+
+    /**
+     * Commander Spellbook combos for this commander, annotated with store stock.
+     *
+     * Body (optional JSON): `{ "cards": ["Sol Ring", "..."] }` — extra names
+     * from the shopper's current picks improve find-my-combos accuracy.
+     */
+    #[Route('/commander/{cardId}/combos', name: 'api_store_recommend_combos', methods: ['GET', 'POST'])]
+    public function combos(string $slug, string $cardId, Request $request): JsonResponse
+    {
+        $store = $this->requireStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $commanderCard = $this->resolveCommanderCard($cardId);
+        if (!$commanderCard instanceof Card) {
+            return $this->json(['detail' => 'Commander not found.'], 404);
+        }
+        if (!$this->isListedCommander($commanderCard)) {
+            return $this->json(['detail' => 'That card is not a legal commander.'], 422);
+        }
+
+        $extra = [];
+        if ($request->isMethod('POST')) {
+            $payload = json_decode($request->getContent() ?: '[]', true);
+            if (is_array($payload['cards'] ?? null)) {
+                foreach ($payload['cards'] as $name) {
+                    if (is_string($name) && '' !== trim($name)) {
+                        $extra[] = trim($name);
+                    }
+                }
+            }
+        }
+
+        $limit = (int) $request->query->get('limit', 20);
+
+        return $this->json($this->comboAnalyzer->analyzeForCommander($store, $commanderCard, $extra, $limit));
+    }
+
+    /** Assemble a ~100-card list from store stock + synergy + Spellbook packages. */
+    #[Route('/commander/{cardId}/deck', name: 'api_store_recommend_deck', methods: ['GET'])]
+    public function assembleDeck(string $slug, string $cardId): JsonResponse
+    {
+        $store = $this->requireStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $commanderCard = $this->resolveCommanderCard($cardId);
+        if (!$commanderCard instanceof Card) {
+            return $this->json(['detail' => 'Commander not found.'], 404);
+        }
+        if (!$this->isListedCommander($commanderCard)) {
+            return $this->json(['detail' => 'That card is not a legal commander.'], 422);
+        }
+
+        return $this->json($this->deckAssembler->assemble($store, $commanderCard));
+    }
+
+    private function resolveCommanderCard(string $cardId): ?Card
+    {
+        return $this->cards->findOneMagicById($cardId);
+    }
+
+    private function isListedCommander(Card $commanderCard): bool
+    {
+        $listed = $this->commanders->findOneByOracleId($commanderCard->getOracleId());
+
+        return $listed instanceof Commander || $this->looksLikeCommander($commanderCard);
     }
 
     private function requireStore(string $slug): ?Store

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2,
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
 import type { InventoryItem, Order, OrderChannel, OrderStatus } from '../../api/types'
-import { inventoryKey, ordersKey, useDebouncedValue, useInventory, useOrders } from '../../hooks'
+import { inventoryKey, openStoreOrdersCountKey, ordersKey, resolveOrdersListTotal, useDebouncedValue, useInventory, useOrders, useStoreOrderQueueCounts } from '../../hooks'
 import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal } from '../../components/ui'
 import { OrderLineList } from '../../components/orders/OrderLineList'
 import { OrderWorkflow } from '../../components/orders/OrderWorkflow'
@@ -31,7 +32,6 @@ import {
   countOrdersBetween,
   customerTierLabel,
   freshStatusPresentation,
-  orderMatchesTab,
   orderPrimaryProductName,
   paymentSubtitle,
   percentChange,
@@ -40,6 +40,27 @@ import {
 import { ORDER_STATUS_LABELS, formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
 
 const PAGE_SIZE = 8
+/** Keeps pagination from jumping when the last page has fewer rows. */
+const ORDER_TABLE_ROW_H = 'h-[4.75rem]'
+
+function tabQueueCount(
+  tabId: OrderListTab,
+  counts: { pending: number; processing: number; delivery: number; delivered: number } | undefined,
+): number {
+  if (!counts) return 0
+  switch (tabId) {
+    case 'pending':
+      return counts.pending
+    case 'processing':
+      return counts.processing
+    case 'delivery':
+      return counts.delivery
+    case 'delivered':
+      return counts.delivered
+    default:
+      return 0
+  }
+}
 
 function statusActions(status: OrderStatus): { status: OrderStatus; label: string; icon: typeof CheckCircle2 }[] {
   if (status === 'pending') {
@@ -59,12 +80,21 @@ function statusActions(status: OrderStatus): { status: OrderStatus; label: strin
 
 export default function OrdersTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
-  const { data = [], isLoading, error, refetch } = useOrders(slug)
+  const [page, setPage] = useState(1)
   const [tab, setTab] = useState<OrderListTab>('all')
+  const {
+    data: pageData,
+    isPending,
+    isFetching,
+    error,
+    refetch: refetchOrders,
+  } = useOrders(slug, page, PAGE_SIZE, tab)
+  const { data: queueCounts, refetch: refetchQueueCounts } = useStoreOrderQueueCounts(slug)
+  const data = pageData?.items ?? []
+  const orderTotal = pageData?.total ?? 0
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 200)
   const [channelFilter, setChannelFilter] = useState<OrderChannel | 'all'>('all')
-  const [page, setPage] = useState(1)
   const [kioskOpen, setKioskOpen] = useState(false)
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [menuOrderId, setMenuOrderId] = useState<number | null>(null)
@@ -72,16 +102,25 @@ export default function OrdersTab({ slug }: { slug: string }) {
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOrderId(null)
+      const target = e.target as Node
+      if (menuRef.current?.contains(target)) return
+      if (target instanceof Element && target.closest('[aria-label="Order actions"]')) return
+      setMenuOrderId(null)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOrderId(null)
     }
     document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [])
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase()
     return data
-      .filter((order) => orderMatchesTab(order, tab))
       .filter((order) => channelFilter === 'all' || (order.channel ?? 'online') === channelFilter)
       .filter((order) => {
         if (!q) return true
@@ -97,12 +136,28 @@ export default function OrdersTab({ slug }: { slug: string }) {
         return hay.includes(q)
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [data, tab, channelFilter, debouncedSearch])
+  }, [data, channelFilter, debouncedSearch])
 
   useEffect(() => setPage(1), [tab, channelFilter, debouncedSearch])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const pageOrders = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const selectTab = (next: OrderListTab) => {
+    setTab(next)
+    void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
+    void refetchQueueCounts()
+    if (next === tab) {
+      void refetchOrders()
+    }
+  }
+
+  const refreshOrdersAndCounts = () => {
+    void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
+    void refetchQueueCounts()
+    void refetchOrders()
+  }
+
+  const listTotal = resolveOrdersListTotal(tab, orderTotal, queueCounts)
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE))
+  const pageOrders = filtered
 
   const stats = useMemo(() => {
     const now = Date.now()
@@ -110,13 +165,13 @@ export default function OrdersTab({ slug }: { slug: string }) {
     const last7 = countOrdersBetween(data, now - 7 * day, now)
     const prev7 = countOrdersBetween(data, now - 14 * day, now - 7 * day)
     return {
-      newOrders: data.length,
+      newOrders: tab === 'all' ? (queueCounts?.total ?? orderTotal) : orderTotal,
       newTrend: percentChange(last7, prev7),
-      pending: data.filter((o) => o.status === 'pending').length,
+      pending: queueCounts?.pending ?? data.filter((o) => o.status === 'pending').length,
       completed: data.filter((o) => o.status === 'fulfilled' || o.status === 'completed').length,
       canceled: data.filter((o) => o.status === 'cancelled' || o.status === 'refunded').length,
     }
-  }, [data])
+  }, [data, orderTotal, queueCounts?.pending, queueCounts?.total, tab])
 
   const updateStatus = useMutation({
     mutationFn: async ({ order, status }: { order: Order; status: OrderStatus }) => {
@@ -124,19 +179,20 @@ export default function OrdersTab({ slug }: { slug: string }) {
       return updated
     },
     onSuccess: (updated) => {
-      queryClient.setQueryData<Order[]>(ordersKey(slug), (current = []) =>
-        current.map((order) => (order.id === updated.id ? updated : order)),
-      )
       setDetailOrder((current) => (current?.id === updated.id ? updated : current))
       setMenuOrderId(null)
+      refreshOrdersAndCounts()
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ordersKey(slug) }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: openStoreOrdersCountKey(slug) })
+      void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
+    },
   })
 
   const status = httpStatus(error)
   const endpointMissing = status === 404 || status === 405
 
-  if (isLoading) {
+  if (isPending && data.length === 0 && !error) {
     return (
       <div className="rounded-2xl bg-bg px-4 py-16">
         <LoadingPanel label="Loading orders…" />
@@ -163,7 +219,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
   if (error) {
     return (
       <div className="rounded-2xl bg-bg p-6">
-        <ErrorState title="Failed to load orders" description="Please try again." onRetry={() => void refetch()} />
+        <ErrorState title="Failed to load orders" description="Please try again." onRetry={() => void refreshOrdersAndCounts()} />
       </div>
     )
   }
@@ -207,7 +263,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
         />
       </div>
 
-      <section className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+      <section className="rounded-card border border-border bg-surface shadow-card">
         <div className="flex flex-col gap-4 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-bold text-fg">Orders List</h2>
           <Button size="sm" onClick={() => setKioskOpen(true)}>
@@ -218,19 +274,32 @@ export default function OrdersTab({ slug }: { slug: string }) {
 
         <div className="flex flex-col gap-4 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap gap-2">
-            {ORDER_LIST_TABS.map((item) => (
+            {ORDER_LIST_TABS.map((item) => {
+              const count = tabQueueCount(item.id, queueCounts)
+              const active = tab === item.id
+              return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setTab(item.id)}
+                onClick={() => selectTab(item.id)}
                 className={cx(
-                  'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
-                  tab === item.id ? 'bg-brand-500 text-white shadow-sm' : 'text-fg-muted hover:bg-bg',
+                  'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                  active ? 'bg-brand-500 text-white shadow-sm' : 'text-fg-muted hover:bg-bg',
                 )}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.id !== 'delivered' && count > 0 ? (
+                  <span
+                    className={cx(
+                      'grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-bold tabular-nums leading-none',
+                      active ? 'bg-white/25 text-white' : 'bg-brand-700 text-brand-100',
+                    )}
+                  >
+                    {count > 99 ? '99+' : count}
+                  </span>
+                ) : null}
               </button>
-            ))}
+            )})}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
@@ -263,7 +332,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
           </div>
         </div>
 
-        {data.length === 0 ? (
+        {orderTotal === 0 ? (
           <div className="px-5 py-16">
             <EmptyState
               icon={ReceiptText}
@@ -281,34 +350,44 @@ export default function OrdersTab({ slug }: { slug: string }) {
           <p className="px-5 py-16 text-center text-sm text-fg-muted">No orders match this filter.</p>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[56rem] text-left text-sm">
+            <div className="relative min-w-0">
+              {isFetching ? (
+                <p
+                  className="pointer-events-none absolute inset-x-0 top-0 z-10 border-b border-border/60 bg-surface/90 px-5 py-2 text-xs font-medium text-fg-muted backdrop-blur-[2px]"
+                  role="status"
+                >
+                  Updating list…
+                </p>
+              ) : null}
+              <table className="w-full table-fixed text-left text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
-                    <th className="px-5 py-3 font-semibold">Product Name</th>
-                    <th className="px-5 py-3 font-semibold">Customer Name</th>
-                    <th className="px-5 py-3 font-semibold">Order Id</th>
-                    <th className="px-5 py-3 font-semibold">Amount</th>
-                    <th className="px-5 py-3 font-semibold">Status</th>
-                    <th className="px-5 py-3 font-semibold text-right">Action</th>
+                    <th className="w-[28%] px-5 py-3 font-semibold">Product Name</th>
+                    <th className="w-[20%] px-5 py-3 font-semibold">Customer Name</th>
+                    <th className="w-[14%] px-5 py-3 font-semibold">Order Id</th>
+                    <th className="w-[12%] px-5 py-3 font-semibold">Amount</th>
+                    <th className="w-[12%] px-5 py-3 font-semibold">Status</th>
+                    <th className="w-16 px-3 py-3 font-semibold text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody
+                  className={cx('min-h-0 transition-opacity duration-150', isFetching && 'opacity-70')}
+                >
                   {pageOrders.map((order) => (
-                    <OrderRow
-                      key={order.id}
-                      order={order}
-                      menuOpen={menuOrderId === order.id}
-                      menuRef={menuOrderId === order.id ? menuRef : undefined}
-                      onToggleMenu={() => setMenuOrderId((id) => (id === order.id ? null : order.id))}
-                      onOpenDetail={() => {
-                        setDetailOrder(order)
-                        setMenuOrderId(null)
-                      }}
-                      onPrint={() => printOrderSheet(order)}
-                      onUpdateStatus={(s) => updateStatus.mutate({ order, status: s })}
-                      updatePending={updateStatus.isPending && updateStatus.variables?.order.id === order.id}
-                    />
+                      <OrderRow
+                        key={order.id}
+                        order={order}
+                        menuOpen={menuOrderId === order.id}
+                        menuRef={menuOrderId === order.id ? menuRef : undefined}
+                        onToggleMenu={() => setMenuOrderId((id) => (id === order.id ? null : order.id))}
+                        onOpenDetail={() => {
+                          setDetailOrder(order)
+                          setMenuOrderId(null)
+                        }}
+                        onPrint={() => printOrderSheet(order)}
+                        onUpdateStatus={(s) => updateStatus.mutate({ order, status: s })}
+                        updatePending={updateStatus.isPending && updateStatus.variables?.order.id === order.id}
+                      />
                   ))}
                 </tbody>
               </table>
@@ -396,6 +475,7 @@ function OrderRow({
   onUpdateStatus: (status: OrderStatus) => void
   updatePending: boolean
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const firstLine = order.lines?.[0]
   const thumb = firstLine ? orderLineImage(firstLine) : undefined
   const statusUi = freshStatusPresentation(order.status)
@@ -403,8 +483,8 @@ function OrderRow({
   const itemCount = orderItemCount(order)
 
   return (
-    <tr className="border-b border-border/60 transition-colors hover:bg-bg/80">
-      <td className="px-5 py-4">
+    <tr className={cx('border-b border-border/60 transition-colors hover:bg-bg/80', ORDER_TABLE_ROW_H)}>
+      <td className="px-5 py-4 align-middle">
         <button type="button" onClick={onOpenDetail} className="flex items-center gap-3 text-left">
           <span className="grid size-11 shrink-0 overflow-hidden rounded-xl bg-bg">
             {thumb ? (
@@ -421,7 +501,7 @@ function OrderRow({
           </span>
         </button>
       </td>
-      <td className="px-5 py-4">
+      <td className="px-5 py-4 align-middle">
         <div className="flex items-center gap-3">
           <Avatar name={order.customerName ?? 'Guest'} size="sm" />
           <div className="min-w-0">
@@ -430,52 +510,133 @@ function OrderRow({
           </div>
         </div>
       </td>
-      <td className="px-5 py-4">
+      <td className="px-5 py-4 align-middle">
         <p className="font-semibold text-fg">{order.reference}</p>
         <p className="text-xs text-fg-muted">{formatOrderShortDate(order.createdAt)}</p>
       </td>
-      <td className="px-5 py-4">
+      <td className="px-5 py-4 align-middle">
         <p className="font-bold text-fg">{formatPrice(order.totalCents)}</p>
         <p className="text-xs text-fg-muted">{paymentSubtitle(order)}</p>
       </td>
-      <td className="px-5 py-4">
+      <td className="px-5 py-4 align-middle">
         <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>{statusUi.label}</span>
       </td>
-      <td className="relative px-5 py-4 text-right">
+      <td className="px-3 py-4 align-middle text-right">
         <button
+          ref={triggerRef}
           type="button"
           aria-label="Order actions"
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
           onClick={onToggleMenu}
           className="inline-flex size-9 items-center justify-center rounded-lg text-fg-muted hover:bg-bg"
         >
           <EllipsisVertical aria-hidden className="size-5" />
         </button>
-        {menuOpen && menuRef && (
-          <div
-            ref={menuRef}
-            className="absolute right-5 top-12 z-20 w-44 overflow-hidden rounded-xl border border-border bg-surface py-1 text-left shadow-lg"
-          >
-            <button type="button" className="block w-full px-3 py-2 text-sm text-fg hover:bg-bg" onClick={onOpenDetail}>
-              View details
-            </button>
-            <button type="button" className="block w-full px-3 py-2 text-sm text-fg hover:bg-bg" onClick={onPrint}>
-              Print sheet
-            </button>
-            {actions.map(({ status, label }) => (
-              <button
-                key={status}
-                type="button"
-                disabled={updatePending}
-                className="block w-full px-3 py-2 text-sm text-fg hover:bg-bg disabled:opacity-50"
-                onClick={() => onUpdateStatus(status)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {menuOpen && menuRef ? (
+          <OrderActionsMenu
+            menuRef={menuRef}
+            triggerRef={triggerRef}
+            onOpenDetail={onOpenDetail}
+            onPrint={onPrint}
+            actions={actions}
+            updatePending={updatePending}
+            onUpdateStatus={onUpdateStatus}
+          />
+        ) : null}
       </td>
     </tr>
+  )
+}
+
+const ORDER_ACTIONS_MENU_WIDTH = 176
+
+function OrderActionsMenu({
+  menuRef,
+  triggerRef,
+  onOpenDetail,
+  onPrint,
+  actions,
+  updatePending,
+  onUpdateStatus,
+}: {
+  menuRef: RefObject<HTMLDivElement | null>
+  triggerRef: RefObject<HTMLButtonElement | null>
+  onOpenDetail: () => void
+  onPrint: () => void
+  actions: { status: OrderStatus; label: string }[]
+  updatePending: boolean
+  onUpdateStatus: (status: OrderStatus) => void
+}) {
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const placeMenu = () => {
+      const trigger = triggerRef.current
+      const menu = menuRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const menuHeight = menu?.offsetHeight ?? 120
+      const gap = 6
+      const left = Math.max(
+        8,
+        Math.min(rect.right - ORDER_ACTIONS_MENU_WIDTH, window.innerWidth - ORDER_ACTIONS_MENU_WIDTH - 8),
+      )
+      const fitsBelow = rect.bottom + gap + menuHeight <= window.innerHeight - 8
+      const top = fitsBelow ? rect.bottom + gap : Math.max(8, rect.top - gap - menuHeight)
+      setCoords({ top, left })
+    }
+
+    placeMenu()
+    const raf = requestAnimationFrame(placeMenu)
+    window.addEventListener('resize', placeMenu)
+    window.addEventListener('scroll', placeMenu, true)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', placeMenu)
+      window.removeEventListener('scroll', placeMenu, true)
+    }
+  }, [actions.length, menuRef, triggerRef])
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      style={coords ? { position: 'fixed', top: coords.top, left: coords.left, zIndex: 80 } : { position: 'fixed', visibility: 'hidden', zIndex: 80 }}
+      className="w-44 rounded-xl border border-border bg-surface py-1 text-left shadow-lg"
+    >
+      <button
+        type="button"
+        role="menuitem"
+        className="block w-full px-3 py-2 text-left text-sm text-fg hover:bg-bg"
+        onClick={onOpenDetail}
+      >
+        View details
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className="block w-full px-3 py-2 text-left text-sm text-fg hover:bg-bg"
+        onClick={onPrint}
+      >
+        Print sheet
+      </button>
+      {actions.map(({ status, label }) => (
+        <button
+          key={status}
+          type="button"
+          role="menuitem"
+          disabled={updatePending}
+          className="block w-full px-3 py-2 text-left text-sm text-fg hover:bg-bg disabled:opacity-50"
+          onClick={() => onUpdateStatus(status)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>,
+    document.body,
   )
 }
 
@@ -487,7 +648,7 @@ function Pagination({ page, totalPages, onPageChange }: { page: number; totalPag
   }, [page, totalPages])
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
+    <div className="flex min-h-[3.25rem] flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
       <button
         type="button"
         disabled={page <= 1}

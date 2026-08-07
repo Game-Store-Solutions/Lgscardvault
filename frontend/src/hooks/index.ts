@@ -1,7 +1,9 @@
 export { useStore } from './useStore'
 export { useInventory, inventoryKey } from './useInventory'
 export { useStoreSections, useStoreCases, usePullSheet, useStockingSheet, storeSectionsKey, storeCasesKey } from './useStoreSections'
-export { useOrders, ordersKey } from './useOrders'
+export { usePendingSellSubmissionCount, useSellSubmissionsList, sellSubmissionsKey, pendingSellSubmissionsCountKey } from './useSellSubmissions'
+export { useOrders, useOrdersPage, useAllStoreOrders, useOpenStoreOrderCount, useStoreOrderQueueCounts, resolveOrdersListTotal, ordersKey, openStoreOrdersCountKey, ADMIN_ORDERS_PAGE_SIZE } from './useOrders'
+export type { StoreOrderQueueCounts } from './useOrders'
 export { useCanManageStore } from './useCanManageStore'
 export { useDebouncedValue } from './useDebouncedValue'
 export { useTheme } from './useTheme'
@@ -17,6 +19,7 @@ export {
   useCustomerWantList,
   useCustomerCart,
   useCustomerOrders,
+  useMyOrders,
   useCustomerNotifications,
 } from './useCustomer'
 export { useCart } from './useCart'
@@ -25,18 +28,27 @@ export { useStoreCart } from './useStoreCart'
 export {
   useCommanderSearch,
   useCommanderRecommendations,
+  useCommanderCombos,
+  useCommanderDeck,
   commanderSearchKey,
   commanderRecommendKey,
+  commanderCombosKey,
+  commanderDeckKey,
 } from './useCommanderRecommend'
 export type {
   CommanderSummary,
   CommanderRecommendation,
   CommanderRecommendResponse,
+  SpellbookCombo,
+  CommanderCombosResponse,
+  AssembledDeckResponse,
+  AssembledDeckCard,
 } from './useCommanderRecommend'
 export {
   useCatalogGames,
   useStoreGames,
   useStoreGameStats,
+  useCatalogByArtist,
   useGameSets,
   useSealedCatalogSearch,
   useStoreSealedInventory,

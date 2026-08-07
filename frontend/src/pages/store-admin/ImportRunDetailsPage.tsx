@@ -44,9 +44,26 @@ export default function ImportRunDetailsPage() {
   const [recoveringRow, setRecoveringRow] = useState<CsvImportRow | null>(null)
   const [batchRecoveryResults, setBatchRecoveryResults] = useState<BatchRecoveryResult[] | null>(null)
 
-  const queryKey = ['csv-import-run', slug, importId, 'imported', rowOffset]
-  const { data: job, refetch } = useQuery({
-    queryKey,
+  const summaryQueryKey = ['csv-import-run', slug, importId, 'summary']
+  const {
+    data: summary,
+    refetch: refetchSummary,
+    isError: summaryRefreshFailed,
+    isFetching: summaryFetching,
+  } = useQuery({
+    queryKey: summaryQueryKey,
+    queryFn: async () => {
+      const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
+        params: { rowLimit: 0 },
+      })
+      return data
+    },
+    enabled: importId !== '',
+    refetchInterval: (query) => (isActive(query.state.data?.status) ? 3000 : false),
+  })
+
+  const { data: importedPage, refetch: refetchImported } = useQuery({
+    queryKey: ['csv-import-run', slug, importId, 'imported', rowOffset],
     queryFn: async () => {
       const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
         params: { rowOffset, rowLimit: ROW_LIMIT, rowStatus: 'imported' },
@@ -54,7 +71,7 @@ export default function ImportRunDetailsPage() {
       return data
     },
     enabled: importId !== '',
-    refetchInterval: (query) => (isActive(query.state.data?.status) ? 3000 : false),
+    refetchInterval: () => (isActive(summary?.status) ? 3000 : false),
   })
 
   const { data: failedJob, refetch: refetchFailed } = useQuery({
@@ -66,8 +83,10 @@ export default function ImportRunDetailsPage() {
       return data
     },
     enabled: importId !== '',
-    refetchInterval: (query) => (isActive(query.state.data?.status) ? 3000 : false),
+    refetchInterval: () => (isActive(summary?.status) ? 3000 : false),
   })
+
+  const job = summary
 
   const actionMutation = useMutation({
     mutationFn: async (action: 'pause' | 'resume' | 'retry' | 'retry-failed' | 'cancel') => {
@@ -78,11 +97,17 @@ export default function ImportRunDetailsPage() {
       await queryClient.invalidateQueries({ queryKey: ['csv-import-run', slug, importId] })
       await queryClient.invalidateQueries({ queryKey: ['csv-import-runs', slug] })
       await queryClient.invalidateQueries({ queryKey: ['csv-import-current', slug] })
-      await refetch()
+      await refetchSummary()
+      await refetchImported()
       await refetchFailed()
     },
     onError: (error: { response?: { data?: { detail?: string } }; message?: string }) => {
-      setActionError(error.response?.data?.detail ?? error.message ?? 'Import action failed')
+      const detail = error.response?.data?.detail
+      if (detail) {
+        setActionError(detail)
+        return
+      }
+      setActionError(error.message === 'Network Error' ? 'Could not reach the server. Check that the API is running.' : (error.message ?? 'Import action failed'))
     },
   })
 
@@ -107,14 +132,15 @@ export default function ImportRunDetailsPage() {
     await queryClient.invalidateQueries({ queryKey: ['csv-import-runs', slug] })
     await queryClient.invalidateQueries({ queryKey: ['csv-import-current', slug] })
     await queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
-    await refetch()
+    await refetchSummary()
+    await refetchImported()
     await refetchFailed()
   }
 
   const totalRows = job?.totalRows ?? 0
   const processedRows = job?.processedRows ?? 0
   const progress = totalRows === 0 ? 0 : Math.min(processedRows / totalRows, 1)
-  const rows = job?.rows ?? []
+  const rows = importedPage?.rows ?? []
   const failedRows = failedJob?.rows ?? []
   const canPrevious = rowOffset > 0
   const canNext = rowOffset + ROW_LIMIT < (job?.importedRows ?? 0)
@@ -203,6 +229,11 @@ export default function ImportRunDetailsPage() {
               )}
             </div>
 
+            {summaryRefreshFailed && !summaryFetching && (
+              <p role="status" className="text-sm font-medium text-danger-700">
+                Could not refresh import progress. Retrying automatically…
+              </p>
+            )}
             {actionError && (
               <p role="alert" className="text-sm font-medium text-danger-700">
                 {actionError}
@@ -236,9 +267,11 @@ export default function ImportRunDetailsPage() {
       <Card>
         <CardHeader
           title="Succeeded cards"
-          subtitle={`Showing ${job?.importedRows === 0 ? 0 : rowOffset + 1}-${rowOffset + rows.length} of ${
-            job?.importedRows ?? 0
-          }`}
+          subtitle={`Showing ${
+            (job?.importedRows ?? 0) === 0 && rows.length === 0
+              ? 0
+              : rowOffset + 1
+          }-${rowOffset + rows.length} of ${job?.importedRows ?? 0}`}
           actions={
             <div className="flex items-center gap-2">
               <Button

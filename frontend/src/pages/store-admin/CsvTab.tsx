@@ -60,6 +60,8 @@ export default function CsvTab({ slug }: { slug: string }) {
   }, [job?.status, queryClient, slug])
 
   const rows = job?.rows ?? []
+  const queuedRows = job?.queuedRows ?? 0
+  const processingRows = job?.processingRows ?? 0
   const importedCount = job?.importedRows ?? 0
   const failedCount = job?.failedRows ?? 0
   const totalRows = job?.totalRows ?? 0
@@ -131,6 +133,25 @@ export default function CsvTab({ slug }: { slug: string }) {
               <p className="text-sm text-fg-muted">
                 Import is running on the server. You can leave this page and come back to this tab to see the current
                 job state.
+                {queuedRows > 0 && processingRows === 0 && (
+                  <>
+                    {' '}
+                    <span className="font-medium text-fg">
+                      {queuedRows} row{queuedRows === 1 ? '' : 's'} waiting in the queue
+                    </span>
+                    — batches of ~40 cards resolve against Scryfall, so large files take a few minutes. If nothing
+                    changes for over a minute, restart dev with <code className="text-xs">.\start-dev.ps1</code> so the
+                    CSV worker is running.
+                  </>
+                )}
+                {processingRows > 0 && (
+                  <>
+                    {' '}
+                    <span className="font-medium text-brand-600">
+                      Resolving {processingRows} row{processingRows === 1 ? '' : 's'}…
+                    </span>
+                  </>
+                )}
               </p>
             )}
             {job.errorMessage && (

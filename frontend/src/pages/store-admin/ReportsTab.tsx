@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, CalendarRange, LineChart as LineChartIcon, TrendingUp } from 'lucide-react'
 import { formatPrice, httpStatus } from '../../api/client'
-import { useOrders } from '../../hooks'
+import { useAllStoreOrders } from '../../hooks'
 import { formatDate } from '../../lib/format'
 import {
   bucketRevenueByDay,
@@ -58,7 +58,7 @@ function MetricCard({ label, value, hint }: { label: string; value: string | num
 
 
 export default function ReportsTab({ slug }: { slug: string }) {
-  const { data: orders = [], isLoading, error } = useOrders(slug)
+  const { data: orders = [], isLoading, error } = useAllStoreOrders(slug)
   const [preset, setPreset] = useState<DateRangePreset>('90d')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')

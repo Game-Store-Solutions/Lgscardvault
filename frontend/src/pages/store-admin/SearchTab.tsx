@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
 import { inventoryKey, useCatalogGames, useInventory, useStoreGameStats } from '../../hooks'
@@ -18,6 +18,7 @@ import {
 } from '../../components/ui'
 import { type Condition } from '../../components/inventory'
 import { defaultFinishFor, finishChoices, isFoilFinish } from '../../lib/finishes'
+import { searchTextIncludes } from '../../lib/searchText'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -33,6 +34,8 @@ export default function SearchTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
 
   const [filter, setFilter] = useState('')
+  const [inventorySetFilter, setInventorySetFilter] = useState('')
+  const [inventoryFinishFilter, setInventoryFinishFilter] = useState<'all' | 'foil' | 'nonfoil'>('all')
   const [gameFilter, setGameFilter] = useState('')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogSetFilter, setCatalogSetFilter] = useState('')
@@ -45,6 +48,7 @@ export default function SearchTab({ slug }: { slug: string }) {
   const [costText, setCostText] = useState('')
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const addEditorRef = useRef<HTMLDivElement>(null)
 
   // Seed the sell price from the market price when there is one. Games
   // outside Magic often have no price at all, and the old flow silently
@@ -90,6 +94,11 @@ export default function SearchTab({ slug }: { slug: string }) {
     setFinish(nextFinish)
     applyScryfallPrice(card, nextFinish)
   }
+
+  useEffect(() => {
+    if (!selectedCard) return
+    addEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [selectedCard])
 
   function handleFinishChange(nextFinish: string) {
     setFinish(nextFinish)
@@ -186,24 +195,43 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   const filteredInventory = useMemo(() => {
     const term = filter.trim().toLowerCase()
+    const setTerm = inventorySetFilter.trim().toLowerCase()
     return inventory.filter((item) => {
       const card = item.card
       if (gameFilter && (card.gameCode ?? 'mtg') !== gameFilter) return false
+
+      if (setTerm) {
+        const code = (card.setCode ?? '').toLowerCase()
+        const setName = (card.setName ?? '').toLowerCase()
+        if (!code.includes(setTerm) && !setName.includes(setTerm)) return false
+      }
+
+      if (inventoryFinishFilter !== 'all') {
+        const foil = isFoilFinish(item.finish) || item.isFoil
+        if (inventoryFinishFilter === 'foil' && !foil) return false
+        if (inventoryFinishFilter === 'nonfoil' && foil) return false
+      }
+
       if (!term) return true
-      return (
-        card.name.toLowerCase().includes(term) ||
-        (card.setCode ?? '').toLowerCase().includes(term) ||
-        (card.setName ?? '').toLowerCase().includes(term) ||
-        (card.typeLine ?? '').toLowerCase().includes(term)
-      )
+      const blob = [card.name, card.setCode ?? '', card.setName ?? '', card.typeLine ?? '', item.finish].join(' ')
+      return searchTextIncludes(blob, term)
     })
-  }, [inventory, filter, gameFilter])
+  }, [inventory, filter, inventorySetFilter, inventoryFinishFilter, gameFilter])
+
+  const inventoryFiltersActive =
+    Boolean(filter.trim()) || Boolean(inventorySetFilter.trim()) || inventoryFinishFilter !== 'all'
+
+  const clearInventoryFilters = () => {
+    setFilter('')
+    setInventorySetFilter('')
+    setInventoryFinishFilter('all')
+  }
 
   // Paginate the inventory grid; reset to page 1 when the search filter changes.
   const [invPage, setInvPage] = useState(1)
   useEffect(() => {
     setInvPage(1)
-  }, [filter, gameFilter])
+  }, [filter, inventorySetFilter, inventoryFinishFilter, gameFilter])
   const invPageCount = Math.max(1, Math.ceil(filteredInventory.length / INVENTORY_PAGE_SIZE))
   const currentInvPage = Math.min(invPage, invPageCount)
   const visibleInventory = filteredInventory.slice(
@@ -290,7 +318,8 @@ export default function SearchTab({ slug }: { slug: string }) {
           )}
 
           {selectedCard && (
-            <SelectedCardEditor
+            <div ref={addEditorRef} className="scroll-mt-24">
+              <SelectedCardEditor
               card={selectedCard}
               quantity={quantity}
               condition={condition}
@@ -305,6 +334,7 @@ export default function SearchTab({ slug }: { slug: string }) {
               onFinishChange={handleFinishChange}
               onAdd={() => addMutation.mutate()}
             />
+            </div>
           )}
         </CardBody>
       </Card>
@@ -313,24 +343,72 @@ export default function SearchTab({ slug }: { slug: string }) {
         <CardHeader
           title={`${activeGameName} inventory`}
           subtitle={`What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`}
-          actions={
-            <Input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder={`Search your ${activeGameName} stock…`}
-              className="min-w-64"
-            />
-          }
         />
-        <CardBody>
+        <CardBody className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_8rem_10rem_auto] lg:items-end">
+            <Field label="Search stock">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder={`Search ${activeGameName} by name, type…`}
+                  className="min-h-11 text-base"
+                />
+              )}
+            </Field>
+            <Field label="Set">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  value={inventorySetFilter}
+                  onChange={(e) => setInventorySetFilter(e.target.value)}
+                  placeholder="Set code"
+                  className="uppercase min-h-11"
+                />
+              )}
+            </Field>
+            <Field label="Finish">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={inventoryFinishFilter}
+                  onChange={(e) => setInventoryFinishFilter(e.target.value as 'all' | 'foil' | 'nonfoil')}
+                  className="min-h-11"
+                >
+                  <option value="all">All finishes</option>
+                  <option value="nonfoil">{gameFinishes.plain} only</option>
+                  <option value="foil">{gameFinishes.foil} only</option>
+                </Select>
+              )}
+            </Field>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!inventoryFiltersActive}
+              onClick={clearInventoryFilters}
+              className="min-h-11"
+            >
+              <X className="size-4" aria-hidden />
+              Clear
+            </Button>
+          </div>
+
           {filteredInventory.length === 0 ? (
             <EmptyState
               icon={Search}
-              title={filter.trim() ? 'No matching inventory' : 'No inventory yet'}
+              title={inventoryFiltersActive ? 'No matching inventory' : 'No inventory yet'}
               description={
-                filter.trim()
-                  ? 'No inventory matches your search.'
+                inventoryFiltersActive
+                  ? 'No listings match your search or filters.'
                   : 'Add cards above or import a CSV to get started.'
+              }
+              action={
+                inventoryFiltersActive ? (
+                  <Button variant="secondary" size="sm" onClick={clearInventoryFilters}>
+                    Clear filters
+                  </Button>
+                ) : undefined
               }
             />
           ) : (

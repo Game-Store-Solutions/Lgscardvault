@@ -109,7 +109,8 @@ export default function CartPage() {
         await queryClient.invalidateQueries({ queryKey: customerKeys.cart(slug) })
       }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: customerKeys.orders(slug) }),
+        queryClient.invalidateQueries({ queryKey: customerKeys.ordersPrefix(slug) }),
+        queryClient.invalidateQueries({ queryKey: ['my-orders'] }),
         queryClient.invalidateQueries({ queryKey: ordersKey(slug) }),
         queryClient.invalidateQueries({ queryKey: inventoryKey(slug) }),
         queryClient.invalidateQueries({ queryKey: ['store-credit', slug] }),

@@ -44,6 +44,12 @@ final class SyncCommanderCatalogCommand extends Command
             return Command::SUCCESS;
         }
 
+        // Full is:commander sync walks ~20 Scryfall pages; raise the ceiling
+        // so Doctrine/JSON hydration does not OOM under the default 128M.
+        if (\function_exists('ini_set')) {
+            ini_set('memory_limit', '512M');
+        }
+
         $io->section('Syncing commanders from Scryfall (is:commander)');
         $result = $this->synchronizer->sync(static function (int $page, int $batchSize, int $upserted) use ($io): void {
             $io->text(sprintf('Page %d: %d cards (running upserted=%d)', $page, $batchSize, $upserted));

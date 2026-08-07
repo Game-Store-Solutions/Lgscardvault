@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, Check, Percent, Plus, Printer, Search, Trash2, WalletCards, X } from 'lucide-react'
+import { Archive, Check, ChevronDown, ChevronLeft, ChevronRight, Percent, Plus, Printer, Trash2, WalletCards, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type {
   BuylistEntry,
@@ -11,12 +11,54 @@ import type {
   TradeRateSettings,
   TradeRates,
 } from '../../api/types'
-import { useDebouncedValue, useStore } from '../../hooks'
+import { useDebouncedValue, useSellSubmissionsList, sellSubmissionsKey, useStore } from '../../hooks'
 import { formatDate } from '../../lib/format'
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Input, LoadingPanel, Modal, Select } from '../../components/ui'
+import { Avatar, Badge, Button, Card, EmptyState, Input, LoadingPanel, Modal, Select } from '../../components/ui'
+import { cx } from '../../lib/cx'
+
+function AccordionPanel({
+  id,
+  title,
+  subtitle,
+  defaultOpen = true,
+  children,
+}: {
+  id: string
+  title: ReactNode
+  subtitle?: ReactNode
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  const panelId = `${id}-panel`
+
+  return (
+    <Card>
+      <div className="flex items-start gap-2 border-b border-border px-4 py-4 sm:px-5">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((value) => !value)}
+          className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg text-fg-muted transition-colors hover:bg-bg hover:text-fg"
+        >
+          <ChevronDown aria-hidden className={cx('size-5 transition-transform', open ? 'rotate-0' : '-rotate-90')} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-display text-lg font-bold text-fg">{title}</h3>
+          {subtitle != null ? <p className="mt-0.5 text-sm text-fg-muted">{subtitle}</p> : null}
+        </div>
+      </div>
+      {open ? (
+        <div id={panelId} className="px-5 py-4">
+          {children}
+        </div>
+      ) : null}
+    </Card>
+  )
+}
 
 const buylistKey = (slug: string) => ['buylist-admin', slug] as const
-const submissionsKey = (slug: string) => ['sell-submissions', slug] as const
 const tradeRatesKey = (slug: string) => ['trade-rates', slug] as const
 
 const STATUS_TONE: Record<SellSubmissionStatus, 'brand' | 'success' | 'danger' | 'neutral'> = {
@@ -24,6 +66,42 @@ const STATUS_TONE: Record<SellSubmissionStatus, 'brand' | 'success' | 'danger' |
   accepted: 'success',
   completed: 'success',
   declined: 'danger',
+}
+
+type SubmissionQueueTab = 'review' | 'accepted'
+
+const SUBMISSIONS_PAGE_SIZE = 8
+const SUBMISSION_TABLE_ROW_H = 'h-[4.75rem]'
+
+function submissionIsArchived(submission: SellSubmission): boolean {
+  if (submission.archivedAt) return true
+  return submission.status === 'completed' || submission.status === 'declined'
+}
+
+function submissionCardCount(submission: SellSubmission): number {
+  return submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)
+}
+
+function submissionPrimaryLabel(submission: SellSubmission): string {
+  const first = submission.items[0]?.cardName
+  if (!first) return 'Sell list'
+  if (submission.items.length === 1) return first
+  return `${first} +${submission.items.length - 1}`
+}
+
+function sellStatusPresentation(status: SellSubmissionStatus): { label: string; className: string } {
+  switch (status) {
+    case 'pending':
+      return { label: 'Pending', className: 'bg-warning-50 text-warning-700' }
+    case 'accepted':
+      return { label: 'Accepted', className: 'bg-brand-50 text-brand-700' }
+    case 'completed':
+      return { label: 'Completed', className: 'bg-success-50 text-success-700' }
+    case 'declined':
+      return { label: 'Declined', className: 'bg-danger-50 text-danger-700' }
+    default:
+      return { label: status, className: 'bg-bg text-fg-muted' }
+  }
 }
 
 /**
@@ -34,14 +112,7 @@ const STATUS_TONE: Record<SellSubmissionStatus, 'brand' | 'success' | 'danger' |
 export default function SellTradeTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
 
-  const { data: submissions = [], isLoading: submissionsLoading } = useQuery({
-    queryKey: submissionsKey(slug),
-    queryFn: async () => {
-      const { data } = await api.get<SellSubmission[]>(`/stores/${slug}/sell-submissions`)
-      return data
-    },
-    refetchInterval: 30_000,
-  })
+  const { data: submissions = [], isLoading: submissionsLoading } = useSellSubmissionsList(slug)
 
   const { data: rates } = useQuery({
     queryKey: tradeRatesKey(slug),
@@ -52,19 +123,42 @@ export default function SellTradeTab({ slug }: { slug: string }) {
   })
 
   const [reviewing, setReviewing] = useState<SellSubmission | null>(null)
+  const [queueTab, setQueueTab] = useState<SubmissionQueueTab>('review')
+  const [queuePage, setQueuePage] = useState(1)
   const [showArchive, setShowArchive] = useState(false)
+  const [archivePage, setArchivePage] = useState(1)
   const [archiveSearch, setArchiveSearch] = useState('')
   const [archiveStatus, setArchiveStatus] = useState<'all' | 'accepted' | 'completed' | 'declined'>('all')
 
-  const { open, archive } = useMemo(() => {
-    const open = submissions.filter((s) => s.status === 'pending' || s.status === 'accepted')
-    const archive = submissions.filter((s) => s.status === 'completed' || s.status === 'declined')
-    return { open, archive }
+  const archiveSubmission = useMutation({
+    mutationFn: async ({ id, archived }: { id: number; archived: boolean }) => {
+      await api.patch(`/stores/${slug}/sell-submissions/${id}`, { archived })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: sellSubmissionsKey(slug) })
+    },
+  })
+
+  const { needsReview, awaitingComplete, archived } = useMemo(() => {
+    const needsReview = submissions.filter((s) => s.status === 'pending' && !s.archivedAt)
+    const awaitingComplete = submissions.filter((s) => s.status === 'accepted' && !s.archivedAt)
+    const archived = submissions.filter((s) => submissionIsArchived(s))
+    return { needsReview, awaitingComplete, archived }
   }, [submissions])
+
+  useEffect(() => setQueuePage(1), [queueTab])
+  useEffect(() => setArchivePage(1), [archiveSearch, archiveStatus, showArchive])
+
+  useEffect(() => {
+    const archivedAccepted = archived.filter((s) => s.status === 'accepted')
+    if (archivedAccepted.length > 0 && awaitingComplete.length === 0) {
+      setShowArchive(true)
+    }
+  }, [archived, awaitingComplete.length])
 
   const visibleArchive = useMemo(() => {
     const q = archiveSearch.trim().toLowerCase()
-    return archive.filter((submission) => {
+    return archived.filter((submission) => {
       if (archiveStatus !== 'all' && submission.status !== archiveStatus) return false
       if (!q) return true
       return (
@@ -73,38 +167,120 @@ export default function SellTradeTab({ slug }: { slug: string }) {
         String(submission.id).includes(q)
       )
     })
-  }, [archive, archiveSearch, archiveStatus])
+  }, [archived, archiveSearch, archiveStatus])
+
+  const pendingCount = needsReview.length
+  const acceptedCount = awaitingComplete.length
+
+  const activeQueue =
+    queueTab === 'review' ? needsReview : awaitingComplete
+  const queueTotalPages = Math.max(1, Math.ceil(activeQueue.length / SUBMISSIONS_PAGE_SIZE))
+  const queuePageClamped = Math.min(queuePage, queueTotalPages)
+  const queuePageRows = activeQueue.slice(
+    (queuePageClamped - 1) * SUBMISSIONS_PAGE_SIZE,
+    queuePageClamped * SUBMISSIONS_PAGE_SIZE,
+  )
+
+  const archiveTotalPages = Math.max(1, Math.ceil(visibleArchive.length / SUBMISSIONS_PAGE_SIZE))
+  const archivePageClamped = Math.min(archivePage, archiveTotalPages)
+  const archivePageRows = visibleArchive.slice(
+    (archivePageClamped - 1) * SUBMISSIONS_PAGE_SIZE,
+    archivePageClamped * SUBMISSIONS_PAGE_SIZE,
+  )
+
+  const invalidateSubmissions = () => queryClient.invalidateQueries({ queryKey: sellSubmissionsKey(slug) })
+
+  const rowActions = (submission: SellSubmission, inArchive: boolean) => ({
+    onReview: () => setReviewing(submission),
+    onArchive:
+      submission.status === 'accepted' && !inArchive
+        ? () => archiveSubmission.mutate({ id: submission.id, archived: true })
+        : undefined,
+    archivePending: archiveSubmission.isPending && archiveSubmission.variables?.id === submission.id,
+    onRestore:
+      inArchive && submission.status === 'accepted'
+        ? () => archiveSubmission.mutate({ id: submission.id, archived: false })
+        : undefined,
+    restorePending: archiveSubmission.isPending && archiveSubmission.variables?.id === submission.id,
+  })
 
   return (
     <div className="space-y-6">
-      <TradeRatesCard slug={slug} rates={rates} />
-      <BuylistCard slug={slug} rates={rates} />
-
-      <Card>
-        <CardHeader
-          title="Sell submissions"
-          subtitle={`${open.filter((s) => s.status === 'pending').length} pending review — finalize the offer, then complete once the customer is paid (completed cards are stocked into inventory automatically).`}
-        />
-        <CardBody className="space-y-4">
+      <AccordionPanel
+        id="sell-submissions"
+        defaultOpen
+        title="Sell submissions"
+        subtitle="Review new offers, then pay out and complete accepted deals (completed submissions stock inventory automatically)."
+      >
+        <div className="space-y-0">
           {submissionsLoading ? (
-            <LoadingPanel />
-          ) : open.length === 0 ? (
-            <EmptyState icon={Search} title="No open submissions" description="Customer sell lists will appear here." />
+            <div className="px-5 py-8">
+              <LoadingPanel />
+            </div>
           ) : (
-            <ul className="space-y-2">
-              {open.map((submission) => (
-                <SubmissionRow key={submission.id} submission={submission} onReview={() => setReviewing(submission)} />
-              ))}
-            </ul>
+            <>
+              <div className="-mx-5 flex flex-wrap gap-2 border-b border-border px-5 py-4">
+                {(
+                  [
+                    { id: 'review' as const, label: 'Needs review', count: pendingCount },
+                    { id: 'accepted' as const, label: 'Accepted', count: acceptedCount },
+                  ] as const
+                ).map((item) => {
+                  const active = queueTab === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setQueueTab(item.id)}
+                      className={cx(
+                        'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                        active ? 'bg-brand-500 text-white shadow-sm' : 'text-fg-muted hover:bg-bg',
+                      )}
+                    >
+                      <span>{item.label}</span>
+                      {item.id === 'review' && item.count > 0 ? (
+                        <span
+                          className={cx(
+                            'grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-bold tabular-nums leading-none',
+                            active ? 'bg-white/25 text-white' : 'bg-brand-700 text-brand-100',
+                          )}
+                        >
+                          {item.count > 99 ? '99+' : item.count}
+                        </span>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {activeQueue.length === 0 ? (
+                <p className="px-5 py-16 text-center text-sm text-fg-muted">
+                  {queueTab === 'review'
+                    ? 'No new submissions waiting for review.'
+                    : 'No accepted submissions awaiting payout. Completed deals may be in the archive below — use Restore on archived accepted rows.'}
+                </p>
+              ) : (
+                <>
+                  <div className="-mx-5 min-w-0 overflow-x-auto">
+                    <SubmissionsTable rows={queuePageRows} getRowActions={(submission) => rowActions(submission, false)} />
+                  </div>
+                  <SubmissionsPagination
+                    page={queuePageClamped}
+                    totalPages={queueTotalPages}
+                    onPageChange={setQueuePage}
+                  />
+                </>
+              )}
+            </>
           )}
 
-          <div className="border-t border-border pt-3">
+          <div className="border-t border-border px-5 py-4">
             <Button variant="ghost" onClick={() => setShowArchive((v) => !v)}>
               <Archive className="size-4" aria-hidden />
-              {showArchive ? 'Hide' : 'Show'} archive ({archive.length})
+              {showArchive ? 'Hide' : 'Show'} archive ({archived.length})
             </Button>
             {showArchive && (
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-4">
                 <div className="flex flex-wrap gap-3">
                   <div className="min-w-56 flex-1">
                     <Input
@@ -121,6 +297,7 @@ export default function SellTradeTab({ slug }: { slug: string }) {
                     className="w-36"
                   >
                     <option value="all">All</option>
+                    <option value="accepted">Accepted</option>
                     <option value="completed">Completed</option>
                     <option value="declined">Declined</option>
                   </Select>
@@ -128,17 +305,25 @@ export default function SellTradeTab({ slug }: { slug: string }) {
                 {visibleArchive.length === 0 ? (
                   <p className="text-sm text-fg-muted">No archived submissions match.</p>
                 ) : (
-                  <ul className="space-y-2">
-                    {visibleArchive.map((submission) => (
-                      <SubmissionRow key={submission.id} submission={submission} onReview={() => setReviewing(submission)} />
-                    ))}
-                  </ul>
+                  <>
+                    <div className="-mx-5 min-w-0 overflow-x-auto border-t border-border">
+                      <SubmissionsTable rows={archivePageRows} getRowActions={(submission) => rowActions(submission, true)} />
+                    </div>
+                    <SubmissionsPagination
+                      page={archivePageClamped}
+                      totalPages={archiveTotalPages}
+                      onPageChange={setArchivePage}
+                    />
+                  </>
                 )}
               </div>
             )}
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </AccordionPanel>
+
+      <TradeRatesCard slug={slug} rates={rates} />
+      <BuylistCard slug={slug} rates={rates} />
 
       {reviewing && (
         <ReviewSubmissionModal
@@ -147,8 +332,17 @@ export default function SellTradeTab({ slug }: { slug: string }) {
           onClose={() => setReviewing(null)}
           onSaved={async () => {
             setReviewing(null)
-            await queryClient.invalidateQueries({ queryKey: submissionsKey(slug) })
+            await invalidateSubmissions()
           }}
+          onArchive={
+            reviewing.status === 'accepted'
+              ? async () => {
+                  await archiveSubmission.mutateAsync({ id: reviewing.id, archived: true })
+                  setReviewing(null)
+                }
+              : undefined
+          }
+          archivePending={archiveSubmission.isPending}
         />
       )}
     </div>
@@ -249,25 +443,26 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
   )
 
   return (
-    <Card>
-      <CardHeader
-        title={
-          <span className="inline-flex items-center gap-2">
-            <Percent aria-hidden className="size-4 text-brand-600" />
-            Trade-in rates
-          </span>
-        }
-        subtitle={
-          rates
-            ? `Customers currently get ${rates.cashPercent}% cash / ${rates.creditPercent}% credit of market price` +
-              (rates.buylistCashPercent > rates.cashPercent || rates.buylistCreditPercent > rates.creditPercent
-                ? `, boosted to ${rates.buylistCashPercent}% / ${rates.buylistCreditPercent}% on your buy list`
-                : '') +
-              (rates.promoActive ? ' — promo rates are LIVE.' : '.')
-            : 'Percent of market price paid for trade-ins.'
-        }
-      />
-      <CardBody className="space-y-4">
+    <AccordionPanel
+      id="trade-rates"
+      defaultOpen={false}
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Percent aria-hidden className="size-4 text-brand-600" />
+          Trade-in rates
+        </span>
+      }
+      subtitle={
+        rates
+          ? `Customers currently get ${rates.cashPercent}% cash / ${rates.creditPercent}% credit of market price` +
+            (rates.buylistCashPercent > rates.cashPercent || rates.buylistCreditPercent > rates.creditPercent
+              ? `, boosted to ${rates.buylistCashPercent}% / ${rates.buylistCreditPercent}% on your buy list`
+              : '') +
+            (rates.promoActive ? ' — promo rates are LIVE.' : '.')
+          : 'Percent of market price paid for trade-ins.'
+      }
+    >
+      <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-3">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Base rates</p>
@@ -328,8 +523,8 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
             </span>
           )}
         </div>
-      </CardBody>
-    </Card>
+      </div>
+    </AccordionPanel>
   )
 }
 
@@ -409,12 +604,13 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
   }
 
   return (
-    <Card>
-      <CardHeader
-        title="Buy list"
-        subtitle="Cards you actively want. Leave the offer blank to pay your premium rate at market; pin a price to lock the per-copy offer."
-      />
-      <CardBody className="space-y-4">
+    <AccordionPanel
+      id="buy-list"
+      defaultOpen={false}
+      title="Buy list"
+      subtitle="Cards you actively want. Leave the offer blank to pay your premium rate at market; pin a price to lock the per-copy offer."
+    >
+      <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_7rem_auto] sm:items-end">
           <Input label="Add a card" value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null) }} placeholder="Search the catalog…" />
           <Input label="Pinned offer ($)" value={offerText} onChange={(e) => setOfferText(e.target.value)} inputMode="decimal" placeholder="Premium rate" />
@@ -517,41 +713,186 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
             ))}
           </ul>
         )}
-      </CardBody>
-    </Card>
+      </div>
+    </AccordionPanel>
   )
 }
 
-/** One submission line in the pending/archive lists. */
-function SubmissionRow({ submission, onReview }: { submission: SellSubmission; onReview: () => void }) {
-  const cardCount = submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)
+/** Orders-style table for sell submission queues. */
+function SubmissionsTable({
+  rows,
+  getRowActions,
+}: {
+  rows: SellSubmission[]
+  getRowActions: (submission: SellSubmission) => {
+    onReview: () => void
+    onArchive?: () => void
+    archivePending?: boolean
+    onRestore?: () => void
+    restorePending?: boolean
+  }
+}) {
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface p-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-bold text-fg">
-          {submission.customerName ?? 'Customer'}
-          {submission.channel === 'kiosk' && (
-            <Badge tone="neutral" className="ml-2">
-              Kiosk
-            </Badge>
-          )}
-        </p>
-        <p className="text-xs text-fg-muted">
-          #{submission.id} · {cardCount} cards · {formatDate(submission.createdAt)}
-          {submission.customerEmail ? ` · ${submission.customerEmail}` : ''}
-        </p>
-      </div>
-      <span className="text-sm text-fg-muted">
+    <table className="w-full table-fixed text-left text-sm">
+      <thead>
+        <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
+          <th className="w-[26%] px-5 py-3 font-semibold">Cards</th>
+          <th className="w-[22%] px-5 py-3 font-semibold">Customer</th>
+          <th className="w-[14%] px-5 py-3 font-semibold">Submission</th>
+          <th className="w-[12%] px-5 py-3 font-semibold">Payout</th>
+          <th className="w-[12%] px-5 py-3 font-semibold">Offer</th>
+          <th className="w-[10%] px-5 py-3 font-semibold">Status</th>
+          <th className="w-[14%] px-3 py-3 text-right font-semibold">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((submission) => (
+          <SubmissionTableRow key={submission.id} submission={submission} {...getRowActions(submission)} />
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function SubmissionTableRow({
+  submission,
+  onReview,
+  onArchive,
+  archivePending = false,
+  onRestore,
+  restorePending = false,
+}: {
+  submission: SellSubmission
+  onReview: () => void
+  onArchive?: () => void
+  archivePending?: boolean
+  onRestore?: () => void
+  restorePending?: boolean
+}) {
+  const cardCount = submissionCardCount(submission)
+  const statusUi = sellStatusPresentation(submission.status)
+  const firstItem = submission.items[0]
+  const thumb = firstItem?.imageUris?.small ?? firstItem?.imageUris?.normal
+
+  return (
+    <tr className={cx('border-b border-border/60 transition-colors hover:bg-bg/80', SUBMISSION_TABLE_ROW_H)}>
+      <td className="px-5 py-4 align-middle">
+        <button type="button" onClick={onReview} className="flex w-full items-center gap-3 text-left">
+          <span className="grid size-11 shrink-0 overflow-hidden rounded-xl bg-bg">
+            {thumb ? (
+              <img src={thumb} alt="" className="size-full object-cover" />
+            ) : (
+              <span className="grid size-full place-items-center text-fg-muted">
+                <WalletCards aria-hidden className="size-5" />
+              </span>
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-fg">{submissionPrimaryLabel(submission)}</span>
+            <span className="block text-xs text-fg-muted">{cardCount} cards</span>
+          </span>
+        </button>
+      </td>
+      <td className="px-5 py-4 align-middle">
+        <div className="flex items-center gap-3">
+          <Avatar name={submission.customerName ?? 'Guest'} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-fg">{submission.customerName ?? 'Guest'}</p>
+            <p className="truncate text-xs text-fg-muted">
+              {submission.channel === 'kiosk' ? 'Walk-in' : submission.customerEmail ?? 'Customer'}
+            </p>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-4 align-middle">
+        <p className="font-semibold text-fg">#{submission.id}</p>
+        <p className="text-xs text-fg-muted">{formatDate(submission.createdAt)}</p>
+      </td>
+      <td className="px-5 py-4 align-middle text-fg-muted">
         {submission.payoutMethod === 'credit' ? 'Store credit' : 'Cash'}
-      </span>
-      <span className="font-display text-lg font-extrabold text-success-700">{formatPrice(submission.totalOfferCents)}</span>
-      <Badge tone={STATUS_TONE[submission.status]} className="uppercase">
-        {submission.status}
-      </Badge>
-      <Button size="sm" variant="secondary" onClick={onReview}>
-        {submission.status === 'pending' ? 'Review' : 'Details'}
-      </Button>
-    </li>
+      </td>
+      <td className="px-5 py-4 align-middle">
+        <p className="font-bold text-fg">{formatPrice(submission.totalOfferCents)}</p>
+      </td>
+      <td className="px-5 py-4 align-middle">
+        <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>{statusUi.label}</span>
+      </td>
+      <td className="px-3 py-4 align-middle">
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {onRestore ? (
+            <Button size="sm" variant="ghost" loading={restorePending} onClick={onRestore}>
+              Restore
+            </Button>
+          ) : null}
+          {onArchive ? (
+            <Button size="sm" variant="ghost" loading={archivePending} onClick={onArchive}>
+              Archive
+            </Button>
+          ) : null}
+          <Button size="sm" variant="secondary" onClick={onReview}>
+            {submission.status === 'pending' ? 'Review' : 'Details'}
+          </Button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function SubmissionsPagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number
+  totalPages: number
+  onPageChange: (page: number) => void
+}) {
+  const pages = useMemo(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
+    const set = new Set<number>([1, totalPages, page, page - 1, page + 1].filter((p) => p >= 1 && p <= totalPages))
+    return [...set].sort((a, b) => a - b)
+  }, [page, totalPages])
+
+  if (totalPages <= 1) return null
+
+  return (
+    <div className="flex min-h-[3.25rem] flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-fg-muted disabled:opacity-40 hover:bg-bg"
+      >
+        <ChevronLeft aria-hidden className="size-4" />
+        Previous
+      </button>
+      <div className="flex items-center gap-1">
+        {pages.map((p, index) => (
+          <span key={p} className="flex items-center gap-1">
+            {index > 0 && pages[index - 1] !== p - 1 && <span className="px-1 text-fg-muted">…</span>}
+            <button
+              type="button"
+              onClick={() => onPageChange(p)}
+              className={cx(
+                'grid size-9 place-items-center rounded-lg text-sm font-bold',
+                p === page ? 'bg-brand-500 text-white' : 'text-fg-muted hover:bg-bg',
+              )}
+            >
+              {p}
+            </button>
+          </span>
+        ))}
+      </div>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onPageChange(page + 1)}
+        className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-fg-muted disabled:opacity-40 hover:bg-bg"
+      >
+        Next
+        <ChevronRight aria-hidden className="size-4" />
+      </button>
+    </div>
   )
 }
 
@@ -570,11 +911,15 @@ function ReviewSubmissionModal({
   submission,
   onClose,
   onSaved,
+  onArchive,
+  archivePending = false,
 }: {
   slug: string
   submission: SellSubmission
   onClose: () => void
   onSaved: () => Promise<void>
+  onArchive?: () => void | Promise<void>
+  archivePending?: boolean
 }) {
   const isPending = submission.status === 'pending'
   const [reviewed, setReviewed] = useState<ReviewedLine[]>(() =>
@@ -736,6 +1081,10 @@ function ReviewSubmissionModal({
           )}
           {submission.status === 'accepted' && (
             <>
+              <Button variant="ghost" loading={archivePending} onClick={() => void onArchive?.()}>
+                <Archive className="size-4" aria-hidden />
+                Archive
+              </Button>
               <Button variant="ghost" className="text-danger-700" loading={decide.isPending} onClick={() => decide.mutate({ status: 'declined' })}>
                 Decline
               </Button>

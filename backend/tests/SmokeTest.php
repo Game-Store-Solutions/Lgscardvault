@@ -37,5 +37,7 @@ final class SmokeTest extends KernelTestCase
         yield 'sync handler' => [\App\MessageHandler\SyncScryfallCatalogMessageHandler::class];
         yield 'commander sync handler' => [\App\MessageHandler\SyncCommanderCatalogMessageHandler::class];
         yield 'commander synchronizer' => [\App\Service\Recommend\CommanderCatalogSynchronizer::class];
+        yield 'spellbook client' => [\App\Service\Spellbook\SpellbookClientInterface::class];
+        yield 'deck assembler' => [\App\Service\Recommend\CommanderDeckAssembler::class];
     }
 }

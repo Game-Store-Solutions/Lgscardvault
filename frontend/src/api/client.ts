@@ -48,6 +48,9 @@ export function extractErrorMessage(error: unknown, fallback: string): string {
 
 export default api
 
+/** Customer-facing order list page size (must match backend default unless overridden). */
+export const CUSTOMER_ORDERS_PAGE_SIZE = 15
+
 export function unwrapCollection<T>(data: T[] | { member?: T[] }): T[] {
   if (Array.isArray(data)) {
     return data

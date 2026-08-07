@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   ChevronRight,
   Heart,
@@ -26,7 +26,7 @@ import {
   useStore,
   useStoreTheme,
 } from '../hooks'
-import { Badge, BackButton, Button, buttonVariants, ErrorState, TabPanel, Tabs } from '../components/ui'
+import { Badge, BackButton, Button, buttonVariants, ErrorState, Modal, TabPanel, Tabs } from '../components/ui'
 import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { rarityAccent, rarityLabel } from '../lib/mtg'
@@ -44,6 +44,7 @@ import {
 import { EditInventoryModal, type InventoryEditPayload } from './store-admin/search'
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 import { setBrowsePath } from '../lib/setBrowse'
+import { artistBrowsePath, inventoryByArtist, resolveCardArtist } from '../lib/artistBrowse'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -65,20 +66,30 @@ function faceImage(face: CardFace): string | undefined {
 export default function CardDetailsPage() {
   const { slug = '', id = '' } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const manageListing = searchParams.get('manage') === '1'
   // Pages that link here can pass `state.from` so "back" returns to where the
   // shopper actually came from (e.g. the case cards page) instead of always
   // landing on the storefront.
   const cameFromCaseCards = (location.state as { from?: string } | null)?.from === 'case-cards'
-  const setNavState = location.state as { from?: string; setCode?: string } | null
+  const setNavState = location.state as {
+    from?: string
+    setCode?: string
+    artist?: string
+    inventoryId?: string
+    gameCode?: string
+  } | null
   const cameFromSet = setNavState?.from === 'set' && Boolean(setNavState.setCode)
+  const cameFromArtist = setNavState?.from === 'artist' && Boolean(setNavState.artist)
   const backTo = cameFromCaseCards
     ? `/s/${slug}/case-cards`
-    : cameFromSet && setNavState?.setCode
-      ? setBrowsePath(slug, setNavState.setCode)
-      : `/s/${slug}`
-  const backLabel = cameFromCaseCards ? CASE_CARDS_LABEL : cameFromSet ? 'Set' : null
+    : cameFromArtist && setNavState?.artist
+      ? artistBrowsePath(slug, setNavState.artist, setNavState.gameCode ?? 'mtg')
+      : cameFromSet && setNavState?.setCode
+        ? setBrowsePath(slug, setNavState.setCode)
+        : `/s/${slug}`
+  const backLabel = cameFromCaseCards ? CASE_CARDS_LABEL : cameFromArtist ? 'Artist' : cameFromSet ? 'Set' : null
   const { user } = useAuth()
   const canManage = useCanManageStore(slug)
   const queryClient = useQueryClient()
@@ -86,6 +97,7 @@ export default function CardDetailsPage() {
   // Which face of a multi-faced card is currently shown (0 = front).
   const [faceIndex, setFaceIndex] = useState(0)
   const [infoTab, setInfoTab] = useState<'details' | 'legality'>('details')
+  const [artistEmptyModalOpen, setArtistEmptyModalOpen] = useState(false)
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -104,7 +116,7 @@ export default function CardDetailsPage() {
   })
 
   // Shared cache key with StorePage — usually warm — powers the recommendations rail.
-  const { data: inventory = [] } = useInventory(slug)
+  const { data: inventory = [], isLoading: inventoryLoading } = useInventory(slug)
 
   const { data: favorites = [] } = useCustomerFavorites(slug, Boolean(user))
   const { data: wantList = [] } = useCustomerWantList(slug, Boolean(user))
@@ -306,6 +318,30 @@ export default function CardDetailsPage() {
   const setPageUrl = card.setCode ? setBrowsePath(slug, card.setCode) : null
   const productTitle = setDisplay ? `${card.name} - ${setDisplay}` : card.name
   const colPad = 'px-5 py-8 sm:px-8 lg:px-10'
+  const displayArtist = resolveCardArtist(card, faceIndex)
+
+  const openArtistBrowse = () => {
+    if (!displayArtist || !item) {
+      return
+    }
+    const inStore = inventoryByArtist(inventory, displayArtist, [item])
+    if (inStore.length === 0 && !inventoryLoading) {
+      setArtistEmptyModalOpen(true)
+      return
+    }
+    if (inStore.length === 0 && inventoryLoading) {
+      return
+    }
+    navigate(artistBrowsePath(slug, displayArtist, card.gameCode ?? 'mtg'), {
+      state: {
+        from: 'card',
+        inventoryId: item.id,
+        artist: displayArtist,
+        gameCode: card.gameCode ?? 'mtg',
+        seedItems: inStore.length > 0 ? inStore : [item],
+      },
+    })
+  }
 
   return (
     <div className={cx(bleed, 'pb-12')}>
@@ -464,27 +500,22 @@ export default function CardDetailsPage() {
                       </dd>
                     </div>
                   )}
-                  {card.artist && (
+                  {displayArtist && (
                     <DetailRow
                       label="Artist"
                       value={
-                        card.scryfallUri ? (
-                          <a
-                            href={card.scryfallUri}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-bold text-brand-600 hover:underline"
-                          >
-                            {card.artist}
-                          </a>
-                        ) : (
-                          card.artist
-                        )
+                        <button
+                          type="button"
+                          onClick={openArtistBrowse}
+                          className="font-bold text-brand-600 hover:underline"
+                        >
+                          {displayArtist}
+                        </button>
                       }
                     />
                   )}
                   {specs
-                    .filter((s) => !['Rarity', 'Power / Toughness'].includes(s.label))
+                    .filter((s) => !['Rarity', 'Power / Toughness', 'Artist'].includes(s.label))
                     .map((spec) => (
                       <DetailRow
                         key={spec.label}
@@ -754,6 +785,22 @@ export default function CardDetailsPage() {
         )}
       </article>
       </div>
+
+      <Modal
+        open={artistEmptyModalOpen}
+        onClose={() => setArtistEmptyModalOpen(false)}
+        title="No cards in this store"
+        footer={
+          <Button variant="primary" onClick={() => setArtistEmptyModalOpen(false)}>
+            OK
+          </Button>
+        }
+      >
+        <p className="text-sm leading-relaxed text-fg">
+          <span className="font-bold">{store?.name ?? 'This store'}</span> doesn’t have any in-stock cards
+          illustrated by <span className="font-bold">{displayArtist ?? 'this artist'}</span> right now.
+        </p>
+      </Modal>
 
       <EditInventoryModal
         slug={slug}

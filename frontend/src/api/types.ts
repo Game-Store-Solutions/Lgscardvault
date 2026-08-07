@@ -669,6 +669,14 @@ export interface Order {
   lines?: OrderLine[]
 }
 
+/** Customer order lists (`/me/orders`, `/stores/{slug}/customer/orders`). */
+export interface PaginatedOrders {
+  items: Order[]
+  total: number
+  page: number
+  itemsPerPage: number
+}
+
 export type OrderStatus = 'pending' | 'received' | 'fulfilled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
 
 /** A store's effective sell/trade payout rates right now (promo-resolved server-side). */
@@ -740,6 +748,7 @@ export interface SellSubmission {
   totalMarketCents: number
   createdAt: string
   decidedAt: string | null
+  archivedAt?: string | null
   customerName?: string | null
   customerEmail?: string | null
   items: SellSubmissionItem[]
@@ -896,11 +905,19 @@ export interface StoreGame extends CatalogGame {
   hasSealed: boolean
 }
 
+export interface CatalogArtistBrowseResult {
+  artist: string
+  gameCode: string
+  total: number
+  offset: number
+  limit: number
+  items: CardSummary[]
+}
+
 /** Inventory headline numbers for one game at one store. */
 export interface StoreGameStats {
   gameCode: string
   gameName: string
   singles: { listings: number; copies: number }
   sealed: { products: number; units: number }
-  total: { listings: number; copies: number }
 }

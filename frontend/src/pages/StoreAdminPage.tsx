@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { buttonVariants, PageHeader } from '../components/ui'
 import { useStore } from '../hooks'
 import SearchTab from './store-admin/SearchTab'
@@ -38,12 +38,13 @@ function resolveSection(value?: string): Section {
 
 export default function StoreAdminPage() {
   const { slug = '', section } = useParams()
+  const location = useLocation()
   const active = resolveSection(section)
   const { data: store } = useStore(slug)
   const hidePageHeader = active === 'orders'
 
   return (
-    <div className={hidePageHeader ? '' : 'space-y-6'}>
+    <div key={location.pathname} className={hidePageHeader ? '' : 'space-y-6'}>
       {!hidePageHeader && (
         <PageHeader
           title={store?.name ?? slug}

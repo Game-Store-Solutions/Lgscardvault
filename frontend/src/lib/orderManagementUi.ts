@@ -3,7 +3,7 @@ import type { Order, OrderStatus } from '../api/types'
 export type OrderListTab = 'all' | 'pending' | 'processing' | 'delivery' | 'delivered'
 
 export const ORDER_LIST_TABS: { id: OrderListTab; label: string }[] = [
-  { id: 'all', label: 'All Order' },
+  { id: 'all', label: 'All orders' },
   { id: 'pending', label: 'Pending' },
   { id: 'processing', label: 'Processing' },
   { id: 'delivery', label: 'Out for Delivery' },
@@ -21,6 +21,11 @@ export function orderMatchesTab(order: Order, tab: OrderListTab): boolean {
   if (tab === 'delivery') return DELIVERY.includes(order.status)
   if (tab === 'delivered') return DELIVERED.includes(order.status)
   return true
+}
+
+/** Query param for GET /stores/{slug}/orders when filtering by admin tab. */
+export function orderListTabQueueParam(tab: OrderListTab): string | undefined {
+  return tab === 'all' ? undefined : tab
 }
 
 /** FreshCart-style status pill labels and colors. */
@@ -77,4 +82,11 @@ export function countOrdersBetween(orders: Order[], fromMs: number, toMs: number
 export function percentChange(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? 100 : null
   return Math.round(((current - previous) / previous) * 100)
+}
+
+const CLOSED_STORE_ORDER_STATUSES: OrderStatus[] = ['fulfilled', 'completed', 'cancelled', 'refunded']
+
+/** Admin Commerce nav badge — open queue until fulfilled or closed. */
+export function isOpenStoreOrder(order: Pick<Order, 'status'>): boolean {
+  return !CLOSED_STORE_ORDER_STATUSES.includes(order.status)
 }

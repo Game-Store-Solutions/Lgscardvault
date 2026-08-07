@@ -22,8 +22,6 @@ final class CommanderCatalogSynchronizer
 {
     public const SCRYFALL_QUERY = 'is:commander';
 
-    private const FLUSH_EVERY = 100;
-
     public function __construct(
         private readonly ScryfallClient $scryfall,
         private readonly ScryfallCardUpserter $cardUpserter,
@@ -38,26 +36,23 @@ final class CommanderCatalogSynchronizer
      */
     public function sync(?callable $onPage = null): array
     {
+        /** @var array<string, true> $seenOracleIds */
         $seenOracleIds = [];
         $upserted = 0;
         $pages = 0;
-        $pending = 0;
 
         foreach ($this->scryfall->iterateSearchPages(self::SCRYFALL_QUERY, 'cards') as $batch) {
             ++$pages;
             $this->cardUpserter->upsertMany($batch);
+            // Native upsert bypasses the identity map — drop it before mirroring.
+            $this->entityManager->clear();
 
             foreach ($batch as $cardData) {
                 $oracleId = Uuid::fromString((string) $cardData['oracle_id']);
                 $cardId = Uuid::fromString((string) $cardData['id']);
-                $seenOracleIds[] = (string) $oracleId;
+                $seenOracleIds[(string) $oracleId] = true;
 
                 $card = $this->cards->find($cardId);
-                if (!$card instanceof Card) {
-                    // Native upsert bypasses the identity map — clear + reload.
-                    $this->entityManager->clear();
-                    $card = $this->cards->find($cardId);
-                }
                 if (!$card instanceof Card) {
                     continue;
                 }
@@ -69,26 +64,17 @@ final class CommanderCatalogSynchronizer
                 }
                 $commander->syncFromCard($card);
                 ++$upserted;
-                ++$pending;
-
-                if ($pending >= self::FLUSH_EVERY) {
-                    $this->entityManager->flush();
-                    $this->entityManager->clear();
-                    $pending = 0;
-                }
             }
+
+            $this->entityManager->flush();
+            $this->entityManager->clear();
 
             if (null !== $onPage) {
                 $onPage($pages, count($batch), $upserted);
             }
         }
 
-        if ($pending > 0) {
-            $this->entityManager->flush();
-            $this->entityManager->clear();
-        }
-
-        $removed = $this->commanders->deleteNotInOracleIds(array_values(array_unique($seenOracleIds)));
+        $removed = $this->commanders->deleteNotInOracleIds(array_keys($seenOracleIds));
 
         return [
             'upserted' => $upserted,

@@ -40,6 +40,7 @@ import {
   ProfileLayout,
   ProfileSection,
   ProfileSideNav,
+  ProfileNavBadge,
   ProfileStatistics,
   storeActivityIcons,
   storeAsideIcons,
@@ -49,8 +50,8 @@ import {
   IconMagicBell,
   IconTreasureChest,
 } from '../components/profile/ProfileNavIcons'
-import { ImageOff, Plus, ReceiptText, Save, Search, Trash2, WalletCards, X } from 'lucide-react'
-import { CustomerOrderCard } from '../components/orders/CustomerOrderCard'
+import { ImageOff, Plus, Save, Search, Trash2, WalletCards, X } from 'lucide-react'
+import { PaginatedCustomerOrdersList } from '../components/orders/PaginatedCustomerOrdersList'
 import { NotificationList } from '../components/notifications/NotificationList'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { formatDate } from '../lib/format'
@@ -70,9 +71,11 @@ export default function CustomerProfilePage() {
   const tab: TabId = tabParam && TAB_IDS.includes(tabParam) ? tabParam : 'profile'
   const setTab = (next: TabId) => setSearchParams(next === 'profile' ? {} : { tab: next }, { replace: true })
 
+  const [ordersPage, setOrdersPage] = useState(1)
+
   const favoritesQuery = useCustomerFavorites(slug)
   const wantListQuery = useCustomerWantList(slug)
-  const ordersQuery = useCustomerOrders(slug)
+  const ordersQuery = useCustomerOrders(slug, ordersPage)
   const notificationsQuery = useCustomerNotifications(slug)
 
   const creditQuery = useQuery({
@@ -87,15 +90,15 @@ export default function CustomerProfilePage() {
   const unreadCount = (notificationsQuery.data ?? []).filter((n) => !n.readAt).length
   const favoritesCount = favoritesQuery.data?.length ?? 0
   const wantListCount = wantListQuery.data?.length ?? 0
-  const ordersCount = ordersQuery.data?.length ?? 0
+  const ordersCount = ordersQuery.data?.total ?? 0
   const creditBalance = creditQuery.data?.balanceCents ?? 0
   const store = storeQuery.data
 
   const navItems = [
     { id: 'profile', label: 'Profile', icon: storeActivityIcons.profile },
-    { id: 'orders', label: 'Orders', icon: storeActivityIcons.orders, badge: ordersCount ? <span className="text-xs">{ordersCount}</span> : null },
-    { id: 'favorites', label: 'Favorites', icon: storeActivityIcons.favorites, badge: favoritesCount ? <span className="text-xs">{favoritesCount}</span> : null },
-    { id: 'wantlist', label: 'Want list', icon: storeActivityIcons.wantlist, badge: wantListCount ? <span className="text-xs">{wantListCount}</span> : null },
+    { id: 'orders', label: 'Orders', icon: storeActivityIcons.orders, badge: ordersCount > 0 ? <ProfileNavBadge count={ordersCount} /> : null },
+    { id: 'favorites', label: 'Favorites', icon: storeActivityIcons.favorites, badge: favoritesCount > 0 ? <ProfileNavBadge count={favoritesCount} /> : null },
+    { id: 'wantlist', label: 'Want list', icon: storeActivityIcons.wantlist, badge: wantListCount > 0 ? <ProfileNavBadge count={wantListCount} /> : null },
     { id: 'selltrade', label: 'Sell / Trade', icon: storeActivityIcons.selltrade },
     {
       id: 'credit',
@@ -107,7 +110,7 @@ export default function CustomerProfilePage() {
       id: 'notifications',
       label: 'Notifications',
       icon: storeActivityIcons.notifications,
-      badge: unreadCount ? <span className="text-xs">{unreadCount}</span> : null,
+      badge: unreadCount > 0 ? <ProfileNavBadge count={unreadCount} tone="attention" /> : null,
     },
   ]
 
@@ -213,7 +216,21 @@ export default function CustomerProfilePage() {
         </Card>
       </TabPanel>
       <TabPanel when="orders" value={tab}>
-        <OrdersPanel slug={slug} query={ordersQuery} />
+        <PaginatedCustomerOrdersList
+          query={ordersQuery}
+          page={ordersPage}
+          onPageChange={setOrdersPage}
+          wrapInCard
+          headerTitle="Past orders"
+          headerSubtitle="Track status and review previous purchases at this store."
+          emptyTitle="No past orders yet"
+          emptyDescription="Orders you place with this store will appear here."
+          emptyAction={
+            <Link to={`/s/${slug}`} className="text-sm font-medium text-brand-600 hover:text-brand-700">
+              Browse the store
+            </Link>
+          }
+        />
       </TabPanel>
       <TabPanel when="favorites" value={tab}>
         <FavoritesPanel slug={slug} query={favoritesQuery} />
@@ -550,53 +567,6 @@ function ProfilePanel({ slug }: { slug: string }) {
         </Card>
       </form>
     </div>
-  )
-}
-
-/* ------------------------------ Orders ------------------------------ */
-
-function OrdersPanel({
-  slug,
-  query,
-}: {
-  slug: string
-  query: ReturnType<typeof useCustomerOrders>
-}) {
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-
-  if (query.isLoading) return <LoadingPanel label="Loading orders..." />
-  if (query.isError) return <ErrorState title="Could not load orders." onRetry={() => void query.refetch()} />
-
-  const orders = query.data ?? []
-  if (orders.length === 0) {
-    return (
-      <EmptyState
-        icon={ReceiptText}
-        title="No past orders yet"
-        description="Orders you place with this store will appear here."
-        action={
-          <Link to={`/s/${slug}`} className="text-sm font-medium text-brand-600 hover:text-brand-700">
-            Browse the store
-          </Link>
-        }
-      />
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader title="Past orders" subtitle="Track order status and review previous purchases." />
-      <CardBody className="grid gap-3 bg-bg/40">
-        {orders.map((order) => (
-          <CustomerOrderCard
-            key={order.id}
-            order={order}
-            expanded={expandedId === order.id}
-            onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
-          />
-        ))}
-      </CardBody>
-    </Card>
   )
 }
 

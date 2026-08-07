@@ -9,6 +9,38 @@ export type ProfileNavItem = {
   badge?: ReactNode
 }
 
+/** High-contrast count pill for profile / account / admin side nav. */
+export function ProfileNavBadge({
+  count,
+  tone = 'brand',
+}: {
+  count: number
+  /** `attention` — open orders / alerts (admin Commerce). */
+  tone?: 'brand' | 'attention'
+}) {
+  if (count <= 0) return null
+  const label = count > 99 ? '99+' : count
+  return (
+    <span
+      className={cx(
+        'ml-auto grid h-6 min-w-6 shrink-0 place-items-center rounded-full border px-1.5',
+        'text-[11px] font-bold tabular-nums leading-none shadow-sm',
+        tone === 'attention'
+          ? cx(
+              'border-danger-700/45 bg-danger-500 text-white',
+              'dark:border-danger-500/35 dark:bg-danger-500 dark:text-white',
+            )
+          : cx(
+              'border-brand-600/35 bg-brand-500 text-white',
+              'dark:border-brand-400/40 dark:bg-brand-500 dark:text-white',
+            ),
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
 export function ProfileSideNav({
   items,
   value,
@@ -36,13 +68,18 @@ export function ProfileSideNav({
                   'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-colors',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
                   active
-                    ? 'border border-brand-200/80 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-950/40 dark:text-brand-300'
+                    ? 'border border-brand-300/80 bg-brand-100 text-brand-900 dark:border-brand-500/40 dark:bg-brand-950/60 dark:text-brand-100'
                     : 'border border-transparent text-fg-muted hover:bg-bg hover:text-fg',
                 )}
               >
-                {Icon ? <Icon aria-hidden className={cx('size-5 shrink-0', active ? 'text-brand-600' : '')} /> : null}
+                {Icon ? (
+                  <Icon
+                    aria-hidden
+                    className={cx('size-5 shrink-0', active ? 'text-brand-700 dark:text-brand-300' : '')}
+                  />
+                ) : null}
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                {item.badge}
+                {item.badge ? <span className="ml-auto shrink-0">{item.badge}</span> : null}
               </button>
             </li>
           )

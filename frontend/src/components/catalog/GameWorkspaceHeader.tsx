@@ -1,8 +1,7 @@
-import { Boxes, Layers, Package } from 'lucide-react'
+import { Layers, Package } from 'lucide-react'
 import type { CatalogGame, StoreGameStats } from '../../api/types'
 import { GameSelector } from './GameSelector'
 import { Card, CardBody } from '../ui'
-import { cx } from '../../lib/cx'
 
 export interface GameWorkspaceHeaderProps {
   games: Pick<CatalogGame, 'code' | 'name'>[]
@@ -44,28 +43,18 @@ export function GameWorkspaceHeader({
         {activeGame && (
           <div>
             <h2 className="font-display text-lg font-bold tracking-tight text-fg">{activeGame.name}</h2>
-            <dl className="mt-2 grid gap-3 sm:grid-cols-3">
+            <dl className="mt-2 grid gap-3 sm:grid-cols-2">
               <Stat
                 icon={Layers}
                 label="Singles"
-                value={stats?.singles.listings}
-                sub={stats ? `${NUMBER.format(stats.singles.copies)} copies` : undefined}
+                value={stats?.singles.copies}
                 loading={loading}
               />
               <Stat
                 icon={Package}
                 label="Sealed products"
-                value={stats?.sealed.products}
-                sub={stats ? `${NUMBER.format(stats.sealed.units)} units` : undefined}
+                value={stats?.sealed.units}
                 loading={loading}
-              />
-              <Stat
-                icon={Boxes}
-                label="Total inventory"
-                value={stats?.total.listings}
-                sub={stats ? `${NUMBER.format(stats.total.copies)} items on hand` : undefined}
-                loading={loading}
-                emphasis
               />
             </dl>
           </div>
@@ -79,24 +68,15 @@ function Stat({
   icon: Icon,
   label,
   value,
-  sub,
   loading,
-  emphasis = false,
 }: {
   icon: typeof Layers
   label: string
   value?: number
-  sub?: string
   loading?: boolean
-  emphasis?: boolean
 }) {
   return (
-    <div
-      className={cx(
-        'rounded-card border px-4 py-3',
-        emphasis ? 'border-brand-300 bg-brand-50' : 'border-border bg-bg',
-      )}
-    >
+    <div className="rounded-card border border-border bg-bg px-4 py-3">
       <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-fg-muted">
         <Icon aria-hidden className="size-3.5" />
         {label}
@@ -105,7 +85,6 @@ function Stat({
         <span className="font-display text-2xl font-extrabold text-fg">
           {loading || undefined === value ? '—' : NUMBER.format(value)}
         </span>
-        {sub && <span className="ml-2 text-xs text-fg-muted">{sub}</span>}
       </dd>
     </div>
   )

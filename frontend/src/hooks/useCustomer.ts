@@ -1,6 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import api from '../api/client'
-import type { CartItem, CustomerFavorite, CustomerNotification, CustomerWantListEntry, Order, StoreCustomer } from '../api/types'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import api, { CUSTOMER_ORDERS_PAGE_SIZE } from '../api/client'
+import type {
+  CartItem,
+  CustomerFavorite,
+  CustomerNotification,
+  CustomerWantListEntry,
+  PaginatedOrders,
+  StoreCustomer,
+} from '../api/types'
 
 /**
  * Centralized React Query keys + fetchers for a customer's per-store data.
@@ -12,7 +19,10 @@ export const customerKeys = {
   favorites: (slug: string) => ['customer-favorites', slug] as const,
   wantList: (slug: string) => ['customer-want-list', slug] as const,
   cart: (slug: string) => ['customer-cart', slug] as const,
-  orders: (slug: string) => ['customer-orders', slug] as const,
+  /** @deprecated use storeOrders(slug, page) — invalidates all pages with prefix */
+  ordersPrefix: (slug: string) => ['customer-orders', slug] as const,
+  storeOrders: (slug: string, page: number) => ['customer-orders', slug, page] as const,
+  myOrders: (page: number) => ['my-orders', page] as const,
   notifications: (slug: string) => ['customer-notifications', slug] as const,
 }
 
@@ -60,14 +70,31 @@ export function useCustomerCart(slug: string, enabled = true) {
   })
 }
 
-export function useCustomerOrders(slug: string, enabled = true) {
+export function useCustomerOrders(slug: string, page: number, enabled = true) {
   return useQuery({
-    queryKey: customerKeys.orders(slug),
+    queryKey: customerKeys.storeOrders(slug, page),
     queryFn: async () => {
-      const { data } = await api.get<Order[]>(`/stores/${slug}/customer/orders`)
+      const { data } = await api.get<PaginatedOrders>(`/stores/${slug}/customer/orders`, {
+        params: { page, itemsPerPage: CUSTOMER_ORDERS_PAGE_SIZE },
+      })
       return data
     },
     enabled: Boolean(slug) && enabled,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useMyOrders(page: number, enabled = true) {
+  return useQuery({
+    queryKey: customerKeys.myOrders(page),
+    queryFn: async () => {
+      const { data } = await api.get<PaginatedOrders>('/me/orders', {
+        params: { page, itemsPerPage: CUSTOMER_ORDERS_PAGE_SIZE },
+      })
+      return data
+    },
+    enabled,
+    placeholderData: keepPreviousData,
   })
 }
 

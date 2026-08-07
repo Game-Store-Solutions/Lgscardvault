@@ -196,4 +196,94 @@ final class CommanderRecommendControllerTest extends WebTestCase
         self::assertContains($itemA->getId(), $cartIds);
         self::assertContains($itemB->getId(), $cartIds);
     }
+
+    public function testCombosIntersectSpellbookWithStoreStock(): void
+    {
+        $store = $this->fixtures->store('combo-store');
+        $commander = $this->fixtures->card(730, [
+            'name' => 'Atraxa Test',
+            'type_line' => 'Legendary Creature — Phyrexian Angel Horror',
+            'oracle_text' => 'At the beginning of your end step, proliferate.',
+            'keywords' => ['Flying', 'Proliferate'],
+            'color_identity' => ['W', 'U', 'B', 'G'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $buddy = $this->fixtures->card(731, [
+            'name' => 'Proliferate Buddy',
+            'type_line' => 'Creature — Phyrexian',
+            'oracle_text' => 'Whenever you proliferate, draw a card.',
+            'color_identity' => ['U'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $this->fixtures->inventoryItem($store, $buddy, quantity: 2, priceCents: 300);
+        $this->em->flush();
+
+        $this->client->request('GET', sprintf(
+            '/api/stores/%s/recommend/commander/%s/combos',
+            $store->getSlug(),
+            $commander->getId(),
+        ));
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame('commander-spellbook', $payload['source']);
+        self::assertNotEmpty($payload['combos']);
+        $first = $payload['combos'][0];
+        self::assertGreaterThanOrEqual(1, $first['inStockCount']);
+        self::assertContains('Missing Combo Piece', $first['missing']);
+        self::assertFalse($first['completeInStore']);
+    }
+
+    public function testAssembleDeckReturnsSlotsAndInventoryIds(): void
+    {
+        $store = $this->fixtures->store('deck-assemble-store');
+        $commander = $this->fixtures->card(740, [
+            'name' => 'Atraxa Test',
+            'type_line' => 'Legendary Creature — Phyrexian Angel Horror',
+            'oracle_text' => 'At the beginning of your end step, proliferate.',
+            'keywords' => ['Proliferate'],
+            'color_identity' => ['W', 'U', 'B', 'G'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+
+        for ($i = 0; $i < 12; ++$i) {
+            $card = $this->fixtures->card(750 + $i, [
+                'name' => 'Forest '.$i,
+                'type_line' => 'Basic Land — Forest',
+                'oracle_text' => '{T}: Add {G}.',
+                'color_identity' => ['G'],
+                'legalities' => ['commander' => 'legal'],
+            ]);
+            $this->fixtures->inventoryItem($store, $card, quantity: 8, priceCents: 10);
+        }
+        $ramp = $this->fixtures->card(770, [
+            'name' => 'Ramp Buddy',
+            'type_line' => 'Creature — Elf Druid',
+            'oracle_text' => '{T}: Add {G}. Search your library for a basic land card.',
+            'color_identity' => ['G'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $this->fixtures->inventoryItem($store, $ramp, quantity: 3, priceCents: 200);
+        $buddy = $this->fixtures->card(771, [
+            'name' => 'Proliferate Buddy',
+            'type_line' => 'Creature — Phyrexian',
+            'oracle_text' => 'Whenever you proliferate, draw a card.',
+            'color_identity' => ['U'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $this->fixtures->inventoryItem($store, $buddy, quantity: 2, priceCents: 250);
+        $this->em->flush();
+
+        $this->client->request('GET', sprintf(
+            '/api/stores/%s/recommend/commander/%s/deck',
+            $store->getSlug(),
+            $commander->getId(),
+        ));
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(100, $payload['targetSize']);
+        self::assertGreaterThanOrEqual(10, $payload['filledSize']);
+        self::assertGreaterThanOrEqual(1, $payload['slots']['land']);
+        self::assertNotEmpty($payload['inventoryIds']);
+        self::assertArrayHasKey('combos', $payload);
+    }
 }

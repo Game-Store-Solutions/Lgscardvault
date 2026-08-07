@@ -1,10 +1,12 @@
 import { Link, useSearchParams } from 'react-router'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Settings, Store as StoreIcon, ArrowRight } from 'lucide-react'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useMyOrders } from '../hooks/useCustomer'
 import { AccountSettingsPanel } from '../components/account/AccountSettingsPanel'
-import { DecksPanel } from '../components/account/DecksPanel'
+import { PaginatedCustomerOrdersList } from '../components/orders/PaginatedCustomerOrdersList'
 import {
   ProfileAsideCard,
   ProfileAsideLink,
@@ -13,6 +15,7 @@ import {
   ProfilePanelCard,
   ProfileSection,
   ProfileSideNav,
+  ProfileNavBadge,
   ProfileStatistics,
   accountNavIcons,
 } from '../components/profile'
@@ -29,8 +32,8 @@ interface MyStore {
   lastActivityAt: string
 }
 
-type AccountSection = 'overview' | 'stores' | 'decks' | 'settings'
-const SECTIONS: AccountSection[] = ['overview', 'stores', 'decks', 'settings']
+type AccountSection = 'overview' | 'orders' | 'stores' | 'settings'
+const SECTIONS: AccountSection[] = ['overview', 'orders', 'stores', 'settings']
 
 /**
  * Global account page: one identity across the whole marketplace. The
@@ -49,6 +52,8 @@ export default function AccountPage() {
     setSearchParams(next === 'overview' ? {} : { section: next }, { replace: true })
   }
 
+  const [ordersPage, setOrdersPage] = useState(1)
+
   const storesQuery = useQuery({
     queryKey: ['my-stores'],
     queryFn: async () => {
@@ -57,23 +62,21 @@ export default function AccountPage() {
     },
   })
 
-  const decksQuery = useQuery({
-    queryKey: ['my-decks'],
-    queryFn: async () => {
-      const { data } = await api.get<unknown[]>('/me/decks')
-      return data
-    },
-  })
+  const ordersQuery = useMyOrders(ordersPage, Boolean(user))
 
   const stores = storesQuery.data ?? []
-  const totalOrders = stores.reduce((n, s) => n + s.orderCount, 0)
+  const orderTotal = ordersQuery.data?.total ?? stores.reduce((n, s) => n + s.orderCount, 0)
   const totalSubmissions = stores.reduce((n, s) => n + s.submissionCount, 0)
-  const deckCount = decksQuery.data?.length ?? 0
 
   const navItems = [
     { id: 'overview', label: 'Overview', icon: accountNavIcons.overview },
-    { id: 'stores', label: 'Your stores', icon: accountNavIcons.stores, badge: stores.length ? <span className="text-xs">{stores.length}</span> : null },
-    { id: 'decks', label: 'Decks', icon: accountNavIcons.decks, badge: deckCount ? <span className="text-xs">{deckCount}</span> : null },
+    {
+      id: 'orders',
+      label: 'Orders',
+      icon: accountNavIcons.orders,
+      badge: orderTotal > 0 ? <ProfileNavBadge count={orderTotal} /> : null,
+    },
+    { id: 'stores', label: 'Your stores', icon: accountNavIcons.stores, badge: stores.length > 0 ? <ProfileNavBadge count={stores.length} /> : null },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
 
@@ -125,6 +128,12 @@ export default function AccountPage() {
           </ProfileAsideCard>
           <ProfileAsideCard title="Quick links">
             <ProfileAsideLink to="/" icon={accountNavIcons.stores} label="Marketplace" meta="Find a store" />
+            <ProfileAsideLink
+              to="/account?section=orders"
+              icon={accountNavIcons.orders}
+              label="All orders"
+              meta="Every store"
+            />
           </ProfileAsideCard>
         </>
       }
@@ -148,8 +157,7 @@ export default function AccountPage() {
         <ProfileStatistics
           stats={[
             { id: 'stores', label: 'Stores', value: stores.length, icon: accountNavIcons.stores, iconClassName: '' },
-            { id: 'orders', label: 'Orders', value: totalOrders, icon: accountNavIcons.orders, iconClassName: '' },
-            { id: 'decks', label: 'Decks', value: deckCount, icon: accountNavIcons.decks, iconClassName: '' },
+            { id: 'orders', label: 'Orders', value: orderTotal, icon: accountNavIcons.orders, iconClassName: '' },
           ]}
         />
       </ProfileSection>
@@ -158,11 +166,39 @@ export default function AccountPage() {
         <ProfileSection title="Get started">
           <div className="grid gap-3 sm:grid-cols-2">
             <OverviewTile
+              title="Your orders"
+              text={
+                orderTotal > 0
+                  ? `${orderTotal} order${orderTotal === 1 ? '' : 's'} across every store you've shopped`
+                  : 'Orders from any store show up here once you check out.'
+              }
+              onClick={() => setSection('orders')}
+            />
+            <OverviewTile
               title="Your stores"
-              text={`${stores.length} store${stores.length === 1 ? '' : 's'} · ${totalOrders} order${totalOrders === 1 ? '' : 's'}${totalSubmissions ? ` · ${totalSubmissions} sell/trade` : ''}`}
+              text={`${stores.length} store${stores.length === 1 ? '' : 's'}${totalSubmissions ? ` · ${totalSubmissions} sell/trade` : ''}`}
               onClick={() => setSection('stores')}
             />
           </div>
+        </ProfileSection>
+      )}
+
+      {section === 'orders' && (
+        <ProfileSection title="All orders">
+          <PaginatedCustomerOrdersList
+            query={ordersQuery}
+            page={ordersPage}
+            onPageChange={setOrdersPage}
+            compact
+            headerTitle="Marketplace-wide"
+            headerSubtitle="Newest first — paginated across every store."
+            emptyDescription="When you check out at any store on this account, your orders will appear here."
+            emptyAction={
+              <Link to="/" className="text-sm font-bold text-brand-600 hover:underline">
+                Browse stores →
+              </Link>
+            }
+          />
         </ProfileSection>
       )}
 
@@ -233,12 +269,6 @@ export default function AccountPage() {
               )}
             </CardBody>
           </ProfilePanelCard>
-        </ProfileSection>
-      )}
-
-      {section === 'decks' && (
-        <ProfileSection title="Decks">
-          <DecksPanel stores={stores.map((store) => ({ slug: store.slug, name: store.name }))} />
         </ProfileSection>
       )}
 

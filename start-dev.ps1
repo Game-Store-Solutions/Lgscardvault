@@ -178,7 +178,7 @@ try {
     }
 
     Start-DevProcess 'backend-api' (Join-Path $RootDir 'backend') 'php' @('-S', '127.0.0.1:8000', '-t', 'public')
-    Start-DevProcess 'csv-worker' (Join-Path $RootDir 'backend') 'php' @('bin/console', 'messenger:consume', 'async', '-vv')
+    Start-DevProcess 'csv-worker' (Join-Path $RootDir 'backend') 'php' @('bin/console', 'messenger:consume', 'async', '-vv', '--memory-limit=512M')
     Start-DevProcess 'frontend' (Join-Path $RootDir 'frontend') 'npm' @('run', 'dev')
 
     Write-Host ''
@@ -191,10 +191,24 @@ try {
     Write-Host 'Press Ctrl+C to stop the backend, worker, and frontend.'
 
     while ($true) {
-        foreach ($Service in $Processes) {
-            if ($Service.Process.HasExited) {
-                throw "$($Service.Name) exited with code $($Service.Process.ExitCode). Check logs in $LogDir."
+        foreach ($Service in @($Processes | ForEach-Object { $_ })) {
+            if ($null -eq $Service.Process) {
+                continue
             }
+            if (-not $Service.Process.HasExited) {
+                continue
+            }
+            if ($Service.Name -eq 'csv-worker') {
+                Write-Host ''
+                Write-Host 'csv-worker exited; restarting in 2s... (see .dev-logs\csv-worker.err.log)'
+                Start-Sleep -Seconds 2
+                $script:Processes = @($Processes | Where-Object { $_.Name -ne 'csv-worker' })
+                Start-DevProcess 'csv-worker' (Join-Path $RootDir 'backend') 'php' @(
+                    'bin/console', 'messenger:consume', 'async', '-vv', '--memory-limit=512M'
+                )
+                break
+            }
+            throw "$($Service.Name) exited with code $($Service.Process.ExitCode). Check logs in $LogDir."
         }
 
         Start-Sleep -Seconds 1

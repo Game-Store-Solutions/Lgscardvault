@@ -17,6 +17,8 @@ import CommanderSynergyPage from './pages/CommanderSynergyPage'
 import CartPage from './pages/CartPage'
 import CardDetailsPage from './pages/CardDetailsPage'
 import SetBrowsePage from './pages/SetBrowsePage'
+import ArtistBrowsePage from './pages/ArtistBrowsePage'
+import ArtistLegacyRedirect from './pages/ArtistLegacyRedirect'
 import CaseCardsPage from './pages/CaseCardsPage'
 import CustomerProfilePage from './pages/CustomerProfilePage'
 import StoreEventsPage from './pages/StoreEventsPage'
@@ -62,6 +64,8 @@ export default function App() {
               <Route path="s/:slug/sell" element={<SellTradePage />} />
               <Route path="s/:slug/cart" element={<CartPage />} />
               <Route path="s/:slug/sets/:setCode" element={<SetBrowsePage />} />
+              <Route path="s/:slug/artists" element={<ArtistBrowsePage />} />
+              <Route path="s/:slug/artists/:artist" element={<ArtistLegacyRedirect />} />
               <Route path="s/:slug/cards/:id" element={<CardDetailsPage />} />
               <Route path="s/:slug/case-cards" element={<CaseCardsPage />} />
               <Route path="s/:slug/events" element={<StoreEventsPage />} />

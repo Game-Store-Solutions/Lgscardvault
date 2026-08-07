@@ -5,6 +5,7 @@ import type {
   CatalogGame,
   CatalogGameSet,
   CatalogSyncRun,
+  CatalogArtistBrowseResult,
   SealedInventoryLine,
   SealedSearchResult,
   StoreGameStats,
@@ -22,6 +23,8 @@ export const sealedSpotlightKey = (slug: string) => ['sealed-spotlight', slug] a
 export const syncRunsKey = ['catalog', 'sync-runs'] as const
 export const storeGamesKey = (slug: string) => ['store-games', slug] as const
 export const storeGameStatsKey = (slug: string, game: string) => ['store-game-stats', slug, game] as const
+export const catalogByArtistKey = (artist: string, game: string, offset: number, limit: number) =>
+  ['catalog', 'by-artist', artist, game, offset, limit] as const
 
 export interface SealedSearchParams {
   game?: string
@@ -70,6 +73,20 @@ export function useStoreGameStats(slug: string, gameCode: string) {
     enabled: Boolean(slug && gameCode),
     queryFn: async () => {
       const { data } = await api.get<StoreGameStats>(`/stores/${slug}/games/${gameCode}/stats`)
+      return data
+    },
+  })
+}
+
+/** Catalog printings for an exact artist name (local DB). */
+export function useCatalogByArtist(artist: string, gameCode: string, offset: number, limit: number) {
+  return useQuery({
+    queryKey: catalogByArtistKey(artist, gameCode, offset, limit),
+    enabled: Boolean(artist),
+    queryFn: async () => {
+      const { data } = await api.get<CatalogArtistBrowseResult>('/catalog/by-artist', {
+        params: { artist, game: gameCode, offset, limit },
+      })
       return data
     },
   })
