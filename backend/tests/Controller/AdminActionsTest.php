@@ -116,4 +116,58 @@ final class AdminActionsTest extends WebTestCase
         $this->client->request('POST', sprintf('/api/admin/stores/%d/approve', $store->getId()));
         self::assertSame(403, $this->client->getResponse()->getStatusCode());
     }
+
+    public function testDisableAndEnableStore(): void
+    {
+        $store = $this->fixtures->store('live-store');
+        $store->setStatus(Store::STATUS_APPROVED);
+        $store->setIsActive(true);
+        $store->setFeatured(true);
+        $this->em->flush();
+        $id = (int) $store->getId();
+
+        $this->client->loginUser($this->fixtures->user(['ROLE_SUPER_ADMIN']));
+        $this->client->request('POST', sprintf('/api/admin/stores/%d/disable', $id));
+        self::assertResponseIsSuccessful();
+
+        $this->em->clear();
+        $disabled = $this->em->getRepository(Store::class)->find($id);
+        self::assertFalse($disabled->isActive());
+        self::assertFalse($disabled->isFeatured());
+
+        $this->client->request('POST', sprintf('/api/admin/stores/%d/enable', $id));
+        self::assertResponseIsSuccessful();
+
+        $this->em->clear();
+        $enabled = $this->em->getRepository(Store::class)->find($id);
+        self::assertTrue($enabled->isActive());
+        self::assertSame(Store::STATUS_APPROVED, $enabled->getStatus());
+    }
+
+    public function testDeleteStoreRequiresSlugConfirmation(): void
+    {
+        $store = $this->fixtures->store('doomed-store');
+        $id = (int) $store->getId();
+        $this->client->loginUser($this->fixtures->user(['ROLE_SUPER_ADMIN']));
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/admin/stores/%d/delete', $id),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['confirmSlug' => 'wrong-slug']),
+        );
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertNotNull($this->em->getRepository(Store::class)->find($id));
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/admin/stores/%d/delete', $id),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['confirmSlug' => 'doomed-store']),
+        );
+        self::assertResponseIsSuccessful();
+
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(Store::class)->find($id));
+    }
 }

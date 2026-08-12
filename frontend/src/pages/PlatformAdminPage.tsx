@@ -25,6 +25,7 @@ import {
   TD,
 } from '../components/ui'
 import {
+  Ban,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -32,9 +33,11 @@ import {
   LayoutDashboard,
   MapPin,
   Plug,
+  Power,
   RefreshCw,
   Star,
   Store as StoreIcon,
+  Trash2,
   Users as UsersIcon,
   XCircle,
 } from 'lucide-react'
@@ -150,6 +153,27 @@ export default function PlatformAdminPage() {
       await queryClient.invalidateQueries({ queryKey: ['stores'] })
     },
   })
+
+  const setStoreActive = useMutation({
+    mutationFn: async ({ id, enable }: { id: number; enable: boolean }) => {
+      await api.post(`/admin/stores/${id}/${enable ? 'enable' : 'disable'}`)
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-stores'] })
+      await queryClient.invalidateQueries({ queryKey: ['stores'] })
+    },
+  })
+
+  const deleteStore = useMutation({
+    mutationFn: async ({ id, confirmSlug }: { id: number; confirmSlug: string }) => {
+      await api.post(`/admin/stores/${id}/delete`, { confirmSlug })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-stores'] })
+      await queryClient.invalidateQueries({ queryKey: ['stores'] })
+    },
+  })
+
   const reviewBusyAction =
     reviewApplication.isPending && reviewApplication.variables ? reviewApplication.variables.action : null
   const reviewError = reviewApplication.isError
@@ -158,6 +182,18 @@ export default function PlatformAdminPage() {
   const openReview = (store: Store) => {
     reviewApplication.reset()
     setReviewing(store)
+  }
+
+  const confirmDeleteStore = (store: Store) => {
+    const typed = window.prompt(
+      `Permanently delete "${store.name}" and all of its inventory, orders, and customer data?\n\nType the slug "${store.slug}" to confirm.`,
+    )
+    if (typed == null) return
+    if (typed.trim() !== store.slug) {
+      window.alert('Slug did not match — store was not deleted.')
+      return
+    }
+    deleteStore.mutate({ id: store.id, confirmSlug: store.slug })
   }
 
   const pending = stores.filter((store) => store.status === 'pending')
@@ -416,18 +452,65 @@ export default function PlatformAdminPage() {
                         </Button>
                       </TD>
                       <TD className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <Link
-                          to={`/s/${store.slug}/admin`}
-                          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                        >
-                          Manage
-                        </Link>
-                        <Link
-                          to={`/platform/admin/stores/${store.slug}/imports`}
-                          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                        >
-                          Imports
-                        </Link>
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <Link
+                            to={`/s/${store.slug}/admin`}
+                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                          >
+                            Manage
+                          </Link>
+                          <Link
+                            to={`/platform/admin/stores/${store.slug}/imports`}
+                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                          >
+                            Imports
+                          </Link>
+                          {store.status !== 'pending' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={
+                                setStoreActive.isPending && setStoreActive.variables?.id === store.id
+                              }
+                              onClick={() =>
+                                setStoreActive.mutate({
+                                  id: store.id,
+                                  enable: store.isActive === false || store.status === 'rejected',
+                                })
+                              }
+                            >
+                              {store.isActive === false || store.status === 'rejected' ? (
+                                <>
+                                  <Power aria-hidden className="size-4" />
+                                  Enable
+                                </>
+                              ) : (
+                                <>
+                                  <Ban aria-hidden className="size-4" />
+                                  Disable
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            loading={deleteStore.isPending && deleteStore.variables?.id === store.id}
+                            onClick={() => confirmDeleteStore(store)}
+                          >
+                            <Trash2 aria-hidden className="size-4" />
+                            Delete
+                          </Button>
+                        </div>
+                        {(setStoreActive.isError && setStoreActive.variables?.id === store.id) ||
+                        (deleteStore.isError && deleteStore.variables?.id === store.id) ? (
+                          <p className="mt-1 text-xs text-danger-700">
+                            {extractErrorMessage(
+                              (setStoreActive.error ?? deleteStore.error) as Error,
+                              'Store action failed.',
+                            )}
+                          </p>
+                        ) : null}
                       </TD>
                     </TR>
                   ))}
