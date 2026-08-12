@@ -140,8 +140,8 @@ export default function CsvTab({ slug }: { slug: string }) {
                       {queuedRows} row{queuedRows === 1 ? '' : 's'} waiting in the queue
                     </span>
                     — batches of ~40 cards resolve against Scryfall, so large files take a few minutes. If nothing
-                    changes for over a minute, restart dev with <code className="text-xs">.\start-dev.ps1</code> so the
-                    CSV worker is running.
+                    changes for over a minute, the background worker may be stuck — refresh this page or retry the
+                    import; production workers run continuously and do not need to be started by hand.
                   </>
                 )}
                 {processingRows > 0 && (
