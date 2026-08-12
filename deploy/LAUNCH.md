@@ -8,6 +8,8 @@ Docker Compose, or any platform that can run the backend + worker + scheduler +
 frontend images and a PostgreSQL 16 database. Managed Postgres is fine — skip
 the `db` service and point `DATABASE_URL` at the provider.
 
+**SSH to current Hetzner prod:** see [`SSH.md`](SSH.md) — local shortcut is `ssh lgs` (or PowerShell `lgs`).
+
 ---
 
 ## Phase 0 — Decide URLs and DNS
@@ -133,7 +135,17 @@ rely on dev seeds (`owner@store.local`).
 
 ## Phase 6 — Releases after launch
 
-Same as RUNBOOK §2: `build` → `migrate` → `up -d` → smoke `/health` and `/health/ready`.
+**Automated:** merge to `main` (green CI) triggers [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
+→ SSH → [`scripts/deploy.sh`](scripts/deploy.sh). Secrets: [`GITHUB_SECRETS.md`](GITHUB_SECRETS.md).
+
+**Manual on the server:**
+
+```bash
+cd /opt/lgscardvault/Lgscardvault
+./deploy/scripts/deploy.sh
+```
+
+Or: `build` → `migrate` → `up -d` → smoke `/health` and `/health/ready` (see RUNBOOK).
 
 ---
 
@@ -152,8 +164,8 @@ Same as RUNBOOK §2: `build` → `migrate` → `up -d` → smoke `/health` and `
 
 ## What we have not automated yet
 
-- CI deploy to your server (push-to-deploy workflow)
-- Terraform / cloud-specific modules
+- Terraform / cloud-specific modules (optional later)
+- GHCR image registry deploys (current pipeline builds on the VPS after `git pull`)
 
-If you tell us your target (single VPS vs Fly/Railway/AWS), we can add a
- tailored deploy workflow next.
+Push-to-deploy after merge to `main` is configured — see [`GITHUB_SECRETS.md`](GITHUB_SECRETS.md).
+

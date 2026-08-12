@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Production deploy on the VPS. Safe to run from SSH or GitHub Actions.
+# Usage (from repo root on the server):
+#   ./deploy/scripts/deploy.sh
+#   DEPLOY_REF=main ./deploy/scripts/deploy.sh
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
+
+DEPLOY_REF="${DEPLOY_REF:-main}"
+COMPOSE=(docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env)
+SMOKE_BASE="${SMOKE_BASE:-http://127.0.0.1:8080}"
+
+echo "==> Deploying ${DEPLOY_REF} in ${ROOT_DIR}"
+
+if [[ ! -f /etc/mtgstore/prod.env ]]; then
+  echo "Missing /etc/mtgstore/prod.env" >&2
+  exit 1
+fi
+
+echo "==> git fetch / checkout / pull"
+git fetch origin
+git checkout "${DEPLOY_REF}"
+git pull --ff-only origin "${DEPLOY_REF}"
+
+echo "==> Build images"
+"${COMPOSE[@]}" build
+
+echo "==> Ensure database is up"
+"${COMPOSE[@]}" up -d db
+"${COMPOSE[@]}" exec -T db pg_isready -U "${POSTGRES_USER:-store}" || true
+
+# Wait for healthy db (compose healthcheck)
+for _ in $(seq 1 30); do
+  if "${COMPOSE[@]}" exec -T db pg_isready -U store >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+echo "==> JWT keypair (no-op if exists)"
+"${COMPOSE[@]}" run --rm --no-deps backend \
+  php bin/console lexik:jwt:generate-keypair --skip-if-exists
+
+echo "==> Migrations"
+"${COMPOSE[@]}" run --rm --no-deps backend \
+  php bin/console doctrine:migrations:migrate --no-interaction
+
+echo "==> Roll app / workers / scheduler / frontend"
+"${COMPOSE[@]}" up -d --remove-orphans
+
+echo "==> Smoke checks against ${SMOKE_BASE}"
+curl -fsS "${SMOKE_BASE}/healthz" >/dev/null
+curl -fsS "${SMOKE_BASE}/health" >/dev/null
+curl -fsS "${SMOKE_BASE}/health/ready" >/dev/null
+
+echo "==> Deploy OK"
+"${COMPOSE[@]}" ps

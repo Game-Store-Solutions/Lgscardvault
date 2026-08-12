@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, 'claude/**']
+    branches: [main, 'claude/**']
   pull_request:
 
 # Cancel superseded runs on the same ref to save CI minutes.

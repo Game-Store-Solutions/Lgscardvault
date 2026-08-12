@@ -82,7 +82,8 @@ services:
       context: ../frontend
     depends_on: [backend]
     ports:
-      - "8080:8080"   # front this with a TLS-terminating proxy / managed LB
+      # Bound to localhost — Caddy (or another TLS proxy) terminates public 443.
+      - "127.0.0.1:8080:8080"
     restart: unless-stopped
 
 volumes:

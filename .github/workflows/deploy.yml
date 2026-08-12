@@ -1,0 +1,43 @@
+name: Deploy
+
+# Push-to-deploy: after CI succeeds on main, SSH to the VPS and run deploy.sh.
+# Manual runs: Actions → Deploy → Run workflow.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    # workflow_run: only when CI succeeded. workflow_dispatch: always allowed.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Passphrase-protected keys: set DEPLOY_SSH_PASSPHRASE if needed
+          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
+          script_stop: true
+          # Enough time for image builds on a small VPS
+          command_timeout: 40m
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+            chmod +x deploy/scripts/deploy.sh
+            ./deploy/scripts/deploy.sh

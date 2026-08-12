@@ -48,7 +48,17 @@ php bin/console lexik:jwt:generate-keypair --skip-if-exists
 
 ## 2. Release / deploy
 
-Each release, in order:
+**Preferred:** merge to `main` with green CI → GitHub Actions **Deploy** runs
+[`scripts/deploy.sh`](scripts/deploy.sh) on the VPS (see [`GITHUB_SECRETS.md`](GITHUB_SECRETS.md)).
+
+**Manual** (SSH on the server), in order:
+
+```bash
+cd /opt/lgscardvault/Lgscardvault   # or your DEPLOY_PATH
+./deploy/scripts/deploy.sh
+```
+
+Equivalent steps:
 
 ```bash
 # 1. Pull/build the new images.
