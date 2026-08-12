@@ -74,10 +74,10 @@ ENV APP_ENV=prod \
 
 COPY --from=vendor /app /app
 
-# Warm the prod cache at build time and make var/ writable by the server user.
-RUN mkdir -p var/cache var/log \
+# Warm the prod cache at build time and make var/ + uploads writable.
+RUN mkdir -p var/cache var/log public/uploads \
     && php bin/console cache:clear --no-warmup --env=prod || true \
-    && chown -R www-data:www-data var
+    && chown -R www-data:www-data var public/uploads
 
 EXPOSE 8000
 

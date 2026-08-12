@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cx } from '../../lib/cx'
 
-/** Duolingo-style profile shell: side nav + main column + optional right rail. */
+/** Full-bleed profile shell: side nav + main + optional right rail. */
 export function ProfileLayout({
   nav,
   children,
@@ -16,7 +16,7 @@ export function ProfileLayout({
   return (
     <div
       className={cx(
-        'mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,13.5rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,13.5rem)_minmax(0,1fr)_minmax(0,17rem)]',
+        'grid w-full gap-6 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)] xl:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_minmax(14rem,18rem)]',
         className,
       )}
     >

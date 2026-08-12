@@ -49,6 +49,9 @@
   --color-brand-500: #6d5efc; /* primary accent */
   --color-brand-600: #5b4ce0; /* hover */
   --color-brand-700: #4a3dc4;
+  --color-brand-800: #3b319e;
+  --color-brand-900: #2e277c;
+  --color-brand-950: #1c184f;
 
   /* Secondary / highlight (coral) */
   --color-accent-500: #ff7a59;
@@ -101,6 +104,9 @@
   --color-brand-500: #8b7dff;
   --color-brand-600: #a99cff;
   --color-brand-700: #c6bfff;
+  --color-brand-800: #ddd8ff;
+  --color-brand-900: #ebe8ff;
+  --color-brand-950: #0f0d24;
 
   --color-accent-500: #ff9573;
 

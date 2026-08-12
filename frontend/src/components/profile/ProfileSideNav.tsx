@@ -67,15 +67,17 @@ export function ProfileSideNav({
                 className={cx(
                   'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-colors',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
+                  // In dark theme brand-100 is a deep purple — never use it for
+                  // both bg and text or the label disappears (icon stayed visible).
                   active
-                    ? 'border border-brand-300/80 bg-brand-100 text-brand-900 dark:border-brand-500/40 dark:bg-brand-950/60 dark:text-brand-100'
+                    ? 'border border-brand-300/80 bg-brand-100 text-brand-700 dark:border-brand-500/40 dark:bg-brand-200 dark:text-fg'
                     : 'border border-transparent text-fg-muted hover:bg-bg hover:text-fg',
                 )}
               >
                 {Icon ? (
                   <Icon
                     aria-hidden
-                    className={cx('size-5 shrink-0', active ? 'text-brand-700 dark:text-brand-300' : '')}
+                    className={cx('size-5 shrink-0', active ? 'text-brand-700 dark:text-brand-600' : '')}
                   />
                 ) : null}
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
