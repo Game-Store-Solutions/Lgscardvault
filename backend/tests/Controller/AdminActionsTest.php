@@ -50,6 +50,9 @@ final class AdminActionsTest extends WebTestCase
         $body = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame('queued', $body['status']);
         self::assertSame('oracle_cards', $body['type']);
+        self::assertIsArray($body['run'] ?? null);
+        self::assertSame('queued', $body['run']['status']);
+        self::assertSame('oracle_cards', $body['run']['bulkType']);
     }
 
     public function testScryfallSyncRejectsUnknownType(): void

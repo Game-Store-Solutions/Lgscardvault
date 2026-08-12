@@ -9,6 +9,7 @@ import type {
   SealedInventoryLine,
   SealedSearchResult,
   StoreGameStats,
+  ScryfallSyncRun,
 } from '../api/types'
 
 /* Multi-game catalog hooks: supported games, their sets, the shared sealed
@@ -21,6 +22,7 @@ export const sealedSearchKey = (params: SealedSearchParams) =>
 export const sealedInventoryKey = (slug: string, game?: string) => ['sealed-inventory', slug, game ?? ''] as const
 export const sealedSpotlightKey = (slug: string) => ['sealed-spotlight', slug] as const
 export const syncRunsKey = ['catalog', 'sync-runs'] as const
+export const scryfallSyncRunsKey = ['scryfall', 'sync-runs'] as const
 export const storeGamesKey = (slug: string) => ['store-games', slug] as const
 export const storeGameStatsKey = (slug: string, game: string) => ['store-game-stats', slug, game] as const
 export const catalogByArtistKey = (artist: string, game: string, offset: number, limit: number) =>
@@ -161,6 +163,21 @@ export function useCatalogSyncRuns() {
       (query.state.data ?? []).some((run) => run.status === 'running') ? 5_000 : 30_000,
     queryFn: async () => {
       const { data } = await api.get<CatalogSyncRun[]>('/admin/catalog/sync-runs')
+      return data
+    },
+  })
+}
+
+/** Platform admin: Scryfall bulk sync history (auto-refreshes while active). */
+export function useScryfallSyncRuns() {
+  return useQuery({
+    queryKey: scryfallSyncRunsKey,
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((run) => run.status === 'queued' || run.status === 'running')
+        ? 5_000
+        : 30_000,
+    queryFn: async () => {
+      const { data } = await api.get<ScryfallSyncRun[]>('/admin/scryfall/sync-runs')
       return data
     },
   })

@@ -39,7 +39,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import api, { extractErrorMessage, unwrapCollection } from '../api/client'
-import type { AdminIntegrations, AdminUser, IntegrationStatus, ScryfallSyncResult, Store } from '../api/types'
+import type { AdminIntegrations, AdminUser, IntegrationStatus, Store } from '../api/types'
 import { StoreApplicationModal } from './platform-admin/StoreApplicationModal'
 import { BillingPanel } from './platform-admin/BillingPanel'
 import { isDevBuild } from '../lib/runtimeEnv'
@@ -159,13 +159,6 @@ export default function PlatformAdminPage() {
     reviewApplication.reset()
     setReviewing(store)
   }
-
-  const syncScryfall = useMutation({
-    mutationFn: async (type: 'oracle_cards' | 'default_cards' = 'oracle_cards') => {
-      const { data } = await api.post<ScryfallSyncResult>('/admin/scryfall/sync', { type })
-      return data
-    },
-  })
 
   const pending = stores.filter((store) => store.status === 'pending')
   const activeStores = stores.filter((store) => store.isActive !== false && store.status !== 'pending').length
@@ -529,50 +522,6 @@ export default function PlatformAdminPage() {
                 setupLabel="Open Square"
               />
             </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Scryfall catalog sync"
-              subtitle="Queues a bulk download into the card database. Production workers pick it up automatically — you do not start them. Default is oracle_cards (one row per unique card). Use default_cards for every printing (much larger / longer)."
-              actions={
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="primary"
-                    loading={syncScryfall.isPending && syncScryfall.variables === 'oracle_cards'}
-                    onClick={() => syncScryfall.mutate('oracle_cards')}
-                  >
-                    <RefreshCw aria-hidden className="size-4" />
-                    {syncScryfall.isPending && syncScryfall.variables === 'oracle_cards' ? 'Queueing…' : 'Sync unique cards'}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    loading={syncScryfall.isPending && syncScryfall.variables === 'default_cards'}
-                    onClick={() => syncScryfall.mutate('default_cards')}
-                  >
-                    <RefreshCw aria-hidden className="size-4" />
-                    {syncScryfall.isPending && syncScryfall.variables === 'default_cards' ? 'Queueing…' : 'Sync all printings'}
-                  </Button>
-                </div>
-              }
-            />
-            {(syncScryfall.data || syncScryfall.isError) && (
-              <CardBody>
-                {syncScryfall.data?.status === 'queued' && (
-                  <p className="text-sm text-success-700">
-                    Sync queued ({syncScryfall.data.type ?? 'oracle_cards'}). A background worker will run it —
-                    this can take many minutes for all printings.
-                  </p>
-                )}
-                {syncScryfall.data && syncScryfall.data.status !== 'queued' && (
-                  <p className="text-sm text-success-700">
-                    Synced {syncScryfall.data.total ?? 0} cards ({syncScryfall.data.inserted ?? 0} inserted,{' '}
-                    {syncScryfall.data.updated ?? 0} updated).
-                  </p>
-                )}
-                {syncScryfall.isError && <p className="text-sm text-danger-700">Scryfall sync failed.</p>}
-              </CardBody>
-            )}
           </Card>
         </TabPanel>
       </Tabs>

@@ -620,9 +620,27 @@ export interface ScryfallSyncResult {
   /** 'queued' — the sync now runs asynchronously on the messenger worker. */
   status: string
   type?: string
+  run?: ScryfallSyncRun
   inserted?: number
   updated?: number
   total?: number
+}
+
+export interface ScryfallSyncRun {
+  id: number
+  source: 'scryfall'
+  bulkType: 'oracle_cards' | 'default_cards' | string
+  label: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  startedAt: string
+  finishedAt: string | null
+  summary: {
+    inserted?: number
+    updated?: number
+    total?: number
+    processed?: number
+  } | null
+  error: string | null
 }
 
 export interface OrderLine {

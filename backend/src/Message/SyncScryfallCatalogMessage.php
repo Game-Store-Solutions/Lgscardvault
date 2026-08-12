@@ -12,6 +12,7 @@ final readonly class SyncScryfallCatalogMessage
 {
     public function __construct(
         public string $type,
+        public int $runId,
     ) {
     }
 }
