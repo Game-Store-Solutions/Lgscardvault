@@ -3,8 +3,10 @@
 namespace App\Tests\Controller;
 
 use App\Entity\Store;
+use App\Entity\User;
 use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -34,6 +36,19 @@ final class AdminActionsTest extends WebTestCase
         $this->em->flush();
 
         return $store;
+    }
+
+    /**
+     * Lexik JWT ignores session loginUser across multiple requests once the
+     * firewall resets — pass an explicit Bearer token instead.
+     *
+     * @param array<string, mixed> $server
+     */
+    private function authRequest(User $user, string $method, string $url, array $server = [], string $content = ''): void
+    {
+        $token = static::getContainer()->get(JWTTokenManagerInterface::class)->create($user);
+        $server['HTTP_AUTHORIZATION'] = 'Bearer '.$token;
+        $this->client->request($method, $url, server: $server, content: $content);
     }
 
     public function testScryfallSyncQueuesForSuperAdmin(): void
@@ -127,8 +142,7 @@ final class AdminActionsTest extends WebTestCase
         $id = (int) $store->getId();
         $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
 
-        $this->client->loginUser($admin);
-        $this->client->request('POST', sprintf('/api/admin/stores/%d/disable', $id));
+        $this->authRequest($admin, 'POST', sprintf('/api/admin/stores/%d/disable', $id));
         self::assertResponseIsSuccessful();
 
         $this->em->clear();
@@ -136,10 +150,8 @@ final class AdminActionsTest extends WebTestCase
         self::assertFalse($disabled->isActive());
         self::assertFalse($disabled->isFeatured());
 
-        // Re-authenticate after EntityManager::clear() — the JWT test token
-        // holds a detached User and the next request otherwise returns 401.
-        $this->client->loginUser($this->em->getRepository(\App\Entity\User::class)->find($admin->getId()));
-        $this->client->request('POST', sprintf('/api/admin/stores/%d/enable', $id));
+        $admin = $this->em->getRepository(User::class)->find($admin->getId());
+        $this->authRequest($admin, 'POST', sprintf('/api/admin/stores/%d/enable', $id));
         self::assertResponseIsSuccessful();
 
         $this->em->clear();
@@ -153,23 +165,23 @@ final class AdminActionsTest extends WebTestCase
         $store = $this->fixtures->store('doomed-store');
         $id = (int) $store->getId();
         $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
-        $this->client->loginUser($admin);
 
-        $this->client->request(
+        $this->authRequest(
+            $admin,
             'POST',
             sprintf('/api/admin/stores/%d/delete', $id),
-            server: ['CONTENT_TYPE' => 'application/json'],
-            content: json_encode(['confirmSlug' => 'wrong-slug']),
+            ['CONTENT_TYPE' => 'application/json'],
+            (string) json_encode(['confirmSlug' => 'wrong-slug']),
         );
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
         self::assertNotNull($this->em->getRepository(Store::class)->find($id));
 
-        $this->client->loginUser($admin);
-        $this->client->request(
+        $this->authRequest(
+            $admin,
             'POST',
             sprintf('/api/admin/stores/%d/delete', $id),
-            server: ['CONTENT_TYPE' => 'application/json'],
-            content: json_encode(['confirmSlug' => 'doomed-store']),
+            ['CONTENT_TYPE' => 'application/json'],
+            (string) json_encode(['confirmSlug' => 'doomed-store']),
         );
         self::assertResponseIsSuccessful();
 
