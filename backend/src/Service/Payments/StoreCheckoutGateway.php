@@ -43,7 +43,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      * Returns disabled rather than throwing so the cart can render a clear
      * "this store isn't taking online payments yet" state.
      *
-     * @return array{enabled: bool, applicationId: string, locationId: string, environment: string, currency: string, countryCode: string}
+     * @return array{enabled: bool, message: ?string, ownerMessage: ?string, applicationId: string, locationId: string, environment: string, currency: string, countryCode: string}
      */
     public function checkoutConfig(Store $store): array
     {
