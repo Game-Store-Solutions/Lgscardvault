@@ -22,10 +22,10 @@ export function AccountSettingsPanel() {
   const [deleteArmed, setDeleteArmed] = useState(false)
 
   const saveProfile = useMutation({
-    mutationFn: async (payload?: { displayName?: string; avatarUrl?: string }) => {
+    mutationFn: async (payload: { displayName?: string; avatarUrl?: string } = {}) => {
       await api.patch('/me', {
-        displayName: (payload?.displayName ?? displayName).trim(),
-        avatarUrl: (payload?.avatarUrl ?? avatarUrl).trim(),
+        displayName: (payload.displayName ?? displayName).trim(),
+        avatarUrl: (payload.avatarUrl ?? avatarUrl).trim(),
       })
     },
     onSuccess: () => void refreshUser(),
@@ -80,7 +80,7 @@ export function AccountSettingsPanel() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button onClick={() => saveProfile.mutate()} loading={saveProfile.isPending} disabled={!displayName.trim()}>
+            <Button onClick={() => saveProfile.mutate({})} loading={saveProfile.isPending} disabled={!displayName.trim()}>
               <Save aria-hidden className="size-4" />
               Save account
             </Button>
