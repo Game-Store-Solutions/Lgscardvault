@@ -54,11 +54,13 @@ export {
   useStoreSealedInventory,
   useSealedSpotlight,
   useCatalogSyncRuns,
+  useScryfallSyncRuns,
   catalogGamesKey,
   gameSetsKey,
   sealedInventoryKey,
   sealedSpotlightKey,
   syncRunsKey,
+  scryfallSyncRunsKey,
   storeGamesKey,
   storeGameStatsKey,
 } from './useCatalog'
