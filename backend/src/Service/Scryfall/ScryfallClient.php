@@ -73,17 +73,27 @@ class ScryfallClient
                 continue;
             }
 
-            $downloadUri = $item['download_uri'] ?? null;
+            // Scryfall dropped legacy `download_uri` (JSON array) after 2026-07-20;
+            // bulk entries now ship `jsonl_download_uri` only. Accept either.
             $updatedAt = $item['updated_at'] ?? null;
-            if (!is_string($downloadUri) || '' === $downloadUri || !is_string($updatedAt) || '' === $updatedAt) {
-                throw new \RuntimeException(sprintf('%s bulk data entry is missing download_uri or updated_at.', $type));
+            if (!is_string($updatedAt) || '' === $updatedAt) {
+                throw new \RuntimeException(sprintf('%s bulk data entry is missing updated_at.', $type));
             }
 
-            $jsonlDownloadUri = $item['jsonl_download_uri'] ?? null;
+            $rawDownloadUri = $item['download_uri'] ?? null;
+            $rawJsonlUri = $item['jsonl_download_uri'] ?? null;
+            $downloadUri = is_string($rawDownloadUri) && '' !== $rawDownloadUri ? $rawDownloadUri : null;
+            $jsonlDownloadUri = is_string($rawJsonlUri) && '' !== $rawJsonlUri ? $rawJsonlUri : null;
+
+            if (null === $downloadUri && null === $jsonlDownloadUri) {
+                throw new \RuntimeException(sprintf('%s bulk data entry is missing jsonl_download_uri (and legacy download_uri).', $type));
+            }
 
             return [
-                'download_uri' => $downloadUri,
-                'jsonl_download_uri' => is_string($jsonlDownloadUri) && '' !== $jsonlDownloadUri ? $jsonlDownloadUri : null,
+                // Always provide a non-empty download_uri for callers/fallback;
+                // prefer the legacy field when present, else the JSONL URI.
+                'download_uri' => $downloadUri ?? $jsonlDownloadUri,
+                'jsonl_download_uri' => $jsonlDownloadUri,
                 'updated_at' => $updatedAt,
             ];
         }
