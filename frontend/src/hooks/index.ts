@@ -27,19 +27,22 @@ export { useGuestCart, guestCartKey, guestCartLines, resetGuestCart } from './us
 export { useStoreCart } from './useStoreCart'
 export {
   useCommanderSearch,
-  useCommanderStrategies,
   useCommanderRecommendations,
+  useCommanderCombos,
+  useCommanderDeck,
   commanderSearchKey,
-  commanderStrategiesKey,
   commanderRecommendKey,
+  commanderCombosKey,
+  commanderDeckKey,
 } from './useCommanderRecommend'
 export type {
   CommanderSummary,
-  CommanderStrategy,
   CommanderRecommendation,
   CommanderRecommendResponse,
-  DeckRole,
-  DeckCardType,
+  SpellbookCombo,
+  CommanderCombosResponse,
+  AssembledDeckResponse,
+  AssembledDeckCard,
 } from './useCommanderRecommend'
 export {
   useCatalogGames,
