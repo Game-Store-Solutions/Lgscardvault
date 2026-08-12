@@ -62,7 +62,7 @@ export default function SyncJobsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Catalog sync jobs"
-        subtitle="Mirror games, sets, cards, and sealed products from TCGCSV. Runs are queued on the background worker."
+        subtitle="Mirror games, sets, cards, and sealed products from TCGCSV. Jobs are queued and picked up by the always-on production workers — no manual worker start."
       />
 
       {error && (

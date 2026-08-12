@@ -5,7 +5,7 @@ import { useCustomerCart, useGuestCart, useKioskMode, useTheme } from '../../hoo
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants } from '../ui'
-import { DEFAULT_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
+import { DEFAULT_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { cx } from '../../lib/cx'
 import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShieldCheck, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
 
@@ -20,8 +20,17 @@ export default function AppLayout() {
   const exactStoreMatch = useMatch('/s/:slug')
   const cardDetailMatch = useMatch('/s/:slug/cards/:id')
   const artistBrowseMatch = useMatch('/s/:slug/artists')
+  const deckBuilderMatch = useMatch('/s/:slug/deck-builder')
+  const accountMatch = useMatch({ path: '/account', end: false })
+  const storeAccountMatch = useMatch('/s/:slug/account')
   const storeSlug = storeMatch?.params.slug ?? exactStoreMatch?.params.slug
-  const pageShell = storeSlug ? STOREFRONT_SHELL : DEFAULT_APP_SHELL
+  const fullWidthAccount = Boolean(accountMatch || storeAccountMatch)
+  const pageShell = fullWidthAccount
+    ? FULL_WIDTH_APP_SHELL
+    : storeSlug
+      ? STOREFRONT_SHELL
+      : DEFAULT_APP_SHELL
+  const flushMain = Boolean(cardDetailMatch || artistBrowseMatch || deckBuilderMatch)
 
   // Live cart count for the active store, so the navbar badge stays in sync.
   const { data: authedCart = [] } = useCustomerCart(storeSlug ?? '', Boolean(user && storeSlug))
@@ -127,7 +136,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className={cx(pageShell, 'flex-1', cardDetailMatch || artistBrowseMatch ? 'py-0' : 'py-8')}>
+        <main className={cx(pageShell, 'flex-1', flushMain ? 'py-0' : 'py-8')}>
           <Outlet />
         </main>
 
@@ -418,7 +427,7 @@ export default function AppLayout() {
         )}
       </header>
 
-      <main className={cx(pageShell, 'flex-1', cardDetailMatch || artistBrowseMatch ? 'py-0' : 'py-8')}>
+      <main className={cx(pageShell, 'flex-1', flushMain ? 'py-0' : 'py-8')}>
         <Outlet />
       </main>
 

@@ -16,7 +16,7 @@ export function ProfileLayout({
   return (
     <div
       className={cx(
-        'grid w-full gap-6 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)] xl:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_minmax(14rem,18rem)]',
+        'grid w-full gap-6 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)] xl:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)_minmax(16rem,20rem)]',
         className,
       )}
     >
