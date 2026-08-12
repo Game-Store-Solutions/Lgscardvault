@@ -33,6 +33,8 @@ services:
       APP_ENV: prod
     volumes:
       - jwt_keys:/app/config/jwt
+      # Persist avatar/branding uploads across image rebuilds.
+      - uploads_data:/app/public/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -89,3 +91,4 @@ services:
 volumes:
   db_data:
   jwt_keys:
+  uploads_data:

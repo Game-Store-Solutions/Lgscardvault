@@ -236,7 +236,8 @@ export default function AdminLayout() {
 
       isActive
 
-        ? 'bg-brand-100 text-brand-900 dark:bg-brand-950/55 dark:text-brand-100'
+        // Dark brand-100 ≈ sidebar active fill — pair with text-fg / brand-700, not brand-100.
+        ? 'bg-brand-100 text-brand-700 dark:bg-brand-200 dark:text-fg'
 
         : 'text-fg-muted hover:bg-bg hover:text-fg',
 

@@ -154,10 +154,18 @@ jobs:
         run: npm audit --audit-level=high
 
       # Catch committed secrets/credentials before they merge.
-      - name: Secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+      # Use the free CLI (orgs need a paid license for gitleaks-action@v2).
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: '8.24.3'
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Secret scan (gitleaks)
+        run: gitleaks detect --source . --config .gitleaks.toml --verbose --redact --exit-code=1
 
   # Single aggregating check to require in branch protection: it only passes
   # when all jobs above succeed, so one required status covers the whole suite

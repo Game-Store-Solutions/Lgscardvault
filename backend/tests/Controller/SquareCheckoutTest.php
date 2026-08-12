@@ -239,7 +239,14 @@ final class SquareCheckoutTest extends WebTestCase
         $config = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/customer/checkout/config");
 
         self::assertResponseIsSuccessful();
-        self::assertSame(['enabled', 'applicationId', 'locationId', 'environment', 'currency', 'countryCode'], array_keys($config));
+        self::assertSame(
+            ['enabled', 'message', 'ownerMessage', 'applicationId', 'locationId', 'environment', 'currency', 'countryCode'],
+            array_keys($config),
+        );
+        // Public config may include shopper/owner status copy, never secrets.
+        self::assertArrayNotHasKey('accessToken', $config);
+        self::assertArrayNotHasKey('refreshToken', $config);
+        self::assertArrayNotHasKey('secret', $config);
     }
 
     private function grantCredit(Store $store, User $customer, int $amountCents): void

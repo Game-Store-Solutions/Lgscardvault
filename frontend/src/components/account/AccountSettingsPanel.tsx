@@ -22,8 +22,11 @@ export function AccountSettingsPanel() {
   const [deleteArmed, setDeleteArmed] = useState(false)
 
   const saveProfile = useMutation({
-    mutationFn: async () => {
-      await api.patch('/me', { displayName: displayName.trim(), avatarUrl: avatarUrl.trim() })
+    mutationFn: async (payload: { displayName?: string; avatarUrl?: string } = {}) => {
+      await api.patch('/me', {
+        displayName: (payload.displayName ?? displayName).trim(),
+        avatarUrl: (payload.avatarUrl ?? avatarUrl).trim(),
+      })
     },
     onSuccess: () => void refreshUser(),
   })
@@ -66,13 +69,18 @@ export function AccountSettingsPanel() {
                 label="Profile image"
                 value={avatarUrl}
                 onChange={setAvatarUrl}
+                onUploadComplete={(url) => {
+                  setAvatarUrl(url)
+                  // Persist immediately — upload alone only fills the field.
+                  saveProfile.mutate({ displayName: displayName.trim() || user?.displayName || '', avatarUrl: url })
+                }}
                 placeholder="https://…/me.jpg (blank = initials)"
-                hint="Upload a picture or paste an image URL."
+                hint="Upload a picture or paste an image URL, then save if you only paste a URL."
               />
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button onClick={() => saveProfile.mutate()} loading={saveProfile.isPending} disabled={!displayName.trim()}>
+            <Button onClick={() => saveProfile.mutate({})} loading={saveProfile.isPending} disabled={!displayName.trim()}>
               <Save aria-hidden className="size-4" />
               Save account
             </Button>
