@@ -165,7 +165,7 @@ jobs:
           gitleaks version
 
       - name: Secret scan (gitleaks)
-        run: gitleaks detect --source . --verbose --redact --exit-code=1
+        run: gitleaks detect --source . --config .gitleaks.toml --verbose --redact --exit-code=1
 
   # Single aggregating check to require in branch protection: it only passes
   # when all jobs above succeed, so one required status covers the whole suite
