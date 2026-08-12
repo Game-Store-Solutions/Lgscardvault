@@ -125,8 +125,9 @@ final class AdminActionsTest extends WebTestCase
         $store->setFeatured(true);
         $this->em->flush();
         $id = (int) $store->getId();
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
 
-        $this->client->loginUser($this->fixtures->user(['ROLE_SUPER_ADMIN']));
+        $this->client->loginUser($admin);
         $this->client->request('POST', sprintf('/api/admin/stores/%d/disable', $id));
         self::assertResponseIsSuccessful();
 
@@ -135,6 +136,9 @@ final class AdminActionsTest extends WebTestCase
         self::assertFalse($disabled->isActive());
         self::assertFalse($disabled->isFeatured());
 
+        // Re-authenticate after EntityManager::clear() — the JWT test token
+        // holds a detached User and the next request otherwise returns 401.
+        $this->client->loginUser($this->em->getRepository(\App\Entity\User::class)->find($admin->getId()));
         $this->client->request('POST', sprintf('/api/admin/stores/%d/enable', $id));
         self::assertResponseIsSuccessful();
 
@@ -148,7 +152,8 @@ final class AdminActionsTest extends WebTestCase
     {
         $store = $this->fixtures->store('doomed-store');
         $id = (int) $store->getId();
-        $this->client->loginUser($this->fixtures->user(['ROLE_SUPER_ADMIN']));
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $this->client->loginUser($admin);
 
         $this->client->request(
             'POST',
@@ -159,6 +164,7 @@ final class AdminActionsTest extends WebTestCase
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
         self::assertNotNull($this->em->getRepository(Store::class)->find($id));
 
+        $this->client->loginUser($admin);
         $this->client->request(
             'POST',
             sprintf('/api/admin/stores/%d/delete', $id),
