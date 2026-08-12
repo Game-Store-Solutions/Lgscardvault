@@ -51,9 +51,22 @@ echo "==> Roll app / workers / scheduler / frontend"
 "${COMPOSE[@]}" up -d --remove-orphans
 
 echo "==> Smoke checks against ${SMOKE_BASE}"
-curl -fsS "${SMOKE_BASE}/healthz" >/dev/null
-curl -fsS "${SMOKE_BASE}/health" >/dev/null
-curl -fsS "${SMOKE_BASE}/health/ready" >/dev/null
+# Frontend/nginx and backend need a few seconds after `up -d` before accepting.
+smoke_ok=0
+for _ in $(seq 1 45); do
+  if curl -fsS "${SMOKE_BASE}/healthz" >/dev/null \
+    && curl -fsS "${SMOKE_BASE}/health" >/dev/null \
+    && curl -fsS "${SMOKE_BASE}/health/ready" >/dev/null; then
+    smoke_ok=1
+    break
+  fi
+  sleep 2
+done
+if [[ "${smoke_ok}" -ne 1 ]]; then
+  echo "Smoke checks failed against ${SMOKE_BASE}" >&2
+  "${COMPOSE[@]}" ps >&2 || true
+  exit 1
+fi
 
 echo "==> Deploy OK"
 "${COMPOSE[@]}" ps
