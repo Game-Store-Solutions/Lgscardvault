@@ -47,7 +47,7 @@ export default function MarketplaceLanding() {
 
       <FloatingCardsBackdrop
         layout="scatter"
-        washClassName="bg-gradient-to-b from-[#fafafa]/70 via-[#f3f4f6]/82 to-[#f3f4f6]/96 dark:from-[#0a0a0b]/55 dark:via-[#171717]/72 dark:to-[#0a0a0b]/96"
+        washClassName="bg-[radial-gradient(ellipse_52%_48%_at_50%_48%,#fafafa_0%,#f3f4f6e6_42%,transparent_72%)] dark:bg-[radial-gradient(ellipse_52%_48%_at_50%_48%,#0a0a0bf2_0%,#171717cc_40%,transparent_72%)]"
       />
 
       <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-3.75rem)] max-w-3xl flex-col items-center justify-center px-6 pb-16 pt-10 text-center sm:px-10">
@@ -62,7 +62,7 @@ export default function MarketplaceLanding() {
           The vault for every local game store
         </h1>
         <p className="mt-4 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
-          Magic, Pokémon, One Piece, and Flesh &amp; Blood from trusted LGSs.
+          Magic, Pokémon, One Piece, Flesh &amp; Blood, and Riftbound from trusted LGSs.
         </p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
