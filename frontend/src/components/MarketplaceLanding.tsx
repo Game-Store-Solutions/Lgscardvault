@@ -58,7 +58,7 @@ export default function MarketplaceLanding() {
           className="drop-shadow-[0_12px_40px_rgba(10,10,11,0.12)] dark:drop-shadow-[0_12px_40px_rgba(220,38,38,0.28)]"
         />
 
-        <h1 className="mt-8 max-w-2xl font-display text-3xl font-bold tracking-tight text-fg sm:text-5xl sm:leading-[1.08]">
+        <h1 className="mt-12 max-w-2xl font-display text-3xl font-bold tracking-tight text-fg sm:text-5xl sm:leading-[1.08]">
           The vault for every local game store
         </h1>
         <p className="mt-4 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">

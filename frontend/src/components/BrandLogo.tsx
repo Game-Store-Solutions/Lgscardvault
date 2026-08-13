@@ -21,7 +21,7 @@ const SIZE = {
   sm: 'size-8',
   md: 'size-9',
   lg: 'size-12',
-  hero: 'h-28 w-28 sm:h-36 sm:w-36',
+  hero: 'h-48 w-48 sm:h-64 sm:w-64',
 } as const
 
 function LogoImg({
@@ -47,8 +47,8 @@ function LogoImg({
         'shrink-0 rounded-[20%] object-cover shadow-sm ring-1 ring-black/10 dark:ring-white/10',
         className,
       )}
-      width={size === 'hero' ? 144 : size === 'lg' ? 48 : size === 'md' ? 36 : 32}
-      height={size === 'hero' ? 144 : size === 'lg' ? 48 : size === 'md' ? 36 : 32}
+      width={size === 'hero' ? 256 : size === 'lg' ? 48 : size === 'md' ? 36 : 32}
+      height={size === 'hero' ? 256 : size === 'lg' ? 48 : size === 'md' ? 36 : 32}
       decoding="async"
     />
   )
