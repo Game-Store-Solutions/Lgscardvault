@@ -24,7 +24,7 @@ export interface InteractiveCardProps {
  * in 3D, drifts a glare highlight, and — for foil cards — sweeps a rainbow
  * holo sheen. Falls back to a static image under reduced-motion.
  */
-export function InteractiveCard({ image, alt, foil = false, accent = '#6d5efc', maxTilt = 14, shadow = true, borderless = false, className }: InteractiveCardProps) {
+export function InteractiveCard({ image, alt, foil = false, accent = '#c6a035', maxTilt = 14, shadow = true, borderless = false, className }: InteractiveCardProps) {
   const { ref, onPointerMove, onPointerLeave } = useTilt(maxTilt)
 
   return (

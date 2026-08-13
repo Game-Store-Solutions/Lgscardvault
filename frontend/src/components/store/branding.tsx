@@ -27,7 +27,7 @@ export function ColorField({
   onChange: (value: string) => void
 }) {
   return (
-    <Field label={label} hint="6-digit hex, e.g. #6d5efc">
+    <Field label={label} hint="6-digit hex, e.g. #0a1627">
       {({ id }) => (
         <div className="flex items-center gap-2">
           <input

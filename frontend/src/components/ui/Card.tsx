@@ -7,7 +7,7 @@ export function Card({ className, ...props }: CardProps) {
   return (
     <div
       className={cx(
-        'bg-surface border border-border rounded-card shadow-card',
+        'rounded-card bg-surface shadow-card ring-1 ring-black/[0.04] dark:ring-white/10',
         className,
       )}
       {...props}
@@ -32,7 +32,7 @@ export function CardHeader({
   const hasSlots = title != null || subtitle != null || actions != null
   return (
     <div
-      className={cx('flex items-start justify-between gap-4 px-5 py-4 border-b border-border', className)}
+      className={cx('flex items-start justify-between gap-4 border-b border-border/80 px-5 py-4', className)}
       {...props}
     >
       {hasSlots ? (
@@ -61,7 +61,7 @@ export type CardFooterProps = HTMLAttributes<HTMLDivElement>
 export function CardFooter({ className, ...props }: CardFooterProps) {
   return (
     <div
-      className={cx('flex items-center justify-end gap-2 px-5 py-4 border-t border-border', className)}
+      className={cx('flex items-center justify-end gap-2 border-t border-border/80 px-5 py-4', className)}
       {...props}
     />
   )

@@ -1,12 +1,12 @@
 /** Shared branding palette types (no UI imports). */
 export const PALETTE_DEFAULTS = {
-  primaryColor: '#6d5efc',
-  accentColor: '#ff7a59',
-  backgroundColor: '#f7f8fa',
+  primaryColor: '#0a1627',
+  accentColor: '#c6a035',
+  backgroundColor: '#f3f4f6',
   surfaceColor: '#ffffff',
-  textColor: '#0f172a',
-  mutedColor: '#64748b',
-  borderColor: '#e7e9ee',
+  textColor: '#0a0a0b',
+  mutedColor: '#6b7280',
+  borderColor: 'rgb(10 10 11 / 0.08)',
 } as const
 
 export type PaletteKey = keyof typeof PALETTE_DEFAULTS

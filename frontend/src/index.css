@@ -40,29 +40,35 @@
 }
 
 @theme {
-  /* Brand — violet primary accent */
-  --color-brand-50: #f1efff;
-  --color-brand-100: #e4e0ff;
-  --color-brand-200: #cfc8ff;
-  --color-brand-300: #b0a4ff;
-  --color-brand-400: #8d7bff;
-  --color-brand-500: #6d5efc; /* primary accent */
-  --color-brand-600: #5b4ce0; /* hover */
-  --color-brand-700: #4a3dc4;
-  --color-brand-800: #3b319e;
-  --color-brand-900: #2e277c;
-  --color-brand-950: #1c184f;
+  /*
+   * Brand — dual-tone.
+   * Light: navy CTAs + gold accents on soft grey.
+   * Dark (see .dark): crimson on near-black.
+   */
+  --color-brand-50: #f3efe6;
+  --color-brand-100: #e5ecf4;
+  --color-brand-200: #c5d0de;
+  --color-brand-300: #8fa3bf;
+  --color-brand-400: #5c7494;
+  --color-brand-500: #0a1627;
+  --color-brand-600: #15233a;
+  --color-brand-700: #1c2f4a;
+  --color-brand-800: #243a58;
+  --color-brand-900: #0a1627;
+  --color-brand-950: #05080f;
 
-  /* Secondary / highlight (coral) */
-  --color-accent-500: #ff7a59;
+  /* Metallic gold / brass accent (light) */
+  --color-accent-500: #c6a035;
 
-  /* Neutrals — single ramp */
-  --color-fg: #0f172a; /* primary text */
-  --color-fg-muted: #64748b; /* secondary text */
-  --color-bg: #f7f8fa; /* app background */
-  --color-surface: #ffffff; /* cards / panels */
-  --color-surface-elevated: #ffffff;
-  --color-border: #e7e9ee; /* hairline borders */
+  /*
+   * Light neutrals — soft grey field (not cream), white panels.
+   */
+  --color-fg: #0a0a0b;
+  --color-fg-muted: #6b7280;
+  --color-bg: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #fafafa;
+  --color-border: rgb(10 10 11 / 0.08);
 
   /* Status */
   --color-success-50: #ecfdf3;
@@ -75,11 +81,11 @@
   --color-danger-500: #f04438;
   --color-danger-700: #b42318;
 
-  /* Radii / shadows — soft dashboard feel (orders-style) */
+  /* Radii / shadows — soft neutral depth */
   --radius-card: 1.25rem;
   --radius-btn: 0.75rem;
   --radius-input: 0.75rem;
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.05), 0 4px 14px rgb(16 24 40 / 0.06);
+  --shadow-card: 0 1px 2px rgb(10 10 11 / 0.04), 0 8px 24px rgb(10 10 11 / 0.06);
 
   /* Fonts */
   --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
@@ -95,28 +101,28 @@
 .dark {
   color-scheme: dark;
 
-  /* Brand — lifted so links, badges and CTAs stay legible on dark surfaces */
-  --color-brand-50: #1d1a3d;
-  --color-brand-100: #262150;
-  --color-brand-200: #322b6b;
-  --color-brand-300: #6b5cf0;
-  --color-brand-400: #7d6fff;
-  --color-brand-500: #8b7dff;
-  --color-brand-600: #a99cff;
-  --color-brand-700: #c6bfff;
-  --color-brand-800: #ddd8ff;
-  --color-brand-900: #ebe8ff;
-  --color-brand-950: #0f0d24;
+  /* Brand — crimson leads on near-black */
+  --color-brand-50: #2a1212;
+  --color-brand-100: #3f1515;
+  --color-brand-200: #7f1d1d;
+  --color-brand-300: #b91c1c;
+  --color-brand-400: #ef4444;
+  --color-brand-500: #dc2626;
+  --color-brand-600: #ef4444;
+  --color-brand-700: #f87171;
+  --color-brand-800: #fca5a5;
+  --color-brand-900: #fecaca;
+  --color-brand-950: #0a0a0b;
 
-  --color-accent-500: #ff9573;
+  --color-accent-500: #a3a3a3;
 
-  /* Neutrals — depth + soft ambient lift (Finotive-style, brand-tinted) */
-  --color-fg: #ffffff;
-  --color-fg-muted: #a1a1aa;
-  --color-bg: #09090b;
-  --color-surface: #121215;
-  --color-surface-elevated: #18181b;
-  --color-border: rgb(255 255 255 / 0.08);
+  /* Neutrals — black + soft greys */
+  --color-fg: #f5f5f5;
+  --color-fg-muted: #a3a3a3;
+  --color-bg: #0a0a0b;
+  --color-surface: #171717;
+  --color-surface-elevated: #262626;
+  --color-border: rgb(255 255 255 / 0.1);
 
   /* Status — lifted 700s so text-*-700 reads on dark */
   --color-success-50: #0f2419;

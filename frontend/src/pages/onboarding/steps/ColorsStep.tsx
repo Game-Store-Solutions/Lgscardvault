@@ -8,7 +8,7 @@ export function ColorsStep({ data, patchBranding }: { data: OnboardingData; patc
   const applyPreset = (preset: ThemePreset) => patchBranding(preset.palette)
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
       <div className="space-y-6">
         <div>
           <p className="mb-1 text-sm font-bold text-fg">Store theme library</p>

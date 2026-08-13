@@ -1,5 +1,6 @@
-import { Link } from 'react-router'
 import { ShieldCheck, Sparkles, Store as StoreIcon, User } from 'lucide-react'
+import { BrandLogo } from './BrandLogo'
+import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 
 export interface AuthMarketingAsideProps {
   /** Small overline label. */
@@ -8,7 +9,7 @@ export interface AuthMarketingAsideProps {
   storeName?: string
   /** Marketing description copy. */
   description: string
-  /** Background image (defaults to the marketplace collectibles shot). */
+  /** @deprecated Stock photos replaced by floating TCG cards; ignored. */
   imageUrl?: string
 }
 
@@ -19,61 +20,47 @@ const FEATURES = [
 ]
 
 /**
- * AuthMarketingAside — the immersive brand panel beside the auth form. A stock
- * marketplace image under a brand-colored gradient, a light logo lockup, a big
- * headline, and glassy role feature chips. Hidden on small screens (the form
- * takes the full width there).
+ * Auth marketing panel — navy/gold soft grey in light, crimson near-black in dark,
+ * with floating multi-game cards behind the copy.
  */
-export default function AuthMarketingAside({ eyebrow = 'LGS Card Vault', storeName, description, imageUrl }: AuthMarketingAsideProps) {
+export default function AuthMarketingAside({ eyebrow = 'LGS Card Vault', storeName, description }: AuthMarketingAsideProps) {
   return (
-    <aside className="relative hidden overflow-hidden lg:block">
-      <img
-        src={imageUrl ?? '/stock/hero-collectibles.jpg'}
-        alt=""
-        aria-hidden
-        className="absolute inset-0 size-full object-cover"
-      />
-      {/* Brand gradient wash for legibility + identity */}
+    <aside className="relative hidden overflow-hidden bg-bg dark:bg-[#0a0a0b] lg:block">
       <div
         aria-hidden
-        className="absolute inset-0"
-        style={{
-          background:
-            'linear-gradient(150deg, rgba(74,61,196,0.94) 0%, rgba(109,94,252,0.82) 42%, rgba(15,17,23,0.72) 100%)',
-        }}
+        className="absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_80%_25%,rgba(198,160,53,0.14),transparent_55%),linear-gradient(165deg,#fafafa_0%,#f3f4f6_48%,#e5e7eb_100%)] dark:bg-[radial-gradient(ellipse_70%_50%_at_70%_20%,rgba(220,38,38,0.18),transparent_55%),linear-gradient(165deg,#0a0a0b_0%,#171717_55%,#0a0a0b_100%)]"
+      />
+      <FloatingCardsBackdrop
+        layout="right"
+        washClassName="bg-gradient-to-r from-[#f3f4f6] via-[#f3f4f6]/88 to-[#f3f4f6]/25 dark:from-[#0a0a0b] dark:via-[#171717]/88 dark:to-[#171717]/30"
       />
 
-      <div className="relative flex h-full flex-col justify-between p-10 text-white xl:p-14">
-        <Link to="/" className="inline-flex items-center gap-2 font-display text-lg font-bold tracking-tight">
-          <span className="grid size-9 place-items-center rounded-btn bg-white/15 text-sm font-bold backdrop-blur">
-            LGS
-          </span>
-          <span>LGS Card Vault</span>
-        </Link>
+      <div className="relative z-10 flex h-full flex-col justify-between p-10 text-fg xl:p-14">
+        <BrandLogo size="md" variant="auto" withWordmark />
 
         <div className="max-w-md">
-          <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.3em] text-white/80">
-            <Sparkles aria-hidden className="size-4" />
+          <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.3em] text-fg-muted">
+            <Sparkles aria-hidden className="size-4 text-accent-500 dark:text-brand-500" />
             {eyebrow}
           </p>
-          <h2 className="mt-5 font-display text-4xl font-bold leading-[1.1] tracking-tight xl:text-5xl">
-            {storeName ?? 'Shop Magic singles from trusted local stores'}
+          <h2 className="mt-5 font-display text-4xl font-bold leading-[1.1] tracking-tight text-fg xl:text-5xl">
+            {storeName ?? 'Shop singles from trusted local stores'}
           </h2>
-          <p className="mt-5 max-w-sm text-base leading-relaxed text-white/85">{description}</p>
+          <p className="mt-5 max-w-sm text-base leading-relaxed text-fg-muted">{description}</p>
         </div>
 
         <div className="grid gap-3">
           {FEATURES.map(({ icon: Icon, label, text }) => (
             <div
               key={label}
-              className="flex items-start gap-3 rounded-card border border-white/15 bg-white/10 p-3.5 backdrop-blur-sm"
+              className="flex items-start gap-3 rounded-card bg-surface/90 p-3.5 shadow-sm ring-1 ring-black/[0.04] backdrop-blur-sm dark:bg-white/10 dark:ring-white/10 dark:shadow-none"
             >
-              <span className="grid size-9 flex-shrink-0 place-items-center rounded-btn bg-white/15">
+              <span className="grid size-9 flex-shrink-0 place-items-center rounded-btn bg-brand-50 text-brand-500 dark:bg-white/15 dark:text-brand-400">
                 <Icon aria-hidden className="size-4" />
               </span>
               <div>
-                <p className="text-sm font-bold">{label}</p>
-                <p className="text-xs text-white/75">{text}</p>
+                <p className="text-sm font-bold text-fg">{label}</p>
+                <p className="text-xs text-fg-muted">{text}</p>
               </div>
             </div>
           ))}

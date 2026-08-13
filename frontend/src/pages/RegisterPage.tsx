@@ -4,6 +4,7 @@ import { Info, UserPlus } from 'lucide-react'
 import { useStore } from '../hooks'
 import { Button, Input } from '../components/ui'
 import AuthMarketingAside from '../components/AuthMarketingAside'
+import { BrandLogo } from '../components/BrandLogo'
 import { SsoOption, useSsoStatus } from '../components/SsoOption'
 import { useAuth } from '../context/AuthContext'
 
@@ -24,7 +25,6 @@ const COPY = {
     asideEyebrow: 'For store owners',
     asideDescription:
       'Run your storefront: list inventory, track orders, brand your page, and reach buyers across the marketplace.',
-    asideImage: '/stock/featured-tabletop.jpg',
   },
   customer: {
     eyebrow: 'Join the marketplace',
@@ -37,8 +37,7 @@ const COPY = {
     alternateTo: '/register/owner',
     asideEyebrow: 'Join the marketplace',
     asideDescription:
-      'Build one account that follows you across every storefront — favorites, want lists, and a faster checkout.',
-    asideImage: undefined,
+      'Build one account that follows you across every storefront. Favorites, want lists, and a faster checkout.',
   },
 } as const
 
@@ -85,15 +84,13 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
         eyebrow={copy.asideEyebrow}
         storeName={store?.name}
         description={copy.asideDescription}
-        imageUrl={copy.asideImage}
       />
 
       <section className="flex items-center justify-center px-6 py-16 sm:px-10">
         <div className="w-full max-w-sm">
-          <Link to="/" className="mb-8 inline-flex items-center gap-2 font-display text-lg font-bold tracking-tight text-brand-600 lg:hidden">
-            <span className="grid size-9 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">LGS</span>
-            LGS Card Vault
-          </Link>
+          <div className="mb-8 lg:hidden">
+            <BrandLogo size="md" withWordmark />
+          </div>
 
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">{copy.eyebrow}</p>
           <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-fg">{copy.title}</h1>

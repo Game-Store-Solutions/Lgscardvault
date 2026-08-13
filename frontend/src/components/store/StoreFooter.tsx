@@ -129,7 +129,10 @@ export function StoreFooter({ slug }: { slug: string }) {
         )}
 
         <div className={`flex flex-wrap items-center justify-between gap-3 text-xs text-fg-muted ${hasAnything ? 'mt-8 border-t border-border pt-6' : ''}`}>
-          <p>Powered by LGS Card Vault</p>
+          <p className="inline-flex items-center gap-2">
+            <img src="/brand/mark.png" alt="" aria-hidden className="size-5 rounded-[20%] object-cover" />
+            Powered by LGS Card Vault
+          </p>
           <div className="flex items-center gap-2">
             <span className="font-bold text-fg">{store.name}</span>
             {store.logoUrl && (

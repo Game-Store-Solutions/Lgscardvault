@@ -27,7 +27,7 @@ export function Tabs({ tabs, value, onChange, children, className, ...rest }: Ta
       <div
         role="tablist"
         aria-label={rest['aria-label'] ?? 'Tabs'}
-        className="flex flex-wrap items-center gap-1 border-b border-border"
+        className="flex flex-wrap items-center gap-1 border-b border-border/70"
       >
         {tabs.map((tab) => {
           const selected = tab.id === value
@@ -43,10 +43,10 @@ export function Tabs({ tabs, value, onChange, children, className, ...rest }: Ta
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(tab.id)}
               className={cx(
-                'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold -mb-px border-b-2',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset',
+                'inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold -mb-px',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:ring-inset',
                 selected
-                  ? 'border-brand-500 text-brand-600 dark:text-brand-400'
+                  ? 'border-accent-500 text-fg'
                   : 'border-transparent text-fg-muted hover:text-fg',
               )}
             >
