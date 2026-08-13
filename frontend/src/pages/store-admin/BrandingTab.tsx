@@ -272,7 +272,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)]">
       <div className="space-y-6">
         <Card>
           <CardHeader

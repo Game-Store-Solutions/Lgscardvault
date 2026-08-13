@@ -13,25 +13,25 @@ export interface ReportChartPalette {
 }
 
 const LIGHT: ReportChartPalette = {
-  brand: '#6d5efc',
-  brandMuted: '#8d7bff',
-  accent: '#14b8a6',
-  grid: '#e4e4e7',
-  tick: '#71717a',
+  brand: '#0a1627',
+  brandMuted: '#5c7494',
+  accent: '#c6a035',
+  grid: '#e5e7eb',
+  tick: '#6b7280',
   tooltipBg: '#ffffff',
-  tooltipBorder: '#e4e4e7',
-  tooltipFg: '#18181b',
+  tooltipBorder: '#e5e7eb',
+  tooltipFg: '#0a0a0b',
 }
 
 const DARK: ReportChartPalette = {
-  brand: '#8b7dff',
-  brandMuted: '#a99cff',
-  accent: '#2dd4bf',
-  grid: '#3f3f46',
-  tick: '#a1a1aa',
-  tooltipBg: '#18181b',
-  tooltipBorder: '#3f3f46',
-  tooltipFg: '#fafafa',
+  brand: '#dc2626',
+  brandMuted: '#ef4444',
+  accent: '#a3a3a3',
+  grid: '#262626',
+  tick: '#a3a3a3',
+  tooltipBg: '#171717',
+  tooltipBorder: '#262626',
+  tooltipFg: '#f5f5f5',
 }
 
 export function chartPalette(theme: Theme): ReportChartPalette {

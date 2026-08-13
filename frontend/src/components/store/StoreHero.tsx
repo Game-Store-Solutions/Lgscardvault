@@ -5,8 +5,8 @@ import { cx } from '../../lib/cx'
 import { normalizeHeroLayout } from './hero/heroLayouts'
 import { SignatureHeroLayout } from './hero/HeroSignatureLayouts'
 
-export const DEFAULT_PRIMARY = '#6d5efc'
-export const DEFAULT_ACCENT = '#ff7a59'
+export const DEFAULT_PRIMARY = '#0a1627'
+export const DEFAULT_ACCENT = '#c6a035'
 
 export type { HeroLayout }
 

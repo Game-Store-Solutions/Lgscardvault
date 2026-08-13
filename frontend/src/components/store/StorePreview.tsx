@@ -214,7 +214,7 @@ export function StorePreview({
           <PreviewModeToggle mode={previewMode} onChange={setPreviewMode} />
         </div>
       ) : null}
-      <div style={themeStyle} className="space-y-4 overflow-hidden rounded-card border border-border p-4">
+      <div style={themeStyle} className="space-y-4 overflow-hidden rounded-card p-5 shadow-card ring-1 ring-black/[0.04] dark:ring-white/10">
       <StoreHero
         name={storeName}
         tagline={branding.tagline}
@@ -241,10 +241,10 @@ export function StorePreview({
         </Button>
       </div>
 
-      <div className={marketplace ? 'grid gap-3' : 'grid grid-cols-2 gap-3'}>
-        {[1, 2].map((n) =>
+      <div className={marketplace ? 'grid gap-3' : 'grid grid-cols-2 gap-3 sm:grid-cols-3'}>
+        {[1, 2, 3].map((n) =>
           marketplace ? (
-            <div key={n} className="flex gap-3 rounded-card border border-border bg-surface p-3 shadow-card">
+            <div key={n} className="flex gap-3 rounded-card bg-surface p-3 shadow-card ring-1 ring-black/[0.04] dark:ring-white/10">
               <div
                 className="grid h-28 w-20 shrink-0 place-items-center self-center rounded-btn border-2 bg-bg text-fg-muted"
                 style={{ borderColor: n === 1 ? '#f59e0b' : '#94a3b8' }}
@@ -276,8 +276,8 @@ export function StorePreview({
               </div>
             </div>
           ) : (
-            <div key={n} className="rounded-card border border-border bg-surface p-3 shadow-card">
-              <div className="grid h-20 place-items-center rounded-btn bg-bg text-fg-muted">
+            <div key={n} className="rounded-card bg-surface p-3 shadow-card ring-1 ring-black/[0.04] dark:ring-white/10">
+              <div className="grid h-24 place-items-center rounded-btn bg-bg text-fg-muted">
                 <ImageOff aria-hidden className="size-5" />
               </div>
               <p className="mt-2 truncate text-sm font-bold text-brand-600">Sample Card {n}</p>

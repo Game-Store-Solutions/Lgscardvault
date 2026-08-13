@@ -14,10 +14,10 @@ export const backButtonVariants = tv({
   variants: {
     tone: {
       surface:
-        'border border-border bg-surface text-fg shadow-sm hover:border-brand-300 hover:bg-bg hover:text-brand-600',
+        'bg-surface text-fg shadow-sm ring-1 ring-black/[0.05] hover:bg-bg hover:text-brand-600 hover:ring-accent-500/35 dark:ring-white/10',
       overlay:
-        'border border-border/80 bg-surface/92 text-fg shadow-md backdrop-blur-md hover:border-brand-400/60 hover:bg-surface hover:text-brand-600',
-      soft: 'border border-transparent bg-bg/80 text-fg-muted hover:border-border hover:bg-surface hover:text-brand-600',
+        'bg-surface/92 text-fg shadow-md ring-1 ring-black/[0.06] backdrop-blur-md hover:bg-surface hover:text-brand-600 hover:ring-accent-500/40 dark:ring-white/10',
+      soft: 'border border-transparent bg-bg/80 text-fg-muted hover:bg-surface hover:text-brand-600 hover:ring-1 hover:ring-black/[0.05]',
     },
     size: {
       sm: 'h-9 px-3.5 text-xs',

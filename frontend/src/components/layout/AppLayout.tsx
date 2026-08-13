@@ -5,7 +5,9 @@ import { useCustomerCart, useGuestCart, useKioskMode, useTheme } from '../../hoo
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants } from '../ui'
-import { DEFAULT_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
+import { BrandLogo } from '../BrandLogo'
+import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
+import { AppShellLayoutProvider, useAppShellLayout } from './AppShellLayout'
 import { cx } from '../../lib/cx'
 import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShieldCheck, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
 
@@ -25,13 +27,12 @@ export default function AppLayout() {
   const storeAccountMatch = useMatch('/s/:slug/account')
   const storeSlug = storeMatch?.params.slug ?? exactStoreMatch?.params.slug
   const fullWidthAccount = Boolean(accountMatch || storeAccountMatch)
-  const pageShell = fullWidthAccount
+  const routeFlush = Boolean(cardDetailMatch || artistBrowseMatch || deckBuilderMatch)
+  const headerShell = fullWidthAccount
     ? FULL_WIDTH_APP_SHELL
     : storeSlug
       ? STOREFRONT_SHELL
       : DEFAULT_APP_SHELL
-  const flushMain = Boolean(cardDetailMatch || artistBrowseMatch || deckBuilderMatch)
-
   // Live cart count for the active store, so the navbar badge stays in sync.
   const { data: authedCart = [] } = useCustomerCart(storeSlug ?? '', Boolean(user && storeSlug))
   const { query: guestCartQuery } = useGuestCart(storeSlug ?? '', Boolean(!user && storeSlug))
@@ -112,56 +113,51 @@ export default function AppLayout() {
   // platform admin) can leave it; the terminal stays signed in as the owner.
   if (kioskMode) {
     return (
-      <div className="flex min-h-screen flex-col bg-bg text-fg">
-        <header className="sticky top-0 z-40 border-b border-border bg-surface/80 shadow-sm backdrop-blur-xl">
-          <div className={cx(pageShell, 'flex items-center justify-between gap-4 py-3')}>
-            <span className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
-              <span className="grid size-9 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">
-                LGS
+      <AppShellLayoutProvider routeFlush={routeFlush}>
+        <div className="flex min-h-screen flex-col bg-bg text-fg">
+          <header className="sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl">
+            <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
+              <span className="flex items-center gap-2">
+                <BrandLogo size="md" />
+                <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-700">
+                  Kiosk
+                </span>
               </span>
-              <span className="hidden sm:inline">LGS Card Vault</span>
-              <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-700">
-                Kiosk
-              </span>
-            </span>
-            <div className="flex items-center gap-2">
-              {cartLink}
-              {(isStoreOwner || isSuperAdmin) && (
-                <Button variant="secondary" size="sm" onClick={exitKioskMode}>
-                  <Monitor aria-hidden className="size-4" />
-                  Exit kiosk
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {cartLink}
+                {(isStoreOwner || isSuperAdmin) && (
+                  <Button variant="secondary" size="sm" onClick={exitKioskMode}>
+                    <Monitor aria-hidden className="size-4" />
+                    Exit kiosk
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main className={cx(pageShell, 'flex-1', flushMain ? 'py-0' : 'py-8')}>
-          <Outlet />
-        </main>
+          <AppMain contentShell={headerShell} />
 
-        {storeSlug && <StoreFooter slug={storeSlug} />}
-      </div>
+          {storeSlug && <StoreFooter slug={storeSlug} />}
+        </div>
+      </AppShellLayoutProvider>
     )
   }
 
   return (
+    <AppShellLayoutProvider routeFlush={routeFlush}>
     <div className="flex min-h-screen flex-col bg-bg text-fg">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/80 shadow-sm backdrop-blur-xl">
-        <div className={cx(pageShell, 'flex items-center justify-between gap-4 py-3')}>
-          <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
-            <span className="grid size-9 place-items-center rounded-btn bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">
-              LGS
-            </span>
-            <span className="hidden sm:inline">LGS Card Vault</span>
-          </Link>
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl">
+        <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
+          <BrandLogo size="md" withWordmark />
 
           <div className="flex items-center gap-3">
           {/* Desktop navigation */}
           <nav className="hidden items-center gap-3 md:flex">
-            <NavLink to="/" className={navLinkClass} end>
-              Stores
-            </NavLink>
+            {user && (
+              <NavLink to="/" className={navLinkClass} end>
+                Stores
+              </NavLink>
+            )}
 
             {/* One primary action per role; everything else lives in the avatar menu. */}
             {isSuperAdmin && (
@@ -347,7 +343,7 @@ export default function AppLayout() {
         {/* Mobile navigation panel */}
         {mobileOpen && (
           <nav id="mobile-nav" className="border-t border-border bg-surface px-4 py-3 md:hidden">
-            <div className={cx(pageShell, 'space-y-1')}>
+            <div className={cx(headerShell, 'space-y-1')}>
               {user && (
                 <div className="flex items-center gap-2 px-3 py-2 text-sm text-fg-muted">
                   <Avatar name={user.displayName} src={user.avatarUrl ?? undefined} size="sm" />
@@ -355,9 +351,11 @@ export default function AppLayout() {
                 </div>
               )}
 
-              <NavLink to="/" end onClick={closeMobile} className={mobileLinkClass}>
-                Stores
-              </NavLink>
+              {user && (
+                <NavLink to="/" end onClick={closeMobile} className={mobileLinkClass}>
+                  Stores
+                </NavLink>
+              )}
 
               {isSuperAdmin && (
                 <Link to="/platform/admin" onClick={closeMobile} className={mobileLinkClass}>
@@ -427,11 +425,21 @@ export default function AppLayout() {
         )}
       </header>
 
-      <main className={cx(pageShell, 'flex-1', flushMain ? 'py-0' : 'py-8')}>
-        <Outlet />
-      </main>
+      <AppMain contentShell={headerShell} />
 
       {storeSlug && <StoreFooter slug={storeSlug} />}
     </div>
+    </AppShellLayoutProvider>
+  )
+}
+
+function AppMain({ contentShell }: { contentShell: string }) {
+  const layout = useAppShellLayout()
+  const flush = layout?.flushMain ?? false
+
+  return (
+    <main className={cx(flush ? FLUSH_APP_SHELL : contentShell, 'flex-1', flush ? 'py-0' : 'py-8')}>
+      <Outlet />
+    </main>
   )
 }

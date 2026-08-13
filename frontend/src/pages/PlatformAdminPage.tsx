@@ -356,7 +356,7 @@ export default function PlatformAdminPage() {
                 {pending.map((store) => (
                   <div
                     key={store.id}
-                    className="flex flex-col gap-4 rounded-card border border-border bg-bg p-4 lg:flex-row lg:items-center lg:justify-between"
+                    className="flex flex-col gap-4 rounded-card bg-bg/80 p-4 ring-1 ring-black/[0.04] lg:flex-row lg:items-center lg:justify-between dark:ring-white/10"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -636,7 +636,7 @@ function IntegrationTile({
 }) {
   const configured = status?.configured ?? false
   return (
-    <div className="rounded-card border border-border bg-bg p-4">
+    <div className="rounded-card bg-bg/80 p-4 ring-1 ring-black/[0.04] dark:ring-white/10">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-sm font-bold text-fg">
           <Plug aria-hidden className="size-4 text-fg-muted" />

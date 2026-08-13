@@ -16,7 +16,7 @@ export const buttonVariants = tv({
   variants: {
     variant: {
       primary: 'bg-brand-500 text-white shadow-sm hover:bg-brand-600 hover:shadow-md active:shadow-sm dark:btn-glow',
-      secondary: 'bg-surface text-fg border border-border shadow-sm hover:bg-bg hover:border-border',
+      secondary: 'bg-surface text-fg shadow-sm ring-1 ring-black/[0.05] hover:bg-bg hover:ring-accent-500/40 dark:ring-white/10',
       ghost: 'bg-transparent text-fg hover:bg-bg',
       danger: 'bg-danger-500 text-white shadow-sm hover:bg-danger-700',
     },

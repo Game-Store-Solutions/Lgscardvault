@@ -1,12 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { ArrowRight, Search, Store as StoreIcon } from 'lucide-react'
+import { ArrowRight, Search, Store } from 'lucide-react'
 import api, { unwrapCollection } from '../api/client'
-import type { Store } from '../api/types'
+import type { Store as StoreType } from '../api/types'
 import { EmptyState, ErrorState, PageHeader, Select } from '../components/ui'
 import { StoreHero, StoreCard, StoreCardSkeleton } from '../components/store'
+import MarketplaceLanding from '../components/MarketplaceLanding'
+import { BrandLogo } from '../components/BrandLogo'
+import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
 import { useDebouncedValue } from '../hooks'
+import { useAuth } from '../context/AuthContext'
 
 type SortKey = 'featured' | 'newest' | 'name'
 
@@ -17,6 +21,8 @@ const SORTS: { value: SortKey; label: string }[] = [
 ]
 
 export default function HomePage() {
+  const { user, loading: authLoading } = useAuth()
+
   const {
     data: stores = [],
     isLoading,
@@ -26,8 +32,9 @@ export default function HomePage() {
     queryKey: ['stores'],
     queryFn: async () => {
       const { data } = await api.get('/stores')
-      return unwrapCollection<Store>(data)
+      return unwrapCollection<StoreType>(data)
     },
+    enabled: !authLoading && !!user,
   })
 
   const [query, setQuery] = useState('')
@@ -51,7 +58,12 @@ export default function HomePage() {
     return list
   }, [stores, debouncedQuery, sort])
 
-  if (isLoading) {
+  // Logged-out visitors always see the marketing landing — separates guest vs app.
+  if (!authLoading && !user) {
+    return <MarketplaceLanding />
+  }
+
+  if (authLoading || isLoading) {
     return (
       <div className="space-y-10">
         <div className="h-64 animate-pulse rounded-card border border-border bg-surface" />
@@ -77,9 +89,9 @@ export default function HomePage() {
   if (stores.length === 0) {
     return (
       <EmptyState
-        icon={StoreIcon}
+        icon={Store}
         title="No active stores yet"
-        description="Platform admins can create one."
+        description="Once a store opens on the marketplace, it will show up here."
       />
     )
   }
@@ -87,23 +99,22 @@ export default function HomePage() {
   return (
     <div className="space-y-12">
       {/* Search-first hero */}
-      <section className="relative overflow-hidden rounded-card border border-border bg-surface">
-        <img
-          src="/stock/hero-collectibles.jpg"
-          alt=""
+      <section className="relative overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-black/[0.04] dark:ring-white/10">
+        <div
           aria-hidden
-          className="absolute inset-0 size-full object-cover"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_70%_80%_at_85%_40%,rgba(198,160,53,0.12),transparent_55%),linear-gradient(135deg,#fafafa_0%,#f3f4f6_55%,#e5e7eb_100%)] dark:bg-[radial-gradient(ellipse_70%_80%_at_85%_40%,rgba(220,38,38,0.14),transparent_55%),linear-gradient(135deg,#0a0a0b_0%,#171717_60%,#0a0a0b_100%)]"
         />
-        {/* Adaptive overlays (use the surface token, so they flip in dark mode) */}
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-surface via-surface/95 to-surface/40" />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-surface/70 to-transparent sm:from-surface/20" />
+        <FloatingCardsBackdrop
+          layout="right"
+          washClassName="bg-gradient-to-r from-surface via-surface/92 to-surface/25 dark:from-[#171717] dark:via-[#171717]/88 dark:to-[#171717]/20"
+        />
         <div className="relative max-w-2xl px-6 py-12 sm:px-10 sm:py-16">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">LGS Card Vault</p>
-          <h1 className="mt-3 max-w-2xl font-display text-4xl font-bold tracking-tight text-fg sm:text-5xl">
-            Find Magic singles from trusted local stores
+          <BrandLogo size="lg" variant="auto" to={null} />
+          <h1 className="mt-4 max-w-2xl font-display text-4xl font-bold tracking-tight text-fg sm:text-5xl">
+            Find singles from trusted local stores
           </h1>
           <p className="mt-3 max-w-xl text-base text-fg-muted">
-            Browse verified storefronts, compare inventory, and shop with confidence.
+            Magic, Pokémon, One Piece, Flesh &amp; Blood — browse verified storefronts and shop with confidence.
           </p>
 
           <div className="relative mt-7 max-w-xl">
@@ -114,7 +125,7 @@ export default function HomePage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search stores by name…"
               aria-label="Search stores"
-              className="h-14 w-full rounded-btn border border-border bg-surface pl-12 pr-4 text-base text-fg shadow-sm placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              className="h-14 w-full rounded-btn border-0 bg-surface pl-12 pr-4 text-base text-fg shadow-sm ring-1 ring-black/[0.06] placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:ring-white/10"
             />
           </div>
 

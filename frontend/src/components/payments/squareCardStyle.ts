@@ -3,21 +3,21 @@ export function squareCardStyle(dark: boolean): Record<string, Record<string, st
   if (dark) {
     return {
       '.input-container': {
-        borderColor: '#2a2f3a',
+        borderColor: '#404040',
         borderRadius: '10px',
         borderWidth: '1px',
       },
       '.input-container.is-focus': {
-        borderColor: '#8b7dff',
+        borderColor: '#dc2626',
       },
       '.input-container.is-error': {
         borderColor: '#f04438',
       },
       '.message-text': {
-        color: '#9aa1b4',
+        color: '#a3a3a3',
       },
       '.message-icon': {
-        color: '#9aa1b4',
+        color: '#a3a3a3',
       },
       '.message-text.is-error': {
         color: '#fca5a5',
@@ -26,12 +26,12 @@ export function squareCardStyle(dark: boolean): Record<string, Record<string, st
         color: '#fca5a5',
       },
       input: {
-        backgroundColor: '#171a22',
-        color: '#e7e9f0',
+        backgroundColor: '#171717',
+        color: '#f5f5f5',
         fontSize: '16px',
       },
       'input::placeholder': {
-        color: '#9aa1b4',
+        color: '#a3a3a3',
       },
       'input.is-error': {
         color: '#fca5a5',
@@ -41,29 +41,29 @@ export function squareCardStyle(dark: boolean): Record<string, Record<string, st
 
   return {
     '.input-container': {
-      borderColor: '#e7e9ee',
+      borderColor: '#e5e7eb',
       borderRadius: '10px',
       borderWidth: '1px',
     },
     '.input-container.is-focus': {
-      borderColor: '#6d5efc',
+      borderColor: '#0a1627',
     },
     '.input-container.is-error': {
       borderColor: '#f04438',
     },
     '.message-text': {
-      color: '#64748b',
+      color: '#6b7280',
     },
     '.message-icon': {
-      color: '#64748b',
+      color: '#6b7280',
     },
     input: {
       backgroundColor: '#ffffff',
-      color: '#0f172a',
+      color: '#0a0a0b',
       fontSize: '16px',
     },
     'input::placeholder': {
-      color: '#64748b',
+      color: '#6b7280',
     },
   }
 }

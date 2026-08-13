@@ -15,7 +15,7 @@ export function BrandingStep({
 }) {
   const b = data.branding
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
       <div className="space-y-4">
         <Input label="Store name" placeholder="Acme Cards" value={data.storeName} onChange={(e) => setStoreName(e.target.value)} required />
         <Input
