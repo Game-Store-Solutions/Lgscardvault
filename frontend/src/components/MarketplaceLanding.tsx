@@ -61,7 +61,7 @@ export default function MarketplaceLanding() {
         <h1 className="mt-12 max-w-2xl font-display text-3xl font-bold tracking-tight text-fg sm:text-5xl sm:leading-[1.08]">
           The vault for every local game store
         </h1>
-        <p className="mt-4 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
+        <p className="mt-4 max-w-lg text-base font-medium leading-relaxed text-zinc-800 drop-shadow-[0_1px_10px_rgba(243,244,246,0.95)] dark:text-zinc-100 dark:drop-shadow-[0_2px_12px_rgba(10,10,11,0.95)] sm:text-lg">
           Magic, Pokémon, One Piece, Flesh &amp; Blood, and Riftbound from trusted LGSs.
         </p>
 
