@@ -24,9 +24,11 @@ Not used as catalog imagery. Game trademarks belong to their respective owners.
 | `op-*.jpg` | One Piece Card Game | Official Bandai card list images (`en.onepiece-cardgame.com`) |
 | `fab-*.jpg` | Flesh and Blood | TCGplayer product images (resized) |
 | `pkm-*.jpg` | Pokémon TCG | [Pokémon TCG API](https://docs.pokemontcg.io/) image CDN (`images.pokemontcg.io`) |
+| `rb-*.jpg` | Riftbound | Riot Games CMS CDN (`cmsassets.rgpub.io`, 744×1039 official art, resized) |
 
-Regenerate with:
+Regenerate / expand with:
 
 ```bash
 python scripts/build_brand_assets.py
+python scripts/fetch_landing_hero_cards.py
 ```

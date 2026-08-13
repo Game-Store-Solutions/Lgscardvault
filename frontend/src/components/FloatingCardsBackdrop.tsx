@@ -7,254 +7,445 @@ export type FloatCard = {
   delay: string
 }
 
-/** Shared TCG art set for marketing surfaces (landing, marketplace hero, auth). */
+/**
+ * Full-field scatter for the marketing landing.
+ * Cards form a dense wreath around the center copy — no empty mid-side pockets.
+ * Density grows with viewport; Riftbound mixed with classic TCGs.
+ */
 export const FLOAT_CARDS: FloatCard[] = [
+  // —— Corner anchors (always) ——
   {
     src: '/brand/cards/mtg-teferi.jpg',
-    alt: 'Magic: The Gathering — Teferi, Hero of Dominaria',
-    className: 'left-[2%] top-[10%] w-[22%] max-w-[9.5rem] -rotate-12 sm:left-[4%] sm:w-[16%]',
+    alt: 'Magic — Teferi',
+    className: 'left-[-1%] top-[2%] w-[22%] max-w-[9rem] -rotate-12 sm:left-[1%] sm:w-[14%]',
     delay: '0s',
   },
   {
     src: '/brand/cards/op-luffy.jpg',
-    alt: 'One Piece Card Game — Monkey D. Luffy',
-    className: 'right-[2%] top-[6%] w-[24%] max-w-[10rem] rotate-8 sm:right-[4%] sm:w-[17%]',
-    delay: '0.25s',
+    alt: 'One Piece — Luffy',
+    className: 'right-[-1%] top-[1%] w-[23%] max-w-[9rem] rotate-9 sm:right-[1%] sm:w-[14%]',
+    delay: '0.12s',
+  },
+  {
+    src: '/brand/cards/rb-jinx.jpg',
+    alt: 'Riftbound — Jinx, Rebel',
+    className: 'left-[-1%] bottom-[1%] w-[22%] max-w-[9rem] rotate-7 sm:left-[1%] sm:w-[14%]',
+    delay: '0.24s',
   },
   {
     src: '/brand/cards/pkm-charizard.jpg',
     alt: 'Pokémon — Charizard',
-    className: 'left-[26%] top-[3%] hidden w-[14%] max-w-[8rem] rotate-3 sm:block',
-    delay: '0.1s',
+    className: 'right-[-1%] bottom-[0%] w-[23%] max-w-[9rem] -rotate-8 sm:right-[1%] sm:w-[14%]',
+    delay: '0.36s',
+  },
+
+  // —— Top / bottom mid (always) — close the horizontal gaps ——
+  {
+    src: '/brand/cards/rb-ahri.jpg',
+    alt: 'Riftbound — Ahri',
+    className: 'left-[18%] top-[-2%] w-[17%] max-w-[7.5rem] rotate-4 sm:w-[12%]',
+    delay: '0.08s',
   },
   {
     src: '/brand/cards/fab-bravo.jpg',
     alt: 'Flesh and Blood — Bravo',
-    className: 'bottom-[8%] left-[3%] w-[20%] max-w-[9rem] rotate-6 sm:left-[6%] sm:w-[15%]',
-    delay: '0.55s',
-  },
-  {
-    src: '/brand/cards/mtg-ragavan.jpg',
-    alt: 'Magic: The Gathering — Ragavan, Nimble Pilferer',
-    className: 'bottom-[5%] right-[3%] w-[22%] max-w-[9.5rem] -rotate-6 sm:right-[6%] sm:w-[16%]',
-    delay: '0.8s',
+    className: 'left-[36%] top-[-1%] w-[16%] max-w-[7.25rem] -rotate-3 sm:w-[11.5%]',
+    delay: '0.18s',
   },
   {
     src: '/brand/cards/pkm-pikachu.jpg',
     alt: 'Pokémon — Pikachu',
-    className: 'right-[26%] top-[7%] hidden w-[13%] max-w-[7.5rem] -rotate-4 md:block',
+    className: 'right-[34%] top-[-2%] w-[16%] max-w-[7.25rem] rotate-6 sm:w-[11.5%]',
+    delay: '0.28s',
+  },
+  {
+    src: '/brand/cards/mtg-ragavan.jpg',
+    alt: 'Magic — Ragavan',
+    className: 'right-[16%] top-[-1%] w-[17%] max-w-[7.5rem] -rotate-5 sm:w-[12%]',
     delay: '0.4s',
   },
   {
     src: '/brand/cards/op-zoro.jpg',
-    alt: 'One Piece Card Game — Roronoa Zoro',
-    className: 'left-[38%] bottom-[2%] hidden w-[13%] max-w-[7.5rem] rotate-2 lg:block',
-    delay: '1.0s',
+    alt: 'One Piece — Zoro',
+    className: 'left-[17%] bottom-[-2%] w-[17%] max-w-[7.5rem] -rotate-4 sm:w-[12%]',
+    delay: '0.48s',
+  },
+  {
+    src: '/brand/cards/rb-annie.jpg',
+    alt: 'Riftbound — Annie',
+    className: 'left-[35%] bottom-[-1%] w-[16%] max-w-[7.25rem] rotate-5 sm:w-[11.5%]',
+    delay: '0.56s',
+  },
+  {
+    src: '/brand/cards/mtg-sheoldred.jpg',
+    alt: 'Magic — Sheoldred',
+    className: 'right-[34%] bottom-[-2%] w-[16%] max-w-[7.25rem] -rotate-6 sm:w-[11.5%]',
+    delay: '0.64s',
   },
   {
     src: '/brand/cards/fab-dorinthea.jpg',
     alt: 'Flesh and Blood — Dorinthea',
-    className: 'right-[34%] bottom-[5%] hidden w-[13%] max-w-[7.5rem] -rotate-3 md:block',
-    delay: '1.15s',
+    className: 'right-[16%] bottom-[-1%] w-[17%] max-w-[7.5rem] rotate-3 sm:w-[12%]',
+    delay: '0.72s',
+  },
+
+  // —— Side mid-ring (always) — kill the empty vertical pockets ——
+  {
+    src: '/brand/cards/rb-yasuo.jpg',
+    alt: 'Riftbound — Yasuo',
+    className: 'left-[-2%] top-[28%] w-[18%] max-w-[7.75rem] -rotate-11 sm:left-[0%] sm:w-[12.5%]',
+    delay: '0.32s',
   },
   {
     src: '/brand/cards/pkm-mewtwo.jpg',
     alt: 'Pokémon — Mewtwo',
-    className: 'left-[12%] bottom-[26%] hidden w-[12%] max-w-[7rem] -rotate-8 xl:block',
-    delay: '0.7s',
+    className: 'left-[-1%] top-[48%] w-[17%] max-w-[7.5rem] rotate-8 sm:left-[1%] sm:w-[12%]',
+    delay: '0.44s',
   },
   {
-    src: '/brand/cards/fab-lexi.jpg',
-    alt: 'Flesh and Blood — Lexi',
-    className: 'right-[10%] top-[34%] hidden w-[12%] max-w-[7rem] rotate-10 xl:block',
-    delay: '1.3s',
+    src: '/brand/cards/op-nami.jpg',
+    alt: 'One Piece — Nami',
+    className: 'right-[-2%] top-[26%] w-[18%] max-w-[7.75rem] rotate-10 sm:right-[0%] sm:w-[12.5%]',
+    delay: '0.52s',
+  },
+  {
+    src: '/brand/cards/rb-lux.jpg',
+    alt: 'Riftbound — Lux',
+    className: 'right-[-1%] top-[46%] w-[17%] max-w-[7.5rem] -rotate-9 sm:right-[1%] sm:w-[12%]',
+    delay: '0.6s',
+  },
+
+  // —— sm+: inner wreath (closer to copy, fills remaining pockets) ——
+  {
+    src: '/brand/cards/rb-darius.jpg',
+    alt: 'Riftbound — Darius',
+    className: 'left-[12%] top-[16%] hidden w-[13%] max-w-[6.75rem] rotate-7 sm:block',
+    delay: '0.8s',
+  },
+  {
+    src: '/brand/cards/mtg-lotus.jpg',
+    alt: 'Magic — Black Lotus',
+    className: 'right-[12%] top-[14%] hidden w-[13%] max-w-[6.75rem] -rotate-6 sm:block',
+    delay: '0.9s',
   },
   {
     src: '/brand/cards/pkm-blastoise.jpg',
     alt: 'Pokémon — Blastoise',
-    className: 'left-[46%] top-[10%] hidden w-[11%] max-w-[6.5rem] rotate-6 xl:block',
-    delay: '0.2s',
+    className: 'left-[12%] bottom-[14%] hidden w-[13%] max-w-[6.75rem] -rotate-5 sm:block',
+    delay: '1.0s',
   },
   {
-    src: '/brand/cards/mtg-sheoldred.jpg',
-    alt: 'Magic: The Gathering — Sheoldred, the Apocalypse',
-    className: 'left-[8%] top-[36%] hidden w-[12%] max-w-[7rem] rotate-[-14deg] lg:block',
-    delay: '1.45s',
+    src: '/brand/cards/op-sanji.jpg',
+    alt: 'One Piece — Sanji',
+    className: 'right-[12%] bottom-[13%] hidden w-[13%] max-w-[6.75rem] rotate-8 sm:block',
+    delay: '1.1s',
   },
   {
-    src: '/brand/cards/op-nami.jpg',
-    alt: 'One Piece Card Game — Nami',
-    className: 'right-[20%] bottom-[28%] hidden w-[12%] max-w-[7rem] rotate-[9deg] lg:block',
-    delay: '1.6s',
+    src: '/brand/cards/fab-lexi.jpg',
+    alt: 'Flesh and Blood — Lexi',
+    className: 'left-[22%] top-[38%] hidden w-[12%] max-w-[6.5rem] rotate-12 sm:block',
+    delay: '1.2s',
   },
   {
-    src: '/brand/cards/mtg-lotus.jpg',
-    alt: 'Magic: The Gathering — Black Lotus',
-    className: 'left-[58%] bottom-[12%] hidden w-[11%] max-w-[6.5rem] rotate-[-5deg] xl:block',
-    delay: '0.95s',
+    src: '/brand/cards/rb-vi.jpg',
+    alt: 'Riftbound — Vi',
+    className: 'right-[22%] top-[36%] hidden w-[12%] max-w-[6.5rem] -rotate-10 sm:block',
+    delay: '1.3s',
+  },
+  {
+    src: '/brand/cards/mtg-solring.jpg',
+    alt: 'Magic — Sol Ring',
+    className: 'left-[24%] bottom-[30%] hidden w-[12%] max-w-[6.5rem] -rotate-7 sm:block',
+    delay: '1.4s',
   },
   {
     src: '/brand/cards/pkm-venusaur.jpg',
     alt: 'Pokémon — Venusaur',
-    className: 'right-[48%] top-[28%] hidden w-[11%] max-w-[6.5rem] rotate-[7deg] xl:block',
+    className: 'right-[24%] bottom-[28%] hidden w-[12%] max-w-[6.5rem] rotate-6 sm:block',
+    delay: '1.5s',
+  },
+
+  // —— md+: denser mid ring ——
+  {
+    src: '/brand/cards/rb-leesin.jpg',
+    alt: 'Riftbound — Lee Sin',
+    className: 'left-[6%] top-[38%] hidden w-[11%] max-w-[6.25rem] rotate-4 md:block',
+    delay: '1.55s',
+  },
+  {
+    src: '/brand/cards/rb-kaisa.jpg',
+    alt: "Riftbound — Kai'Sa",
+    className: 'right-[6%] top-[38%] hidden w-[11%] max-w-[6.25rem] -rotate-5 md:block',
+    delay: '1.65s',
+  },
+  {
+    src: '/brand/cards/mtg-atraxa.jpg',
+    alt: 'Magic — Atraxa',
+    className: 'left-[48%] top-[4%] hidden w-[11%] max-w-[6.25rem] rotate-9 md:block',
+    delay: '0.75s',
+  },
+  {
+    src: '/brand/cards/op-shanks.jpg',
+    alt: 'One Piece — Shanks',
+    className: 'right-[48%] top-[5%] hidden w-[11%] max-w-[6.25rem] -rotate-8 md:block',
     delay: '1.75s',
   },
   {
-    src: '/brand/cards/mtg-solring.jpg',
-    alt: 'Magic: The Gathering — Sol Ring',
-    className: 'left-[22%] top-[48%] hidden w-[11%] max-w-[6.5rem] rotate-[11deg] xl:block',
-    delay: '1.9s',
-  },
-  {
-    src: '/brand/cards/op-sanji.jpg',
-    alt: 'One Piece Card Game — Sanji',
-    className: 'right-[58%] bottom-[8%] hidden w-[11%] max-w-[6.5rem] rotate-[-9deg] xl:block',
-    delay: '2.05s',
-  },
-  {
-    src: '/brand/cards/pkm-gyarados.jpg',
-    alt: 'Pokémon — Gyarados',
-    className: 'left-[70%] top-[40%] hidden w-[10%] max-w-[6rem] rotate-[5deg] 2xl:block',
-    delay: '2.2s',
-  },
-  {
-    src: '/brand/cards/mtg-bolt.jpg',
-    alt: 'Magic: The Gathering — Lightning Bolt',
-    className: 'right-[70%] top-[16%] hidden w-[10%] max-w-[6rem] rotate-[-11deg] 2xl:block',
-    delay: '2.35s',
+    src: '/brand/cards/pkm-gengar.jpg',
+    alt: 'Pokémon — Gengar',
+    className: 'left-[48%] bottom-[3%] hidden w-[11%] max-w-[6.25rem] -rotate-4 md:block',
+    delay: '1.85s',
   },
   {
     src: '/brand/cards/fab-chane.jpg',
     alt: 'Flesh and Blood — Chane',
-    className: 'left-[34%] top-[22%] hidden w-[11%] max-w-[6.5rem] rotate-[-6deg] xl:block',
-    delay: '2.5s',
+    className: 'right-[48%] bottom-[4%] hidden w-[11%] max-w-[6.25rem] rotate-7 md:block',
+    delay: '1.95s',
+  },
+  {
+    src: '/brand/cards/mtg-oko.jpg',
+    alt: 'Magic — Oko',
+    className: 'left-[34%] top-[28%] hidden w-[10.5%] max-w-[6rem] -rotate-9 md:block',
+    delay: '2.05s',
+  },
+  {
+    src: '/brand/cards/rb-jinx-demo.jpg',
+    alt: 'Riftbound — Jinx, Demolitionist',
+    className: 'right-[34%] top-[26%] hidden w-[10.5%] max-w-[6rem] rotate-5 md:block',
+    delay: '2.15s',
+  },
+
+  // —— lg+: fill remaining seams ——
+  {
+    src: '/brand/cards/pkm-mew.jpg',
+    alt: 'Pokémon — Mew',
+    className: 'left-[34%] bottom-[22%] hidden w-[10%] max-w-[5.75rem] rotate-8 lg:block',
+    delay: '2.25s',
+  },
+  {
+    src: '/brand/cards/op-law.jpg',
+    alt: 'One Piece — Law',
+    className: 'right-[34%] bottom-[20%] hidden w-[10%] max-w-[5.75rem] -rotate-7 lg:block',
+    delay: '2.35s',
+  },
+  {
+    src: '/brand/cards/mtg-force.jpg',
+    alt: 'Magic — Force of Will',
+    className: 'left-[8%] top-[18%] hidden w-[10%] max-w-[5.75rem] -rotate-12 lg:block',
+    delay: '2.45s',
+  },
+  {
+    src: '/brand/cards/fab-ira.jpg',
+    alt: 'Flesh and Blood — Ira',
+    className: 'right-[8%] top-[17%] hidden w-[10%] max-w-[5.75rem] rotate-11 lg:block',
+    delay: '2.55s',
+  },
+  {
+    src: '/brand/cards/pkm-lugia.jpg',
+    alt: 'Pokémon — Lugia',
+    className: 'left-[8%] bottom-[32%] hidden w-[10%] max-w-[5.75rem] rotate-6 lg:block',
+    delay: '2.65s',
+  },
+  {
+    src: '/brand/cards/mtg-bowmasters.jpg',
+    alt: 'Magic — Orcish Bowmasters',
+    className: 'right-[8%] bottom-[31%] hidden w-[10%] max-w-[5.75rem] -rotate-6 lg:block',
+    delay: '2.75s',
   },
   {
     src: '/brand/cards/op-ace.jpg',
-    alt: 'One Piece Card Game — Portgas D. Ace',
-    className: 'right-[40%] top-[44%] hidden w-[11%] max-w-[6.5rem] rotate-[13deg] 2xl:block',
-    delay: '2.65s',
+    alt: 'One Piece — Ace',
+    className: 'left-[18%] top-[50%] hidden w-[10%] max-w-[5.75rem] rotate-3 lg:block',
+    delay: '2.85s',
+  },
+  {
+    src: '/brand/cards/fab-prism.jpg',
+    alt: 'Flesh and Blood — Prism',
+    className: 'right-[18%] top-[49%] hidden w-[10%] max-w-[5.75rem] -rotate-4 lg:block',
+    delay: '2.95s',
+  },
+
+  // —— xl / 2xl: fine fill ——
+  {
+    src: '/brand/cards/pkm-rayquaza.jpg',
+    alt: 'Pokémon — Rayquaza',
+    className: 'left-[42%] top-[18%] hidden w-[9.5%] max-w-[5.5rem] rotate-10 xl:block',
+    delay: '3.0s',
+  },
+  {
+    src: '/brand/cards/pkm-gyarados.jpg',
+    alt: 'Pokémon — Gyarados',
+    className: 'right-[42%] top-[17%] hidden w-[9.5%] max-w-[5.5rem] -rotate-9 xl:block',
+    delay: '3.1s',
+  },
+  {
+    src: '/brand/cards/mtg-bolt.jpg',
+    alt: 'Magic — Lightning Bolt',
+    className: 'left-[42%] bottom-[16%] hidden w-[9.5%] max-w-[5.5rem] -rotate-5 xl:block',
+    delay: '3.15s',
+  },
+  {
+    src: '/brand/cards/mtg-rhystic.jpg',
+    alt: 'Magic — Rhystic Study',
+    className: 'right-[42%] bottom-[15%] hidden w-[9.5%] max-w-[5.5rem] rotate-7 xl:block',
+    delay: '3.2s',
+  },
+  {
+    src: '/brand/cards/pkm-alakazam.jpg',
+    alt: 'Pokémon — Alakazam',
+    className: 'left-[2%] top-[62%] hidden w-[9.5%] max-w-[5.5rem] rotate-9 2xl:block',
+    delay: '3.3s',
+  },
+  {
+    src: '/brand/cards/fab-prism-hq.jpg',
+    alt: 'Flesh and Blood — Prism',
+    className: 'right-[2%] top-[62%] hidden w-[9.5%] max-w-[5.5rem] -rotate-8 2xl:block',
+    delay: '3.4s',
   },
 ]
 
-/** Right-anchored layout for marketplace / auth panels (copy sits on the left). */
+/** Right-anchored layout for marketplace / auth panels — denser side stack. */
 const RIGHT_FOCUS_CARDS: FloatCard[] = [
   {
     src: '/brand/cards/mtg-teferi.jpg',
-    alt: 'Magic: The Gathering — Teferi, Hero of Dominaria',
-    className: 'right-[2%] top-[4%] w-[30%] max-w-[10rem] rotate-[-10deg] sm:w-[22%]',
+    alt: 'Magic — Teferi',
+    className: 'right-[1%] top-[2%] w-[28%] max-w-[9.5rem] -rotate-10 sm:w-[18%]',
     delay: '0s',
   },
   {
+    src: '/brand/cards/rb-jinx.jpg',
+    alt: 'Riftbound — Jinx',
+    className: 'right-[14%] top-[6%] w-[26%] max-w-[9rem] rotate-8 sm:w-[16%]',
+    delay: '0.12s',
+  },
+  {
     src: '/brand/cards/op-luffy.jpg',
-    alt: 'One Piece Card Game — Monkey D. Luffy',
-    className: 'right-[16%] top-[8%] w-[28%] max-w-[9.5rem] rotate-[8deg] sm:right-[18%] sm:w-[20%]',
-    delay: '0.2s',
+    alt: 'One Piece — Luffy',
+    className: 'right-[2%] bottom-[4%] w-[26%] max-w-[9rem] rotate-6 sm:w-[16%]',
+    delay: '0.24s',
   },
   {
     src: '/brand/cards/pkm-charizard.jpg',
     alt: 'Pokémon — Charizard',
-    className: 'right-[4%] bottom-[6%] w-[26%] max-w-[9rem] rotate-[6deg] sm:w-[18%]',
+    className: 'right-[20%] bottom-[2%] w-[24%] max-w-[8.5rem] -rotate-7 sm:w-[15%]',
+    delay: '0.36s',
+  },
+  {
+    src: '/brand/cards/rb-ahri.jpg',
+    alt: 'Riftbound — Ahri',
+    className: 'right-[28%] top-[2%] w-[20%] max-w-[8rem] rotate-4 sm:w-[14%]',
+    delay: '0.2s',
+  },
+  {
+    src: '/brand/cards/rb-yasuo.jpg',
+    alt: 'Riftbound — Yasuo',
+    className: 'right-[6%] top-[30%] w-[20%] max-w-[8rem] rotate-11 sm:w-[14%]',
     delay: '0.45s',
   },
   {
     src: '/brand/cards/fab-bravo.jpg',
     alt: 'Flesh and Blood — Bravo',
-    className: 'right-[24%] bottom-[3%] w-[24%] max-w-[8.5rem] rotate-[-7deg] sm:right-[26%] sm:w-[17%]',
+    className: 'right-[32%] bottom-[12%] w-[18%] max-w-[7.5rem] -rotate-4 sm:w-[13%]',
+    delay: '0.55s',
+  },
+  {
+    src: '/brand/cards/rb-annie.jpg',
+    alt: 'Riftbound — Annie',
+    className: 'right-[8%] top-[48%] hidden w-[16%] max-w-[7.25rem] -rotate-8 sm:block',
     delay: '0.7s',
   },
   {
-    src: '/brand/cards/pkm-pikachu.jpg',
-    alt: 'Pokémon — Pikachu',
-    className: 'right-[34%] top-[3%] hidden w-[18%] max-w-[8rem] rotate-[4deg] md:block',
-    delay: '0.35s',
-  },
-  {
-    src: '/brand/cards/mtg-ragavan.jpg',
-    alt: 'Magic: The Gathering — Ragavan, Nimble Pilferer',
-    className: 'right-[38%] bottom-[16%] hidden w-[16%] max-w-[7.5rem] rotate-[-4deg] lg:block',
-    delay: '0.9s',
-  },
-  {
-    src: '/brand/cards/op-zoro.jpg',
-    alt: 'One Piece Card Game — Roronoa Zoro',
-    className: 'right-[10%] top-[34%] hidden w-[16%] max-w-[7.5rem] rotate-[12deg] xl:block',
-    delay: '1.1s',
-  },
-  {
     src: '/brand/cards/mtg-sheoldred.jpg',
-    alt: 'Magic: The Gathering — Sheoldred, the Apocalypse',
-    className: 'right-[46%] top-[18%] hidden w-[15%] max-w-[7rem] rotate-[-12deg] lg:block',
-    delay: '1.25s',
-  },
-  {
-    src: '/brand/cards/op-nami.jpg',
-    alt: 'One Piece Card Game — Nami',
-    className: 'right-[30%] top-[40%] hidden w-[15%] max-w-[7rem] rotate-[9deg] xl:block',
-    delay: '1.4s',
+    alt: 'Magic — Sheoldred',
+    className: 'right-[40%] top-[14%] hidden w-[15%] max-w-[7rem] -rotate-11 sm:block',
+    delay: '0.85s',
   },
   {
     src: '/brand/cards/pkm-mewtwo.jpg',
     alt: 'Pokémon — Mewtwo',
-    className: 'right-[52%] bottom-[8%] hidden w-[14%] max-w-[6.5rem] rotate-[5deg] xl:block',
-    delay: '1.55s',
+    className: 'right-[44%] bottom-[6%] hidden w-[14%] max-w-[6.5rem] rotate-5 md:block',
+    delay: '1.0s',
   },
   {
-    src: '/brand/cards/fab-dorinthea.jpg',
-    alt: 'Flesh and Blood — Dorinthea',
-    className: 'right-[18%] bottom-[30%] hidden w-[14%] max-w-[6.5rem] rotate-[-8deg] xl:block',
-    delay: '1.7s',
+    src: '/brand/cards/op-zoro.jpg',
+    alt: 'One Piece — Zoro',
+    className: 'right-[22%] top-[36%] hidden w-[14%] max-w-[6.5rem] -rotate-6 md:block',
+    delay: '1.15s',
   },
   {
-    src: '/brand/cards/mtg-lotus.jpg',
-    alt: 'Magic: The Gathering — Black Lotus',
-    className: 'right-[58%] top-[8%] hidden w-[13%] max-w-[6rem] rotate-[7deg] xl:block',
-    delay: '1.85s',
+    src: '/brand/cards/rb-lux.jpg',
+    alt: 'Riftbound — Lux',
+    className: 'right-[52%] top-[6%] hidden w-[13%] max-w-[6rem] rotate-7 md:block',
+    delay: '1.3s',
   },
   {
-    src: '/brand/cards/pkm-venusaur.jpg',
-    alt: 'Pokémon — Venusaur',
-    className: 'right-[42%] bottom-[34%] hidden w-[13%] max-w-[6rem] rotate-[-6deg] xl:block',
-    delay: '2.0s',
+    src: '/brand/cards/rb-darius.jpg',
+    alt: 'Riftbound — Darius',
+    className: 'right-[36%] top-[42%] hidden w-[13%] max-w-[6rem] -rotate-5 md:block',
+    delay: '1.45s',
   },
   {
-    src: '/brand/cards/op-sanji.jpg',
-    alt: 'One Piece Card Game — Sanji',
-    className: 'right-[8%] bottom-[42%] hidden w-[13%] max-w-[6rem] rotate-[11deg] xl:block',
-    delay: '2.15s',
+    src: '/brand/cards/mtg-atraxa.jpg',
+    alt: 'Magic — Atraxa',
+    className: 'right-[12%] bottom-[28%] hidden w-[13%] max-w-[6rem] rotate-9 lg:block',
+    delay: '1.6s',
   },
   {
-    src: '/brand/cards/mtg-solring.jpg',
-    alt: 'Magic: The Gathering — Sol Ring',
-    className: 'right-[62%] bottom-[22%] hidden w-[12%] max-w-[5.5rem] rotate-[-10deg] 2xl:block',
-    delay: '2.3s',
+    src: '/brand/cards/op-shanks.jpg',
+    alt: 'One Piece — Shanks',
+    className: 'right-[56%] bottom-[18%] hidden w-[12%] max-w-[5.75rem] -rotate-8 lg:block',
+    delay: '1.75s',
   },
   {
-    src: '/brand/cards/pkm-gyarados.jpg',
-    alt: 'Pokémon — Gyarados',
-    className: 'right-[54%] top-[36%] hidden w-[12%] max-w-[5.5rem] rotate-[8deg] 2xl:block',
-    delay: '2.45s',
+    src: '/brand/cards/rb-vi.jpg',
+    alt: 'Riftbound — Vi',
+    className: 'right-[58%] top-[28%] hidden w-[12%] max-w-[5.5rem] -rotate-10 xl:block',
+    delay: '1.9s',
   },
   {
-    src: '/brand/cards/mtg-bolt.jpg',
-    alt: 'Magic: The Gathering — Lightning Bolt',
-    className: 'right-[26%] top-[52%] hidden w-[12%] max-w-[5.5rem] rotate-[-13deg] 2xl:block',
-    delay: '2.6s',
+    src: '/brand/cards/rb-leesin.jpg',
+    alt: 'Riftbound — Lee Sin',
+    className: 'right-[46%] top-[48%] hidden w-[12%] max-w-[5.5rem] rotate-6 xl:block',
+    delay: '2.05s',
+  },
+  {
+    src: '/brand/cards/pkm-gengar.jpg',
+    alt: 'Pokémon — Gengar',
+    className: 'right-[28%] top-[52%] hidden w-[12%] max-w-[5.5rem] -rotate-12 xl:block',
+    delay: '2.2s',
+  },
+  {
+    src: '/brand/cards/rb-kaisa.jpg',
+    alt: "Riftbound — Kai'Sa",
+    className: 'right-[64%] top-[18%] hidden w-[11%] max-w-[5.25rem] rotate-5 xl:block',
+    delay: '2.35s',
+  },
+  {
+    src: '/brand/cards/mtg-oko.jpg',
+    alt: 'Magic — Oko',
+    className: 'right-[50%] top-[24%] hidden w-[11%] max-w-[5.25rem] rotate-8 2xl:block',
+    delay: '2.5s',
+  },
+  {
+    src: '/brand/cards/op-law.jpg',
+    alt: 'One Piece — Law',
+    className: 'right-[40%] bottom-[36%] hidden w-[11%] max-w-[5.25rem] -rotate-9 2xl:block',
+    delay: '2.65s',
+  },
+  {
+    src: '/brand/cards/rb-jinx-demo.jpg',
+    alt: 'Riftbound — Jinx, Demolitionist',
+    className: 'right-[68%] bottom-[32%] hidden w-[10%] max-w-[5rem] rotate-10 2xl:block',
+    delay: '2.8s',
   },
 ]
 
 type FloatingCardsBackdropProps = {
-  /** `scatter` = full field (landing). `right` = cards clustered on the right for copy+search heroes. */
   layout?: 'scatter' | 'right'
   className?: string
-  /** Soft wash over the cards for text readability. */
   washClassName?: string
 }
 
-/**
- * Decorative floating TCG cards for marketing backgrounds.
- * Replaces stock photography with the vault’s multi-game card art.
- */
 export function FloatingCardsBackdrop({
   layout = 'scatter',
   className,
@@ -264,9 +455,9 @@ export function FloatingCardsBackdrop({
 
   return (
     <div aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>
-      {cards.map((card) => (
+      {cards.map((card, i) => (
         <img
-          key={`${layout}-${card.src}`}
+          key={`${layout}-${card.src}-${i}`}
           src={card.src}
           alt=""
           className={cx(
