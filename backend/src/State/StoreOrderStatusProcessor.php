@@ -12,10 +12,9 @@ use App\Enum\OrderStatus;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\UserRepository;
 use App\Service\Checkout\OrderStockReleaser;
+use App\Service\Mail\TransactionalMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Email;
 
 /** @implements ProcessorInterface<Order, Order> */
 final readonly class StoreOrderStatusProcessor implements ProcessorInterface
@@ -25,7 +24,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         private UserRepository $userRepository,
         private CustomerNotificationRepository $notificationRepository,
         private OrderStockReleaser $stockReleaser,
-        private MailerInterface $mailer,
+        private TransactionalMailer $mail,
     ) {
     }
 
@@ -97,30 +96,11 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
             ->setBody($body);
 
         $this->entityManager->persist($notification);
-        $this->sendFulfilledEmail($order, $user, $store, $title, $body);
-    }
-
-    private function sendFulfilledEmail(Order $order, User $user, Store $store, string $title, string $body): void
-    {
-        $email = $user->getEmail();
-        if (null === $email || '' === $email) {
-            return;
-        }
 
         try {
-            $this->mailer->send((new Email())
-                ->from('no-reply@store.local')
-                ->to($email)
-                ->subject(sprintf('%s - %s', $title, $order->getReference()))
-                ->text(sprintf(
-                    "%s\n\nOrder: %s\nStore: %s\nTotal: $%0.2f\n\nYou can view this order from your account page.",
-                    $body,
-                    $order->getReference(),
-                    $store->getName() ?? 'Store',
-                    $order->getTotalCents() / 100,
-                )));
+            $this->mail->sendOrderFulfilled($order, $user, $store);
         } catch (TransportExceptionInterface) {
-            // Local notifications should still be created if Mailpit is not running.
+            // In-app notification still saved if Mailpit / SMTP is down.
         }
     }
 }
