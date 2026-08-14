@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\OidcClient;
+use App\Service\Mail\TransactionalMailer;
 use App\Service\Payments\SignedOAuthState;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -33,6 +34,7 @@ class SsoController extends AbstractController
         private readonly JWTTokenManagerInterface $jwtManager,
         private readonly SignedOAuthState $state,
         private readonly LoggerInterface $logger,
+        private readonly TransactionalMailer $mail,
     ) {
     }
 
@@ -105,6 +107,15 @@ class SsoController extends AbstractController
         $user->setPassword($this->passwordHasher->hashPassword($user, bin2hex(random_bytes(32))));
 
         $this->userRepository->save($user, true);
+
+        try {
+            $this->mail->sendWelcome($user);
+        } catch (\Throwable $e) {
+            $this->logger->error('Welcome email failed after SSO signup.', [
+                'user' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $user;
     }

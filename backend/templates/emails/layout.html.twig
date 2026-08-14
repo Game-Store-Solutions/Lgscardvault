@@ -1,0 +1,80 @@
+{#
+  Shared transactional layout (HubSpot-style).
+
+  brandKind: platform | store
+  Platform → LGS logo, navy header, gold accent strip, navy CTAs, gold links
+  Store    → store logo/colors, "Powered by LGS Card Vault"
+#}
+{% set brandKind = brandKind|default('platform') %}
+{% set brandName = brandName|default('LGS Card Vault') %}
+{% set headerColor = headerColor|default('#0a1627') %}
+{% set ctaColor = ctaColor|default(headerColor) %}
+{% set accentColor = accentColor|default('#c6a035') %}
+{% set textColor = '#1f2937' %}
+{% set mutedColor = '#6b7280' %}
+{% set pageBg = '#f3f4f6' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{{ subject|default(brandName) }}</title>
+  <!--[if mso]><style>table,td{font-family:Arial,sans-serif!important}</style><![endif]-->
+</head>
+<body style="margin:0;padding:0;background:{{ pageBg }};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{{ textColor }};">
+  {% if preheader is defined and preheader %}
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">{{ preheader }}</div>
+  {% endif %}
+
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:{{ pageBg }};padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          {# Header #}
+          <tr>
+            <td align="center" style="background:{{ headerColor }};padding:28px 24px;">
+              {% if logoUrl %}
+                <img src="{{ logoUrl }}" alt="{{ brandName }}" width="96" height="96" style="display:block;margin:0 auto;width:96px;height:96px;object-fit:contain;border:0;border-radius:12px;">
+                {% if showBrandName|default(false) %}
+                  <div style="margin-top:12px;font-size:18px;font-weight:700;letter-spacing:0.02em;color:#ffffff;">{{ brandName }}</div>
+                {% endif %}
+              {% else %}
+                <div style="font-size:20px;font-weight:700;letter-spacing:0.02em;color:#ffffff;">{{ brandName }}</div>
+              {% endif %}
+            </td>
+          </tr>
+          {% if brandKind == 'platform' %}
+          <tr>
+            <td style="background:{{ accentColor }};height:4px;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          {% endif %}
+
+          {# Body #}
+          <tr>
+            <td style="padding:36px 32px 28px;background:#ffffff;">
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+        </table>
+
+        {# Footer outside card #}
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;margin-top:20px;">
+          <tr>
+            <td align="center" style="padding:0 16px;font-size:12px;line-height:1.6;color:{{ mutedColor }};">
+              {% if footerNote is defined and footerNote %}
+                <p style="margin:0 0 8px;">{{ footerNote|raw }}</p>
+              {% endif %}
+              {% if poweredBy|default(false) %}
+                <p style="margin:0;">Powered by <strong style="color:{{ textColor }};">LGS Card Vault</strong></p>
+              {% else %}
+                <p style="margin:0;">{{ brandName }}</p>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

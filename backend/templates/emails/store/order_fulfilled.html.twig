@@ -1,0 +1,38 @@
+{% extends 'emails/layout.html.twig' %}
+
+{% block content %}
+  <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;font-weight:700;color:#111827;">
+    Your order is fulfilled
+  </h1>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 20px;">
+  <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#4b5563;">
+    Hi {{ customerName }},
+  </p>
+  <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#4b5563;">
+    Good news — <strong style="color:#111827;">{{ storeName }}</strong> has fulfilled your order.
+  </p>
+
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;background:#f9fafb;border-radius:8px;border-left:4px solid {{ accentColor|default('#c6a035') }};">
+    <tr>
+      <td style="padding:16px 18px;">
+        <p style="margin:0 0 8px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Order details</p>
+        <p style="margin:0 0 6px;font-size:15px;color:#111827;"><strong>Reference:</strong> {{ orderReference }}</p>
+        <p style="margin:0 0 6px;font-size:15px;color:#111827;"><strong>Store:</strong> {{ storeName }}</p>
+        <p style="margin:0;font-size:15px;color:#111827;"><strong>Total:</strong> ${{ totalFormatted }}</p>
+      </td>
+    </tr>
+  </table>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 16px;">
+    <tr>
+      <td align="center" style="border-radius:8px;background:{{ ctaColor|default('#0a1627') }};">
+        <a href="{{ orderUrl }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+          View order
+        </a>
+      </td>
+    </tr>
+  </table>
+  <p style="margin:0;font-size:13px;line-height:1.6;color:#9ca3af;text-align:center;">
+    Questions? Contact the store or open your account on LGS Card Vault.
+  </p>
+{% endblock %}

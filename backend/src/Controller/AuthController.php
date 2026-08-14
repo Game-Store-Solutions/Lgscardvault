@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Mail\TransactionalMailer;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,6 +22,8 @@ class AuthController extends AbstractController
         private readonly UserRepository $userRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly ValidatorInterface $validator,
+        private readonly TransactionalMailer $mail,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -71,6 +75,12 @@ class AuthController extends AbstractController
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
         $this->userRepository->save($user, true);
+
+        try {
+            $this->mail->sendWelcome($user);
+        } catch (\Throwable $e) {
+            $this->logger->error('Welcome email failed.', ['user' => $user->getId(), 'error' => $e->getMessage()]);
+        }
 
         return $this->json([
             'id' => $user->getId(),

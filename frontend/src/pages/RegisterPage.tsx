@@ -20,7 +20,7 @@ const COPY = {
     button: 'Create owner account',
     loading: 'Creating owner account…',
     alternateText: 'Just here to shop?',
-    alternateLabel: 'Create a customer account',
+    alternateLabel: 'Create a shopper account',
     alternateTo: '/register/customer',
     asideEyebrow: 'For store owners',
     asideDescription:

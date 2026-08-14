@@ -300,7 +300,7 @@ export default function AppLayout() {
                         onClick={() => setAccountMenuOpen(false)}
                         className="block rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
                       >
-                        Customer
+                        Shopper
                       </Link>
                       <Link
                         to="/register/owner"
@@ -412,7 +412,7 @@ export default function AppLayout() {
                       Sign in
                     </Link>
                     <Link to="/register/customer" onClick={closeMobile} className={mobileLinkClass}>
-                      Create customer account
+                      Create shopper account
                     </Link>
                     <Link to="/register/owner" onClick={closeMobile} className={mobileLinkClass}>
                       Create owner account
