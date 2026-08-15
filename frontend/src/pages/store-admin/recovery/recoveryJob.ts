@@ -1,0 +1,47 @@
+import type { CsvImportRow } from '../../../api/types'
+import { shortRowReason } from './shortReason'
+
+export type RecoveryJob = 'quantity' | 'price' | 'match' | 'online' | 'other'
+
+/** What the right pane should ask — not the raw server sentence. */
+export function recoveryJob(row: CsvImportRow): RecoveryJob {
+  const reason = shortRowReason(row.error)
+  if (reason === 'Invalid quantity') return 'quantity'
+  if (reason === 'No market price') return 'price'
+  if (reason === 'No catalog match' || reason === 'Needs a match') return 'match'
+  if (reason === 'Online-only') return 'online'
+  return 'other'
+}
+
+export function recoveryJobCopy(job: RecoveryJob): { title: string; hint: string } {
+  switch (job) {
+    case 'quantity':
+      return { title: 'Fix the quantity', hint: 'This printing already matched. Set how many copies to add.' }
+    case 'price':
+      return { title: 'Pick a priced printing', hint: 'This finish has no market price. Choose another printing, or skip.' }
+    case 'match':
+      return { title: 'Find the card', hint: 'Search or paste a Scryfall link, then add it.' }
+    case 'online':
+      return { title: 'Online-only printing', hint: 'Skip this Alchemy/Arena row, or switch to the paper printing.' }
+    default:
+      return { title: 'Fix this row', hint: 'Match a stockable printing, then add it.' }
+  }
+}
+
+/** Same name + set + # + job + finish → one confirm can clear the cluster. */
+export function recoveryClusterKey(row: CsvImportRow): string {
+  return [
+    row.name.trim().toLowerCase(),
+    row.set.trim().toLowerCase(),
+    row.collectorNumber.trim().toLowerCase(),
+    recoveryJob(row),
+    row.isFoil ? 'foil' : 'nonfoil',
+  ].join('\t')
+}
+
+export function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable) return true
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+}

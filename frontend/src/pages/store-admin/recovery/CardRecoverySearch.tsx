@@ -23,6 +23,7 @@ export interface CardRecoverySearchProps {
   onFiltersChange: (filters: RecoveryFilters) => void
   selectedCardId: string | null
   onSelect: (card: CardSummary) => void
+  onResultsChange?: (items: CardSummary[]) => void
 }
 
 /**
@@ -38,6 +39,7 @@ export function CardRecoverySearch({
   onFiltersChange,
   selectedCardId,
   onSelect,
+  onResultsChange,
 }: CardRecoverySearchProps) {
   const [reference, setReference] = useState('')
   const [showLink, setShowLink] = useState(false)
@@ -79,6 +81,16 @@ export function CardRecoverySearch({
   const rejected = data?.rejected ?? []
   const relaxationNotice = describeRelaxations(data?.relaxed ?? [])
   const hasNarrowingFilters = Boolean(filters.set || filters.collectorNumber || filters.rarity)
+
+  useEffect(() => {
+    onResultsChange?.(data?.items ?? [])
+  }, [data, onResultsChange])
+
+  useEffect(() => {
+    const hits = data?.items ?? []
+    if (selectedCardId || hits.length === 0) return
+    onSelect(hits[0])
+  }, [data, selectedCardId, onSelect])
 
   function clearAllFilters() {
     onFiltersChange({ ...filters, set: '', collectorNumber: '', rarity: '' })
@@ -192,7 +204,7 @@ export function CardRecoverySearch({
         </div>
       ) : (
         <div className={cx('grid gap-3', items.length === 1 ? 'grid-cols-1' : 'sm:grid-cols-2')}>
-          {items.map((card) => {
+          {items.map((card, index) => {
             const selected = card.id === selectedCardId
             return (
               <button
@@ -206,6 +218,14 @@ export function CardRecoverySearch({
                     : 'border-border bg-surface hover:border-fg/20 hover:bg-bg',
                 )}
               >
+                {index < 6 && (
+                  <span
+                    aria-hidden
+                    className="grid size-6 shrink-0 place-items-center rounded-btn border border-border text-[11px] font-bold text-fg-muted"
+                  >
+                    {index + 1}
+                  </span>
+                )}
                 <CardImage
                   src={cardImage(card)}
                   alt={card.name}

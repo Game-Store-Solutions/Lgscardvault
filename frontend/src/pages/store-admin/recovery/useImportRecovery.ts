@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../../api/client'
-import { inventoryKey } from '../../../hooks'
+import { inventoryKey, inventoryPageKey } from '../../../hooks'
 import type {
   CardSummary,
   RecoveryQueue,
@@ -121,6 +121,7 @@ export function useRecoveryActions(slug: string, importId: string) {
       // The one intentional cross-boundary invalidation: a resolved row is
       // now real stock.
       await queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+      await queryClient.invalidateQueries({ queryKey: inventoryPageKey(slug) })
       await refresh()
     },
   })

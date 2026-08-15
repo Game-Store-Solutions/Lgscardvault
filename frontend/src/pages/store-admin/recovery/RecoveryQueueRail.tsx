@@ -1,6 +1,7 @@
 import { Check, CircleSlash } from 'lucide-react'
 import type { CsvImportRow, RecoveryErrorGroup } from '../../../api/types'
 import { cx } from '../../../lib/cx'
+import { shortRowReason } from './shortReason'
 
 export interface RecoveryQueueRailProps {
   rows: CsvImportRow[]
@@ -90,7 +91,9 @@ export function RecoveryQueueRail({
                   >
                     {row.name || `Row ${row.rowIndex + 1}`}
                   </span>
-                  {meta && <span className="mt-0.5 block truncate text-xs text-fg-muted">{meta}</span>}
+                  <span className="mt-0.5 block truncate text-xs text-fg-muted">
+                    {[meta, !isSkipped && !isDone ? shortRowReason(row.error) : null].filter(Boolean).join(' · ')}
+                  </span>
                 </button>
                 {isDone && <Check aria-label="Added" className="size-4 shrink-0 text-success-700" />}
                 {isSkipped && <CircleSlash aria-label="Skipped" className="size-4 shrink-0 text-fg-muted" />}
