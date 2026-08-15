@@ -162,6 +162,21 @@ export default function CsvTab({ slug }: { slug: string }) {
                 {job.errorMessage}
               </p>
             )}
+
+            {failedCount > 0 && !isActive(job.status) && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-danger-200 bg-danger-50 px-4 py-3">
+                <p className="text-sm text-danger-800">
+                  <span className="font-bold">{failedCount}</span> failed card
+                  {failedCount === 1 ? '' : 's'} — edit qty/name/set and resolve them on the run details page.
+                </p>
+                <Link
+                  to={`/s/${slug}/admin/imports/${job.id}`}
+                  className="inline-flex items-center rounded-btn bg-brand-500 px-3 py-1.5 text-sm font-bold text-white hover:bg-brand-600"
+                >
+                  Fix failed cards
+                </Link>
+              </div>
+            )}
           </CardBody>
         </Card>
       )}

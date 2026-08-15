@@ -256,7 +256,7 @@ export default function ImportRunDetailsPage() {
           subtitle={
             failedRows.length === 0
               ? 'No failed cards in this run.'
-              : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}.`
+              : `Edit name, set, collector #, qty, condition, or foil below — then Save or Resolve. Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}.`
           }
         />
         {failedRows.length > 0 && (
