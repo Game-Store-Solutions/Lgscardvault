@@ -13,6 +13,7 @@ use App\Repository\GameRepository;
 use App\Repository\StoreRepository;
 use App\Security\ApiRateLimit;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Catalog\StockablePrintingPolicy;
 use App\Service\CsvImport\ImportRowSerializer;
 use App\Service\Recovery\CardReferenceResolver;
 use App\Service\Recovery\RecoveryCardFinder;
@@ -45,6 +46,12 @@ final class StoreImportRecoveryController extends AbstractController
     /** Recovery searches are interactive; keep the response snappy. */
     private const MAX_RESULTS = 40;
 
+    /** Same bound as failed-row preview — a 50k fail list cannot dump every row. */
+    private const QUEUE_ERROR_LIMIT = 300;
+
+    /** Skipped rows stay restorable without crowding out outstanding work. */
+    private const QUEUE_SKIPPED_LIMIT = 100;
+
     public function __construct(
         private readonly StoreRepository $storeRepository,
         private readonly CsvImportJobRepository $jobRepository,
@@ -55,6 +62,7 @@ final class StoreImportRecoveryController extends AbstractController
         private readonly CardReferenceResolver $referenceResolver,
         private readonly RecoveryErrorClassifier $errorClassifier,
         private readonly CatalogCardResolver $catalogCardResolver,
+        private readonly StockablePrintingPolicy $stockablePrintingPolicy,
         private readonly ImportRowSerializer $rowSerializer,
         private readonly EntityManagerInterface $entityManager,
         private readonly \App\Service\Import\ImportLogger $importLogger,
@@ -76,24 +84,38 @@ final class StoreImportRecoveryController extends AbstractController
             return $this->json(['detail' => 'Import job not found.'], 404);
         }
 
-        $rows = $this->rowRepository->findByStatuses($job, [CsvImportRow::STATUS_ERROR, CsvImportRow::STATUS_SKIPPED]);
-
+        $errorSummaries = $this->rowRepository->findErrorSummaries($job);
         $groups = [];
-        foreach ($rows as $row) {
-            if (CsvImportRow::STATUS_SKIPPED === $row->getStatus()) {
-                continue;
-            }
-            $reason = $this->errorClassifier->classify($row->getError());
+        foreach ($errorSummaries as $summary) {
+            $reason = $this->errorClassifier->classify($summary['error']);
             $groups[$reason] ??= ['reason' => $reason, 'count' => 0, 'rowIndexes' => []];
             ++$groups[$reason]['count'];
+        }
+
+        $errorRows = $this->rowRepository->findByStatuses(
+            $job,
+            [CsvImportRow::STATUS_ERROR],
+            self::QUEUE_ERROR_LIMIT,
+        );
+        foreach ($errorRows as $row) {
+            $reason = $this->errorClassifier->classify($row->getError());
+            $groups[$reason] ??= ['reason' => $reason, 'count' => 0, 'rowIndexes' => []];
             $groups[$reason]['rowIndexes'][] = $row->getRowIndex();
         }
 
         usort($groups, static fn (array $a, array $b): int => $b['count'] <=> $a['count']);
+        $skippedRows = $this->rowRepository->findByStatuses(
+            $job,
+            [CsvImportRow::STATUS_SKIPPED],
+            self::QUEUE_SKIPPED_LIMIT,
+        );
+        $rows = array_merge($errorRows, $skippedRows);
+        $counts = $this->rowRepository->countByStatus($job);
 
         return $this->json([
             'gameCode' => $job->resolvedGameCode(),
-            'counts' => $this->rowRepository->countByStatus($job),
+            'counts' => $counts,
+            'truncated' => $counts['error'] > count($errorRows),
             'groups' => array_values($groups),
             'rows' => array_map($this->rowSerializer->serialize(...), $rows),
         ]);
@@ -192,8 +214,9 @@ final class StoreImportRecoveryController extends AbstractController
             ], 422);
         }
 
-        $onlineOnly = \App\Service\Catalog\PaperPrinting::onlineOnlyReason($card);
-        if (null !== $onlineOnly) {
+        $onlineOnly = $this->stockablePrintingPolicy->storedRejectionReason($card, false);
+        $onlineOnlyFoil = $this->stockablePrintingPolicy->storedRejectionReason($card, true);
+        if (null !== $onlineOnly && null !== $onlineOnlyFoil) {
             return $this->json(['detail' => $onlineOnly], 422);
         }
 
@@ -203,11 +226,15 @@ final class StoreImportRecoveryController extends AbstractController
     /** Every other paper printing of a matched card, newest first. */
     #[Route('/printings/{cardId}', name: 'api_store_import_recovery_printings', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    public function printings(string $slug, int $id, string $cardId): JsonResponse
+    public function printings(Request $request, string $slug, int $id, string $cardId): JsonResponse
     {
         $job = $this->findManagedJob($slug, $id);
         if (!$job instanceof CsvImportJob) {
             return $this->json(['detail' => 'Import job not found.'], 404);
+        }
+
+        if (null !== $response = ApiRateLimit::enforce($this->recoveryLimiter, $this->rateLimitKey($request))) {
+            return $response;
         }
 
         try {

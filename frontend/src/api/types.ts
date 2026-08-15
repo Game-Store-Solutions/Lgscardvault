@@ -567,6 +567,7 @@ export interface CsvImportJob {
   processedRows: number
   importedRows: number
   failedRows: number
+  skippedRows?: number
   queuedRows: number
   processingRows: number
   errorMessage?: string | null
@@ -620,6 +621,8 @@ export interface RecoveryQueue {
   counts: RecoveryRowCounts
   groups: RecoveryErrorGroup[]
   rows: CsvImportRow[]
+  /** True when more failed rows exist than this payload includes. */
+  truncated?: boolean
 }
 
 export interface CsvImportJobSummary {
@@ -632,6 +635,7 @@ export interface CsvImportJobSummary {
   processedRows: number
   importedRows: number
   failedRows: number
+  skippedRows?: number
   errorMessage?: string | null
   createdAt: string
   updatedAt: string

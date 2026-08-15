@@ -7,7 +7,9 @@ use App\Entity\Game;
 use App\Repository\CardRepository;
 use App\Repository\GameRepository;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Catalog\StockablePrintingPolicy;
 use App\Service\MTGJson\MTGJsonClient;
+use App\Service\Pricing\MarketPriceSource;
 use App\Service\Recovery\RecoveryCardFinder;
 use App\Service\Recovery\RecoveryQuery;
 use App\Service\Scryfall\ScryfallClient;
@@ -40,13 +42,20 @@ final class RecoveryCardFinderTest extends KernelTestCase
         // A resolver whose remote legs can never fire, so the cascade inside
         // each rung stays local and deterministic.
         $this->scryfall = $this->createMock(ScryfallClient::class);
+        $this->scryfall->method('searchRemoteAndUpsert')->willReturn([]);
+        $this->scryfall->method('fetchCollectionBySetCollectors')->willReturn([]);
         $resolver = new CatalogCardResolver(
             $this->cards,
             $this->createMock(MTGJsonClient::class),
             $this->scryfall,
         );
 
-        $this->finder = new RecoveryCardFinder($this->cards, $this->scryfall, $resolver);
+        $this->finder = new RecoveryCardFinder(
+            $this->cards,
+            $this->scryfall,
+            $resolver,
+            new StockablePrintingPolicy($this->storedPrices()),
+        );
     }
 
     private function paperCard(int $seed, array $overrides): Card
@@ -155,10 +164,86 @@ final class RecoveryCardFinderTest extends KernelTestCase
         $this->digitalCard(43, [
             'name' => 'Sol Ring', 'set' => 'ymid', 'collector_number' => 'A-9', 'oracle_id' => $oracle,
         ]);
+        $this->paperCard(44, [
+            'name' => 'Sol Ring', 'set' => 'sld', 'collector_number' => '1', 'oracle_id' => $oracle,
+            'prices' => ['usd' => '0.00'],
+        ]);
 
         $siblings = $this->finder->paperPrintingsOf($first);
 
         self::assertCount(1, $siblings);
         self::assertSame('lea', $siblings[0]->getSetCode());
+    }
+
+    public function testUnpricedPaperPrintingIsRejectedNotOffered(): void
+    {
+        $this->paperCard(50, [
+            'name' => 'Bulk Rare',
+            'set' => 'mh3',
+            'collector_number' => '1',
+            'prices' => ['usd' => '0.00'],
+        ]);
+
+        $result = $this->finder->find(new RecoveryQuery($this->mtg, 'Bulk Rare', 'mh3', '1'));
+
+        self::assertSame([], $result->items);
+        self::assertCount(1, $result->rejected);
+        self::assertStringContainsString('$0', $result->rejected[0]['reason']);
+    }
+
+    public function testUnpricedExactHitFallsThroughToAPricedPrinting(): void
+    {
+        $this->paperCard(51, [
+            'name' => 'Guide of Souls',
+            'set' => 'mh3',
+            'collector_number' => '20',
+            'prices' => ['usd' => '0.00'],
+        ]);
+        $this->paperCard(52, [
+            'name' => 'Guide of Souls',
+            'set' => 'mh3',
+            'collector_number' => '21',
+            'prices' => ['usd' => '3.00'],
+        ]);
+
+        $result = $this->finder->find(new RecoveryQuery($this->mtg, 'Guide of Souls', 'mh3', '20'));
+
+        self::assertCount(1, $result->items);
+        self::assertSame('21', $result->items[0]->getCollectorNumber());
+        self::assertContains(RecoveryCardFinder::RELAXED_COLLECTOR, $result->relaxed);
+    }
+
+    public function testFuzzyUsesTheNormalizedAlchemyName(): void
+    {
+        $paper = $this->paperCard(53, [
+            'name' => 'Guide of Souls',
+            'set' => 'mh3',
+            'collector_number' => '20',
+        ]);
+
+        $this->scryfall->expects($this->atLeastOnce())
+            ->method('fetchByFuzzyName')
+            ->willReturnCallback(function (string $name, ?string $set = null) use ($paper): ?Card {
+                self::assertSame('Gude of Souls', $name);
+                self::assertFalse(str_starts_with($name, 'A-'));
+
+                return 'mh3' === $set ? $paper : null;
+            });
+
+        $result = $this->finder->find(new RecoveryQuery($this->mtg, 'A-Gude of Souls', 'mh3', 'A-29'));
+
+        self::assertCount(1, $result->items);
+        self::assertSame('Guide of Souls', $result->items[0]->getName());
+        self::assertContains(RecoveryCardFinder::RELAXED_FUZZY, $result->relaxed);
+    }
+
+    private function storedPrices(): MarketPriceSource
+    {
+        return new class implements MarketPriceSource {
+            public function marketPriceCents(Card $card, bool $isFoil): ?int
+            {
+                return StockablePrintingPolicy::storedPriceCents($card, $isFoil);
+            }
+        };
     }
 }

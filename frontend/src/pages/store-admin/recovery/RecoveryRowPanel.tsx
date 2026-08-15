@@ -10,6 +10,7 @@ import {
   type Condition,
 } from '../../../components/inventory'
 import { CardRecoverySearch } from './CardRecoverySearch'
+import { isStockableRecoveryCard } from './stockableCard'
 import { useCardPrintings, useRecoveryActions, type RecoveryFilters } from './useImportRecovery'
 
 export interface RecoveryRowPanelProps {
@@ -52,7 +53,10 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
   )
   const [term, setTerm] = useState(() => initialTerm(row))
   const [filters, setFilters] = useState<RecoveryFilters>(() => initialFilters(row))
-  const [selectedCard, setSelectedCard] = useState<CardSummary | null>(row.card ?? null)
+  const seedCard = row.card ?? null
+  const [selectedCard, setSelectedCard] = useState<CardSummary | null>(() =>
+    seedCard && isStockableRecoveryCard(seedCard, initialFilters(row).finish) ? seedCard : null,
+  )
   const [error, setError] = useState<string | null>(null)
 
   // Re-seed everything when the operator moves to another row.
@@ -66,19 +70,29 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
     )
     setTerm(initialTerm(row))
     setFilters(initialFilters(row))
-    setSelectedCard(row.card ?? null)
     setError(null)
   }, [row])
 
   const { resolveRow, saveRow, skipRow } = useRecoveryActions(slug, importId)
-  const { data: printings = [] } = useCardPrintings(slug, importId, selectedCard?.id ?? null)
+  const printingsCardId = selectedCard?.id ?? seedCard?.id ?? null
+  const { data: printings = [] } = useCardPrintings(slug, importId, printingsCardId)
 
   const isFoil = filters.finish === 'foil'
   const isSkipped = row.status === 'skipped'
+  const canStockSelected = selectedCard ? isStockableRecoveryCard(selectedCard, filters.finish) : false
   const marketPrice = useMemo(
     () => (selectedCard ? formatScryfallPrice(selectedCard, filters.finish) : null),
     [selectedCard, filters.finish],
   )
+
+  // The failed row often already points at the $0 / digital printing. Pull
+  // sibling paper printings of that card and pick the first one that can
+  // actually be stocked, so Add is never armed with the card that just failed.
+  useEffect(() => {
+    if (selectedCard) return
+    const priced = printings.find((printing) => isStockableRecoveryCard(printing, filters.finish))
+    if (priced) setSelectedCard(priced)
+  }, [printings, selectedCard, filters.finish])
 
   async function run(action: () => Promise<unknown>, fallback: string) {
     setError(null)
@@ -92,7 +106,7 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
   }
 
   async function addToInventory() {
-    if (!selectedCard) return
+    if (!selectedCard || !canStockSelected) return
     const ok = await run(
       () =>
         resolveRow.mutateAsync({
@@ -222,8 +236,17 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
                 <span className="font-bold text-fg">{isFoil ? 'foil' : 'nonfoil'}</span> at{' '}
                 <span className="font-bold text-fg">{marketPrice}</span>
               </p>
+              {!canStockSelected && (
+                <p className="mt-1 text-sm font-medium text-danger-700">
+                  This printing cannot be stocked — pick a paper printing with a market price.
+                </p>
+              )}
             </div>
-            <Button loading={resolveRow.isPending} onClick={() => void addToInventory()}>
+            <Button
+              loading={resolveRow.isPending}
+              disabled={!canStockSelected}
+              onClick={() => void addToInventory()}
+            >
               Add to inventory
             </Button>
           </div>

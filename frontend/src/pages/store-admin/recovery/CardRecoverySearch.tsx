@@ -209,7 +209,9 @@ export function CardRecoverySearch({
           </p>
           {rejected.map((entry) => (
             <div key={entry.card.id} className="flex items-center gap-3 text-sm">
-              <Badge tone="danger">Online only</Badge>
+              <Badge tone="danger">
+                {/market price|\$0/i.test(entry.reason) ? 'No price' : 'Online only'}
+              </Badge>
               <span className="font-medium text-fg-muted line-through">
                 {entry.card.name} · {(entry.card.setCode ?? '-').toUpperCase()} #
                 {entry.card.collectorNumber ?? '-'}

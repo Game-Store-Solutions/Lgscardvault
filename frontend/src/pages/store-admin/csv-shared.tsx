@@ -36,6 +36,28 @@ export function rowMarketPrice(row: CsvImportRow): string {
   return cents === null ? '-' : formatPrice(cents)
 }
 
+/** Rows the operator skipped during recovery (derived if the API omits it). */
+export function skippedRowCount(job: {
+  processedRows: number
+  importedRows: number
+  failedRows: number
+  skippedRows?: number
+}): number {
+  if (typeof job.skippedRows === 'number') return job.skippedRows
+  return Math.max(0, job.processedRows - job.importedRows - job.failedRows)
+}
+
+/** Failed or skipped rows that still belong in the /fix workspace. */
+export function canOpenRecovery(job: {
+  status: CsvImportJobStatus
+  failedRows: number
+  processedRows: number
+  importedRows: number
+  skippedRows?: number
+}): boolean {
+  return !isActive(job.status) && job.status !== 'cancelled' && (job.failedRows > 0 || skippedRowCount(job) > 0)
+}
+
 /** Small metric tile (label + toned value) used in CSV import summaries. */
 export function ImportStat({
   label,

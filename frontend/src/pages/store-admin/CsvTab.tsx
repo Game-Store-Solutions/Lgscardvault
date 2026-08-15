@@ -17,7 +17,7 @@ import {
   EmptyRow,
   Badge,
 } from '../../components/ui'
-import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
+import { ImportStat, RunStatusBadge, isActive, rowMarketPrice, canOpenRecovery, skippedRowCount } from './csv-shared'
 import ImportWizard from './ImportWizard'
 import { CardImage } from '../../components/cards'
 
@@ -65,6 +65,7 @@ export default function CsvTab({ slug }: { slug: string }) {
   const processingRows = job?.processingRows ?? 0
   const importedCount = job?.importedRows ?? 0
   const failedCount = job?.failedRows ?? 0
+  const skippedCount = job ? skippedRowCount(job) : 0
   const totalRows = job?.totalRows ?? 0
   const processedRows = job?.processedRows ?? 0
   const progress = totalRows === 0 ? 0 : Math.min(processedRows / totalRows, 1)
@@ -138,17 +139,27 @@ export default function CsvTab({ slug }: { slug: string }) {
               </p>
             )}
 
-            {failedCount > 0 && !isActive(job.status) && (
+            {canOpenRecovery(job) && (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-danger-200 bg-danger-50 px-4 py-3">
                 <p className="text-sm text-danger-800">
-                  <span className="font-bold">{failedCount}</span> failed card
-                  {failedCount === 1 ? '' : 's'} — match them to real printings, or skip the ones that cannot be fixed.
+                  {failedCount > 0 ? (
+                    <>
+                      <span className="font-bold">{failedCount}</span> failed card
+                      {failedCount === 1 ? '' : 's'} — match them to real printings, or skip the ones that cannot be
+                      fixed.
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold">{skippedCount}</span> skipped card
+                      {skippedCount === 1 ? '' : 's'} — review them or put them back in the queue.
+                    </>
+                  )}
                 </p>
                 <Link
                   to={`/s/${slug}/admin/imports/${job.id}/fix`}
                   className="inline-flex items-center rounded-btn bg-brand-500 px-3 py-1.5 text-sm font-bold text-white hover:bg-brand-600"
                 >
-                  Fix failed cards
+                  {failedCount > 0 ? 'Fix failed cards' : 'Review skipped cards'}
                 </Link>
               </div>
             )}

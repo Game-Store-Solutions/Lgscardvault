@@ -793,6 +793,7 @@ final class StoreCsvImportController extends AbstractController
             'processedRows' => $job->getProcessedRows(),
             'importedRows' => $job->getImportedRows(),
             'failedRows' => $job->getFailedRows(),
+            'skippedRows' => max(0, $job->getProcessedRows() - $job->getImportedRows() - $job->getFailedRows()),
             'errorMessage' => $job->getErrorMessage(),
             'createdAt' => $job->getCreatedAt()->format(DATE_ATOM),
             'updatedAt' => $job->getUpdatedAt()->format(DATE_ATOM),
@@ -877,7 +878,7 @@ final class StoreCsvImportController extends AbstractController
     private function serializeJob(CsvImportJob $job, Request $request): array
     {
         $rowStatus = (string) $request->query->get('rowStatus', '');
-        if (!in_array($rowStatus, ['queued', 'processing', 'imported', 'error'], true)) {
+        if (!in_array($rowStatus, ['queued', 'processing', 'imported', 'error', 'skipped'], true)) {
             $rowStatus = '';
         }
         $requestedRowLimit = $request->query->getInt('rowLimit', 75);
@@ -910,6 +911,7 @@ final class StoreCsvImportController extends AbstractController
             'processedRows' => $processedRows,
             'importedRows' => $statusCounts['imported'],
             'failedRows' => $statusCounts['error'],
+            'skippedRows' => $statusCounts['skipped'],
             'queuedRows' => $statusCounts['queued'],
             'processingRows' => $statusCounts['processing'],
             'errorMessage' => $job->getErrorMessage(),

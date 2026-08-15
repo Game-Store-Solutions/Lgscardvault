@@ -114,11 +114,9 @@ class CardSearchController extends AbstractController
         //    lookup. A printing is uniquely identified by set + collector, so
         //    this finds the exact card even when the query name is messy
         //    ("Sol Ring (Retro Frame)", typos, foreign text) and name search
-        //    misses it. This is the same path the CSV failed-row recovery uses,
-        //    which is why retry finds cards that plain search could not. The
-        //    name query is intentionally NOT applied here, and rarity/finish are
-        //    left to the caller to pick, since set + collector already pin the
-        //    printing.
+        //    misses it. The name query is intentionally NOT applied here, and
+        //    rarity/finish are left to the caller to pick, since set +
+        //    collector already pin the printing.
         if ('' !== $setCode && '' !== $collectorNumber) {
             $exact = $this->cardRepository->findByNaturalKey($setCode, $collectorNumber);
             if ([] === $exact) {
@@ -153,23 +151,6 @@ class CardSearchController extends AbstractController
                 }
             } catch (\Throwable) {
                 // Remote catalog is best-effort; local results already stand.
-            }
-        }
-
-        // 4. Last resort for a zero-hit search with a set in hand: run the full
-        //    CSV-recovery resolution cascade (tolerant local match → Scryfall
-        //    search → MTGJSON), so the failed-row modal can find printings
-        //    that plain name search can't (typos, promo variants, foreign
-        //    names). Only on empty results — the cascade can cost remote
-        //    lookups, and a populated result set doesn't need it.
-        if ([] === $merged && '' !== $setCode) {
-            try {
-                $resolution = $this->catalogCardResolver->resolve($query, $setCode, $collectorNumber, $rarity, $finish);
-                if ($resolution->card instanceof \App\Entity\Card) {
-                    $merged[(string) $resolution->card->getId()] = $resolution->card;
-                }
-            } catch (\Throwable) {
-                // Best-effort as well; an empty result is still a valid answer.
             }
         }
 

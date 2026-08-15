@@ -20,7 +20,7 @@ import {
   Button,
   buttonVariants,
 } from '../../components/ui'
-import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
+import { ImportStat, RunStatusBadge, isActive, rowMarketPrice, canOpenRecovery, skippedRowCount } from './csv-shared'
 import { FailedRowsTable } from './FailedRowsTable'
 
 const ROW_LIMIT = 100
@@ -168,13 +168,13 @@ export default function ImportRunDetailsPage() {
                   Retry
                 </Button>
               )}
-              {job.failedRows > 0 && !isActive(job.status) && job.status !== 'cancelled' && (
+              {canOpenRecovery(job) && (
                 <Link
                   to={`/s/${slug}/admin/imports/${importId}/fix`}
                   className={buttonVariants({ variant: 'primary', size: 'sm' })}
                 >
                   <Wrench aria-hidden className="size-4" />
-                  Fix failed cards
+                  {job.failedRows > 0 ? 'Fix failed cards' : 'Review skipped cards'}
                 </Link>
               )}
               {!['completed', 'failed', 'cancelled'].includes(job.status) && (
@@ -213,17 +213,19 @@ export default function ImportRunDetailsPage() {
           title="Failed cards"
           subtitle={
             failedRows.length === 0
-              ? 'No failed cards in this run.'
+              ? job && skippedRowCount(job) > 0
+                ? `${skippedRowCount(job)} skipped card${skippedRowCount(job) === 1 ? '' : 's'}. Open the workspace to review or restore them.`
+                : 'No failed cards in this run.'
               : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}. Open the workspace to match them to real printings.`
           }
           actions={
-            failedRows.length > 0 ? (
+            job && canOpenRecovery(job) ? (
               <Link
                 to={`/s/${slug}/admin/imports/${importId}/fix`}
                 className={buttonVariants({ variant: 'primary', size: 'sm' })}
               >
                 <Wrench aria-hidden className="size-4" />
-                Fix failed cards
+                {job.failedRows > 0 ? 'Fix failed cards' : 'Review skipped cards'}
               </Link>
             ) : undefined
           }

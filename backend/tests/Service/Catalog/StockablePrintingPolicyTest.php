@@ -70,6 +70,7 @@ final class StockablePrintingPolicyTest extends TestCase
 
         self::assertNull($policy->rejectionReason($card, false, 150));
         self::assertNotNull($policy->rejectionReason($card, false, 0));
+        self::assertNotNull($policy->storedRejectionReason($card, false));
     }
 
     public function testOnlinePrintingRejectedEvenWithExplicitPrice(): void

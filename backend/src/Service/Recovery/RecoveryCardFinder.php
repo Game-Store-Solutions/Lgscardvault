@@ -5,7 +5,8 @@ namespace App\Service\Recovery;
 use App\Entity\Card;
 use App\Repository\CardRepository;
 use App\Service\Catalog\CatalogCardResolver;
-use App\Service\Catalog\PaperPrinting;
+use App\Service\Catalog\FinishVocabulary;
+use App\Service\Catalog\StockablePrintingPolicy;
 use App\Service\Scryfall\ScryfallClient;
 
 /**
@@ -45,6 +46,7 @@ final class RecoveryCardFinder
         private readonly CardRepository $cardRepository,
         private readonly ScryfallClient $scryfallClient,
         private readonly CatalogCardResolver $catalogCardResolver,
+        private readonly StockablePrintingPolicy $stockablePrintingPolicy,
     ) {
     }
 
@@ -100,12 +102,18 @@ final class RecoveryCardFinder
 
         // Rung 4: everything structural is gone, so the name itself is the
         // suspect. Scryfall's fuzzy matcher handles the typos that a
-        // substring search never will.
+        // substring search never will. Use the *normalized* name — fuzzying
+        // "A-Gude of Souls" resolves the Alchemy card and gets rejected.
         if ($query->isMagic()) {
-            $fuzzy = $this->fuzzy($original->name, $original->setCode);
+            $fuzzy = $this->fuzzy($query->name, $original->setCode);
             if ($fuzzy instanceof Card) {
                 $relaxed[] = self::RELAXED_FUZZY;
-                [$items, $rejected] = $this->partition([$fuzzy], $original->game->getCode(), $rejected);
+                [$items, $rejected] = $this->partition(
+                    [$fuzzy],
+                    $original->game->getCode(),
+                    $query->finish,
+                    $rejected,
+                );
                 if ([] !== $items) {
                     return new RecoveryResult($items, array_values($rejected), $relaxed);
                 }
@@ -170,7 +178,7 @@ final class RecoveryCardFinder
                 }
             }
 
-            return $this->partition(array_values($merged), $query->game->getCode(), $rejected);
+            return $this->partition(array_values($merged), $query->game->getCode(), $query->finish, $rejected);
         }
 
         // Natural key first: set + collector uniquely pins a printing, so it
@@ -226,7 +234,7 @@ final class RecoveryCardFinder
             }
         }
 
-        return $this->partition(array_values($merged), $query->game->getCode(), $rejected);
+        return $this->partition(array_values($merged), $query->game->getCode(), $query->finish, $rejected);
     }
 
     /**
@@ -234,21 +242,26 @@ final class RecoveryCardFinder
      * dropping anything from another game (remote upserts join the merge, so
      * this stays belt-and-braces).
      *
+     * Unpriced paper printings go in `rejected` with the same $0 reason the
+     * import used — offering them as matches is how the operator restocks
+     * the card that just failed.
+     *
      * @param list<Card>                                       $candidates
      * @param array<string, array{card: Card, reason: string}> $rejected
      *
      * @return array{list<Card>, array<string, array{card: Card, reason: string}>}
      */
-    private function partition(array $candidates, string $gameCode, array $rejected): array
+    private function partition(array $candidates, string $gameCode, string $finish, array $rejected): array
     {
         $items = [];
+        $isFoil = FinishVocabulary::isFoil($finish);
 
         foreach ($candidates as $card) {
             if ($card->resolvedGameCode() !== $gameCode) {
                 continue;
             }
 
-            $reason = PaperPrinting::onlineOnlyReason($card);
+            $reason = $this->stockablePrintingPolicy->storedRejectionReason($card, $isFoil);
             if (null !== $reason) {
                 $rejected[(string) $card->getId()] ??= ['card' => $card, 'reason' => $reason];
                 continue;
@@ -299,8 +312,8 @@ final class RecoveryCardFinder
     }
 
     /**
-     * Every paper printing of a matched card, newest first — the one-click
-     * path from "close, but the wrong printing" to the right one.
+     * Every stockable paper printing of a matched card, newest first — the
+     * one-click path from "close, but the wrong printing" to the right one.
      *
      * @return list<Card>
      */
@@ -311,7 +324,7 @@ final class RecoveryCardFinder
             if ((string) $printing->getId() === (string) $card->getId()) {
                 continue;
             }
-            if (PaperPrinting::isPaper($printing)) {
+            if ($this->stockablePrintingPolicy->isStoredStockable($printing)) {
                 $siblings[] = $printing;
             }
         }

@@ -152,6 +152,13 @@ export default function FixFailedCardsPage() {
               {bulkError}
             </p>
           )}
+
+          {data.truncated && (
+            <p className="text-sm text-fg-muted">
+              Showing the first {data.rows.filter((row) => row.status === 'error').length} of{' '}
+              {data.counts.error} failed cards. Resolve or skip these to load the rest.
+            </p>
+          )}
         </CardBody>
       </Card>
 

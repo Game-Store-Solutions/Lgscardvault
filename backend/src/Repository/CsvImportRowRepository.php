@@ -44,20 +44,42 @@ class CsvImportRowRepository extends ServiceEntityRepository
      *
      * @return list<CsvImportRow>
      */
-    public function findByStatuses(CsvImportJob $job, array $statuses): array
+    public function findByStatuses(CsvImportJob $job, array $statuses, int $limit = 0, int $offset = 0): array
     {
         if ([] === $statuses) {
             return [];
         }
 
-        return $this->createQueryBuilder('row')
+        $qb = $this->createQueryBuilder('row')
             ->andWhere('row.job = :job')
             ->andWhere('row.status IN (:statuses)')
             ->setParameter('job', $job)
             ->setParameter('statuses', $statuses)
+            ->orderBy('row.rowIndex', 'ASC');
+
+        if ($limit > 0) {
+            $qb->setFirstResult(max(0, $offset))->setMaxResults($limit);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Lightweight error index for grouping — no card JSON.
+     *
+     * @return list<array{rowIndex: int, error: ?string}>
+     */
+    public function findErrorSummaries(CsvImportJob $job): array
+    {
+        return $this->createQueryBuilder('row')
+            ->select('row.rowIndex AS rowIndex, row.error AS error')
+            ->andWhere('row.job = :job')
+            ->andWhere('row.status = :status')
+            ->setParameter('job', $job)
+            ->setParameter('status', CsvImportRow::STATUS_ERROR)
             ->orderBy('row.rowIndex', 'ASC')
             ->getQuery()
-            ->getResult();
+            ->getArrayResult();
     }
 
     /** @return list<CsvImportRow> */
@@ -208,9 +230,12 @@ class CsvImportRowRepository extends ServiceEntityRepository
         $job->setFailedRows($counts['error']);
         $job->setProcessedRows($counts['imported'] + $counts['error'] + $counts['skipped']);
 
+        if (CsvImportJob::STATUS_CANCELLED === $job->getStatus()) {
+            return $counts;
+        }
+
         if (
             $completeIfSettled
-            && CsvImportJob::STATUS_CANCELLED !== $job->getStatus()
             && 0 === $counts['queued']
             && 0 === $counts['processing']
             && 0 === $counts['error']
@@ -218,6 +243,15 @@ class CsvImportRowRepository extends ServiceEntityRepository
             $job->setStatus(CsvImportJob::STATUS_COMPLETED);
             $job->setErrorMessage(null);
             $job->setFinishedAt(new \DateTimeImmutable());
+        } elseif (
+            $completeIfSettled
+            && $counts['error'] > 0
+            && CsvImportJob::STATUS_COMPLETED === $job->getStatus()
+        ) {
+            // Unskip after a skip-to-complete: there is work again, so the
+            // run must leave "completed" or the Fix CTA never comes back.
+            $job->setStatus(CsvImportJob::STATUS_FAILED);
+            $job->setFinishedAt(null);
         }
 
         return $counts;

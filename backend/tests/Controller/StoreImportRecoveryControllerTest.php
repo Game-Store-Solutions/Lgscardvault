@@ -244,6 +244,7 @@ final class StoreImportRecoveryControllerTest extends WebTestCase
         $job = $this->em->find(CsvImportJob::class, $jobId);
         self::assertInstanceOf(CsvImportJob::class, $job);
         self::assertSame(1, $job->getFailedRows());
+        self::assertSame(CsvImportJob::STATUS_FAILED, $job->getStatus());
     }
 
     public function testSkippedRowsLeaveTheActiveQueue(): void
@@ -261,6 +262,45 @@ final class StoreImportRecoveryControllerTest extends WebTestCase
         // unresolved one counts toward the work remaining.
         self::assertCount(2, $body['rows']);
         self::assertSame(1, array_sum(array_column($body['groups'], 'count')));
+    }
+
+    public function testSearchRejectsAnUnpricedPaperPrinting(): void
+    {
+        $job = $this->jobWithFailedRows([
+            ['name' => 'Bulk Rare', 'set' => 'mh3', 'collector' => '1', 'error' => 'No market price available for this printing (priced at $0).'],
+        ]);
+        $this->fixtures->card(1, [
+            'name' => 'Bulk Rare', 'set' => 'mh3', 'collector_number' => '1',
+            'games' => ['paper'], 'prices' => ['usd' => '0.00'],
+        ]);
+
+        $body = $this->get($this->base($job).'/search', [
+            'q' => 'Bulk Rare',
+            'set' => 'mh3',
+            'collectorNumber' => '1',
+            'finish' => 'nonfoil',
+        ]);
+
+        self::assertSame([], $body['items']);
+        self::assertCount(1, $body['rejected']);
+        self::assertStringContainsString('$0', $body['rejected'][0]['reason']);
+    }
+
+    public function testReferenceRejectsAnUnpricedPaperPrinting(): void
+    {
+        $job = $this->jobWithFailedRows([
+            ['name' => 'Bulk Rare', 'set' => 'mh3', 'collector' => '1', 'error' => 'No market price available for this printing (priced at $0).'],
+        ]);
+        $this->fixtures->card(1, [
+            'name' => 'Bulk Rare', 'set' => 'mh3', 'collector_number' => '1',
+            'games' => ['paper'], 'prices' => ['usd' => '0.00'],
+        ]);
+
+        $this->request('GET', $this->base($job).'/reference', ['ref' => 'mh3/1']);
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertStringContainsString('$0', $body['detail']);
     }
 
     public function testAnotherStoresOwnerIsRefused(): void
