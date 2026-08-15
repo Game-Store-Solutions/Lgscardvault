@@ -116,7 +116,7 @@ export default function CardDetailsPage() {
   })
 
   // Shared cache key with StorePage — usually warm — powers the recommendations rail.
-  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
+  const { data: inventory = [], isLoading: inventoryLoading } = useInventory(slug, { inStockOnly: true })
 
   const { data: favorites = [] } = useCustomerFavorites(slug, Boolean(user))
   const { data: wantList = [] } = useCustomerWantList(slug, Boolean(user))
