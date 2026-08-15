@@ -604,6 +604,7 @@ export default function StorePage() {
             </div>
           ) : (
             <div className={cx('space-y-6', listingsRefreshing && 'opacity-70')}>
+              <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={setPage} totalItems={resultTotal} />
               {cardDisplayStyle === 'marketplace' ? (
                 <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
                   {visibleResults.map((item) => (

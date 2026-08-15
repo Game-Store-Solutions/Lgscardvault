@@ -122,6 +122,19 @@ final class GameScopedInventoryTest extends WebTestCase
         self::assertCount(1, $whiteItems);
         self::assertSame('lea', $whiteItems[0]['card']['setCode']);
         self::assertSame(1, $white['totalItems'] ?? $white['hydra:totalItems']);
+
+        // The storefront sends Accept: application/json. Without an envelope,
+        // API Platform serializes the paginator as a 24-item array and the UI
+        // thinks that is the whole catalog.
+        $this->client->request('GET', $base.'?q=Swords&page=1&itemsPerPage=1&inStockOnly=1', server: [
+            'HTTP_ACCEPT' => 'application/json',
+            'CONTENT_TYPE' => 'application/json',
+        ]);
+        $json = json_decode((string) $this->client->getResponse()->getContent(), true) ?? [];
+        self::assertIsArray($json['member'] ?? null);
+        self::assertCount(1, $json['member']);
+        self::assertSame(2, $json['totalItems'] ?? null);
+        self::assertNotTrue(array_is_list($json), 'json catalog pages must not be a bare item array');
     }
 
     public function testStoreGamesListsOnlyWhatTheStoreCarries(): void
