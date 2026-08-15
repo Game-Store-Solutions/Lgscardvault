@@ -220,7 +220,7 @@ export default function PlatformReportsPage() {
           ) : rows.length === 0 ? (
             <div className="p-6">
               <EmptyState
-                icon={<CreditCard aria-hidden className="size-8" />}
+                icon={CreditCard}
                 title="No matching payments"
                 description="Try clearing filters, or complete a storefront checkout with Square connected."
               />
