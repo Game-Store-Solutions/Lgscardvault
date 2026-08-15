@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { CircleSlash, RotateCcw } from 'lucide-react'
 import { cardImage, extractErrorMessage, formatScryfallPrice } from '../../../api/client'
 import type { CardSummary, CsvImportRow } from '../../../api/types'
-import { Button, Input } from '../../../components/ui'
+import { Badge, Button, Input } from '../../../components/ui'
+import { CardImage } from '../../../components/cards'
 import {
   CONDITIONS,
   ConditionSegmented,
@@ -32,6 +33,13 @@ function initialFilters(row: CsvImportRow): RecoveryFilters {
     rarity: row.rarity.trim(),
     finish: row.isFoil ? 'foil' : 'nonfoil',
   }
+}
+
+function reasonTone(error?: string | null): 'warning' | 'danger' | 'neutral' {
+  const text = (error ?? '').toLowerCase()
+  if (text.includes('quantity')) return 'danger'
+  if (text.includes('market price') || text.includes('no match') || text.includes('not found')) return 'warning'
+  return 'neutral'
 }
 
 /**
@@ -81,9 +89,6 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
     [selectedCard, filters.finish],
   )
   const reason = shortRowReason(row.error)
-  const printingMeta = [row.set ? row.set.toUpperCase() : null, row.collectorNumber ? `#${row.collectorNumber}` : null]
-    .filter(Boolean)
-    .join(' ')
 
   useEffect(() => {
     if (selectedCard) return
@@ -119,26 +124,24 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border px-6 py-4">
         <div className="min-w-0">
           <h2 className="font-display text-xl font-bold leading-tight text-fg">{row.name}</h2>
-          <p className="mt-0.5 text-sm text-fg-muted">
-            {printingMeta}
-            {printingMeta ? ' · ' : ''}
-            <span title={row.error ?? undefined}>{reason}</span>
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {row.set && <Badge>{row.set.toUpperCase()}</Badge>}
+            {row.collectorNumber && <Badge>#{row.collectorNumber}</Badge>}
+            <Badge tone={reasonTone(row.error)} title={row.error ?? undefined}>
+              {reason}
+            </Badge>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            className="text-xs text-fg-muted hover:text-fg hover:underline"
-            onClick={() => setEditingSheet((open) => !open)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setEditingSheet((open) => !open)}>
             {editingSheet ? 'Hide sheet' : 'Edit sheet'}
-          </button>
+          </Button>
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             loading={skipRow.isPending}
             onClick={async () => {
@@ -162,10 +165,10 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
             )}
           </Button>
         </div>
-      </div>
+      </header>
 
       {editingSheet && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="shrink-0 grid gap-3 border-b border-border bg-bg/50 px-6 py-4 sm:grid-cols-2 lg:grid-cols-4">
           <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
           <Input label="Set" value={set} onChange={(e) => setSet(e.target.value)} className="uppercase" />
           <Input
@@ -200,33 +203,41 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
         </div>
       )}
 
-      <CardRecoverySearch
-        slug={slug}
-        importId={importId}
-        term={term}
-        onTermChange={setTerm}
-        filters={filters}
-        onFiltersChange={setFilters}
-        selectedCardId={selectedCard?.id ?? null}
-        onSelect={setSelectedCard}
-      />
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
+        <CardRecoverySearch
+          slug={slug}
+          importId={importId}
+          term={term}
+          onTermChange={setTerm}
+          filters={filters}
+          onFiltersChange={setFilters}
+          selectedCardId={selectedCard?.id ?? null}
+          onSelect={setSelectedCard}
+        />
 
-      {error && (
-        <p role="alert" className="text-sm text-danger-700">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p role="alert" className="mt-4 text-sm text-danger-700">
+            {error}
+          </p>
+        )}
+      </div>
 
       {selectedCard && (
-        <div className="sticky bottom-0 space-y-3 rounded-card border border-border bg-surface p-4">
+        <div className="shrink-0 border-t border-border bg-bg/60 px-6 py-4">
           <div className="flex flex-wrap items-center gap-4">
-            {cardImage(selectedCard) && (
-              <img src={cardImage(selectedCard)} alt="" className="h-20 rounded-btn" />
-            )}
+            <CardImage
+              src={cardImage(selectedCard)}
+              alt={selectedCard.name}
+              fit="contain"
+              showLabel={false}
+              className="h-[4.5rem] w-12 rounded-btn"
+            />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-fg">{selectedCard.name}</p>
-              <p className="text-xs text-fg-muted">
-                {(selectedCard.setCode ?? '-').toUpperCase()} #{selectedCard.collectorNumber ?? '-'} · {marketPrice}
+              <p className="truncate font-display text-sm font-bold text-fg">{selectedCard.name}</p>
+              <p className="mt-0.5 text-xs text-fg-muted">
+                {(selectedCard.setCode ?? '-').toUpperCase()} #{selectedCard.collectorNumber ?? '-'}
+                <span className="mx-1.5 text-border">·</span>
+                <span className="font-semibold text-fg">{marketPrice}</span>
               </p>
             </div>
             <QuantityStepper value={quantity} onChange={setQuantity} />
@@ -238,18 +249,18 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
               disabled={!canStockSelected}
               onClick={() => void addToInventory()}
             >
-              Add
+              Add to inventory
             </Button>
           </div>
 
-          {printings.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+          {printings.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {printings.slice(0, 8).map((printing) => (
                 <button
                   key={printing.id}
                   type="button"
                   onClick={() => setSelectedCard(printing)}
-                  className="rounded-full border border-border px-2.5 py-0.5 text-xs text-fg-muted hover:border-brand-400 hover:text-fg"
+                  className="rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-fg-muted hover:border-brand-400 hover:text-fg"
                 >
                   {(printing.setCode ?? '-').toUpperCase()} #{printing.collectorNumber ?? '-'}{' '}
                   {formatScryfallPrice(printing, filters.finish)}

@@ -29,23 +29,26 @@ export function RecoveryQueueRail({
   const total = groups.reduce((sum, group) => sum + group.count, 0)
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="space-y-1 border-b border-border p-3">
-        <GroupRow
-          label="All"
-          count={total}
-          active={activeGroup === null}
-          onClick={() => onGroupChange(null)}
-        />
-        {groups.map((group) => (
+    <div className="flex h-full min-h-0 flex-col bg-bg/40">
+      <div className="border-b border-border px-4 py-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">Queue</p>
+        <div className="mt-2 space-y-0.5">
           <GroupRow
-            key={group.reason}
-            label={group.reason}
-            count={group.count}
-            active={activeGroup === group.reason}
-            onClick={() => onGroupChange(group.reason)}
+            label="All"
+            count={total}
+            active={activeGroup === null}
+            onClick={() => onGroupChange(null)}
           />
-        ))}
+          {groups.map((group) => (
+            <GroupRow
+              key={group.reason}
+              label={group.reason}
+              count={group.count}
+              active={activeGroup === group.reason}
+              onClick={() => onGroupChange(group.reason)}
+            />
+          ))}
+        </div>
       </div>
 
       <ul className="min-h-0 flex-1 overflow-auto">
@@ -61,8 +64,10 @@ export function RecoveryQueueRail({
             <li key={row.rowIndex}>
               <div
                 className={cx(
-                  'flex items-center gap-3 px-3 py-2.5 transition-colors',
-                  isActive ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-bg',
+                  'flex items-center gap-3 border-l-2 px-3 py-2.5 transition-colors',
+                  isActive
+                    ? 'border-l-brand-500 bg-surface'
+                    : 'border-l-transparent hover:bg-surface/70',
                 )}
               >
                 <input
@@ -118,12 +123,14 @@ function GroupRow({
       type="button"
       onClick={onClick}
       className={cx(
-        'flex w-full items-center justify-between gap-3 rounded-btn px-3 py-2 text-left text-sm transition-colors',
-        active ? 'bg-brand-500 text-white' : 'text-fg-muted hover:bg-bg hover:text-fg',
+        'flex w-full items-center justify-between gap-3 rounded-btn px-2.5 py-1.5 text-left text-sm transition-colors',
+        active ? 'bg-fg text-bg' : 'text-fg-muted hover:bg-surface hover:text-fg',
       )}
     >
       <span className="min-w-0 truncate font-medium">{label}</span>
-      <span className={cx('shrink-0 tabular-nums', active ? 'text-white/80' : 'text-fg-muted')}>{count}</span>
+      <span className={cx('shrink-0 tabular-nums text-xs', active ? 'text-bg/70' : 'text-fg-muted')}>
+        {count}
+      </span>
     </button>
   )
 }

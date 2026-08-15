@@ -113,8 +113,8 @@ export default function FixFailedCardsPage() {
       </div>
 
       {selectedRowIndexes.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-fg">{selectedRowIndexes.length} selected</p>
+        <div className="flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface px-4 py-3">
+          <p className="text-sm font-medium text-fg">{selectedRowIndexes.length} selected</p>
           <Button variant="secondary" size="sm" loading={skipRow.isPending} onClick={() => void skipSelected()}>
             <CircleSlash aria-hidden className="size-4" />
             Skip selected
@@ -148,37 +148,35 @@ export default function FixFailedCardsPage() {
           </CardBody>
         </Card>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
-          <Card className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)]">
-            <CardBody className="flex max-h-[36rem] flex-col p-0 lg:max-h-[calc(100vh-6rem)]">
-              <RecoveryQueueRail
-                rows={visibleRows}
-                groups={data.groups}
-                activeGroup={activeGroup}
-                onGroupChange={setActiveGroup}
-                activeRowIndex={activeRowIndex}
-                onSelectRow={setActiveRowIndex}
-                selectedRowIndexes={selectedRowIndexes}
-                onToggleSelected={toggleSelected}
-              />
-            </CardBody>
-          </Card>
+        <div className="overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-black/[0.04] dark:ring-white/10 lg:grid lg:h-[calc(100vh-9rem)] lg:grid-cols-[20rem_minmax(0,1fr)]">
+          <aside className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r lg:border-border">
+            <RecoveryQueueRail
+              rows={visibleRows}
+              groups={data.groups}
+              activeGroup={activeGroup}
+              onGroupChange={setActiveGroup}
+              activeRowIndex={activeRowIndex}
+              onSelectRow={setActiveRowIndex}
+              selectedRowIndexes={selectedRowIndexes}
+              onToggleSelected={toggleSelected}
+            />
+          </aside>
 
-          <Card>
-            <CardBody className="min-h-[32rem] p-6 lg:min-h-[calc(100vh-8rem)]">
-              {activeRow ? (
-                <RecoveryRowPanel
-                  key={activeRow.rowIndex}
-                  slug={slug}
-                  importId={importId}
-                  row={activeRow}
-                  onResolved={advance}
-                />
-              ) : (
+          <section className="flex min-h-[32rem] min-w-0 flex-col lg:min-h-0">
+            {activeRow ? (
+              <RecoveryRowPanel
+                key={activeRow.rowIndex}
+                slug={slug}
+                importId={importId}
+                row={activeRow}
+                onResolved={advance}
+              />
+            ) : (
+              <div className="grid flex-1 place-items-center p-8">
                 <EmptyState title="Pick a row" description="Choose a failed card from the list." />
-              )}
-            </CardBody>
-          </Card>
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>

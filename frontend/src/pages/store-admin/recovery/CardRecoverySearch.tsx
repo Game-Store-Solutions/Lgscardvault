@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link2, Search, X } from 'lucide-react'
 import { cardImage, extractErrorMessage, formatScryfallPrice } from '../../../api/client'
 import type { CardSummary } from '../../../api/types'
-import { Button, Input, Spinner } from '../../../components/ui'
+import { Button, FilterPill, Input, Spinner } from '../../../components/ui'
+import { CardImage } from '../../../components/cards'
 import { useDebouncedValue } from '../../../hooks'
 import { cx } from '../../../lib/cx'
 import { looksLikeCardReference } from './looksLikeCardReference'
@@ -99,121 +100,132 @@ export function CardRecoverySearch({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative min-w-0 flex-1">
-          <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
-          <input
-            value={term}
-            onChange={(event) => onTermChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return
-              if (looksLikeCardReference(term)) return
-              void refetch()
-            }}
-            placeholder="Search printings or paste a Scryfall link"
-            aria-label="Search printings or paste a Scryfall link"
-            className="h-12 w-full rounded-[var(--radius-input)] border border-border bg-bg py-2 pl-10 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowLink((open) => !open)}
-          className={cx(
-            'inline-flex size-12 shrink-0 items-center justify-center rounded-[var(--radius-input)] border text-fg-muted hover:text-fg',
-            showLink ? 'border-brand-400 text-brand-600' : 'border-border',
-          )}
-          aria-expanded={showLink}
-          aria-label="Paste a Scryfall link"
-          title="Paste a Scryfall link"
-        >
-          <Link2 aria-hidden className="size-4" />
-        </button>
-      </div>
-
-      {showLink && (
-        <div className="flex items-end gap-2">
-          <Input
-            label="Scryfall link or set/collector"
-            value={reference}
-            onChange={(event) => setReference(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void submitReference()
-            }}
-            placeholder="scryfall.com/card/clb/532 — or clb/532"
-          />
-          <Button variant="secondary" loading={resolveByReference.isPending} onClick={() => void submitReference()}>
-            Use
+      <div className="rounded-card border border-border bg-bg/70 p-3 sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+            <input
+              value={term}
+              onChange={(event) => onTermChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return
+                if (looksLikeCardReference(term)) return
+                void refetch()
+              }}
+              placeholder="Search printings or paste a Scryfall link"
+              aria-label="Search printings or paste a Scryfall link"
+              className="h-11 w-full rounded-[var(--radius-input)] border border-border bg-surface pl-10 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
+            />
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowLink((open) => !open)}
+            aria-expanded={showLink}
+            className={showLink ? 'ring-1 ring-fg/20' : undefined}
+          >
+            <Link2 aria-hidden className="size-4" />
+            Paste link
           </Button>
         </div>
-      )}
 
-      {referenceError && (
-        <p role="alert" className="text-sm text-danger-700">
-          {referenceError}
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterChip label="Set" value={filters.set} onClear={() => onFiltersChange({ ...filters, set: '' })} />
-        <FilterChip
-          label="#"
-          value={filters.collectorNumber}
-          onClear={() => onFiltersChange({ ...filters, collectorNumber: '' })}
-        />
-        <FilterChip
-          label="Rarity"
-          value={filters.rarity}
-          onClear={() => onFiltersChange({ ...filters, rarity: '' })}
-        />
-        <button
-          type="button"
-          onClick={() =>
-            onFiltersChange({ ...filters, finish: filters.finish === 'foil' ? 'nonfoil' : 'foil' })
-          }
-          className="rounded-full border border-border px-3 py-1 text-sm text-fg-muted hover:text-fg"
-        >
-          {filters.finish === 'foil' ? 'Foil' : 'Nonfoil'}
-        </button>
-        {hasNarrowingFilters && (
-          <button type="button" onClick={clearAllFilters} className="text-xs text-fg-muted hover:text-fg hover:underline">
-            Name only
-          </button>
+        {showLink && (
+          <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-end">
+            <Input
+              label="Scryfall link or set/collector"
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void submitReference()
+              }}
+              placeholder="scryfall.com/card/clb/532 — or clb/532"
+            />
+            <Button variant="secondary" loading={resolveByReference.isPending} onClick={() => void submitReference()}>
+              Use link
+            </Button>
+          </div>
         )}
-        {relaxationNotice && <span className="text-xs text-fg-muted">{relaxationNotice}</span>}
+
+        {referenceError && (
+          <p role="alert" className="mt-2 text-sm text-danger-700">
+            {referenceError}
+          </p>
+        )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <FilterPill
+            active={filters.finish === 'nonfoil'}
+            onClick={() => onFiltersChange({ ...filters, finish: 'nonfoil' })}
+          >
+            Nonfoil
+          </FilterPill>
+          <FilterPill
+            active={filters.finish === 'foil'}
+            onClick={() => onFiltersChange({ ...filters, finish: 'foil' })}
+          >
+            Foil
+          </FilterPill>
+          <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
+          <FilterChip label="Set" value={filters.set} onClear={() => onFiltersChange({ ...filters, set: '' })} />
+          <FilterChip
+            label="#"
+            value={filters.collectorNumber}
+            onClear={() => onFiltersChange({ ...filters, collectorNumber: '' })}
+          />
+          <FilterChip
+            label="Rarity"
+            value={filters.rarity}
+            onClear={() => onFiltersChange({ ...filters, rarity: '' })}
+          />
+          {hasNarrowingFilters && (
+            <button type="button" onClick={clearAllFilters} className="text-xs font-medium text-fg-muted hover:text-fg">
+              Name only
+            </button>
+          )}
+          {relaxationNotice && <span className="text-xs text-fg-muted">{relaxationNotice}</span>}
+        </div>
       </div>
 
       {(isFetching || (isReference && resolveByReference.isPending)) && items.length === 0 ? (
-        <div className="flex justify-center py-10">
+        <div className="flex justify-center py-16">
           <Spinner />
         </div>
       ) : (
-        <div className="grid gap-3 xl:grid-cols-2">
-          {items.map((card) => (
-            <button
-              key={card.id}
-              type="button"
-              onClick={() => onSelect(card)}
-              className={cx(
-                'flex items-center gap-4 rounded-card border p-3.5 text-left transition-colors',
-                card.id === selectedCardId
-                  ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 dark:bg-brand-500/10'
-                  : 'border-border hover:border-brand-300',
-              )}
-            >
-              {cardImage(card) && (
-                <img src={cardImage(card)} alt="" className="h-24 rounded-btn" loading="lazy" />
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-medium leading-snug text-fg">{card.name}</span>
-                <span className="mt-1 block text-sm text-fg-muted">
-                  {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
+        <div className={cx('grid gap-3', items.length === 1 ? 'grid-cols-1' : 'sm:grid-cols-2')}>
+          {items.map((card) => {
+            const selected = card.id === selectedCardId
+            return (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => onSelect(card)}
+                className={cx(
+                  'flex items-center gap-4 rounded-card border p-3 text-left transition-colors',
+                  selected
+                    ? 'border-fg/30 bg-bg shadow-sm ring-1 ring-fg/15'
+                    : 'border-border bg-surface hover:border-fg/20 hover:bg-bg',
+                )}
+              >
+                <CardImage
+                  src={cardImage(card)}
+                  alt={card.name}
+                  fit="contain"
+                  showLabel={false}
+                  className="h-28 w-[5.25rem] shrink-0 rounded-btn"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-base font-bold leading-snug text-fg">{card.name}</span>
+                  <span className="mt-1 block text-xs uppercase tracking-wide text-fg-muted">
+                    {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
+                    {card.rarity ? ` · ${card.rarity}` : ''}
+                  </span>
+                  <span className="mt-3 block font-display text-lg font-bold text-fg">
+                    {formatScryfallPrice(card, filters.finish)}
+                  </span>
                 </span>
-                <span className="mt-2 block text-base font-semibold text-brand-600">
-                  {formatScryfallPrice(card, filters.finish)}
-                </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -222,7 +234,9 @@ export function CardRecoverySearch({
         items.length === 0 &&
         rejected.length === 0 &&
         debouncedTerm.trim() !== '' && (
-          <p className="text-sm text-fg-muted">No stockable printing found. Paste a Scryfall link, or skip this row.</p>
+          <p className="rounded-card border border-dashed border-border px-4 py-8 text-center text-sm text-fg-muted">
+            No stockable printing found. Paste a Scryfall link, or skip this row.
+          </p>
         )}
 
       {rejected.length > 0 && (
@@ -254,7 +268,7 @@ function FilterChip({
   if (!value) return null
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-sm text-fg">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg">
       {label} {value.toUpperCase()}
       <button type="button" onClick={onClear} aria-label={`Ignore ${label} filter`} className="text-fg-muted hover:text-fg">
         <X aria-hidden className="size-3" />
