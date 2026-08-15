@@ -18,7 +18,7 @@ export function recoveryJobCopy(job: RecoveryJob): { title: string; hint: string
     case 'quantity':
       return { title: 'Fix the quantity', hint: 'Set how many copies to add. We match the printing from the sheet.' }
     case 'price':
-      return { title: 'Pick a priced printing', hint: 'This finish has no market price. Choose another printing, or skip.' }
+      return { title: 'Set a sell price', hint: 'This printing has no market price. We fill one in from another printing when we have it — edit it, or pick that printing.' }
     case 'match':
       return { title: 'Find the card', hint: 'Pick a printing from the catalog. Browse all printings of the name — no extra tab.' }
     case 'online':

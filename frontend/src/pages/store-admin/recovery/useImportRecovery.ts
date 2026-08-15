@@ -111,6 +111,7 @@ export function useRecoveryActions(slug: string, importId: string) {
       quantity: number
       condition: string
       isFoil: boolean
+      priceCents?: number | null
     }) => {
       await api.post(
         `/stores/${slug}/csv-imports/${importId}/rows/${input.rowIndex}/manual-import`,
@@ -119,6 +120,7 @@ export function useRecoveryActions(slug: string, importId: string) {
           quantity: input.quantity,
           condition: input.condition,
           isFoil: input.isFoil,
+          ...(input.priceCents != null && input.priceCents > 0 ? { priceCents: input.priceCents } : {}),
         },
       )
     },
@@ -140,6 +142,7 @@ export function useRecoveryActions(slug: string, importId: string) {
       quantity: number
       condition: string
       isFoil: boolean
+      priceCents?: number | null
     }) => {
       const { rowIndex, ...body } = input
       await api.patch(`/stores/${slug}/csv-imports/${importId}/rows/${rowIndex}`, body)

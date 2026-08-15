@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react'
 import { CircleSlash, RotateCcw, Search } from 'lucide-react'
-import { cardImage, extractErrorMessage, formatScryfallPrice } from '../../../api/client'
+import { cardImage, extractErrorMessage, formatPrice, formatScryfallPrice, parsePriceInput, scryfallPriceCents } from '../../../api/client'
 import type { CardSummary, CsvImportRow } from '../../../api/types'
 import { Badge, Button, Input, Spinner } from '../../../components/ui'
 import { CardImage } from '../../../components/cards'
@@ -14,7 +14,7 @@ import { CardRecoverySearch } from './CardRecoverySearch'
 import { PrintingGrid } from './PrintingGrid'
 import { recoveryJob, recoveryJobCopy } from './recoveryJob'
 import { shortRowReason } from './shortReason'
-import { isStockableRecoveryCard } from './stockableCard'
+import { isPaperRecoveryCard, isStockableRecoveryCard } from './stockableCard'
 import { useCardPrintings, useRecoveryActions, useRecoverySearch, type RecoveryFilters } from './useImportRecovery'
 
 export interface RecoveryRowPanelProps {
@@ -55,6 +55,25 @@ function startingQuantity(row: CsvImportRow): number {
   return row.quantity > 0 ? row.quantity : 1
 }
 
+function startingPriceText(row: CsvImportRow): string {
+  return row.priceCents && row.priceCents > 0 ? (row.priceCents / 100).toFixed(2) : ''
+}
+
+function dollarsFromCents(cents: number): string {
+  return (cents / 100).toFixed(2)
+}
+
+function marketCentsFor(card: CardSummary, finish: 'foil' | 'nonfoil'): number | null {
+  const cents = scryfallPriceCents(card, finish)
+  return cents && cents > 0 ? cents : null
+}
+
+function initialSelectedCard(row: CsvImportRow, seed: CardSummary | null, finish: 'foil' | 'nonfoil'): CardSummary | null {
+  if (!seed) return null
+  if (recoveryJob(row) === 'price' && isPaperRecoveryCard(seed)) return seed
+  return isStockableRecoveryCard(seed, finish) ? seed : null
+}
+
 /**
  * One failed row. The body changes with the failure: quantity, missing price,
  * no match, or online-only. Search is an escape hatch, not the default screen.
@@ -75,8 +94,10 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     const [term, setTerm] = useState(() => initialTerm(row))
     const [filters, setFilters] = useState<RecoveryFilters>(() => initialFilters(row))
     const [selectedCard, setSelectedCard] = useState<CardSummary | null>(() =>
-      seedCard && isStockableRecoveryCard(seedCard, initialFilters(row).finish) ? seedCard : null,
+      initialSelectedCard(row, seedCard, initialFilters(row).finish),
     )
+    const [priceText, setPriceText] = useState(() => startingPriceText(row))
+    const [priceTouched, setPriceTouched] = useState(false)
     const [searchResults, setSearchResults] = useState<CardSummary[]>([])
     const [error, setError] = useState<string | null>(null)
     const [editingSheet, setEditingSheet] = useState(false)
@@ -85,6 +106,7 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
 
     useEffect(() => {
       const nextJob = recoveryJob(row)
+      const nextFilters = initialFilters(row)
       setName(row.name)
       setSet(row.set)
       setCollectorNumber(row.collectorNumber)
@@ -93,14 +115,15 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
         (CONDITIONS as readonly string[]).includes(row.condition) ? (row.condition as Condition) : 'NM',
       )
       setTerm(initialTerm(row))
-      setFilters(initialFilters(row))
+      setFilters(nextFilters)
+      setPriceText(startingPriceText(row))
+      setPriceTouched(false)
       setError(null)
       setEditingSheet(false)
       setShowSearch(nextJob === 'match' || nextJob === 'other')
       setApplySimilar(true)
       setSearchResults([])
-      const finish = row.isFoil ? 'foil' : 'nonfoil'
-      setSelectedCard(row.card && isStockableRecoveryCard(row.card, finish) ? row.card : null)
+      setSelectedCard(initialSelectedCard(row, row.card ?? null, nextFilters.finish))
     }, [row])
 
     const { resolveRow, saveRow, skipRow } = useRecoveryActions(slug, importId)
@@ -118,10 +141,11 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     const isFoil = filters.finish === 'foil'
     const isSkipped = row.status === 'skipped'
     const canStockSelected = selectedCard ? isStockableRecoveryCard(selectedCard, filters.finish) : false
-    const marketPrice = useMemo(
-      () => (selectedCard ? formatScryfallPrice(selectedCard, filters.finish) : null),
-      [selectedCard, filters.finish],
-    )
+    const paperSelected = selectedCard ? isPaperRecoveryCard(selectedCard) : false
+    const parsedPriceCents = parsePriceInput(priceText)
+    const canAddWithPrice = paperSelected && (parsedPriceCents ?? 0) > 0
+    const canAdd = Boolean(selectedCard) && (canStockSelected || canAddWithPrice)
+    const needsSellPrice = Boolean(selectedCard) && paperSelected && !canStockSelected
     const reason = shortRowReason(row.error)
     const pricedPrintings = useMemo(
       () => printings.filter((printing) => isStockableRecoveryCard(printing, filters.finish)),
@@ -130,23 +154,55 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     const pickList = searchResults.length > 0 ? searchResults : pricedPrintings
     const similarCount = similarRows.length
     const previewCard =
-      seedCard && isStockableRecoveryCard(seedCard, filters.finish) ? seedCard : selectedCard
+      job === 'price' && seedCard && isPaperRecoveryCard(seedCard)
+        ? seedCard
+        : seedCard && isStockableRecoveryCard(seedCard, filters.finish)
+          ? seedCard
+          : selectedCard
+    const priceJobCard = selectedCard ?? seedCard
+    const selectedMarketCents = selectedCard ? marketCentsFor(selectedCard, filters.finish) : null
+    const siblingMarketCents = useMemo(() => {
+      const sibling = pricedPrintings.find((printing) => printing.id !== selectedCard?.id)
+      return sibling ? marketCentsFor(sibling, filters.finish) : null
+    }, [pricedPrintings, selectedCard, filters.finish])
+
+    const selectPrinting = useCallback(
+      (card: CardSummary) => {
+        setSelectedCard(card)
+        if (priceTouched) return
+        const cents = marketCentsFor(card, filters.finish)
+        if (cents) setPriceText(dollarsFromCents(cents))
+      },
+      [filters.finish, priceTouched],
+    )
 
     useEffect(() => {
-      if (selectedCard) return
+      if (selectedCard || job === 'price') return
       const priced = pricedPrintings[0]
-      if (priced) setSelectedCard(priced)
-    }, [pricedPrintings, selectedCard])
+      if (priced) selectPrinting(priced)
+    }, [pricedPrintings, selectedCard, job, selectPrinting])
 
     useEffect(() => {
       if (selectedCard || showSearch) return
       const hit = sheetMatch?.items[0]
-      if (hit) setSelectedCard(hit)
-    }, [sheetMatch, selectedCard, showSearch])
+      if (hit) selectPrinting(hit)
+    }, [sheetMatch, selectedCard, showSearch, selectPrinting])
+
+    useEffect(() => {
+      if (priceTouched || (row.priceCents ?? 0) > 0) return
+      if ((parsePriceInput(priceText) ?? 0) > 0) return
+      const cents = selectedMarketCents ?? siblingMarketCents
+      if (cents) setPriceText(dollarsFromCents(cents))
+    }, [priceTouched, row.priceCents, priceText, selectedMarketCents, siblingMarketCents])
 
     const handleResults = useCallback((items: CardSummary[]) => {
       setSearchResults(items)
     }, [])
+
+    function editPrice(value: string) {
+      setPriceTouched(true)
+      setPriceText(value)
+    }
 
     async function run(action: () => Promise<unknown>, fallback: string) {
       setError(null)
@@ -160,7 +216,12 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     }
 
     async function addToInventory() {
-      if (!selectedCard || !canStockSelected) return
+      if (!selectedCard) return
+      if (!canAdd) {
+        if (needsSellPrice) setError('Enter a sell price greater than $0.')
+        return
+      }
+      const priceCents = (parsedPriceCents ?? 0) > 0 ? parsedPriceCents : null
       const targets = applySimilar && similarCount > 0 ? [row, ...similarRows] : [row]
       const ok = await run(async () => {
         for (const target of targets) {
@@ -170,6 +231,7 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
             quantity: target.rowIndex === row.rowIndex ? quantity : startingQuantity(target),
             condition: target.rowIndex === row.rowIndex ? condition : (target.condition as Condition),
             isFoil,
+            priceCents,
           })
         }
       }, 'Could not add this card to inventory.')
@@ -186,7 +248,7 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
 
     useImperativeHandle(ref, () => ({
       confirm: () => {
-        if (job === 'online' && !canStockSelected) {
+        if (job === 'online' && !canStockSelected && !canAddWithPrice) {
           void skipCurrent()
           return
         }
@@ -197,12 +259,12 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
       },
       pickResult: (index: number) => {
         const card = pickList[index]
-        if (card) setSelectedCard(card)
+        if (card) selectPrinting(card)
       },
     }))
 
     const confirmLabel =
-      job === 'online' && !canStockSelected
+      job === 'online' && !canStockSelected && !canAddWithPrice
         ? 'Skip'
         : similarCount > 0 && applySimilar
           ? `Add ${similarCount + 1} to inventory`
@@ -284,6 +346,9 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
                         quantity,
                         condition,
                         isFoil,
+                        ...(parsedPriceCents != null && parsedPriceCents > 0
+                          ? { priceCents: parsedPriceCents }
+                          : {}),
                       }),
                     'Could not save this row.',
                   )
@@ -317,17 +382,53 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
           )}
 
           {job === 'price' && !showSearch && (
-            matchingSheet && pricedPrintings.length === 0 ? (
-              <SheetMatchStatus />
-            ) : (
-              <PrintingPicker
-                printings={pricedPrintings}
-                selectedId={selectedCard?.id ?? null}
-                finish={filters.finish}
-                onSelect={setSelectedCard}
-                empty="No priced printing of this card. Find another printing, or skip."
-              />
-            )
+            <div className="space-y-4">
+              {priceJobCard ? (
+                <>
+                  <MatchedCardPreview card={priceJobCard} finish={filters.finish} />
+                  <Input
+                    label="Sell price ($)"
+                    value={priceText}
+                    onChange={(e) => editPrice(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    hint={
+                      selectedMarketCents
+                        ? `Market price ${formatPrice(selectedMarketCents)} — edit to override`
+                        : siblingMarketCents
+                          ? `From another printing (${formatPrice(siblingMarketCents)}) — edit to override`
+                          : 'No market price for this printing — set what you will sell it for'
+                    }
+                  />
+                </>
+              ) : matchingSheet ? (
+                <SheetMatchStatus />
+              ) : (
+                <p className="rounded-card border border-dashed border-border px-4 py-8 text-center text-sm text-fg-muted">
+                  Couldn&apos;t match this row from the sheet.{' '}
+                  <button
+                    type="button"
+                    className="font-medium text-fg underline-offset-2 hover:underline"
+                    onClick={() => setShowSearch(true)}
+                  >
+                    Find a printing
+                  </button>
+                  , or skip.
+                </p>
+              )}
+              {pricedPrintings.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-fg-muted">Or pick a printing that already has a market price</p>
+                  <PrintingPicker
+                    printings={pricedPrintings}
+                    selectedId={selectedCard?.id ?? null}
+                    finish={filters.finish}
+                    onSelect={selectPrinting}
+                    empty="No priced printing of this card."
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           {job === 'online' && !showSearch && (
@@ -342,7 +443,7 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
                   printings={pricedPrintings}
                   selectedId={selectedCard?.id ?? null}
                   finish={filters.finish}
-                  onSelect={setSelectedCard}
+                  onSelect={selectPrinting}
                   empty="No paper printing in the catalog for this name."
                 />
               )}
@@ -358,7 +459,7 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
               filters={filters}
               onFiltersChange={setFilters}
               selectedCardId={selectedCard?.id ?? null}
-              onSelect={setSelectedCard}
+              onSelect={selectPrinting}
               onResultsChange={handleResults}
             />
           )}
@@ -385,7 +486,13 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
                 <p className="mt-0.5 text-xs text-fg-muted">
                   {(selectedCard.setCode ?? '-').toUpperCase()} #{selectedCard.collectorNumber ?? '-'}
                   <span className="mx-1.5 text-border">·</span>
-                  <span className="font-semibold text-fg">{marketPrice}</span>
+                  <span className="font-semibold text-fg">
+                    {selectedMarketCents
+                      ? formatPrice(selectedMarketCents)
+                      : parsedPriceCents
+                        ? formatPrice(parsedPriceCents)
+                        : 'No market price'}
+                  </span>
                 </p>
                 {similarCount > 0 && (
                   <label className="mt-2 flex items-center gap-2 text-xs text-fg-muted">
@@ -398,13 +505,24 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
                   </label>
                 )}
               </div>
+              {(job === 'price' || needsSellPrice) && (
+                <div className="w-32 shrink-0">
+                  <Input
+                    label="Sell price ($)"
+                    value={priceText}
+                    onChange={(e) => editPrice(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
               <QuantityStepper value={quantity} onChange={setQuantity} />
               <div className="w-52 shrink-0">
                 <ConditionSegmented value={condition} onChange={setCondition} />
               </div>
               <Button
                 loading={resolveRow.isPending}
-                disabled={!canStockSelected}
+                disabled={!canAdd}
                 onClick={() => void addToInventory()}
               >
                 {confirmLabel}
@@ -418,7 +536,11 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-fg-muted">Pick a stockable printing to add it. Enter confirms · S skips.</p>
+            <p className="text-sm text-fg-muted">
+              {job === 'price'
+                ? 'Enter a sell price to add this printing. Enter confirms · S skips.'
+                : 'Pick a stockable printing to add it. Enter confirms · S skips.'}
+            </p>
           )}
         </div>
       </div>
@@ -450,7 +572,9 @@ function MatchedCardPreview({ card, finish }: { card: CardSummary; finish: 'foil
           {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
           {card.rarity ? ` · ${card.rarity}` : ''}
         </p>
-        <p className="mt-3 font-display text-xl font-bold text-fg">{formatScryfallPrice(card, finish)}</p>
+        <p className="mt-3 font-display text-xl font-bold text-fg">
+          {formatScryfallPrice(card, finish) === '-' ? 'No market price' : formatScryfallPrice(card, finish)}
+        </p>
       </div>
     </div>
   )

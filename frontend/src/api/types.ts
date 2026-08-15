@@ -552,6 +552,8 @@ export interface CsvImportRow {
   card?: CardSummary | null
   error?: string | null
   importedItemId?: number
+  /** Sell price in cents, when the operator set one during recovery. */
+  priceCents?: number | null
 }
 
 export interface CsvImportJob {

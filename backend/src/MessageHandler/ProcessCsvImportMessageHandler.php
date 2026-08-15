@@ -200,9 +200,11 @@ final readonly class ProcessCsvImportMessageHandler
                 // Reject Alchemy / Arena-only printings and anything that would
                 // stock at $0 — those belong in failed rows for manual recovery
                 // onto a paper printing (or an explicit sell price).
+                $explicitPrice = ($row->getPriceCents() ?? 0) > 0 ? $row->getPriceCents() : null;
                 $reject = $this->stockablePrintingPolicy->rejectionReason(
                     $card,
                     FinishVocabulary::isFoil($finish),
+                    $explicitPrice,
                 );
                 if (null !== $reject) {
                     $row->setStatus(CsvImportRow::STATUS_ERROR);
@@ -229,6 +231,8 @@ final readonly class ProcessCsvImportMessageHandler
                     $finish,
                     '' !== $notes ? $notes : null,
                     false,
+                    null,
+                    $explicitPrice,
                 );
 
                 $row->setStatus(CsvImportRow::STATUS_IMPORTED);

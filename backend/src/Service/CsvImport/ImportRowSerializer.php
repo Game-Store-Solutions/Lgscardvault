@@ -31,6 +31,7 @@ final class ImportRowSerializer
             'card' => $row->getCard(),
             'error' => $row->getError(),
             'importedItemId' => $row->getImportedItemId(),
+            'priceCents' => $row->getPriceCents(),
         ];
     }
 }

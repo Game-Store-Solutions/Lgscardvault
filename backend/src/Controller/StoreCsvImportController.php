@@ -531,7 +531,16 @@ final class StoreCsvImportController extends AbstractController
                 'isFoil' => $item['isFoil'] ?? null,
                 'finish' => $item['finish'] ?? null,
             ]);
-            $reject = $this->stockablePrintingPolicy->rejectionReason($card, FinishVocabulary::isFoil($finish));
+            [$explicitPrice, $priceError] = $this->readPriceCents($item['priceCents'] ?? $row->getPriceCents());
+            if ($priceError instanceof JsonResponse) {
+                $errors[] = ['rowIndex' => $rowIndex, 'detail' => 'Sell price must be a number of cents.'];
+                continue;
+            }
+            $reject = $this->stockablePrintingPolicy->rejectionReason(
+                $card,
+                FinishVocabulary::isFoil($finish),
+                $explicitPrice,
+            );
             if (null !== $reject) {
                 $errors[] = ['rowIndex' => $rowIndex, 'detail' => $reject];
                 continue;
@@ -542,6 +551,7 @@ final class StoreCsvImportController extends AbstractController
                 'condition' => $item['condition'] ?? null,
                 'isFoil' => $item['isFoil'] ?? null,
                 'finish' => $item['finish'] ?? null,
+                'priceCents' => $explicitPrice,
             ];
 
             $selected[] = [$row, $card, $overrides];
@@ -631,6 +641,13 @@ final class StoreCsvImportController extends AbstractController
                 $row->setFinish($foil ? FinishVocabulary::DEFAULT_FOIL : FinishVocabulary::DEFAULT_PLAIN);
             }
         }
+        if (array_key_exists('priceCents', $payload)) {
+            [$priceCents, $priceError] = $this->readPriceCents($payload['priceCents']);
+            if ($priceError instanceof JsonResponse) {
+                return $priceError;
+            }
+            $row->setPriceCents($priceCents);
+        }
 
         // Drop stale "bad quantity" errors once qty is valid so the table
         // reflects the edit; Resolve / Retry still required to import.
@@ -693,12 +710,22 @@ final class StoreCsvImportController extends AbstractController
             return $this->json(['detail' => 'Store not found for this import job.'], 409);
         }
 
-        $item = $this->importRowIntoInventory($job, $store, $row, $card, [
-            'condition' => $payload['condition'] ?? null,
-            'quantity' => $payload['quantity'] ?? null,
-            'finish' => $payload['finish'] ?? null,
-            'isFoil' => $payload['isFoil'] ?? null,
-        ]);
+        [$explicitPrice, $priceError] = $this->readPriceCents($payload['priceCents'] ?? $row->getPriceCents());
+        if ($priceError instanceof JsonResponse) {
+            return $priceError;
+        }
+
+        try {
+            $item = $this->importRowIntoInventory($job, $store, $row, $card, [
+                'condition' => $payload['condition'] ?? null,
+                'quantity' => $payload['quantity'] ?? null,
+                'finish' => $payload['finish'] ?? null,
+                'isFoil' => $payload['isFoil'] ?? null,
+                'priceCents' => $explicitPrice,
+            ]);
+        } catch (\Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
 
         $this->entityManager->flush();
         if (null !== $item->getId()) {
@@ -839,7 +866,7 @@ final class StoreCsvImportController extends AbstractController
     }
 
     /**
-     * @param array{condition?: mixed, quantity?: mixed, finish?: mixed, isFoil?: mixed} $overrides
+     * @param array{condition?: mixed, quantity?: mixed, finish?: mixed, isFoil?: mixed, priceCents?: ?int} $overrides
      */
     private function importRowIntoInventory(
         CsvImportJob $job,
@@ -851,7 +878,13 @@ final class StoreCsvImportController extends AbstractController
         $condition = CardCondition::tryFrom((string) ($overrides['condition'] ?? $row->getCondition())) ?? CardCondition::NM;
         $quantity = max(0, (int) ($overrides['quantity'] ?? $row->getQuantity()));
         $finish = $this->resolveRowFinish($row, $card, $overrides);
-        $reject = $this->stockablePrintingPolicy->rejectionReason($card, FinishVocabulary::isFoil($finish));
+        $explicitPrice = $overrides['priceCents'] ?? $row->getPriceCents();
+        $explicitPrice = is_int($explicitPrice) && $explicitPrice > 0 ? $explicitPrice : null;
+        $reject = $this->stockablePrintingPolicy->rejectionReason(
+            $card,
+            FinishVocabulary::isFoil($finish),
+            $explicitPrice,
+        );
         if (null !== $reject) {
             throw new \Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException($reject);
         }
@@ -861,18 +894,51 @@ final class StoreCsvImportController extends AbstractController
             '' !== $row->getVariant() ? 'Variant: '.$row->getVariant() : '',
         ])));
 
-        $item = $this->inventoryWriter->write($store, $card, $quantity, $condition, $finish, $notes, false);
+        $item = $this->inventoryWriter->write(
+            $store,
+            $card,
+            $quantity,
+            $condition,
+            $finish,
+            $notes,
+            false,
+            null,
+            $explicitPrice,
+        );
 
         $row
             ->setStatus(CsvImportRow::STATUS_IMPORTED)
             ->setCard($this->catalogCardResolver->serializeCard($card))
-            ->setError(null);
+            ->setError(null)
+            ->setPriceCents($explicitPrice);
 
         if (null !== $item->getId()) {
             $row->setImportedItemId($item->getId());
         }
 
         return $item;
+    }
+
+    /**
+     * @return array{0: ?int, 1: ?JsonResponse}
+     */
+    private function readPriceCents(mixed $value): array
+    {
+        if (null === $value || '' === $value) {
+            return [null, null];
+        }
+        if (!is_numeric($value)) {
+            return [null, $this->json(['detail' => 'Sell price must be a number of cents.'], 422)];
+        }
+        $cents = (int) $value;
+        if ($cents < 0) {
+            return [null, $this->json(['detail' => 'Sell price cannot be negative.'], 422)];
+        }
+        if (0 === $cents) {
+            return [null, null];
+        }
+
+        return [$cents, null];
     }
 
     private function serializeJob(CsvImportJob $job, Request $request): array

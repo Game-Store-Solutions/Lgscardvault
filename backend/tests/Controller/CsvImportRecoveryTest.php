@@ -171,4 +171,120 @@ final class CsvImportRecoveryTest extends WebTestCase
 
         self::assertSame(400, $this->client->getResponse()->getStatusCode());
     }
+
+    public function testManualImportStocksUnpricedPaperWhenPriceCentsProvided(): void
+    {
+        [$job] = $this->jobWithFailedRow('Obscure Bulk', 'mh3', '1');
+        $card = $this->fixtures->card(910, [
+            'name' => 'Obscure Bulk',
+            'set' => 'mh3',
+            'collector_number' => '1',
+            'games' => ['paper'],
+            'prices' => ['usd' => '0.00', 'usd_foil' => null],
+        ]);
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/csv-imports/%d/rows/0/manual-import', $this->store->getSlug(), $job->getId()),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'cardId' => (string) $card->getId(),
+                'quantity' => 2,
+                'condition' => 'NM',
+                'isFoil' => false,
+                'priceCents' => 150,
+            ]),
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $this->em->clear();
+        $row = $this->em->getRepository(CsvImportRow::class)->findOneBy(['job' => $job->getId(), 'rowIndex' => 0]);
+        self::assertSame(CsvImportRow::STATUS_IMPORTED, $row->getStatus());
+        self::assertSame(150, $row->getPriceCents());
+
+        $store = $this->em->getRepository(Store::class)->find($this->store->getId());
+        $items = $this->items->findBy(['store' => $store]);
+        self::assertCount(1, $items);
+        self::assertSame(150, $items[0]->getPriceCents(), 'the operator-entered sell price is what gets listed');
+    }
+
+    public function testManualImportRejectsUnpricedPaperWithoutPrice(): void
+    {
+        [$job] = $this->jobWithFailedRow('Obscure Bulk', 'mh3', '1');
+        $card = $this->fixtures->card(911, [
+            'name' => 'Obscure Bulk',
+            'set' => 'mh3',
+            'collector_number' => '1',
+            'games' => ['paper'],
+            'prices' => ['usd' => '0.00'],
+        ]);
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/csv-imports/%d/rows/0/manual-import', $this->store->getSlug(), $job->getId()),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'cardId' => (string) $card->getId(),
+                'quantity' => 1,
+                'condition' => 'NM',
+                'isFoil' => false,
+            ]),
+        );
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertStringContainsString('$0', (string) ($body['detail'] ?? ''));
+        self::assertSame(0, $this->items->countByStore($this->em->getRepository(Store::class)->find($this->store->getId())));
+    }
+
+    public function testManualImportRejectsOnlineOnlyEvenWithPrice(): void
+    {
+        [$job] = $this->jobWithFailedRow('A-Guide of Souls', 'mh3', 'A-29');
+        $card = $this->fixtures->card(912, [
+            'name' => 'A-Guide of Souls',
+            'set' => 'mh3',
+            'collector_number' => 'A-29',
+            'games' => ['arena'],
+            'digital' => true,
+            'prices' => ['usd' => null],
+        ]);
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/csv-imports/%d/rows/0/manual-import', $this->store->getSlug(), $job->getId()),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'cardId' => (string) $card->getId(),
+                'quantity' => 1,
+                'condition' => 'NM',
+                'isFoil' => false,
+                'priceCents' => 500,
+            ]),
+        );
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertStringContainsString('online', strtolower((string) ($body['detail'] ?? '')));
+    }
+
+    public function testPatchPersistsSellPriceOnFailedRow(): void
+    {
+        [$job] = $this->jobWithFailedRow('Obscure Bulk', 'mh3', '1');
+
+        $this->client->request(
+            'PATCH',
+            sprintf('/api/stores/%s/csv-imports/%d/rows/0', $this->store->getSlug(), $job->getId()),
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['priceCents' => 250]),
+        );
+
+        self::assertResponseIsSuccessful();
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(250, $body['priceCents']);
+
+        $this->em->clear();
+        $row = $this->em->getRepository(CsvImportRow::class)->findOneBy(['job' => $job->getId(), 'rowIndex' => 0]);
+        self::assertSame(250, $row->getPriceCents());
+    }
 }

@@ -102,8 +102,8 @@ class CsvImportRow
 
     /**
      * Sell price carried by the row, in cents. Sealed imports price each
-     * product from the sheet (falling back to the market snapshot); card
-     * imports leave this null and price from the catalog as before.
+     * product from the sheet; card recovery can set this when the catalog
+     * printing has no market price.
      */
     #[ORM\Column(nullable: true)]
     private ?int $priceCents = null;

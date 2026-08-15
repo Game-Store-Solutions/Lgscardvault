@@ -130,7 +130,8 @@ export default function FixFailedCardsPage() {
       if (event.key === 'Enter') {
         const field = event.target
         const fromQty = field instanceof HTMLInputElement && field.type === 'number'
-        if (fromQty || !isTypingTarget(event.target)) {
+        const fromPrice = field instanceof HTMLInputElement && field.inputMode === 'decimal'
+        if (fromQty || fromPrice || !isTypingTarget(event.target)) {
           event.preventDefault()
           panelRef.current?.confirm()
         }
