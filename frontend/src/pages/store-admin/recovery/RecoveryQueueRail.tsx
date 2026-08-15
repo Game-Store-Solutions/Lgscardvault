@@ -14,8 +14,7 @@ export interface RecoveryQueueRailProps {
 }
 
 /**
- * Compact work queue: reason pills on top, then names. Metadata stays
- * one quiet line so seventy rows do not become a wall of chrome.
+ * Failed-card queue: reasons as a vertical filter, then a scannable name list.
  */
 export function RecoveryQueueRail({
   rows,
@@ -31,15 +30,15 @@ export function RecoveryQueueRail({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap gap-1 border-b border-border p-2">
-        <GroupPill
+      <div className="space-y-1 border-b border-border p-3">
+        <GroupRow
           label="All"
           count={total}
           active={activeGroup === null}
           onClick={() => onGroupChange(null)}
         />
         {groups.map((group) => (
-          <GroupPill
+          <GroupRow
             key={group.reason}
             label={group.reason}
             count={group.count}
@@ -62,13 +61,13 @@ export function RecoveryQueueRail({
             <li key={row.rowIndex}>
               <div
                 className={cx(
-                  'flex items-center gap-2 px-2.5 py-1.5 transition-colors',
+                  'flex items-center gap-3 px-3 py-2.5 transition-colors',
                   isActive ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-bg',
                 )}
               >
                 <input
                   type="checkbox"
-                  className="shrink-0"
+                  className="size-4 shrink-0"
                   checked={selectedRowIndexes.includes(row.rowIndex)}
                   onChange={() => onToggleSelected(row.rowIndex)}
                   aria-label={`Select ${row.name || `row ${row.rowIndex + 1}`}`}
@@ -80,30 +79,30 @@ export function RecoveryQueueRail({
                 >
                   <span
                     className={cx(
-                      'block truncate text-sm',
+                      'block truncate text-sm leading-snug',
                       isSkipped ? 'text-fg-muted line-through' : 'font-medium text-fg',
                     )}
                   >
                     {row.name || `Row ${row.rowIndex + 1}`}
                   </span>
-                  {meta && <span className="block truncate text-xs text-fg-muted">{meta}</span>}
+                  {meta && <span className="mt-0.5 block truncate text-xs text-fg-muted">{meta}</span>}
                 </button>
-                {isDone && <Check aria-label="Added" className="size-3.5 shrink-0 text-success-700" />}
-                {isSkipped && <CircleSlash aria-label="Skipped" className="size-3.5 shrink-0 text-fg-muted" />}
+                {isDone && <Check aria-label="Added" className="size-4 shrink-0 text-success-700" />}
+                {isSkipped && <CircleSlash aria-label="Skipped" className="size-4 shrink-0 text-fg-muted" />}
               </div>
             </li>
           )
         })}
 
         {rows.length === 0 && (
-          <li className="p-4 text-sm text-fg-muted">Nothing left in this bucket.</li>
+          <li className="p-5 text-sm text-fg-muted">Nothing left in this bucket.</li>
         )}
       </ul>
     </div>
   )
 }
 
-function GroupPill({
+function GroupRow({
   label,
   count,
   active,
@@ -119,12 +118,12 @@ function GroupPill({
       type="button"
       onClick={onClick}
       className={cx(
-        'inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-        active ? 'bg-brand-500 text-white' : 'bg-bg text-fg-muted hover:text-fg',
+        'flex w-full items-center justify-between gap-3 rounded-btn px-3 py-2 text-left text-sm transition-colors',
+        active ? 'bg-brand-500 text-white' : 'text-fg-muted hover:bg-bg hover:text-fg',
       )}
     >
-      <span className="truncate">{label}</span>
-      <span className={cx('tabular-nums', active ? 'text-white/80' : 'text-fg-muted')}>{count}</span>
+      <span className="min-w-0 truncate font-medium">{label}</span>
+      <span className={cx('shrink-0 tabular-nums', active ? 'text-white/80' : 'text-fg-muted')}>{count}</span>
     </button>
   )
 }

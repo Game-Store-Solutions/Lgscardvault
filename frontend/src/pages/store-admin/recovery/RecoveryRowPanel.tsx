@@ -119,7 +119,7 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-display text-xl font-bold leading-tight text-fg">{row.name}</h2>
@@ -218,10 +218,10 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
       )}
 
       {selectedCard && (
-        <div className="sticky bottom-0 space-y-3 rounded-card border border-border bg-surface p-3">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="sticky bottom-0 space-y-3 rounded-card border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-center gap-4">
             {cardImage(selectedCard) && (
-              <img src={cardImage(selectedCard)} alt="" className="h-16 rounded-btn" />
+              <img src={cardImage(selectedCard)} alt="" className="h-20 rounded-btn" />
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-fg">{selectedCard.name}</p>

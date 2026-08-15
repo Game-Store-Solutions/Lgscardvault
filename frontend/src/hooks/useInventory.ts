@@ -5,44 +5,56 @@ import type { InventoryItem } from '../api/types'
 export type InventoryQueryOptions = {
   /** Public storefront: only listings with quantity > 0. Admin omits this. */
   inStockOnly?: boolean
+  /** Scope to one game so a Magic workspace never downloads Pokémon. */
+  game?: string
+  /** Extra gate — e.g. wait until the game switcher has a selection. */
+  enabled?: boolean
 }
 
 /** React Query key for a store's inventory — shared by the hook and invalidations. */
 export const inventoryKey = (slug: string, opts?: InventoryQueryOptions) =>
-  opts?.inStockOnly ? (['inventory', slug, 'in-stock'] as const) : (['inventory', slug] as const)
+  opts
+    ? (['inventory', slug, opts.inStockOnly ? 'in-stock' : 'all', opts.game || 'any-game'] as const)
+    : (['inventory', slug] as const)
 
 /** Server page size — must not exceed the API's itemsPerPage cap (500). */
 const PAGE_SIZE = 500
 /** Hard stop so a misbehaving server can never loop us forever (500 × 400 = 200k items). */
 const MAX_PAGES = 400
 
+function sortInventory(items: InventoryItem[]): InventoryItem[] {
+  return [...items].sort((a, b) => a.card.name.localeCompare(b.card.name) || a.id - b.id)
+}
+
 /**
- * useInventory — fetch a store's full inventory listing. The API serves the
- * collection in keyset pages (`?afterId=` cursor, bounded response size and
- * O(page) server cost); this hook walks the cursor and aggregates, so
- * consumers still get the complete array they always did.
- *
- * Pass `{ inStockOnly: true }` on public storefront pages so sold-out
- * singles never appear. Admin inventory keeps the full list for restocking.
+ * useInventory — fetch a store's inventory listing. The API serves keyset
+ * pages (`?afterId=`); this hook walks them. The first page is published into
+ * the cache immediately so the storefront and admin inventory can paint
+ * instead of waiting on an 18k-row walk.
  */
 export function useInventory(slug: string, opts?: InventoryQueryOptions) {
   const inStockOnly = Boolean(opts?.inStockOnly)
+  const game = opts?.game?.trim() || undefined
+  const key = inventoryKey(slug, { inStockOnly, game })
 
   return useQuery({
-    queryKey: inventoryKey(slug, { inStockOnly }),
-    enabled: Boolean(slug),
-    // Short enough that imports show up quickly; still long enough to avoid
-    // refetching the whole list on every storefront navigation.
+    queryKey: key,
+    enabled: (opts?.enabled ?? true) && Boolean(slug),
     staleTime: 30 * 1000,
-    queryFn: async () => {
+    queryFn: async ({ client }) => {
       const seen = new Map<number, InventoryItem>()
       let afterId = 0
+      const publish = () => {
+        client.setQueryData(key, sortInventory([...seen.values()]))
+      }
+
       for (let page = 0; page < MAX_PAGES; page++) {
         const { data } = await api.get(`/stores/${slug}/inventory`, {
           params: {
             afterId,
             itemsPerPage: PAGE_SIZE,
             ...(inStockOnly ? { inStockOnly: 1 } : {}),
+            ...(game ? { game } : {}),
           },
         })
         const chunk = unwrapCollection<InventoryItem>(data)
@@ -50,15 +62,11 @@ export function useInventory(slug: string, opts?: InventoryQueryOptions) {
           seen.set(item.id, item)
           if (item.id > afterId) afterId = item.id
         }
-        // A short (or empty) page means we've reached the end.
+        if (seen.size > 0) publish()
         if (chunk.length < PAGE_SIZE) break
       }
-      // Keyset pages arrive in id order; restore the name ordering the old
-      // server response had (the storefront's default "featured" sort keeps
-      // fetch order, so this preserves its behavior).
-      return [...seen.values()].sort(
-        (a, b) => a.card.name.localeCompare(b.card.name) || a.id - b.id,
-      )
+
+      return sortInventory([...seen.values()])
     },
   })
 }

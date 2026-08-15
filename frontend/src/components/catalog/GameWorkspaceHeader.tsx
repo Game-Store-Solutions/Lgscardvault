@@ -47,7 +47,7 @@ export function GameWorkspaceHeader({
               <Stat
                 icon={Layers}
                 label="Singles"
-                value={stats?.singles.copies}
+                value={stats?.singles.listings}
                 loading={loading}
               />
               <Stat

@@ -15,6 +15,7 @@ import {
   Button,
   EmptyState,
   Pagination,
+  InventoryGridSkeleton,
 } from '../../components/ui'
 import { type Condition } from '../../components/inventory'
 import { defaultFinishFor, finishChoices, isFoilFinish } from '../../lib/finishes'
@@ -58,7 +59,10 @@ export default function SearchTab({ slug }: { slug: string }) {
     setPriceText(market == null ? '' : (market / 100).toFixed(2))
   }
 
-  const { data: inventory = [] } = useInventory(slug)
+  const { data: inventory = [], isPending, isFetching } = useInventory(slug, {
+    game: gameFilter || undefined,
+    enabled: Boolean(gameFilter),
+  })
 
   const { data: catalogResults = [], refetch: runCatalogSearch } = useQuery({
     queryKey: ['card-search', catalogSearch, catalogSetFilter, catalogFinishFilter, gameFilter],
@@ -146,8 +150,8 @@ export default function SearchTab({ slug }: { slug: string }) {
       // Write the server's result straight into the cache so the list reflects
       // the edit immediately (don't rely solely on the refetch), then invalidate
       // to reconcile the merge/removal case.
-      queryClient.setQueryData<InventoryItem[]>(inventoryKey(slug), (old = []) =>
-        old.map((it) => (it.id === payload.itemId ? { ...it, ...updated } : it)),
+      queryClient.setQueriesData<InventoryItem[]>({ queryKey: inventoryKey(slug) }, (old = []) =>
+        (old ?? []).map((it) => (it.id === payload.itemId ? { ...it, ...updated } : it)),
       )
       void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
       setEditingItem(null)
@@ -162,8 +166,8 @@ export default function SearchTab({ slug }: { slug: string }) {
     },
     onMutate: () => setMutationError(null),
     onSuccess: (id) => {
-      queryClient.setQueryData<InventoryItem[]>(inventoryKey(slug), (old = []) =>
-        old.filter((it) => it.id !== id),
+      queryClient.setQueriesData<InventoryItem[]>({ queryKey: inventoryKey(slug) }, (old = []) =>
+        (old ?? []).filter((it) => it.id !== id),
       )
       void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
     },
@@ -342,7 +346,11 @@ export default function SearchTab({ slug }: { slug: string }) {
       <Card>
         <CardHeader
           title={`${activeGameName} inventory`}
-          subtitle={`What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`}
+          subtitle={
+            isFetching && inventory.length > 0
+              ? `Loaded ${inventory.length.toLocaleString()} listings so far…`
+              : `What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`
+          }
         />
         <CardBody className="space-y-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_8rem_10rem_auto] lg:items-end">
@@ -394,7 +402,9 @@ export default function SearchTab({ slug }: { slug: string }) {
             </Button>
           </div>
 
-          {filteredInventory.length === 0 ? (
+          {isPending && inventory.length === 0 ? (
+            <InventoryGridSkeleton count={6} />
+          ) : filteredInventory.length === 0 ? (
             <EmptyState
               icon={Search}
               title={inventoryFiltersActive ? 'No matching inventory' : 'No inventory yet'}

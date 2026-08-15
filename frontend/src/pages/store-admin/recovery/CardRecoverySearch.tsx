@@ -98,10 +98,10 @@ export function CardRecoverySearch({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
         <div className="relative min-w-0 flex-1">
-          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+          <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
           <input
             value={term}
             onChange={(event) => onTermChange(event.target.value)}
@@ -112,14 +112,14 @@ export function CardRecoverySearch({
             }}
             placeholder="Search printings or paste a Scryfall link"
             aria-label="Search printings or paste a Scryfall link"
-            className="w-full rounded-[var(--radius-input)] border border-border bg-bg py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
+            className="h-12 w-full rounded-[var(--radius-input)] border border-border bg-bg py-2 pl-10 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
           />
         </div>
         <button
           type="button"
           onClick={() => setShowLink((open) => !open)}
           className={cx(
-            'inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-input)] border text-fg-muted hover:text-fg',
+            'inline-flex size-12 shrink-0 items-center justify-center rounded-[var(--radius-input)] border text-fg-muted hover:text-fg',
             showLink ? 'border-brand-400 text-brand-600' : 'border-border',
           )}
           aria-expanded={showLink}
@@ -153,7 +153,7 @@ export function CardRecoverySearch({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
         <FilterChip label="Set" value={filters.set} onClear={() => onFiltersChange({ ...filters, set: '' })} />
         <FilterChip
           label="#"
@@ -170,7 +170,7 @@ export function CardRecoverySearch({
           onClick={() =>
             onFiltersChange({ ...filters, finish: filters.finish === 'foil' ? 'nonfoil' : 'foil' })
           }
-          className="rounded-full border border-border px-2.5 py-0.5 text-xs text-fg-muted hover:text-fg"
+          className="rounded-full border border-border px-3 py-1 text-sm text-fg-muted hover:text-fg"
         >
           {filters.finish === 'foil' ? 'Foil' : 'Nonfoil'}
         </button>
@@ -187,28 +187,28 @@ export function CardRecoverySearch({
           <Spinner />
         </div>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-3 xl:grid-cols-2">
           {items.map((card) => (
             <button
               key={card.id}
               type="button"
               onClick={() => onSelect(card)}
               className={cx(
-                'flex items-center gap-3 rounded-card border p-2.5 text-left transition-colors',
+                'flex items-center gap-4 rounded-card border p-3.5 text-left transition-colors',
                 card.id === selectedCardId
                   ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 dark:bg-brand-500/10'
                   : 'border-border hover:border-brand-300',
               )}
             >
               {cardImage(card) && (
-                <img src={cardImage(card)} alt="" className="h-16 rounded-btn" loading="lazy" />
+                <img src={cardImage(card)} alt="" className="h-24 rounded-btn" loading="lazy" />
               )}
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium leading-snug text-fg">{card.name}</span>
-                <span className="mt-0.5 block text-xs text-fg-muted">
+                <span className="block text-base font-medium leading-snug text-fg">{card.name}</span>
+                <span className="mt-1 block text-sm text-fg-muted">
                   {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
                 </span>
-                <span className="mt-1 block text-sm font-semibold text-brand-600">
+                <span className="mt-2 block text-base font-semibold text-brand-600">
                   {formatScryfallPrice(card, filters.finish)}
                 </span>
               </span>
@@ -254,7 +254,7 @@ function FilterChip({
   if (!value) return null
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs text-fg">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-sm text-fg">
       {label} {value.toUpperCase()}
       <button type="button" onClick={onClear} aria-label={`Ignore ${label} filter`} className="text-fg-muted hover:text-fg">
         <X aria-hidden className="size-3" />

@@ -40,3 +40,25 @@ export const MANA_COLORS: Record<string, string> = {
   G: '#22a35a',
   C: '#a8a29e',
 }
+
+const WUBRG = ['W', 'U', 'B', 'R', 'G'] as const
+
+/**
+ * Canonical identity key: "W", "WU", "C", … . Gold cards are the full
+ * combination, never the individual pips — so a White filter stays mono-white.
+ */
+export function colorIdentityKey(colors: readonly string[]): string {
+  const letters = WUBRG.filter((letter) =>
+    colors.some((color) => color.toUpperCase() === letter),
+  )
+  return letters.length > 0 ? letters.join('') : 'C'
+}
+
+/** True when the card's identity is exactly the selected pips (order-insensitive). */
+export function matchesExactColorIdentity(
+  cardColors: readonly string[],
+  selected: readonly string[],
+): boolean {
+  if (selected.length === 0) return true
+  return colorIdentityKey(cardColors) === colorIdentityKey(selected)
+}

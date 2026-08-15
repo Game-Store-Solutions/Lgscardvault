@@ -188,8 +188,8 @@ export default function CardDetailsPage() {
     },
     onSuccess: (updated) => {
       queryClient.setQueryData(['inventory-item', slug, id], updated)
-      queryClient.setQueryData<InventoryItem[]>(inventoryKey(slug), (old = []) =>
-        old.map((it) => (it.id === updated.id ? { ...it, ...updated } : it)),
+      queryClient.setQueriesData<InventoryItem[]>({ queryKey: inventoryKey(slug) }, (old) =>
+        (old ?? []).map((it) => (it.id === updated.id ? { ...it, ...updated } : it)),
       )
       void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
       closeManageListing()

@@ -28,6 +28,7 @@ import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { SealedSpotlightRow } from '../components/store/SealedSpotlightRow'
 import { cx } from '../lib/cx'
+import { colorIdentityKey, matchesExactColorIdentity } from '../lib/mtg'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
 import {
     QUICK_ACTIONS,
@@ -79,8 +80,12 @@ export default function StorePage() {
   useStoreTheme(store)
   const cardDisplayStyle = store?.cardDisplayStyle ?? 'gallery'
 
-  const { data: allInventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
-  const { data: storeGames = [] } = useStoreGames(slug)
+  const { data: storeGames = [], isLoading: gamesLoading } = useStoreGames(slug)
+  const { data: allInventory = [], isLoading, isFetching, isPending } = useInventory(slug, {
+    inStockOnly: true,
+    game: gameFilter || undefined,
+    enabled: Boolean(gameFilter) || (!gamesLoading && storeGames.length === 0),
+  })
 
   // Every list below (search, filters, sets, colors, spotlight, counts) works
   // off this, so picking a game scopes the whole page in one place.
@@ -114,7 +119,10 @@ export default function StorePage() {
 
   const colorCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const item of inventory) for (const c of cardColors(item)) counts[c] = (counts[c] ?? 0) + 1
+    for (const item of inventory) {
+      const key = colorIdentityKey(cardColors(item))
+      if (key.length === 1) counts[key] = (counts[key] ?? 0) + 1
+    }
     return counts
   }, [inventory])
 
@@ -144,7 +152,7 @@ export default function StorePage() {
         finishFilter === 'all' ||
         (finishFilter === 'foil' && item.isFoil) ||
         (finishFilter === 'nonfoil' && !item.isFoil)
-      const matchesColors = selectedColors.length === 0 || selectedColors.every((sel) => colors.includes(sel))
+      const matchesColors = matchesExactColorIdentity(colors, selectedColors)
       const priceCents = marketPriceCents(item)
       const matchesMinPrice = minPriceCents === null || (priceCents !== null && priceCents >= minPriceCents)
       const matchesMaxPrice = maxPriceCents === null || (priceCents !== null && priceCents <= maxPriceCents)
@@ -313,7 +321,7 @@ export default function StorePage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, type, color, or text"
+              placeholder="Name, type, color, or set"
               aria-label="Search inventory"
               className="h-10 w-full rounded-btn border border-border bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             />
@@ -351,7 +359,7 @@ export default function StorePage() {
                   type="button"
                   onClick={() => toggleColor(color.key)}
                   aria-pressed={active}
-                  title={`${color.label} · ${colorCounts[color.key] ?? 0} cards`}
+                  title={`${color.label} only · ${colorCounts[color.key] ?? 0} cards`}
                   className={cx(
                     'grid place-items-center rounded-full transition-all',
                     active ? 'scale-110 ring-2 ring-brand-500 ring-offset-2 ring-offset-bg' : 'opacity-85 hover:opacity-100',
@@ -392,7 +400,9 @@ export default function StorePage() {
 
   // Full-screen branded loader only while the screen isn't completely
   // loaded — cached revisits render instantly.
-  if (storeLoading || isLoading) {
+  const waitingForGame = !gameFilter && (gamesLoading || storeGames.length > 0)
+  const waitingForListings = isPending && allInventory.length === 0 && !waitingForGame
+  if (storeLoading || waitingForGame || waitingForListings) {
     return <StorePageLoader label="Loading store…" />
   }
 
@@ -652,7 +662,11 @@ export default function StorePage() {
             </div>
           </div>
 
-          {isLoading ? (
+          {isFetching && allInventory.length > 0 && (
+            <p className="mb-3 text-xs text-fg-muted">Loading remaining listings…</p>
+          )}
+
+          {isLoading && sorted.length === 0 ? (
             <InventoryGridSkeleton count={12} />
           ) : sorted.length === 0 ? (
             <div className="rounded-card border border-border bg-surface dark:glass-card">

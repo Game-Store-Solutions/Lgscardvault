@@ -93,7 +93,7 @@ export default function FixFailedCardsPage() {
   const outstanding = data.groups.reduce((sum, group) => sum + group.count, 0)
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <BackButton to={`/s/${slug}/admin/imports/${importId}`}>Back to import run</BackButton>
@@ -148,9 +148,9 @@ export default function FixFailedCardsPage() {
           </CardBody>
         </Card>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-[16.5rem_minmax(0,1fr)] lg:items-start">
-          <Card className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-5.5rem)]">
-            <CardBody className="flex max-h-[28rem] flex-col p-0 lg:max-h-[calc(100vh-5.5rem)]">
+        <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
+          <Card className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)]">
+            <CardBody className="flex max-h-[36rem] flex-col p-0 lg:max-h-[calc(100vh-6rem)]">
               <RecoveryQueueRail
                 rows={visibleRows}
                 groups={data.groups}
@@ -165,7 +165,7 @@ export default function FixFailedCardsPage() {
           </Card>
 
           <Card>
-            <CardBody className="p-4">
+            <CardBody className="min-h-[32rem] p-6 lg:min-h-[calc(100vh-8rem)]">
               {activeRow ? (
                 <RecoveryRowPanel
                   key={activeRow.rowIndex}

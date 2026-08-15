@@ -92,4 +92,22 @@ final class InventoryItemRepositoryTest extends KernelTestCase
             self::assertSame($storeB->getId(), $item->getStore()->getId());
         }
     }
+
+    public function testListingEagerLoadsGameSoGameCodeDoesNotLazyLoad(): void
+    {
+        $store = $this->fixtures->store();
+        $card = $this->fixtures->card(42);
+        $this->fixtures->inventoryItem($store, $card);
+        $this->em->flush();
+        $this->em->clear();
+
+        $items = $this->repo->findByStoreAfterId($store, 0, 10);
+        self::assertCount(1, $items);
+
+        $this->em->clear();
+        $items = $this->repo->findByStoreAfterId($store, 0, 10);
+        // Accessing gameCode after clearing other entities must still work
+        // from the joined Game, not a follow-up SELECT.
+        self::assertSame('mtg', $items[0]->getCard()?->getGameCode());
+    }
 }

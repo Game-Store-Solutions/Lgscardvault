@@ -34,7 +34,25 @@ use Symfony\Component\Validator\Constraints as Assert;
             // serves them in full for the card details page.
             normalizationContext: [
                 'groups' => ['inventory:read'],
-                'ignored_attributes' => ['legalities', 'flavorText', 'cardFaces', 'scryfallUri'],
+                // List tiles need identity, prices, and a thumbnail — not
+                // rules text, keywords, or per-face dumps. Dropping those
+                // keeps an 18k-listing walk from shipping megabytes of
+                // unused JSON. The item GET still returns the full card.
+                'ignored_attributes' => [
+                    'legalities',
+                    'flavorText',
+                    'cardFaces',
+                    'scryfallUri',
+                    'oracleText',
+                    'keywords',
+                    'power',
+                    'toughness',
+                    'loyalty',
+                    'layout',
+                    'lang',
+                    'cmc',
+                    'manaCost',
+                ],
             ],
             provider: \App\State\StoreInventoryCollectionProvider::class,
         ),

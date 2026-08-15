@@ -38,23 +38,11 @@ class InventoryItemRepository extends ServiceEntityRepository
         ?string $gameCode = null,
         bool $inStockOnly = false,
     ): array {
-        $qb = $this->createQueryBuilder('i')
-            ->andWhere('i.store = :store')
-            ->setParameter('store', $store)
-            ->join('i.card', 'c')
-            ->addSelect('c')
+        $qb = $this->listingQuery($store, $inStockOnly, $gameCode)
             ->orderBy('c.name', 'ASC')
             ->addOrderBy('i.id', 'ASC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
-
-        if ($inStockOnly) {
-            $qb->andWhere('i.quantity > 0');
-        }
-
-        if (null !== $gameCode && '' !== $gameCode) {
-            $this->scopeToGame($qb, $gameCode);
-        }
 
         return $qb->getQuery()->getResult();
     }
@@ -138,15 +126,29 @@ class InventoryItemRepository extends ServiceEntityRepository
         ?string $gameCode = null,
         bool $inStockOnly = false,
     ): array {
-        $qb = $this->createQueryBuilder('i')
-            ->andWhere('i.store = :store')
+        $qb = $this->listingQuery($store, $inStockOnly, $gameCode)
             ->andWhere('i.id > :afterId')
-            ->setParameter('store', $store)
             ->setParameter('afterId', $afterId)
-            ->join('i.card', 'c')
-            ->addSelect('c')
             ->orderBy('i.id', 'ASC')
             ->setMaxResults($limit);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Shared listing query: card + game are eager so serializing `gameCode`
+     * never N+1s a 500-row page (18k listings × one Game SELECT each is what
+     * made the storefront crawl after a large import).
+     */
+    private function listingQuery(Store $store, bool $inStockOnly, ?string $gameCode): QueryBuilder
+    {
+        $qb = $this->createQueryBuilder('i')
+            ->andWhere('i.store = :store')
+            ->setParameter('store', $store)
+            ->join('i.card', 'c')
+            ->addSelect('c')
+            ->leftJoin('c.game', 'g')
+            ->addSelect('g');
 
         if ($inStockOnly) {
             $qb->andWhere('i.quantity > 0');
@@ -156,7 +158,7 @@ class InventoryItemRepository extends ServiceEntityRepository
             $this->scopeToGame($qb, $gameCode);
         }
 
-        return $qb->getQuery()->getResult();
+        return $qb;
     }
 
     /**
@@ -169,7 +171,9 @@ class InventoryItemRepository extends ServiceEntityRepository
     private function scopeToGame(QueryBuilder $qb, string $gameCode): void
     {
         $code = strtolower(trim($gameCode));
-        $qb->leftJoin('c.game', 'g');
+        if (!$this->hasJoinAlias($qb, 'g')) {
+            $qb->leftJoin('c.game', 'g');
+        }
 
         if (Game::CODE_MTG === $code) {
             $qb->andWhere('g.code = :gameCode OR c.game IS NULL');
@@ -178,6 +182,19 @@ class InventoryItemRepository extends ServiceEntityRepository
         }
 
         $qb->setParameter('gameCode', $code);
+    }
+
+    private function hasJoinAlias(QueryBuilder $qb, string $alias): bool
+    {
+        foreach ($qb->getDQLPart('join') as $joins) {
+            foreach ($joins as $join) {
+                if ($join->getAlias() === $alias) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
 
