@@ -24,18 +24,9 @@ import {
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
 import { CONDITIONS, FailedRowsTable } from './FailedRowsTable'
+import { BatchRecoveryModal, type BatchRecoveryResult } from './BatchRecoveryModal'
 
 const ROW_LIMIT = 100
-
-interface BatchRecoveryResult {
-  row: CsvImportRow
-  card?: CardSummary | null
-  error?: string | null
-}
-
-function hasResolvedCard(result: BatchRecoveryResult): result is BatchRecoveryResult & { card: CardSummary } {
-  return result.card != null
-}
 
 export default function ImportRunDetailsPage() {
   const { slug = '', importId = '' } = useParams()
@@ -321,6 +312,7 @@ export default function ImportRunDetailsPage() {
       <BatchRecoveryModal
         slug={slug}
         importId={importId}
+        gameCode={job?.gameCode ?? 'mtg'}
         results={batchRecoveryResults}
         onClose={() => setBatchRecoveryResults(null)}
         onResolved={async () => {
@@ -587,138 +579,6 @@ function Fact({ label, value }: { label: string; value: string }) {
       <p className="text-xs uppercase tracking-wide text-fg-muted">{label}</p>
       <p className="font-bold text-fg">{value}</p>
     </div>
-  )
-}
-
-function BatchRecoveryModal({
-  slug,
-  importId,
-  results,
-  onClose,
-  onResolved,
-}: {
-  slug: string
-  importId: string
-  results: BatchRecoveryResult[] | null
-  onClose: () => void
-  onResolved: () => Promise<void>
-}) {
-  const safeResults = results ?? []
-  const resolved = safeResults.filter(hasResolvedCard)
-  const unresolvedCount = safeResults.length - resolved.length
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (results) setError(null)
-  }, [results])
-
-  const finalizeMutation = useMutation({
-    mutationFn: async () => {
-      await api.post(`/stores/${slug}/csv-imports/${importId}/failed/manual-import`, {
-        items: resolved.map((result) => ({
-          rowIndex: result.row.rowIndex,
-          cardId: result.card.id,
-        })),
-      })
-    },
-    onMutate: () => setError(null),
-    onSuccess: onResolved,
-    onError: (err: { response?: { data?: { detail?: string } }; message?: string }) => {
-      setError(err.response?.data?.detail ?? err.message ?? 'Could not finalize failed card recovery.')
-    },
-  })
-
-  if (!results) return null
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Review failed card matches"
-      className="max-w-[calc(100vw-2rem)] 2xl:max-w-[92rem]"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={finalizeMutation.isPending}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            loading={finalizeMutation.isPending}
-            disabled={resolved.length === 0}
-            onClick={() => finalizeMutation.mutate()}
-          >
-            {unresolvedCount === 0 ? 'Finalize all cards' : `Finalize ${resolved.length} matched cards`}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <ImportStat label="Matched" value={String(resolved.length)} tone="success" />
-          <ImportStat label="Needs review" value={String(unresolvedCount)} tone={unresolvedCount > 0 ? 'danger' : 'neutral'} />
-          <ImportStat label="Total" value={String(safeResults.length)} />
-        </div>
-
-        {error && (
-          <p role="alert" className="text-sm font-medium text-danger-700">
-            {error}
-          </p>
-        )}
-
-        <div className="max-h-[60vh] overflow-auto rounded-card border border-border">
-          <Table>
-            <THead>
-              <TR className="hover:bg-transparent">
-                <TH>CSV row</TH>
-                <TH>Matched card</TH>
-                <TH>Set</TH>
-                <TH>Collector</TH>
-                <TH>Qty</TH>
-                <TH>Finish</TH>
-                <TH>Market price</TH>
-                <TH>Status</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {safeResults.map((result) => (
-                <TR key={result.row.rowIndex}>
-                  <TD>
-                    <div className="min-w-48">
-                      <div className="font-bold text-fg">{result.row.name}</div>
-                      <div className="text-xs text-fg-muted">Row {result.row.rowIndex + 1}</div>
-                    </div>
-                  </TD>
-                  <TD>
-                    {result.card ? (
-                      <div className="flex min-w-64 items-center gap-3">
-                        {cardImage(result.card) && (
-                          <img src={cardImage(result.card)} alt={result.card.name} className="h-16 rounded-btn" />
-                        )}
-                        <div>
-                          <div className="font-bold text-fg">{result.card.name}</div>
-                          {result.card.setName && <div className="text-xs text-fg-muted">{result.card.setName}</div>}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-fg-muted">{result.error ?? 'No match found'}</span>
-                    )}
-                  </TD>
-                  <TD className="uppercase">{result.card?.setCode ?? result.row.set}</TD>
-                  <TD>{result.card?.collectorNumber ?? result.row.collectorNumber}</TD>
-                  <TD>{result.row.quantity}</TD>
-                  <TD>{result.row.finish}</TD>
-                  <TD>{result.card ? formatScryfallPrice(result.card, result.row.isFoil ? 'foil' : 'nonfoil') : '-'}</TD>
-                  <TD>
-                    {result.card ? <Badge tone="success">Ready</Badge> : <Badge tone="danger">Needs review</Badge>}
-                  </TD>
-                </TR>
-              ))}
-              {safeResults.length === 0 && <EmptyRow colSpan={8}>No failed cards to resolve.</EmptyRow>}
-            </TBody>
-          </Table>
-        </div>
-      </div>
-    </Modal>
   )
 }
 

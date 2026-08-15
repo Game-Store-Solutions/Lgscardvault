@@ -522,7 +522,14 @@ final class StoreCsvImportController extends AbstractController
                 continue;
             }
 
-            $selected[] = [$row, $card];
+            $overrides = [
+                'quantity' => $item['quantity'] ?? null,
+                'condition' => $item['condition'] ?? null,
+                'isFoil' => $item['isFoil'] ?? null,
+                'finish' => $item['finish'] ?? null,
+            ];
+
+            $selected[] = [$row, $card, $overrides];
         }
 
         if ([] !== $errors) {
@@ -534,8 +541,8 @@ final class StoreCsvImportController extends AbstractController
         }
 
         $written = [];
-        foreach ($selected as [$row, $card]) {
-            $written[] = [$row, $this->importRowIntoInventory($job, $store, $row, $card)];
+        foreach ($selected as [$row, $card, $overrides]) {
+            $written[] = [$row, $this->importRowIntoInventory($job, $store, $row, $card, $overrides)];
         }
 
         $this->entityManager->flush();
