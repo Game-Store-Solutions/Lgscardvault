@@ -93,7 +93,7 @@ export function parsePriceInput(value: string): number | null {
 export function parseScryfallPrice(value?: string | null): number | null {
   if (!value) return null
   const parsed = Number(value)
-  if (Number.isNaN(parsed)) return null
+  if (Number.isNaN(parsed) || parsed <= 0) return null
   return Math.round(parsed * 100)
 }
 

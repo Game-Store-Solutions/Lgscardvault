@@ -60,7 +60,7 @@ function EditInventoryModalBody({
   const editIsFoil = isFoilFinish(editFinish)
   const marketCents = scryfallPriceCents(editSelectedCard, editIsFoil ? 'foil' : 'nonfoil')
   const priceCents = parsePriceInput(editPriceText)
-  const priceInvalid = priceCents === null
+  const priceInvalid = priceCents === null || priceCents <= 0
 
   // Warn when the chosen printing + condition + finish already exists on another
   // listing — saving will MERGE (sum quantities) rather than create a duplicate.
@@ -198,7 +198,11 @@ function EditInventoryModalBody({
                   className="pl-7"
                 />
               </div>
-              {priceInvalid && <p className="mt-1 text-xs font-medium text-danger-700">Enter a valid price.</p>}
+              {priceInvalid && (
+                <p className="mt-1 text-xs font-medium text-danger-700">
+                  Enter a sell price above $0.00.
+                </p>
+              )}
             </div>
 
             <div>

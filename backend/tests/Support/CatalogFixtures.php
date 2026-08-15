@@ -70,6 +70,7 @@ final class CatalogFixtures
         $card->setSetName($data['set_name'] ?? null);
         $card->setFinishes($data['finishes'] ?? null);
         $card->setPrices($data['prices'] ?? null);
+        $card->setGames($data['games'] ?? null);
         $card->setTypeLine($data['type_line'] ?? null);
         $card->setOracleText($data['oracle_text'] ?? null);
         $card->setManaCost($data['mana_cost'] ?? null);

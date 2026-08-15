@@ -17,6 +17,7 @@ use App\Repository\StoreRepository;
 use App\Security\ApiRateLimit;
 use App\Service\Catalog\CatalogCardResolver;
 use App\Service\Catalog\FinishVocabulary;
+use App\Service\Catalog\StockablePrintingPolicy;
 use App\Service\CsvImport\CsvImportParser;
 use App\Service\CsvImport\ImportPreviewer;
 use App\Service\CsvImport\SealedCsvImportParser;
@@ -62,6 +63,7 @@ final class StoreCsvImportController extends AbstractController
         private readonly \App\Service\CsvImport\CsvImportWorkerKick $csvImportWorkerKick,
         private readonly GameRepository $gameRepository,
         private readonly StoreInventoryWriter $inventoryWriter,
+        private readonly StockablePrintingPolicy $stockablePrintingPolicy,
         private readonly ScryfallClient $scryfallClient,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
@@ -522,6 +524,18 @@ final class StoreCsvImportController extends AbstractController
                 continue;
             }
 
+            $finish = $this->resolveRowFinish($row, $card, [
+                'quantity' => $item['quantity'] ?? null,
+                'condition' => $item['condition'] ?? null,
+                'isFoil' => $item['isFoil'] ?? null,
+                'finish' => $item['finish'] ?? null,
+            ]);
+            $reject = $this->stockablePrintingPolicy->rejectionReason($card, FinishVocabulary::isFoil($finish));
+            if (null !== $reject) {
+                $errors[] = ['rowIndex' => $rowIndex, 'detail' => $reject];
+                continue;
+            }
+
             $overrides = [
                 'quantity' => $item['quantity'] ?? null,
                 'condition' => $item['condition'] ?? null,
@@ -849,6 +863,10 @@ final class StoreCsvImportController extends AbstractController
         $condition = CardCondition::tryFrom((string) ($overrides['condition'] ?? $row->getCondition())) ?? CardCondition::NM;
         $quantity = max(0, (int) ($overrides['quantity'] ?? $row->getQuantity()));
         $finish = $this->resolveRowFinish($row, $card, $overrides);
+        $reject = $this->stockablePrintingPolicy->rejectionReason($card, FinishVocabulary::isFoil($finish));
+        if (null !== $reject) {
+            throw new \Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException($reject);
+        }
         $notes = implode("\n", array_values(array_filter([
             'Manually recovered from CSV import row #'.($row->getRowIndex() + 1).' in import #'.$job->getId(),
             '' !== $row->getGame() && !CsvImportRow::isMagicGame($row->getGame()) ? 'Game: '.$row->getGame() : '',

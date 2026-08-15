@@ -23,6 +23,7 @@ services:
     # please note that last definitions always *replace* previous ones
 
     App\Service\Spellbook\SpellbookClientInterface: '@App\Service\Spellbook\SpellbookClient'
+    App\Service\Pricing\MarketPriceSource: '@App\Service\Pricing\MarketPriceResolver'
 
     # Return HTTP 429 for login-throttling failures; delegate all other auth
     # failures to Lexik's JWT handler (see App\Security\AuthenticationFailureHandler).

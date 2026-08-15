@@ -12,6 +12,7 @@ use App\Repository\CsvImportRowRepository;
 use App\Repository\CardRepository;
 use App\Service\Catalog\CatalogCardResolver;
 use App\Service\Catalog\FinishVocabulary;
+use App\Service\Catalog\StockablePrintingPolicy;
 use App\Service\CsvImport\SealedImportProcessor;
 use App\Service\Doctrine\SqlDebugLogPruner;
 use App\Service\Inventory\StoreInventoryWriter;
@@ -46,6 +47,7 @@ final readonly class ProcessCsvImportMessageHandler
         private SealedImportProcessor $sealedImportProcessor,
         private ScryfallClient $scryfallClient,
         private StoreInventoryWriter $inventoryWriter,
+        private StockablePrintingPolicy $stockablePrintingPolicy,
         private \App\Service\Import\ImportLogger $importLogger,
         private SqlDebugLogPruner $sqlDebugLogPruner,
         private EntityManagerInterface $entityManager,
@@ -189,17 +191,39 @@ final readonly class ProcessCsvImportMessageHandler
                 $notes = implode("\n", array_values(array_filter($notes)));
                 $condition = CardCondition::tryFrom($row->getCondition()) ?? CardCondition::NM;
                 $quantity = max(0, $row->getQuantity());
+                $finish = FinishVocabulary::resolveForCard(
+                    $card,
+                    FinishVocabulary::isGeneric($row->getFinish()) ? null : $row->getFinish(),
+                    $row->isFoil(),
+                );
+
+                // Reject Alchemy / Arena-only printings and anything that would
+                // stock at $0 — those belong in failed rows for manual recovery
+                // onto a paper printing (or an explicit sell price).
+                $reject = $this->stockablePrintingPolicy->rejectionReason(
+                    $card,
+                    FinishVocabulary::isFoil($finish),
+                );
+                if (null !== $reject) {
+                    $row->setStatus(CsvImportRow::STATUS_ERROR);
+                    $row->setError($reject);
+                    ++$failed;
+                    $this->importLogger->log($job, 'row_failed', [
+                        'rowIndex' => $row->getRowIndex(),
+                        'name' => $row->getName(),
+                        'set' => $row->getSetCode(),
+                        'collectorNumber' => $row->getCollectorNumber(),
+                        'error' => $reject,
+                    ], 'warning');
+                    continue;
+                }
 
                 $item = $this->inventoryWriter->write(
                     $store,
                     $card,
                     $quantity,
                     $condition,
-                    FinishVocabulary::resolveForCard(
-                        $card,
-                        FinishVocabulary::isGeneric($row->getFinish()) ? null : $row->getFinish(),
-                        $row->isFoil(),
-                    ),
+                    $finish,
                     '' !== $notes ? $notes : null,
                     false,
                 );

@@ -40,7 +40,8 @@ function draftFromResult(result: BatchRecoveryResult): RowDraft {
     condition: result.row.condition || 'NM',
     isFoil: result.row.isFoil,
     card: result.card ?? null,
-    search: result.row.name,
+    // Strip Alchemy "A-" name prefix so Find card hits the paper printing.
+    search: result.row.name.trim().replace(/^A-/i, ''),
     searching: false,
   }
 }

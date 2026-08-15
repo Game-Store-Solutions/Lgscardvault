@@ -76,13 +76,19 @@ final class CardSearchControllerTest extends WebTestCase
         self::assertSame('Lightning Bolt', $results[0]['name']);
     }
 
-    public function testWrongCollectorNumberReturnsNoLocalMatch(): void
+    public function testWrongCollectorNumberWidensToNameAndSetMatch(): void
     {
-        $this->fixtures->card(1, ['name' => 'Lightning Bolt', 'set' => 'clb', 'collector_number' => '187']);
+        $this->fixtures->card(1, [
+            'name' => 'Lightning Bolt',
+            'set' => 'clb',
+            'collector_number' => '187',
+            'games' => ['paper'],
+            'finishes' => ['nonfoil', 'foil'],
+        ]);
 
-        // Right name + set, wrong collector: the name branch is filtered out by
-        // the collector mismatch and the natural-key branch finds nothing local
-        // (remote unavailable in tests), so the result is empty — not a 500.
+        // Wrong collector used to hard-empty the result. Recovery now widens
+        // past a dead collector key so the paper printing in that set still
+        // appears (Scryfall has it; the CSV key was just wrong).
         $results = $this->search([
             'q' => 'Lightning Bolt',
             'set' => 'clb',
@@ -90,7 +96,9 @@ final class CardSearchControllerTest extends WebTestCase
             'finish' => 'nonfoil',
         ]);
 
-        self::assertSame([], $results);
+        self::assertNotEmpty($results);
+        self::assertSame('Lightning Bolt', $results[0]['name']);
+        self::assertSame('187', $results[0]['collectorNumber']);
     }
 
     public function testNameOnlySearchStillWorks(): void
@@ -116,6 +124,44 @@ final class CardSearchControllerTest extends WebTestCase
 
         self::assertNotEmpty($results);
         self::assertStringContainsString('Adéwalé', $results[0]['name']);
+    }
+
+    public function testWidensPastDigitalCollectorToPaperPrinting(): void
+    {
+        // Paper printing of the same card — different collector number.
+        $this->fixtures->card(20, [
+            'name' => 'Guide of Souls',
+            'set' => 'mh3',
+            'collector_number' => '20',
+            'games' => ['paper', 'arena', 'mtgo'],
+            'prices' => ['usd' => '2.50'],
+        ]);
+        // Digital-only Alchemy printing the CSV row keyed on.
+        $this->fixtures->card(29, [
+            'name' => 'A-Guide of Souls',
+            'set' => 'mh3',
+            'collector_number' => 'A-29',
+            'games' => ['arena'],
+            'digital' => true,
+            'prices' => ['usd' => null],
+        ]);
+
+        // Recovery UI still sends the failed row's Alchemy collector number.
+        // Search must surface the paper printing, not an empty list.
+        $results = $this->search([
+            'q' => 'Guide of Souls',
+            'set' => 'mh3',
+            'collectorNumber' => 'A-29',
+            'finish' => 'nonfoil',
+        ]);
+
+        self::assertNotEmpty($results);
+        self::assertSame('Guide of Souls', $results[0]['name']);
+        self::assertSame('20', $results[0]['collectorNumber']);
+        self::assertFalse(
+            in_array('A-29', array_column($results, 'collectorNumber'), true),
+            'Alchemy printing must stay out of paper-only search results',
+        );
     }
 
     public function testEmptyQueryReturnsEmpty(): void

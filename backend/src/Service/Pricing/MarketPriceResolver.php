@@ -12,7 +12,7 @@ use Psr\Log\LoggerInterface;
  * sync), then a live Scryfall refresh of that printing — persisted, so
  * every later read (storefront tiles included) sees the healed price.
  */
-final class MarketPriceResolver
+final class MarketPriceResolver implements MarketPriceSource
 {
     public function __construct(
         private readonly ScryfallClient $scryfall,
@@ -87,6 +87,10 @@ final class MarketPriceResolver
             return null;
         }
 
-        return (int) round(((float) $raw) * 100);
+        $cents = (int) round(((float) $raw) * 100);
+
+        // Scryfall stores "0.00" / null-equivalents for unpriced digital and
+        // obscure printings — treat that as missing, not a free card.
+        return $cents > 0 ? $cents : null;
     }
 }

@@ -10,6 +10,7 @@ use App\MultiTenancy\TenantContext;
 use App\Repository\CardRepository;
 use App\Repository\InventoryItemRepository;
 use App\Service\Catalog\FinishVocabulary;
+use App\Service\Catalog\StockablePrintingPolicy;
 use App\Service\Inventory\StoreInventoryWriter;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,6 +28,7 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
         private CardRepository $cardRepository,
         private InventoryItemRepository $inventoryItemRepository,
         private StoreInventoryWriter $inventoryWriter,
+        private StockablePrintingPolicy $stockablePrintingPolicy,
         private EntityManagerInterface $entityManager,
         private ScryfallClient $scryfallClient,
         private LoggerInterface $logger,
@@ -94,6 +96,16 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
                 ? FinishVocabulary::resolveForCard($targetCard, $data->getRequestedFinish(), $data->getFoilHint())
                 : $existing->getFinish();
 
+            $explicitPrice = $data->getPriceCents() > 0 ? $data->getPriceCents() : null;
+            $reject = $this->stockablePrintingPolicy->rejectionReason(
+                $targetCard,
+                FinishVocabulary::isFoil($finish),
+                $explicitPrice,
+            );
+            if (null !== $reject) {
+                throw new BadRequestHttpException($reject);
+            }
+
             $conflict = $this->inventoryItemRepository->findOneBy([
                 'store' => $store,
                 'card' => $targetCard,
@@ -141,6 +153,16 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
         }
 
         $card = $data->getCard();
+        $finish = FinishVocabulary::resolveForCard($card, $data->getRequestedFinish(), $data->getFoilHint());
+        $explicitPrice = $data->getPriceCents() > 0 ? $data->getPriceCents() : null;
+        $reject = $this->stockablePrintingPolicy->rejectionReason(
+            $card,
+            FinishVocabulary::isFoil($finish),
+            $explicitPrice,
+        );
+        if (null !== $reject) {
+            throw new BadRequestHttpException($reject);
+        }
 
         // The submitted price wins. Deriving it from the card instead meant a
         // card with no market price — routine outside Magic — was listed at
@@ -150,10 +172,10 @@ final readonly class StoreInventoryProcessor implements ProcessorInterface
             $card,
             $data->getQuantity(),
             $data->getCondition(),
-            FinishVocabulary::resolveForCard($card, $data->getRequestedFinish(), $data->getFoilHint()),
+            $finish,
             $data->getNotes(),
             acquisitionCostCents: $data->getAcquisitionCostCents(),
-            priceCents: $data->getPriceCents() > 0 ? $data->getPriceCents() : null,
+            priceCents: $explicitPrice,
         );
     }
 }

@@ -394,7 +394,14 @@ function ImportRowsTable({ rows }: { rows: CsvImportRow[] }) {
 }
 
 function scryfallSearchTerm(row: CsvImportRow): string {
-  return row.name.trim()
+  // Alchemy rows are named "A-Guide of Souls" — strip that prefix so catalog /
+  // Scryfall search finds the paper printing ("Guide of Souls").
+  return row.name.trim().replace(/^A-/i, '')
+}
+
+/** Collector numbers like A-29 only exist on digital Alchemy printings. */
+function isDigitalCollectorNumber(value: string): boolean {
+  return /^A[-.]/i.test(value.trim())
 }
 
 function ManualImportModal({
@@ -441,8 +448,14 @@ function ManualImportModal({
           // Pokemon row is how game-less listings used to get created.
           game: gameCode,
           ...(row.set.trim() ? { set: row.set.trim() } : {}),
-          ...(row.collectorNumber.trim() ? { collectorNumber: row.collectorNumber.trim() } : {}),
-          ...(row.rarity.trim() ? { rarity: row.rarity.trim() } : {}),
+          // Never lock an Alchemy collector (#A-29): that printing is rejected
+          // as online-only, and the lock hides every paper variant.
+          ...(!isDigitalCollectorNumber(row.collectorNumber) && row.collectorNumber.trim()
+            ? { collectorNumber: row.collectorNumber.trim() }
+            : {}),
+          ...(row.rarity.trim() && !isDigitalCollectorNumber(row.collectorNumber)
+            ? { rarity: row.rarity.trim() }
+            : {}),
           finish: isFoil ? 'foil' : 'nonfoil',
         },
       })
