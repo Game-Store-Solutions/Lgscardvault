@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link2, Search, X } from 'lucide-react'
-import { cardImage, extractErrorMessage, formatScryfallPrice } from '../../../api/client'
+import { extractErrorMessage } from '../../../api/client'
 import type { CardSummary } from '../../../api/types'
 import { Button, FilterPill, Input, Spinner } from '../../../components/ui'
-import { CardImage } from '../../../components/cards'
 import { useDebouncedValue } from '../../../hooks'
-import { cx } from '../../../lib/cx'
 import { looksLikeCardReference } from './looksLikeCardReference'
+import { PrintingGrid } from './PrintingGrid'
 import {
   describeRelaxations,
   useRecoveryActions,
@@ -209,94 +208,13 @@ export function CardRecoverySearch({
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : browsing ? (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-          {items.map((card, index) => {
-            const selected = card.id === selectedCardId
-            return (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => onSelect(card)}
-                className={cx(
-                  'group relative overflow-hidden rounded-card border text-left transition-colors',
-                  selected
-                    ? 'border-fg/30 bg-bg shadow-sm ring-1 ring-fg/15'
-                    : 'border-border bg-surface hover:border-fg/20 hover:bg-bg',
-                )}
-              >
-                {index < 6 && (
-                  <span
-                    aria-hidden
-                    className="absolute left-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-btn border border-border bg-bg/90 text-[10px] font-bold text-fg-muted"
-                  >
-                    {index + 1}
-                  </span>
-                )}
-                <CardImage
-                  src={cardImage(card)}
-                  alt={card.name}
-                  fit="cover"
-                  showLabel={false}
-                  className="aspect-[5/7] w-full"
-                />
-                <span className="block px-2 py-1.5">
-                  <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg">
-                    {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
-                  </span>
-                  <span className="mt-0.5 block text-xs font-bold text-fg">
-                    {formatScryfallPrice(card, filters.finish)}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
       ) : (
-        <div className={cx('grid gap-3', items.length === 1 ? 'grid-cols-1' : 'sm:grid-cols-2')}>
-          {items.map((card, index) => {
-            const selected = card.id === selectedCardId
-            return (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => onSelect(card)}
-                className={cx(
-                  'flex items-center gap-4 rounded-card border p-3 text-left transition-colors',
-                  selected
-                    ? 'border-fg/30 bg-bg shadow-sm ring-1 ring-fg/15'
-                    : 'border-border bg-surface hover:border-fg/20 hover:bg-bg',
-                )}
-              >
-                {index < 6 && (
-                  <span
-                    aria-hidden
-                    className="grid size-6 shrink-0 place-items-center rounded-btn border border-border text-[11px] font-bold text-fg-muted"
-                  >
-                    {index + 1}
-                  </span>
-                )}
-                <CardImage
-                  src={cardImage(card)}
-                  alt={card.name}
-                  fit="contain"
-                  showLabel={false}
-                  className="h-28 w-[5.25rem] shrink-0 rounded-btn"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-display text-base font-bold leading-snug text-fg">{card.name}</span>
-                  <span className="mt-1 block text-xs uppercase tracking-wide text-fg-muted">
-                    {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
-                    {card.rarity ? ` · ${card.rarity}` : ''}
-                  </span>
-                  <span className="mt-3 block font-display text-lg font-bold text-fg">
-                    {formatScryfallPrice(card, filters.finish)}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        <PrintingGrid
+          items={items}
+          selectedId={selectedCardId}
+          finish={filters.finish}
+          onSelect={onSelect}
+        />
       )}
 
       {!isReference &&

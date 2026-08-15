@@ -10,8 +10,8 @@ import {
   QuantityStepper,
   type Condition,
 } from '../../../components/inventory'
-import { cx } from '../../../lib/cx'
 import { CardRecoverySearch } from './CardRecoverySearch'
+import { PrintingGrid } from './PrintingGrid'
 import { recoveryJob, recoveryJobCopy } from './recoveryJob'
 import { shortRowReason } from './shortReason'
 import { isStockableRecoveryCard } from './stockableCard'
@@ -477,49 +477,5 @@ function PrintingPicker({
     )
   }
 
-  return (
-    <div className={cx('grid gap-3', printings.length === 1 ? 'grid-cols-1' : 'sm:grid-cols-2')}>
-      {printings.slice(0, 8).map((card, index) => {
-        const selected = card.id === selectedId
-        return (
-          <button
-            key={card.id}
-            type="button"
-            onClick={() => onSelect(card)}
-            className={cx(
-              'flex items-center gap-4 rounded-card border p-3 text-left transition-colors',
-              selected
-                ? 'border-fg/30 bg-bg shadow-sm ring-1 ring-fg/15'
-                : 'border-border bg-surface hover:border-fg/20 hover:bg-bg',
-            )}
-          >
-            {index < 6 && (
-              <span
-                aria-hidden
-                className="grid size-6 shrink-0 place-items-center rounded-btn border border-border text-[11px] font-bold text-fg-muted"
-              >
-                {index + 1}
-              </span>
-            )}
-            <CardImage
-              src={cardImage(card)}
-              alt={card.name}
-              fit="contain"
-              showLabel={false}
-              className="h-24 w-[4.5rem] shrink-0 rounded-btn"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block font-display text-sm font-bold leading-snug text-fg">{card.name}</span>
-              <span className="mt-1 block text-xs uppercase tracking-wide text-fg-muted">
-                {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
-              </span>
-              <span className="mt-2 block font-display text-base font-bold text-fg">
-                {formatScryfallPrice(card, finish)}
-              </span>
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
+  return <PrintingGrid items={printings} selectedId={selectedId} finish={finish} onSelect={onSelect} />
 }
