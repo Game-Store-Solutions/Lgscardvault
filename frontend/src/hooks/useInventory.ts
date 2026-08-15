@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import api, { unwrapCollection } from '../api/client'
 import type { InventoryItem } from '../api/types'
 
@@ -11,11 +11,37 @@ export type InventoryQueryOptions = {
   enabled?: boolean
 }
 
+export type InventoryPageFilters = {
+  q?: string
+  set?: string
+  type?: string
+  finish?: 'all' | 'foil' | 'nonfoil'
+  colors?: string
+  minPriceCents?: number | null
+  maxPriceCents?: number | null
+  sort?: string
+  inStockOnly?: boolean
+  game?: string
+  page?: number
+  itemsPerPage?: number
+  enabled?: boolean
+}
+
+export interface InventoryPage {
+  items: InventoryItem[]
+  total: number
+  page: number
+  itemsPerPage: number
+}
+
 /** React Query key for a store's inventory — shared by the hook and invalidations. */
 export const inventoryKey = (slug: string, opts?: InventoryQueryOptions) =>
   opts
     ? (['inventory', slug, opts.inStockOnly ? 'in-stock' : 'all', opts.game || 'any-game'] as const)
     : (['inventory', slug] as const)
+
+/** Prefix for one-page catalog queries (storefront + admin grid). */
+export const inventoryPageKey = (slug: string) => ['inventory-page', slug] as const
 
 /** Server page size — must not exceed the API's itemsPerPage cap (500). */
 const PAGE_SIZE = 500
@@ -26,11 +52,94 @@ function sortInventory(items: InventoryItem[]): InventoryItem[] {
   return [...items].sort((a, b) => a.card.name.localeCompare(b.card.name) || a.id - b.id)
 }
 
+export function parseInventoryPage(data: unknown, page: number, itemsPerPage: number): InventoryPage {
+  if (Array.isArray(data)) {
+    return { items: data, total: data.length, page, itemsPerPage }
+  }
+
+  const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : null
+  if (!record) {
+    return { items: [], total: 0, page, itemsPerPage }
+  }
+
+  const items = Array.isArray(record.items)
+    ? (record.items as InventoryItem[])
+    : unwrapCollection(data as InventoryItem[] | { member?: InventoryItem[] })
+
+  const meta = record.meta && typeof record.meta === 'object' ? (record.meta as Record<string, unknown>) : null
+  const totalRaw =
+    record.totalItems ??
+    record['hydra:totalItems'] ??
+    record.total ??
+    meta?.totalItems
+
+  const total =
+    totalRaw !== undefined && totalRaw !== null && totalRaw !== ''
+      ? Math.max(0, Number(totalRaw) || 0)
+      : items.length
+
+  return {
+    items,
+    total,
+    page: Math.max(1, Number(record.page ?? page) || page),
+    itemsPerPage: Math.max(1, Number(record.itemsPerPage ?? itemsPerPage) || itemsPerPage),
+  }
+}
+
 /**
- * useInventory — fetch a store's inventory listing. The API serves keyset
- * pages (`?afterId=`); this hook walks them. The first page is published into
- * the cache immediately so the storefront and admin inventory can paint
- * instead of waiting on an 18k-row walk.
+ * One page of inventory from the server — the storefront and admin grids
+ * should use this. Changing filters/page hits SQL, not an 18k-row download.
+ */
+export function useInventoryPage(slug: string, filters: InventoryPageFilters) {
+  const page = Math.max(1, filters.page ?? 1)
+  const itemsPerPage = Math.max(1, filters.itemsPerPage ?? 24)
+  const game = filters.game?.trim() || undefined
+  const inStockOnly = Boolean(filters.inStockOnly)
+
+  return useQuery({
+    queryKey: [
+      ...inventoryPageKey(slug),
+      inStockOnly ? 'in-stock' : 'all',
+      game ?? '',
+      page,
+      itemsPerPage,
+      filters.q ?? '',
+      filters.set ?? '',
+      filters.type ?? '',
+      filters.finish ?? 'all',
+      filters.colors ?? '',
+      filters.minPriceCents ?? '',
+      filters.maxPriceCents ?? '',
+      filters.sort ?? 'name',
+    ],
+    enabled: (filters.enabled ?? true) && Boolean(slug),
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const { data } = await api.get(`/stores/${slug}/inventory`, {
+        params: {
+          page,
+          itemsPerPage,
+          ...(inStockOnly ? { inStockOnly: 1 } : {}),
+          ...(game ? { game } : {}),
+          ...(filters.q?.trim() ? { q: filters.q.trim() } : {}),
+          ...(filters.set?.trim() ? { set: filters.set.trim() } : {}),
+          ...(filters.type?.trim() ? { type: filters.type.trim() } : {}),
+          ...(filters.finish && filters.finish !== 'all' ? { finish: filters.finish } : {}),
+          ...(filters.colors ? { colors: filters.colors } : {}),
+          ...(filters.minPriceCents != null ? { minPriceCents: filters.minPriceCents } : {}),
+          ...(filters.maxPriceCents != null ? { maxPriceCents: filters.maxPriceCents } : {}),
+          ...(filters.sort && filters.sort !== 'name' ? { sort: filters.sort } : {}),
+        },
+      })
+      return parseInventoryPage(data, page, itemsPerPage)
+    },
+  })
+}
+
+/**
+ * Full-catalog walk for tools that still need every row (mass search, case
+ * cards). Storefront and admin grids should use useInventoryPage instead.
  */
 export function useInventory(slug: string, opts?: InventoryQueryOptions) {
   const inStockOnly = Boolean(opts?.inStockOnly)
@@ -41,13 +150,9 @@ export function useInventory(slug: string, opts?: InventoryQueryOptions) {
     queryKey: key,
     enabled: (opts?.enabled ?? true) && Boolean(slug),
     staleTime: 30 * 1000,
-    queryFn: async ({ client }) => {
+    queryFn: async () => {
       const seen = new Map<number, InventoryItem>()
       let afterId = 0
-      const publish = () => {
-        client.setQueryData(key, sortInventory([...seen.values()]))
-      }
-
       for (let page = 0; page < MAX_PAGES; page++) {
         const { data } = await api.get(`/stores/${slug}/inventory`, {
           params: {
@@ -62,7 +167,6 @@ export function useInventory(slug: string, opts?: InventoryQueryOptions) {
           seen.set(item.id, item)
           if (item.id > afterId) afterId = item.id
         }
-        if (seen.size > 0) publish()
         if (chunk.length < PAGE_SIZE) break
       }
 

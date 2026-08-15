@@ -110,4 +110,50 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         // from the joined Game, not a follow-up SELECT.
         self::assertSame('mtg', $items[0]->getCard()?->getGameCode());
     }
+
+    public function testCatalogPageFiltersByNameAndExactColor(): void
+    {
+        $store = $this->fixtures->store();
+        $white = $this->fixtures->card(101, [
+            'name' => 'Swords to Plowshares',
+            'set' => 'lea',
+            'color_identity' => ['W'],
+        ]);
+        $gold = $this->fixtures->card(102, [
+            'name' => 'Swords to Plowshares',
+            'set' => 'clb',
+            'color_identity' => ['W', 'U'],
+        ]);
+        $bolt = $this->fixtures->card(103, [
+            'name' => 'Lightning Bolt',
+            'set' => 'lea',
+            'color_identity' => ['R'],
+        ]);
+        $this->fixtures->inventoryItem($store, $white, 4);
+        $this->fixtures->inventoryItem($store, $gold, 2);
+        $this->fixtures->inventoryItem($store, $bolt, 8);
+
+        $filters = new \App\Service\Inventory\InventoryCatalogFilters(q: 'Swords', colors: ['W']);
+        $page = $this->repo->findCatalogPage($store, 0, 24, null, true, $filters);
+
+        self::assertCount(1, $page);
+        self::assertSame('Swords to Plowshares', $page[0]->getCard()?->getName());
+        self::assertSame('lea', $page[0]->getCard()?->getSetCode());
+        self::assertSame(1, $this->repo->countCatalog($store, null, true, $filters));
+    }
+
+    public function testCatalogSetsAreDistinctAndInStockOnly(): void
+    {
+        $store = $this->fixtures->store();
+        $a = $this->fixtures->card(201, ['name' => 'Alpha Bolt', 'set' => 'lea', 'set_name' => 'Limited Edition Alpha']);
+        $b = $this->fixtures->card(202, ['name' => 'Beta Bolt', 'set' => 'lea', 'set_name' => 'Limited Edition Alpha']);
+        $c = $this->fixtures->card(203, ['name' => 'Sold Out', 'set' => 'clb', 'set_name' => 'Commander Legends']);
+        $this->fixtures->inventoryItem($store, $a, 1);
+        $this->fixtures->inventoryItem($store, $b, 1);
+        $this->fixtures->inventoryItem($store, $c, 0);
+
+        $sets = $this->repo->findCatalogSets($store, null, inStockOnly: true);
+        $codes = array_column($sets, 'code');
+        self::assertSame(['lea'], $codes);
+    }
 }

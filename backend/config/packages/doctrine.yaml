@@ -13,6 +13,9 @@ doctrine:
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         auto_mapping: true
+        dql:
+            string_functions:
+                CAST_AS_TEXT: App\Doctrine\CastAsTextFunction
         filters:
             tenant:
                 class: App\MultiTenancy\TenantFilter

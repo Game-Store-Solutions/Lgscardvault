@@ -9,6 +9,7 @@ import type {
   SealedInventoryLine,
   SealedSearchResult,
   StoreGameStats,
+  StoreGameShelf,
   ScryfallSyncRun,
 } from '../api/types'
 
@@ -25,6 +26,7 @@ export const syncRunsKey = ['catalog', 'sync-runs'] as const
 export const scryfallSyncRunsKey = ['scryfall', 'sync-runs'] as const
 export const storeGamesKey = (slug: string) => ['store-games', slug] as const
 export const storeGameStatsKey = (slug: string, game: string) => ['store-game-stats', slug, game] as const
+export const storeGameShelfKey = (slug: string, game: string) => ['store-game-shelf', slug, game] as const
 export const catalogByArtistKey = (artist: string, game: string, offset: number, limit: number) =>
   ['catalog', 'by-artist', artist, game, offset, limit] as const
 
@@ -75,6 +77,19 @@ export function useStoreGameStats(slug: string, gameCode: string) {
     enabled: Boolean(slug && gameCode),
     queryFn: async () => {
       const { data } = await api.get<StoreGameStats>(`/stores/${slug}/games/${gameCode}/stats`)
+      return data
+    },
+  })
+}
+
+/** In-stock listing counts and sets for the public storefront. */
+export function useStoreGameShelf(slug: string, gameCode: string) {
+  return useQuery({
+    queryKey: storeGameShelfKey(slug, gameCode),
+    enabled: Boolean(slug && gameCode),
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<StoreGameShelf>(`/stores/${slug}/games/${gameCode}/shelf`)
       return data
     },
   })

@@ -9,6 +9,8 @@ use App\Entity\InventoryItem;
 use App\Entity\Store;
 use App\MultiTenancy\TenantContext;
 use App\Repository\InventoryItemRepository;
+use App\Service\Inventory\InventoryCatalogFilters;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -30,6 +32,7 @@ final readonly class StoreInventoryCollectionProvider implements ProviderInterfa
     public function __construct(
         private InventoryItemRepository $inventoryRepository,
         private TenantContext $tenantContext,
+        private RequestStack $requestStack,
     ) {
     }
 
@@ -41,6 +44,13 @@ final readonly class StoreInventoryCollectionProvider implements ProviderInterfa
         }
 
         $filters = is_array($context['filters'] ?? null) ? $context['filters'] : [];
+        $request = $this->requestStack->getCurrentRequest();
+        if (null !== $request) {
+            // API Platform 4 only guarantees declared parameters in
+            // $context['filters']. Catalog query keys (q, set, colors, …)
+            // come from the request so a storefront page always hits SQL.
+            $filters = array_merge($request->query->all(), $filters);
+        }
         $itemsPerPage = (int) ($filters['itemsPerPage'] ?? self::DEFAULT_ITEMS_PER_PAGE);
         $itemsPerPage = min(self::MAX_ITEMS_PER_PAGE, max(1, $itemsPerPage));
 
@@ -65,8 +75,16 @@ final readonly class StoreInventoryCollectionProvider implements ProviderInterfa
         }
 
         $page = max(1, (int) ($filters['page'] ?? 1));
-        $items = $this->inventoryRepository->findPageByStore($store, ($page - 1) * $itemsPerPage, $itemsPerPage, $gameCode, $inStockOnly);
-        $total = $this->inventoryRepository->countByStore($store, $gameCode, $inStockOnly);
+        $catalog = InventoryCatalogFilters::fromQuery($filters);
+        $items = $this->inventoryRepository->findCatalogPage(
+            $store,
+            ($page - 1) * $itemsPerPage,
+            $itemsPerPage,
+            $gameCode,
+            $inStockOnly,
+            $catalog,
+        );
+        $total = $this->inventoryRepository->countCatalog($store, $gameCode, $inStockOnly, $catalog);
 
         return new TraversablePaginator(new \ArrayIterator($items), $page, $itemsPerPage, $total);
     }

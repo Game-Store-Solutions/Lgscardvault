@@ -94,6 +94,36 @@ final class GameScopedInventoryTest extends WebTestCase
         self::assertCount(0, ($this->jsonRequest('GET', $base.'?game=fab'))['member'] ?? []);
     }
 
+    public function testInventoryCatalogPageFiltersAndReportsTotal(): void
+    {
+        $store = $this->fixtures->store();
+        $this->fixtures->inventoryItem($store, $this->fixtures->card(8901, ['name' => 'Swords to Plowshares', 'set' => 'lea', 'color_identity' => ['W']]), 2);
+        $this->fixtures->inventoryItem($store, $this->fixtures->card(8902, ['name' => 'Swords to Plowshares', 'set' => 'clb', 'color_identity' => ['W', 'U']]), 1);
+        $this->fixtures->inventoryItem($store, $this->fixtures->card(8903, ['name' => 'Lightning Bolt', 'set' => 'lea', 'color_identity' => ['R']]), 4);
+        $this->em->flush();
+
+        $base = "/api/stores/{$store->getSlug()}/inventory";
+        $page = $this->jsonRequest('GET', $base.'?q=Swords&page=1&itemsPerPage=1&inStockOnly=1');
+        $items = $page['member'] ?? $page['hydra:member'] ?? [];
+        $total = $page['totalItems'] ?? $page['hydra:totalItems'] ?? null;
+
+        self::assertCount(1, $items);
+        self::assertSame(2, $total);
+        self::assertSame('Swords to Plowshares', $items[0]['card']['name']);
+
+        $page2 = $this->jsonRequest('GET', $base.'?q=Swords&page=2&itemsPerPage=1&inStockOnly=1');
+        $items2 = $page2['member'] ?? $page2['hydra:member'] ?? [];
+        self::assertCount(1, $items2);
+        self::assertSame('Swords to Plowshares', $items2[0]['card']['name']);
+        self::assertNotSame($items[0]['id'], $items2[0]['id']);
+
+        $white = $this->jsonRequest('GET', $base.'?q=Swords&colors=W&page=1&itemsPerPage=24&inStockOnly=1');
+        $whiteItems = $white['member'] ?? $white['hydra:member'] ?? [];
+        self::assertCount(1, $whiteItems);
+        self::assertSame('lea', $whiteItems[0]['card']['setCode']);
+        self::assertSame(1, $white['totalItems'] ?? $white['hydra:totalItems']);
+    }
+
     public function testStoreGamesListsOnlyWhatTheStoreCarries(): void
     {
         $store = $this->fixtures->store();

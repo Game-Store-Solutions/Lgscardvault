@@ -987,3 +987,10 @@ export interface StoreGameStats {
   singles: { listings: number; copies: number }
   sealed: { products: number; units: number }
 }
+
+/** Public in-stock shelf for the storefront (counts + set list). */
+export interface StoreGameShelf {
+  listings: number
+  copies: number
+  sets: { code: string; name: string }[]
+}

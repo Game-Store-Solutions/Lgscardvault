@@ -91,4 +91,31 @@ final class StoreGameController extends AbstractController
             'sealed' => $sealed,
         ]);
     }
+
+    /**
+     * Public: in-stock singles counts and the set list for the storefront
+     * filters. Cheap aggregates so the shop never downloads the catalog to
+     * learn how many listings it has.
+     */
+    #[Route('/games/{code}/shelf', name: 'api_store_game_shelf', methods: ['GET'])]
+    public function shelf(string $slug, string $code): JsonResponse
+    {
+        $store = $this->stores->findOneBySlug($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $game = $this->games->findOneByCode($code);
+        if (null === $game) {
+            return $this->json(['detail' => 'Unknown game.'], 404);
+        }
+
+        $stats = $this->singles->statsForGame($store, $game->getCode(), inStockOnly: true);
+
+        return $this->json([
+            'listings' => $stats['listings'],
+            'copies' => $stats['copies'],
+            'sets' => $this->singles->findCatalogSets($store, $game->getCode(), inStockOnly: true),
+        ]);
+    }
 }

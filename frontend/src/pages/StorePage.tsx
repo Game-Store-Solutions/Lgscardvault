@@ -14,12 +14,11 @@ import {
   UserCircle,
   X,
 } from 'lucide-react'
-import { formatPrice, parsePriceInput, scryfallPriceCents } from '../api/client'
-import type { InventoryItem } from '../api/types'
+import { formatPrice, parsePriceInput } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { useCanManageStore, useInventory, useStore, useStoreCart, useStoreGames, useStoreTheme } from '../hooks'
+import { useCanManageStore, useDebouncedValue, useInventoryPage, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
-import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton } from '../components/ui'
+import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, Skeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
 import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
 import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
@@ -28,7 +27,7 @@ import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { SealedSpotlightRow } from '../components/store/SealedSpotlightRow'
 import { cx } from '../lib/cx'
-import { colorIdentityKey, matchesExactColorIdentity } from '../lib/mtg'
+import { colorIdentityKey } from '../lib/mtg'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
 import {
     QUICK_ACTIONS,
@@ -43,19 +42,6 @@ import {
     type ViewMode,
     type SortKey
  } from './utils/actionsUtil.tsx'
-
-
-
-
-
-function cardColors(item: InventoryItem): string[] {
-  const identity = item.card.colorIdentity ?? item.card.colors ?? []
-  return identity.length > 0 ? identity : ['C']
-}
-
-function marketPriceCents(item: InventoryItem): number | null {
-  return scryfallPriceCents(item.card, item.isFoil ? 'foil' : 'nonfoil')
-}
 
 export default function StorePage() {
   const { slug = '' } = useParams()
@@ -81,22 +67,52 @@ export default function StorePage() {
   const cardDisplayStyle = store?.cardDisplayStyle ?? 'gallery'
 
   const { data: storeGames = [], isLoading: gamesLoading } = useStoreGames(slug)
-  const { data: allInventory = [], isLoading, isFetching, isPending } = useInventory(slug, {
+  const gameOptions = useMemo(
+    () => storeGames.map((game) => ({ code: game.code, name: game.name })),
+    [storeGames],
+  )
+  useEffect(() => {
+    if (!gameFilter && gameOptions.length > 0) {
+      setGameFilter(gameOptions[0].code)
+    }
+  }, [gameFilter, gameOptions])
+
+  const debouncedSearch = useDebouncedValue(search, 300)
+  const minPriceCents = parsePriceInput(minPrice)
+  const maxPriceCents = parsePriceInput(maxPrice)
+  const catalogEnabled = Boolean(gameFilter) || (!gamesLoading && storeGames.length === 0)
+
+  const catalog = useInventoryPage(slug, {
     inStockOnly: true,
     game: gameFilter || undefined,
-    enabled: Boolean(gameFilter) || (!gamesLoading && storeGames.length === 0),
+    q: debouncedSearch,
+    set: setFilter,
+    type: typeFilter,
+    finish: finishFilter,
+    colors: selectedColors.length > 0 ? colorIdentityKey(selectedColors) : undefined,
+    minPriceCents,
+    maxPriceCents,
+    sort,
+    page,
+    itemsPerPage: RESULTS_PAGE_SIZE,
+    enabled: catalogEnabled,
   })
+  const spotlight = useInventoryPage(slug, {
+    inStockOnly: true,
+    game: gameFilter || undefined,
+    sort: 'price-desc',
+    minPriceCents: store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,
+    page: 1,
+    itemsPerPage: SPOTLIGHT_MAX_ITEMS,
+    enabled: catalogEnabled,
+  })
+  const { data: shelf } = useStoreGameShelf(slug, gameFilter)
 
-  // Every list below (search, filters, sets, colors, spotlight, counts) works
-  // off this, so picking a game scopes the whole page in one place.
-  // Out-of-stock listings stay in admin inventory but are hidden on the storefront.
-  const inventory = useMemo(
-    () =>
-      allInventory.filter(
-        (item) => item.quantity > 0 && (!gameFilter || (item.card.gameCode ?? 'mtg') === gameFilter),
-      ),
-    [allInventory, gameFilter],
-  )
+  const inventory = catalog.data?.items ?? []
+  const resultTotal = catalog.data?.total ?? 0
+  const spotlightItems = spotlight.data?.items ?? []
+  const availableSets = shelf?.sets ?? []
+
   const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
   const cartByItemId = useMemo(() => {
     const map = new Map<number, number>()
@@ -106,118 +122,16 @@ export default function StorePage() {
     return map
   }, [cartQuery.data])
 
-  // code → display name; the option value stays the code (stable, matches the
-  // filter) while the label shows the human-readable set name.
-  const availableSets = useMemo(() => {
-    const bySet = new Map<string, string>()
-    for (const item of inventory) {
-      const code = item.card.setCode
-      if (code && !bySet.has(code)) bySet.set(code, item.card.setName || code.toUpperCase())
-    }
-    return Array.from(bySet, ([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name))
-  }, [inventory])
-
-  const colorCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const item of inventory) {
-      const key = colorIdentityKey(cardColors(item))
-      if (key.length === 1) counts[key] = (counts[key] ?? 0) + 1
-    }
-    return counts
-  }, [inventory])
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    const setTerm = setFilter.trim().toLowerCase()
-    const typeTerm = typeFilter.trim().toLowerCase()
-    const minPriceCents = parsePriceInput(minPrice)
-    const maxPriceCents = parsePriceInput(maxPrice)
-
-    return inventory.filter((item) => {
-      const colors = cardColors(item)
-      const matchesTerm =
-        !term ||
-        item.card.name.toLowerCase().includes(term) ||
-        (item.card.setCode ?? '').toLowerCase().includes(term) ||
-        (item.card.setName ?? '').toLowerCase().includes(term) ||
-        (item.card.typeLine ?? '').toLowerCase().includes(term) ||
-        (item.card.oracleText ?? '').toLowerCase().includes(term) ||
-        colors.some((color) => color.toLowerCase().includes(term))
-      const matchesSet =
-        !setTerm ||
-        (item.card.setCode ?? '').toLowerCase() === setTerm ||
-        (item.card.setName ?? '').toLowerCase().includes(setTerm)
-      const matchesType = !typeTerm || (item.card.typeLine ?? '').toLowerCase().includes(typeTerm)
-      const matchesFinish =
-        finishFilter === 'all' ||
-        (finishFilter === 'foil' && item.isFoil) ||
-        (finishFilter === 'nonfoil' && !item.isFoil)
-      const matchesColors = matchesExactColorIdentity(colors, selectedColors)
-      const priceCents = marketPriceCents(item)
-      const matchesMinPrice = minPriceCents === null || (priceCents !== null && priceCents >= minPriceCents)
-      const matchesMaxPrice = maxPriceCents === null || (priceCents !== null && priceCents <= maxPriceCents)
-
-      return (
-        matchesTerm && matchesSet && matchesType && matchesFinish && matchesColors && matchesMinPrice && matchesMaxPrice
-      )
-    })
-  }, [inventory, search, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice])
-
-  const sorted = useMemo(() => {
-    const list = [...filtered]
-    switch (sort) {
-      case 'price-desc':
-        list.sort((a, b) => (marketPriceCents(b) ?? -1) - (marketPriceCents(a) ?? -1))
-        break
-      case 'price-asc':
-        list.sort((a, b) => (marketPriceCents(a) ?? Number.POSITIVE_INFINITY) - (marketPriceCents(b) ?? Number.POSITIVE_INFINITY))
-        break
-      case 'name':
-        list.sort((a, b) => a.card.name.localeCompare(b.card.name))
-        break
-      case 'newest':
-        list.sort((a, b) => (b.card.releasedAt ?? '').localeCompare(a.card.releasedAt ?? ''))
-        break
-    }
-    return list
-  }, [filtered, sort])
-
-  const spotlightItems = useMemo(() => {
-    const threshold = store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS
-    return inventory
-      .map((item) => ({ item, priceCents: marketPriceCents(item) }))
-      .filter(({ priceCents }) => priceCents !== null && priceCents >= threshold)
-      .sort((a, b) => (b.priceCents ?? 0) - (a.priceCents ?? 0))
-      .map(({ item }) => item)
-      .slice(0, SPOTLIGHT_MAX_ITEMS)
-  }, [inventory, store?.spotlightMinPriceCents])
-
-  const totalCards = inventory.reduce((sum, item) => sum + item.quantity, 0)
-  const heroShowcaseCards = useMemo(() => buildHeroCardPool(allInventory, 20), [allInventory])
+  const heroShowcaseCards = useMemo(
+    () => buildHeroCardPool(spotlightItems.length > 0 ? spotlightItems : inventory, 20),
+    [spotlightItems, inventory],
+  )
   const heroLayout = normalizeHeroLayout(store?.heroLayout ?? 'cinematic')
   const locationLabel = [store?.city, store?.region].filter(Boolean).join(', ') || null
 
-  // Pure navigation — no counts on the pills. A number there can't say what
-  // it counts (listings? copies? sealed?), same reason it came off the
-  // admin selector.
-  const gameOptions = useMemo(
-    () => storeGames.map((game) => ({ code: game.code, name: game.name })),
-    [storeGames],
-  )
-
-  // One game at a time, always. An "All games" view interleaved every game
-  // alphabetically — a One Piece card wedged between two Magic cards — which
-  // reads as data corruption, not browsing. Default to the store's first
-  // stocked game (platform order puts Magic first) once the list arrives.
-  useEffect(() => {
-    if (!gameFilter && gameOptions.length > 0) {
-      setGameFilter(gameOptions[0].code)
-    }
-  }, [gameFilter, gameOptions])
-
   useEffect(() => {
     setPage(1)
-  }, [search, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice, sort, gameFilter])
+  }, [debouncedSearch, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice, sort, gameFilter])
 
   // Filters describe one game's cards (sets, colors, types), so switching
   // games clears them rather than silently returning nothing.
@@ -227,9 +141,12 @@ export default function StorePage() {
     setSelectedColors([])
   }, [gameFilter])
 
-  const resultsPageCount = Math.max(1, Math.ceil(sorted.length / RESULTS_PAGE_SIZE))
+  const resultsPageCount = Math.max(1, Math.ceil(resultTotal / RESULTS_PAGE_SIZE))
   const currentResultsPage = Math.min(page, resultsPageCount)
-  const visibleResults = sorted.slice((currentResultsPage - 1) * RESULTS_PAGE_SIZE, currentResultsPage * RESULTS_PAGE_SIZE)
+  const visibleResults = inventory
+  const listingsLoading = catalog.isPending && !catalog.data
+  const listingsRefreshing = catalog.isFetching && catalog.isPlaceholderData
+  const spotlightLoading = spotlight.isPending && !spotlight.data
 
   function toggleColor(color: string) {
     setSelectedColors((current) =>
@@ -359,7 +276,7 @@ export default function StorePage() {
                   type="button"
                   onClick={() => toggleColor(color.key)}
                   aria-pressed={active}
-                  title={`${color.label} only · ${colorCounts[color.key] ?? 0} cards`}
+                  title={`${color.label} only`}
                   className={cx(
                     'grid place-items-center rounded-full transition-all',
                     active ? 'scale-110 ring-2 ring-brand-500 ring-offset-2 ring-offset-bg' : 'opacity-85 hover:opacity-100',
@@ -390,19 +307,15 @@ export default function StorePage() {
             ))}
           </Select>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Min market" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" />
-            <Input label="Max market" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="50" />
+            <Input label="Min price" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" />
+            <Input label="Max price" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="50" />
           </div>
         </div>
       </div>
     )
   }
 
-  // Full-screen branded loader only while the screen isn't completely
-  // loaded — cached revisits render instantly.
-  const waitingForGame = !gameFilter && (gamesLoading || storeGames.length > 0)
-  const waitingForListings = isPending && allInventory.length === 0 && !waitingForGame
-  if (storeLoading || waitingForGame || waitingForListings) {
+  if (storeLoading) {
     return <StorePageLoader label="Loading store…" />
   }
 
@@ -426,8 +339,8 @@ export default function StorePage() {
         locationLabel={locationLabel}
         verified={store?.status === 'approved'}
         stats={{
-          listings: inventory.length,
-          cards: totalCards,
+          listings: shelf?.listings ?? resultTotal,
+          cards: shelf?.copies ?? 0,
           sets: availableSets.length,
         }}
         showcaseCards={heroShowcaseCards}
@@ -457,8 +370,8 @@ export default function StorePage() {
 
       {/* Slim stat line */}
       <p className="text-sm text-fg-muted">
-        <span className="font-bold text-fg">{inventory.length}</span> listings ·{' '}
-        <span className="font-bold text-fg">{totalCards}</span> cards ·{' '}
+        <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings ·{' '}
+        <span className="font-bold text-fg">{shelf?.copies ?? 0}</span> cards ·{' '}
         <span className="font-bold text-fg">{availableSets.length}</span> sets ·{' '}
         <Link
           to={`/s/${slug}/events`}
@@ -511,7 +424,7 @@ export default function StorePage() {
       )}
 
       {/* Spotlight — holographic cards in a lively persistent rail */}
-      {spotlightItems.length > 0 && (
+      {(spotlightLoading || spotlightItems.length > 0) && (
         <section>
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
@@ -526,34 +439,46 @@ export default function StorePage() {
               </p>
             </div>
           </div>
-          <div className="relative">
-            <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-bg to-transparent" />
-            <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-bg to-transparent" />
-            <button
-              type="button"
-              onClick={() => scrollRail(-1)}
-              aria-label="Scroll spotlight left"
-              className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
-            >
-              <ChevronLeft aria-hidden className="size-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollRail(1)}
-              aria-label="Scroll spotlight right"
-              className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
-            >
-              <ChevronRight aria-hidden className="size-5" />
-            </button>
+          {spotlightLoading ? (
             <div
-              ref={railRef}
-              className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-14 pb-2 pl-14 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex gap-4 overflow-hidden pl-14"
+              aria-busy="true"
+              aria-label="Loading spotlight"
             >
-              {spotlightItems.map((item, i) => (
-                <SpotlightCard key={item.id} item={item} slug={slug} ribbon={i === 0 ? 'Featured' : undefined} />
+              {Array.from({ length: 6 }, (_, i) => (
+                <Skeleton key={i} className="h-64 w-40 flex-shrink-0 rounded-card" />
               ))}
             </div>
-          </div>
+          ) : (
+            <div className="relative">
+              <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-bg to-transparent" />
+              <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-bg to-transparent" />
+              <button
+                type="button"
+                onClick={() => scrollRail(-1)}
+                aria-label="Scroll spotlight left"
+                className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+              >
+                <ChevronLeft aria-hidden className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollRail(1)}
+                aria-label="Scroll spotlight right"
+                className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+              >
+                <ChevronRight aria-hidden className="size-5" />
+              </button>
+              <div
+                ref={railRef}
+                className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-14 pb-2 pl-14 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {spotlightItems.map((item, i) => (
+                  <SpotlightCard key={item.id} item={item} slug={slug} ribbon={i === 0 ? 'Featured' : undefined} />
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -566,7 +491,7 @@ export default function StorePage() {
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
-                <p className="text-sm text-fg-muted">{sorted.length} {sorted.length === 1 ? 'result' : 'results'}</p>
+                <p className="text-sm text-fg-muted">{resultTotal} {resultTotal === 1 ? 'result' : 'results'}</p>
               </div>
               {chips.length > 0 && (
                 <button type="button" onClick={clearFilters} className="text-xs font-bold text-brand-600 hover:underline">
@@ -584,7 +509,7 @@ export default function StorePage() {
               <h2 className="font-display text-2xl font-bold tracking-tight text-fg">Singles</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm text-fg-muted">
-                  <span className="font-bold text-fg">{sorted.length}</span> {sorted.length === 1 ? 'result' : 'results'}
+                  <span className="font-bold text-fg">{resultTotal}</span> {resultTotal === 1 ? 'result' : 'results'}
                 </span>
                 {chips.length > 0 && <span aria-hidden className="text-fg-muted">·</span>}
                 {chips.map((chip, i) => (
@@ -662,13 +587,9 @@ export default function StorePage() {
             </div>
           </div>
 
-          {isFetching && allInventory.length > 0 && (
-            <p className="mb-3 text-xs text-fg-muted">Loading remaining listings…</p>
-          )}
-
-          {isLoading && sorted.length === 0 ? (
+          {listingsLoading ? (
             <InventoryGridSkeleton count={12} />
-          ) : sorted.length === 0 ? (
+          ) : resultTotal === 0 ? (
             <div className="rounded-card border border-border bg-surface dark:glass-card">
               <EmptyState
                 icon={Search}
@@ -682,7 +603,7 @@ export default function StorePage() {
               />
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className={cx('space-y-6', listingsRefreshing && 'opacity-70')}>
               {cardDisplayStyle === 'marketplace' ? (
                 <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
                   {visibleResults.map((item) => (
@@ -709,7 +630,7 @@ export default function StorePage() {
                   ))}
                 </div>
               )}
-              <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={setPage} totalItems={sorted.length} />
+              <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={setPage} totalItems={resultTotal} />
             </div>
           )}
         </main>
@@ -738,7 +659,7 @@ export default function StorePage() {
                 Clear all
               </Button>
               <Button className="flex-1" onClick={() => setAdvancedOpen(false)}>
-                Show {sorted.length} {sorted.length === 1 ? 'result' : 'results'}
+                Show {resultTotal} {resultTotal === 1 ? 'result' : 'results'}
               </Button>
             </div>
           </div>

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search, X } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
-import { inventoryKey, useCatalogGames, useInventory, useStoreGameStats } from '../../hooks'
+import { inventoryKey, inventoryPageKey, useCatalogGames, useDebouncedValue, useInventoryPage, useStoreGameStats } from '../../hooks'
 import { GameWorkspaceHeader } from '../../components/catalog'
 import {
   Card,
@@ -15,11 +15,10 @@ import {
   Button,
   EmptyState,
   Pagination,
-  InventoryGridSkeleton,
+  InventoryAdminListSkeleton,
 } from '../../components/ui'
 import { type Condition } from '../../components/inventory'
 import { defaultFinishFor, finishChoices, isFoilFinish } from '../../lib/finishes'
-import { searchTextIncludes } from '../../lib/searchText'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -59,10 +58,22 @@ export default function SearchTab({ slug }: { slug: string }) {
     setPriceText(market == null ? '' : (market / 100).toFixed(2))
   }
 
-  const { data: inventory = [], isPending, isFetching } = useInventory(slug, {
+  const [invPage, setInvPage] = useState(1)
+  const debouncedFilter = useDebouncedValue(filter, 300)
+
+  const inventoryQuery = useInventoryPage(slug, {
     game: gameFilter || undefined,
+    q: debouncedFilter,
+    set: inventorySetFilter,
+    finish: inventoryFinishFilter,
+    page: invPage,
+    itemsPerPage: INVENTORY_PAGE_SIZE,
     enabled: Boolean(gameFilter),
   })
+  const inventory = inventoryQuery.data?.items ?? []
+  const inventoryTotal = inventoryQuery.data?.total ?? 0
+  const listingsLoading = inventoryQuery.isPending && !inventoryQuery.data
+  const listingsRefreshing = inventoryQuery.isFetching && inventoryQuery.isPlaceholderData
 
   const { data: catalogResults = [], refetch: runCatalogSearch } = useQuery({
     queryKey: ['card-search', catalogSearch, catalogSetFilter, catalogFinishFilter, gameFilter],
@@ -126,6 +137,7 @@ export default function SearchTab({ slug }: { slug: string }) {
     onMutate: () => setMutationError(null),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+      await queryClient.invalidateQueries({ queryKey: inventoryPageKey(slug) })
       setSelectedCard(null)
       setCatalogSearch('')
       setCostText('')
@@ -154,6 +166,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         (old ?? []).map((it) => (it.id === payload.itemId ? { ...it, ...updated } : it)),
       )
       void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+      void queryClient.invalidateQueries({ queryKey: inventoryPageKey(slug) })
       setEditingItem(null)
     },
     onError: (err) => setMutationError(extractErrorMessage(err, 'Could not save changes.')),
@@ -170,6 +183,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         (old ?? []).filter((it) => it.id !== id),
       )
       void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+      void queryClient.invalidateQueries({ queryKey: inventoryPageKey(slug) })
     },
     onError: (err) => setMutationError(extractErrorMessage(err, 'Could not remove inventory item.')),
   })
@@ -197,31 +211,6 @@ export default function SearchTab({ slug }: { slug: string }) {
     }
   }, [gameFilter, gameOptions])
 
-  const filteredInventory = useMemo(() => {
-    const term = filter.trim().toLowerCase()
-    const setTerm = inventorySetFilter.trim().toLowerCase()
-    return inventory.filter((item) => {
-      const card = item.card
-      if (gameFilter && (card.gameCode ?? 'mtg') !== gameFilter) return false
-
-      if (setTerm) {
-        const code = (card.setCode ?? '').toLowerCase()
-        const setName = (card.setName ?? '').toLowerCase()
-        if (!code.includes(setTerm) && !setName.includes(setTerm)) return false
-      }
-
-      if (inventoryFinishFilter !== 'all') {
-        const foil = isFoilFinish(item.finish) || item.isFoil
-        if (inventoryFinishFilter === 'foil' && !foil) return false
-        if (inventoryFinishFilter === 'nonfoil' && foil) return false
-      }
-
-      if (!term) return true
-      const blob = [card.name, card.setCode ?? '', card.setName ?? '', card.typeLine ?? '', item.finish].join(' ')
-      return searchTextIncludes(blob, term)
-    })
-  }, [inventory, filter, inventorySetFilter, inventoryFinishFilter, gameFilter])
-
   const inventoryFiltersActive =
     Boolean(filter.trim()) || Boolean(inventorySetFilter.trim()) || inventoryFinishFilter !== 'all'
 
@@ -231,17 +220,11 @@ export default function SearchTab({ slug }: { slug: string }) {
     setInventoryFinishFilter('all')
   }
 
-  // Paginate the inventory grid; reset to page 1 when the search filter changes.
-  const [invPage, setInvPage] = useState(1)
   useEffect(() => {
     setInvPage(1)
   }, [filter, inventorySetFilter, inventoryFinishFilter, gameFilter])
-  const invPageCount = Math.max(1, Math.ceil(filteredInventory.length / INVENTORY_PAGE_SIZE))
+  const invPageCount = Math.max(1, Math.ceil(inventoryTotal / INVENTORY_PAGE_SIZE))
   const currentInvPage = Math.min(invPage, invPageCount)
-  const visibleInventory = filteredInventory.slice(
-    (currentInvPage - 1) * INVENTORY_PAGE_SIZE,
-    currentInvPage * INVENTORY_PAGE_SIZE,
-  )
 
   return (
     <div className="space-y-6">
@@ -347,9 +330,11 @@ export default function SearchTab({ slug }: { slug: string }) {
         <CardHeader
           title={`${activeGameName} inventory`}
           subtitle={
-            isFetching && inventory.length > 0
-              ? `Loaded ${inventory.length.toLocaleString()} listings so far…`
-              : `What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`
+            listingsRefreshing
+              ? 'Updating listings…'
+              : inventoryTotal > 0
+                ? `${inventoryTotal.toLocaleString()} listings in ${activeGameName}.`
+                : `What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`
           }
         />
         <CardBody className="space-y-4">
@@ -402,9 +387,9 @@ export default function SearchTab({ slug }: { slug: string }) {
             </Button>
           </div>
 
-          {isPending && inventory.length === 0 ? (
-            <InventoryGridSkeleton count={6} />
-          ) : filteredInventory.length === 0 ? (
+          {listingsLoading ? (
+            <InventoryAdminListSkeleton count={6} />
+          ) : inventoryTotal === 0 ? (
             <EmptyState
               icon={Search}
               title={inventoryFiltersActive ? 'No matching inventory' : 'No inventory yet'}
@@ -422,9 +407,9 @@ export default function SearchTab({ slug }: { slug: string }) {
               }
             />
           ) : (
-            <div className="space-y-4">
+            <div className={listingsRefreshing ? 'space-y-4 opacity-70' : 'space-y-4'}>
               <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-                {visibleInventory.map((item) => (
+                {inventory.map((item) => (
                   <InventoryResultCard
                     key={item.id}
                     item={item}
@@ -438,7 +423,7 @@ export default function SearchTab({ slug }: { slug: string }) {
                 page={currentInvPage}
                 pageCount={invPageCount}
                 onPageChange={setInvPage}
-                totalItems={filteredInventory.length}
+                totalItems={inventoryTotal}
               />
             </div>
           )}

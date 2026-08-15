@@ -51,12 +51,17 @@ export default api
 /** Customer-facing order list page size (must match backend default unless overridden). */
 export const CUSTOMER_ORDERS_PAGE_SIZE = 15
 
-export function unwrapCollection<T>(data: T[] | { member?: T[] }): T[] {
+export function unwrapCollection<T>(data: T[] | { member?: T[]; 'hydra:member'?: T[] }): T[] {
   if (Array.isArray(data)) {
     return data
   }
-  if (data && typeof data === 'object' && Array.isArray(data.member)) {
-    return data.member
+  if (data && typeof data === 'object') {
+    if (Array.isArray(data.member)) {
+      return data.member
+    }
+    if (Array.isArray(data['hydra:member'])) {
+      return data['hydra:member']
+    }
   }
   return []
 }

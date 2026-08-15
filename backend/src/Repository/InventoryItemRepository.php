@@ -7,6 +7,7 @@ use App\Entity\InventoryItem;
 use App\Entity\Game;
 use App\Entity\Store;
 use App\Service\Catalog\FinishVocabulary;
+use App\Service\Inventory\InventoryCatalogFilters;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -28,9 +29,6 @@ class InventoryItemRepository extends ServiceEntityRepository
      *
      * @return list<InventoryItem>
      */
-    /**
-     * @return list<InventoryItem>
-     */
     public function findPageByStore(
         Store $store,
         int $offset,
@@ -38,13 +36,95 @@ class InventoryItemRepository extends ServiceEntityRepository
         ?string $gameCode = null,
         bool $inStockOnly = false,
     ): array {
-        $qb = $this->listingQuery($store, $inStockOnly, $gameCode)
-            ->orderBy('c.name', 'ASC')
-            ->addOrderBy('i.id', 'ASC')
-            ->setFirstResult($offset)
-            ->setMaxResults($limit);
+        return $this->findCatalogPage(
+            $store,
+            $offset,
+            $limit,
+            $gameCode,
+            $inStockOnly,
+            new InventoryCatalogFilters(),
+        );
+    }
 
-        return $qb->getQuery()->getResult();
+    /**
+     * One page of listings matching storefront/admin catalog filters.
+     *
+     * @return list<InventoryItem>
+     */
+    public function findCatalogPage(
+        Store $store,
+        int $offset,
+        int $limit,
+        ?string $gameCode,
+        bool $inStockOnly,
+        InventoryCatalogFilters $filters,
+    ): array {
+        $qb = $this->listingQuery($store, $inStockOnly, $gameCode);
+        $this->applyCatalogFilters($qb, $filters);
+        $this->applyCatalogSort($qb, $filters->sort);
+
+        return $qb->setFirstResult($offset)->setMaxResults($limit)->getQuery()->getResult();
+    }
+
+    public function countCatalog(
+        Store $store,
+        ?string $gameCode,
+        bool $inStockOnly,
+        InventoryCatalogFilters $filters,
+    ): int {
+        $qb = $this->createQueryBuilder('i')
+            ->select('COUNT(i.id)')
+            ->andWhere('i.store = :store')
+            ->setParameter('store', $store)
+            ->join('i.card', 'c');
+
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
+        if (null !== $gameCode && '' !== $gameCode) {
+            $this->scopeToGame($qb, $gameCode);
+        }
+        $this->applyCatalogFilters($qb, $filters);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Distinct in-stock sets for the set dropdown — cheap even at 18k listings.
+     *
+     * @return list<array{code: string, name: string}>
+     */
+    public function findCatalogSets(Store $store, ?string $gameCode, bool $inStockOnly): array
+    {
+        $qb = $this->createQueryBuilder('i')
+            ->select('c.setCode AS code', 'MAX(c.setName) AS name')
+            ->join('i.card', 'c')
+            ->andWhere('i.store = :store')
+            ->setParameter('store', $store)
+            ->groupBy('c.setCode')
+            ->orderBy('name', 'ASC');
+
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
+        if (null !== $gameCode && '' !== $gameCode) {
+            $this->scopeToGame($qb, $gameCode);
+        }
+
+        $rows = $qb->getQuery()->getScalarResult();
+        $sets = [];
+        foreach ($rows as $row) {
+            $code = (string) $row['code'];
+            if ('' === $code) {
+                continue;
+            }
+            $sets[] = [
+                'code' => $code,
+                'name' => '' !== (string) $row['name'] ? (string) $row['name'] : strtoupper($code),
+            ];
+        }
+
+        return $sets;
     }
 
     public function countByStore(Store $store, ?string $gameCode = null, bool $inStockOnly = false): int
@@ -72,13 +152,17 @@ class InventoryItemRepository extends ServiceEntityRepository
      *
      * @return array{listings: int, copies: int}
      */
-    public function statsForGame(Store $store, string $gameCode): array
+    public function statsForGame(Store $store, string $gameCode, bool $inStockOnly = false): array
     {
         $qb = $this->createQueryBuilder('i')
             ->select('COUNT(i.id) AS listings', 'COALESCE(SUM(i.quantity), 0) AS copies')
             ->join('i.card', 'c')
             ->andWhere('i.store = :store')
             ->setParameter('store', $store);
+
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
 
         $this->scopeToGame($qb, $gameCode);
 
@@ -159,6 +243,96 @@ class InventoryItemRepository extends ServiceEntityRepository
         }
 
         return $qb;
+    }
+
+    private function applyCatalogFilters(QueryBuilder $qb, InventoryCatalogFilters $filters): void
+    {
+        if ('' !== $filters->q) {
+            $qb->andWhere(
+                'LOWER(c.name) LIKE :q OR LOWER(c.setCode) LIKE :q OR LOWER(COALESCE(c.setName, :empty)) LIKE :q OR LOWER(COALESCE(c.typeLine, :empty)) LIKE :q',
+            )
+                ->setParameter('q', '%'.mb_strtolower($filters->q).'%')
+                ->setParameter('empty', '');
+        }
+
+        if ('' !== $filters->set) {
+            $set = mb_strtolower($filters->set);
+            $qb->andWhere('LOWER(c.setCode) = :setExact OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setLike')
+                ->setParameter('setExact', $set)
+                ->setParameter('setLike', '%'.$set.'%')
+                ->setParameter('emptySet', '');
+        }
+
+        if ('' !== $filters->type) {
+            $qb->andWhere('LOWER(COALESCE(c.typeLine, :emptyType)) LIKE :type')
+                ->setParameter('type', '%'.mb_strtolower($filters->type).'%')
+                ->setParameter('emptyType', '');
+        }
+
+        $this->applyFinishFilter($qb, $filters->finish);
+        $this->applyColorFilter($qb, $filters->colors);
+
+        if (null !== $filters->minPriceCents) {
+            $qb->andWhere('i.priceCents >= :minPrice')->setParameter('minPrice', $filters->minPriceCents);
+        }
+        if (null !== $filters->maxPriceCents) {
+            $qb->andWhere('i.priceCents <= :maxPrice')->setParameter('maxPrice', $filters->maxPriceCents);
+        }
+    }
+
+    private function applyFinishFilter(QueryBuilder $qb, string $finish): void
+    {
+        if ('all' === $finish) {
+            return;
+        }
+
+        $markers = ['%foil%', '%holo%', '%prism%', '%rainbow%', '%etched%', '%shatter%', '%galaxy%', '%gilded%'];
+        $likes = [];
+        foreach ($markers as $i => $marker) {
+            $likes[] = 'LOWER(i.finish) LIKE :foilMarker'.$i;
+            $qb->setParameter('foilMarker'.$i, $marker);
+        }
+
+        $foil = "LOWER(i.finish) NOT LIKE 'non%' AND LOWER(i.finish) NOT IN (:plainFinishes) AND (".implode(' OR ', $likes).')';
+        $qb->setParameter('plainFinishes', ['normal', 'unlimited', 'unlimited edition', '1st edition']);
+
+        if ('foil' === $finish) {
+            $qb->andWhere($foil);
+        } else {
+            $qb->andWhere('NOT ('.$foil.')');
+        }
+    }
+
+    /** @param list<string> $colors */
+    private function applyColorFilter(QueryBuilder $qb, array $colors): void
+    {
+        if ([] === $colors) {
+            return;
+        }
+
+        // PostgreSQL has no `json = json` operator, and DQL has no CAST.
+        // Exact identity is "has each requested pip and none of the others".
+        $wanted = ['C'] === $colors ? [] : $colors;
+        foreach (['W', 'U', 'B', 'R', 'G'] as $letter) {
+            $param = 'colorPip'.$letter;
+            if (in_array($letter, $wanted, true)) {
+                $qb->andWhere('CAST_AS_TEXT(c.colorIdentity) LIKE :'.$param)
+                    ->setParameter($param, '%"'.$letter.'"%');
+            } else {
+                $qb->andWhere('c.colorIdentity IS NULL OR CAST_AS_TEXT(c.colorIdentity) NOT LIKE :'.$param)
+                    ->setParameter($param, '%"'.$letter.'"%');
+            }
+        }
+    }
+
+    private function applyCatalogSort(QueryBuilder $qb, string $sort): void
+    {
+        match ($sort) {
+            'price-desc' => $qb->orderBy('i.priceCents', 'DESC')->addOrderBy('c.name', 'ASC')->addOrderBy('i.id', 'ASC'),
+            'price-asc' => $qb->orderBy('i.priceCents', 'ASC')->addOrderBy('c.name', 'ASC')->addOrderBy('i.id', 'ASC'),
+            'newest' => $qb->orderBy('c.releasedAt', 'DESC')->addOrderBy('i.id', 'DESC'),
+            default => $qb->orderBy('c.name', 'ASC')->addOrderBy('i.id', 'ASC'),
+        };
     }
 
     /**

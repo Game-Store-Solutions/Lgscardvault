@@ -1,5 +1,5 @@
 export { useStore } from './useStore'
-export { useInventory, inventoryKey } from './useInventory'
+export { useInventory, inventoryKey, inventoryPageKey, useInventoryPage } from './useInventory'
 export { useStoreSections, useStoreCases, usePullSheet, useStockingSheet, storeSectionsKey, storeCasesKey } from './useStoreSections'
 export { usePendingSellSubmissionCount, useSellSubmissionsList, sellSubmissionsKey, pendingSellSubmissionsCountKey } from './useSellSubmissions'
 export { useOrders, useOrdersPage, useAllStoreOrders, useOpenStoreOrderCount, useStoreOrderQueueCounts, resolveOrdersListTotal, ordersKey, openStoreOrdersCountKey, ADMIN_ORDERS_PAGE_SIZE } from './useOrders'
@@ -48,6 +48,7 @@ export {
   useCatalogGames,
   useStoreGames,
   useStoreGameStats,
+  useStoreGameShelf,
   useCatalogByArtist,
   useGameSets,
   useSealedCatalogSearch,

@@ -129,4 +129,27 @@ final class StoreGameStatsTest extends WebTestCase
         $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/games/nope/stats");
         self::assertSame(404, $this->client->getResponse()->getStatusCode());
     }
+
+    public function testPublicShelfReturnsInStockCountsAndSets(): void
+    {
+        $store = $this->fixtures->store();
+        $this->fixtures->inventoryItem(
+            $store,
+            $this->fixtures->card(9510, ['name' => 'Alpha Bolt', 'set' => 'lea', 'set_name' => 'Limited Edition Alpha']),
+            3,
+        );
+        $this->fixtures->inventoryItem(
+            $store,
+            $this->fixtures->card(9511, ['name' => 'Sold Out', 'set' => 'clb', 'set_name' => 'Commander Legends']),
+            0,
+        );
+        $this->em->flush();
+
+        $this->authenticate(null);
+        $shelf = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/games/mtg/shelf");
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame(1, $shelf['listings']);
+        self::assertSame(3, $shelf['copies']);
+        self::assertSame(['lea'], array_column($shelf['sets'] ?? [], 'code'));
+    }
 }
