@@ -135,7 +135,7 @@ export default function ImportWizard({
           ))}
         </ol>
 
-        {/* Step 1 — game */}
+        {/* Step 1. Game */}
         <section className="space-y-2">
           <h3 className="text-sm font-bold text-fg">1. Which game?</h3>
           <GameSelector
@@ -149,7 +149,7 @@ export default function ImportWizard({
           />
         </section>
 
-        {/* Step 2 — type */}
+        {/* Step 2. Type */}
         {gameCode && (
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-fg">2. What are you importing?</h3>
@@ -178,7 +178,7 @@ export default function ImportWizard({
           </section>
         )}
 
-        {/* Step 3 — upload */}
+        {/* Step 3. Upload */}
         {gameCode && importType && (
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-fg">3. Upload your CSV</h3>
@@ -222,7 +222,7 @@ export default function ImportWizard({
           </section>
         )}
 
-        {/* Step 4 — preview */}
+        {/* Step 4. Preview */}
         {previewMutation.isPending && <LoadingPanel label="Validating your sheet…" />}
         {preview && (
           <section className="space-y-3">
@@ -266,7 +266,7 @@ export default function ImportWizard({
 
             {preview.matchedRows === 0 && (
               <p className="text-sm text-warning-700">
-                Nothing in this sample matched the catalog. Check the game and column names — for non-Magic games the
+                Nothing in this sample matched the catalog. Check the game and column names. For non-Magic games the
                 catalog needs a TCGCSV sync first.
               </p>
             )}
@@ -279,7 +279,7 @@ export default function ImportWizard({
           </p>
         )}
 
-        {/* Step 5 — import */}
+        {/* Step 5. Import */}
         {preview && (
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={() => importMutation.mutate()} disabled={busy || importMutation.isPending}>

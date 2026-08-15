@@ -22,7 +22,7 @@ export const HERO_LAYOUT_CATEGORIES: HeroLayoutCategory[] = [
   {
     id: 'hero-styles',
     title: 'Storefront hero',
-    subtitle: 'Pick how your header feels — classic photo, playmat, events, motion, or live stock.',
+    subtitle: 'Pick how your header feels. Classic photo, playmat, events, motion, or live stock.',
     featured: true,
     defaultOpen: true,
     layoutIds: HERO_LAYOUT_OPTIONS.map((o) => o.id),

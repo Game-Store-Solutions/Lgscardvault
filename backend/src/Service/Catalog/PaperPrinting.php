@@ -25,12 +25,12 @@ final class PaperPrinting
 
         $data = $card->getScryfallData() ?? [];
         if (true === ($data['digital'] ?? false)) {
-            return 'Online-only (digital) printing — paper cards only.';
+            return 'Online-only (digital) printing. Paper cards only.';
         }
 
         $setType = $data['set_type'] ?? null;
         if (is_string($setType) && 'alchemy' === strtolower($setType)) {
-            return 'Alchemy set printing — paper cards only.';
+            return 'Alchemy set printing. Paper cards only.';
         }
 
         $games = $card->getGames();
@@ -38,17 +38,17 @@ final class PaperPrinting
             $games = is_array($data['games'] ?? null) ? $data['games'] : null;
         }
         if (is_array($games) && [] !== $games && !in_array('paper', $games, true)) {
-            return 'Online-only printing (Arena/MTGO) — paper cards only.';
+            return 'Online-only printing (Arena/MTGO). Paper cards only.';
         }
 
         $collector = trim($card->getCollectorNumber());
         if (1 === preg_match('/^A[-.]/i', $collector)) {
-            return 'Alchemy / digital collector number — paper cards only.';
+            return 'Alchemy / digital collector number. Paper cards only.';
         }
 
         $name = trim($card->getName());
         if (str_starts_with($name, 'A-')) {
-            return 'Alchemy (Arena) printing — paper cards only.';
+            return 'Alchemy (Arena) printing. Paper cards only.';
         }
 
         return null;

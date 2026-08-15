@@ -118,9 +118,7 @@ export default function SetBrowsePage() {
   return (
     <div className="storefront-atmosphere space-y-8 pb-12">
       <div className="space-y-4">
-        <BackButton to={`/s/${slug}`} tone="soft">
-          {store?.name ?? 'Store'}
-        </BackButton>
+        <BackButton to={`/s/${slug}`}>Back to store</BackButton>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card dark:glass-card">
           <div className="relative px-6 py-8 sm:px-10 sm:py-10">
@@ -136,7 +134,7 @@ export default function SetBrowsePage() {
                 </div>
                 <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">{setName}</h1>
                 <p className="max-w-2xl text-sm leading-relaxed text-fg-muted">
-                  Every card {store?.name ?? 'this store'} has in stock from this set — browse by collector number, compare
+                  Every card {store?.name ?? 'this store'} has in stock from this set. Browse by collector number, compare
                   prices, and jump straight to a listing.
                 </p>
                 <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">

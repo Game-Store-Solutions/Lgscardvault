@@ -98,8 +98,8 @@ export function SelectedCardEditor({
             placeholder="0.00"
             hint={
               hasMarketPrice
-                ? `Market price ${marketPrice} — edit to override`
-                : 'No market price for this card yet — set your own'
+                ? `Market price ${marketPrice}. Edit to override`
+                : 'No market price for this card yet. Set your own'
             }
           />
         </div>
@@ -109,7 +109,7 @@ export function SelectedCardEditor({
             value={costText}
             onChange={(e) => onCostChange(e.target.value)}
             inputMode="decimal"
-            placeholder="What you paid — powers profit reports"
+            placeholder="What you paid. Powers profit reports"
           />
         </div>
       </div>

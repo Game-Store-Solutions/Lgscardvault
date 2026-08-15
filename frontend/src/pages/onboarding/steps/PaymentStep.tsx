@@ -34,7 +34,7 @@ export function PaymentStep({
     return (
       <p className="flex items-center gap-2 rounded-btn bg-success-50 px-3 py-2 text-sm font-medium text-success-700">
         <CheckCircle2 aria-hidden className="size-4" />
-        {plan?.name ?? 'This plan'} is free — no payment method needed. Continue to review.
+        {plan?.name ?? 'This plan'} is free. No payment method needed. Continue to review.
       </p>
     )
   }
@@ -94,7 +94,7 @@ export function PaymentStep({
       ) : isDevBuild ? (
         <div className="space-y-3">
           <p className="rounded-btn bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
-            Dev only — Square is not configured; no real charge is made.
+            Dev only. Square is not configured; no real charge is made.
           </p>
           <Button
             variant="secondary"

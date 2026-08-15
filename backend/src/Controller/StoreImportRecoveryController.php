@@ -215,7 +215,7 @@ final class StoreImportRecoveryController extends AbstractController
         if ($card->resolvedGameCode() !== $job->resolvedGameCode()) {
             return $this->json([
                 'detail' => sprintf(
-                    'That card is not from this import\'s game — pick a card from the %s catalog.',
+                    'That card is not from this import\'s game. Pick a card from the %s catalog.',
                     $job->getGame()?->getName() ?? $job->resolvedGameCode(),
                 ),
             ], 422);

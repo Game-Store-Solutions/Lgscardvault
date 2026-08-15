@@ -71,7 +71,7 @@ export default function PatchNotesTab() {
       <div>
         <h2 className="text-lg font-bold text-fg">Patch notes</h2>
         <p className="mt-1 text-sm text-fg-muted">
-          What changed on the platform — visible to store admins only.
+          What changed on the platform. Visible to store admins only.
         </p>
       </div>
 

@@ -45,7 +45,7 @@ export function GameSelector({
 
   return (
     <div className={cx('w-full', className)}>
-      {/* Mobile: a native picker — reliable, no horizontal scrolling. */}
+      {/* Mobile: a native picker. Reliable, no horizontal scrolling. */}
       <label className="block sm:hidden">
         <span className="sr-only">{label}</span>
         <Select value={value} onChange={(event) => onChange(event.target.value)}>

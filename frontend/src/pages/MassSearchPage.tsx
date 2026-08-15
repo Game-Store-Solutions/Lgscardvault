@@ -200,7 +200,7 @@ export default function MassSearchPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <BackButton to={`/s/${slug}`}>Back to {store?.name ?? 'store'}</BackButton>
+        <BackButton to={`/s/${slug}`}>Back to store</BackButton>
       </div>
 
       <div>
@@ -211,7 +211,7 @@ export default function MassSearchPage() {
           Mass Search
         </h1>
         <p className="mt-2 max-w-2xl text-fg-muted">
-          Paste a decklist or want list and see what {store?.name ?? 'this store'} has in stock — with an estimated
+          Paste a decklist or want list and see what {store?.name ?? 'this store'} has in stock. With an estimated
           total at market prices.
         </p>
       </div>
@@ -373,7 +373,7 @@ function LineActions({
         (wanted ? (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-success-700">
             <Check aria-hidden className="size-3.5" />
-            On your want list — we'll notify you when it's in stock
+            On your want list. We'll notify you when it's in stock
           </span>
         ) : (
           <Button size="sm" variant="secondary" loading={wantPending} onClick={onWant}>

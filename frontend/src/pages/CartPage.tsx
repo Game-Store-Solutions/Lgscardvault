@@ -2,13 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
-  ArrowLeft,
-  CreditCard,
   Minus,
   PackageCheck,
   Plus,
   RotateCcw,
-  ShieldCheck,
   ShoppingCart,
   Sparkles,
   Trash2,
@@ -222,7 +219,7 @@ export default function CartPage() {
 
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div className="min-w-0">
-          <BackButton to={`/s/${slug}`}>Continue shopping</BackButton>
+          <BackButton to={`/s/${slug}`}>Back to store</BackButton>
           <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Checkout</h1>
           <p className="mt-1 text-sm text-fg-muted">{store?.name ?? 'Store'}</p>
         </div>
@@ -277,7 +274,7 @@ export default function CartPage() {
                 <legend className="px-1 text-base font-bold text-fg">Delivery</legend>
                 {isGuest ? (
                   <p className="mt-4 text-sm text-fg-muted">
-                    Guest checkout is <span className="font-semibold text-fg">pickup only</span> — reserve your order and pay at the counter when you arrive.
+                    Guest checkout is <span className="font-semibold text-fg">pickup only</span>. Reserve your order and pay at the counter when you arrive.
                   </p>
                 ) : (
                   <div className="mt-4 space-y-2">
@@ -285,7 +282,7 @@ export default function CartPage() {
                       checked={fulfillment === 'pickup'}
                       onSelect={() => setFulfillment('pickup')}
                       title="Pick up in store"
-                      text={`Free — grab it at ${store?.name ?? 'the store'}.`}
+                      text={`Free. Grab it at ${store?.name ?? 'the store'}.`}
                     />
                     <FulfillmentOption
                       checked={fulfillment === 'shipping'}
@@ -384,7 +381,7 @@ export default function CartPage() {
               <p className="font-display text-xl font-bold text-fg">{subtotalLabel}</p>
             </div>
             {/* The payment form lives in the summary panel, which is below the
-                lines on mobile — jump to it rather than duplicating it here. */}
+                lines on mobile. Jump to it rather than duplicating it here. */}
             <a href="#order-summary" className={buttonVariants({ variant: 'primary', size: 'lg' })}>
               <PackageCheck aria-hidden className="size-4" />
               Checkout
@@ -511,7 +508,7 @@ function OrderSummary({
       <dl className="mt-5 text-sm">
         <div className="space-y-1">
           <SummaryRow label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={subtotalLabel} strong />
-          <SummaryRow label="Shipping" value={fulfillment === 'pickup' ? 'Free — in-store pickup' : 'Calculated at checkout'} />
+          <SummaryRow label="Shipping" value={fulfillment === 'pickup' ? 'Free. In-store pickup' : 'Calculated at checkout'} />
           <SummaryRow label="Taxes" value="Calculated at checkout" />
           {creditApplied > 0 && <SummaryRow label="Store credit" value={`−${formatPrice(creditApplied)}`} />}
         </div>
@@ -581,7 +578,7 @@ function OrderSummary({
             Create test order (no charge)
           </Button>
           <p className="rounded-btn border border-warning-500/30 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-700">
-            Developer shortcut — places an order without charging a card.
+            Developer shortcut. Places an order without charging a card.
           </p>
         </div>
       )}
@@ -598,18 +595,9 @@ function OrderSummary({
         </Link>
       )}
 
-      <Link
-        to={`/s/${slug}`}
-        className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-fg-muted transition-colors hover:text-brand-600"
-      >
-        <ArrowLeft aria-hidden className="size-4 shrink-0" />
-        Continue shopping
-      </Link>
-
-      <div className="mt-5 grid gap-3 border-t border-border pt-5">
-        <TrustNote icon={ShieldCheck} title="Live inventory" text="Stock is reserved when you pay." />
-        <TrustNote icon={CreditCard} title="Secure payments" text="Card details go straight to Square and never reach our servers." />
-      </div>
+      <BackButton to={`/s/${slug}`} className="mt-4">
+        Back to store
+      </BackButton>
     </aside>
   )
 }
@@ -652,20 +640,6 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
     <div className="flex items-center justify-between gap-3">
       <dt className="text-fg-muted">{label}</dt>
       <dd className={strong ? 'font-bold text-fg' : 'text-right text-fg-muted'}>{value}</dd>
-    </div>
-  )
-}
-
-function TrustNote({ icon: Icon, title, text }: { icon: typeof ShieldCheck; title: string; text: string }) {
-  return (
-    <div className="flex gap-3">
-      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-btn bg-bg text-success-700">
-        <Icon aria-hidden className="size-4" />
-      </span>
-      <div>
-        <p className="text-sm font-bold text-fg">{title}</p>
-        <p className="text-xs leading-5 text-fg-muted">{text}</p>
-      </div>
     </div>
   )
 }

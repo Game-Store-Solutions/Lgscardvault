@@ -191,7 +191,7 @@ export default function AccountPage() {
             onPageChange={setOrdersPage}
             compact
             headerTitle="Marketplace-wide"
-            headerSubtitle="Newest first — paginated across every store."
+            headerSubtitle="Newest first. Paginated across every store."
             emptyDescription="When you check out at any store on this account, your orders will appear here."
             emptyAction={
               <Link to="/" className="text-sm font-bold text-brand-600 hover:underline">

@@ -13,26 +13,26 @@ export const HERO_LAYOUT_OPTIONS: HeroLayoutOption[] = [
   {
     id: 'cinematic',
     title: 'Cinematic (classic)',
-    description: 'Full-height photo banner with gradients and bottom-left copy — the original hero style.',
+    description: 'Full-height photo banner with gradients and bottom-left copy. The original hero style.',
     featured: true,
     emoji: '🎬',
   },
   {
     id: 'living-inventory',
     title: 'Living inventory',
-    description: 'The background is your stock — cards slide through as recently added and trending.',
+    description: 'The background is your stock. Cards slide through as recently added and trending.',
     emoji: '📊',
   },
   {
     id: 'trading-table',
     title: 'Trading table',
-    description: 'Premium playmat with dice, deck box, and sleeves — store copy printed on the mat.',
+    description: 'Premium playmat with dice, deck box, and sleeves. Store copy printed on the mat.',
     emoji: '🎴',
   },
   {
     id: 'event-board',
     title: 'Event board',
-    description: 'Community cork board on the hero — customize events under Storefront → Events.',
+    description: 'Community cork board on the hero. Customize events under Storefront → Events.',
     emoji: '📅',
   },
   {

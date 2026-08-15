@@ -316,7 +316,7 @@ export default function AppLayout() {
             )}
           </nav>
 
-          {/* Cart — always visible top-right when inside a store */}
+          {/* Cart. Always visible top-right when inside a store */}
           {user && storeSlug && <NotificationBell slug={storeSlug} />}
           {cartLink}
 

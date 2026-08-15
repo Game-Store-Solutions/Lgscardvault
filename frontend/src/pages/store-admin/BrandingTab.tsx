@@ -332,7 +332,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                 value={form.logoUrl}
                 onChange={onLogoChange}
                 onUploadComplete={(url) => saveHeroBranding({ logoUrl: url })}
-                hint="Upload an image or paste a URL — also used by the loading screen."
+                hint="Upload an image or paste a URL. Also used by the loading screen."
               />
               <ImageUploadField
                 label="Hero banner image"

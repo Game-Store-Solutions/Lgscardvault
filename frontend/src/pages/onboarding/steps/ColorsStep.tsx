@@ -12,7 +12,7 @@ export function ColorsStep({ data, patchBranding }: { data: OnboardingData; patc
       <div className="space-y-6">
         <div>
           <p className="mb-1 text-sm font-bold text-fg">Store theme library</p>
-          <p className="mb-3 text-xs text-fg-muted">MTG-native mana and guild palettes, plus signature moods — expand a category to choose one.</p>
+          <p className="mb-3 text-xs text-fg-muted">MTG-native mana and guild palettes, plus signature moods. Expand a category to choose one.</p>
           <ThemePresetPicker onSelect={applyPreset} />
         </div>
         <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">

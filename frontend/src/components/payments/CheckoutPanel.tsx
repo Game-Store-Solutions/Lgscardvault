@@ -91,7 +91,7 @@ export function CheckoutPanel({
     return (
       <div className="mt-5 space-y-3">
         <p className="text-sm text-fg-muted">
-          We&apos;ll hold your items. Pay at the counter when you pick up — no card needed online.
+          We&apos;ll hold your items. Pay at the counter when you pick up. No card needed online.
         </p>
         {!paymentReady ? (
           <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{paymentBlockedMessage}</p>

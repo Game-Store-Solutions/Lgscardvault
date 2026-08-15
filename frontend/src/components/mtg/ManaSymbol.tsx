@@ -78,7 +78,7 @@ function Glyph({ symbol, color }: { symbol: string; color: string }) {
           <path d="M66 44 L66 62 L48 62" fill="none" />
         </g>
       )
-    default: // numbers, X, Y, unknown — bold text
+    default: // numbers, X, Y, unknown. Bold text
       return (
         <text x="50" y="68" textAnchor="middle" fontSize="56" fontWeight="800" fontFamily="ui-sans-serif, system-ui, sans-serif" fill={color}>
           {symbol}

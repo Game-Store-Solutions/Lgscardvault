@@ -110,7 +110,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
     sub?.subscriptionStatus === 'suspended'
       ? 'We could not collect your subscription after several attempts, so billing is paused. Save a new payment method below to restore it.'
       : sub?.subscriptionStatus === 'past_due'
-        ? `A renewal was declined${sub.nextAttemptAt ? ` — we will try again on ${formatDate(sub.nextAttemptAt)}` : ''}. Save a new payment method below to settle it sooner.`
+        ? `A renewal was declined${sub.nextAttemptAt ? `. We will try again on ${formatDate(sub.nextAttemptAt)}` : ''}. Save a new payment method below to settle it sooner.`
         : ''
 
   // The owner's real question is "am I paid up?", which the raw status word
@@ -165,7 +165,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
         <CardBody>
           {sub && sub.priceCents <= 0 ? (
             <p className="text-sm text-fg-muted">
-              {sub.planName ?? 'Starter'} is free — no platform subscription payment method is required.
+              {sub.planName ?? 'Starter'} is free. No platform subscription payment method is required.
             </p>
           ) : sub ? (
             <div className="space-y-4">

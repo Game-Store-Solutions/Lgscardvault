@@ -44,7 +44,7 @@ export function CardTile({ item, slug }: CardTileProps) {
             </div>
           )}
 
-          {/* Holographic overlays (the sheen itself signals a foil — no pill needed) */}
+          {/* Holographic overlays (the sheen itself signals a foil. No pill needed) */}
           {image && <span aria-hidden className="tilt-glare pointer-events-none absolute inset-0" />}
           {image && item.isFoil && <span aria-hidden className="tilt-holo pointer-events-none absolute inset-0" />}
 

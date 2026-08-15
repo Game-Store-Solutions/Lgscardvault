@@ -381,7 +381,7 @@ export default function StorePage() {
         </Link>
       </p>
 
-      {/* Quick actions — themed shortcut tiles over the spotlight */}
+      {/* Quick actions. Themed shortcut tiles over the spotlight */}
       <section className="space-y-5">
         <p className="mx-auto max-w-2xl text-center text-sm text-fg/75 sm:text-base">
           Browse thousands of in-stock singles, build decks, sell or trade your collection.
@@ -416,14 +416,14 @@ export default function StorePage() {
         </div>
       </section>
 
-      {/* Game switcher — only when this store actually carries more than one */}
+      {/* Game switcher. Only when this store actually carries more than one */}
       {gameOptions.length > 1 && (
         <section aria-label="Choose a game">
           <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Browse by game" />
         </section>
       )}
 
-      {/* Spotlight — holographic cards in a lively persistent rail */}
+      {/* Spotlight. Holographic cards in a lively persistent rail */}
       {(spotlightLoading || spotlightItems.length > 0) && (
         <section>
           <div className="mb-4 flex items-end justify-between gap-4">
@@ -482,7 +482,7 @@ export default function StorePage() {
         </section>
       )}
 
-      {/* Sealed spotlight — scoped to the same game as everything else */}
+      {/* Sealed spotlight. Scoped to the same game as everything else */}
       <SealedSpotlightRow slug={slug} gameCode={gameFilter} />
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -637,7 +637,7 @@ export default function StorePage() {
         </main>
       </div>
 
-      {/* Advanced filters — mobile bottom-sheet drawer */}
+      {/* Advanced filters. Mobile bottom-sheet drawer */}
       {advancedOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" aria-hidden onClick={() => setAdvancedOpen(false)} />

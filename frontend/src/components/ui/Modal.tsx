@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* Backdrop — a true dim that works on light and dark themes alike. */}
+      {/* Backdrop. A true dim that works on light and dark themes alike. */}
       <div className="absolute inset-0 bg-black/50" aria-hidden />
       {/* Scroll container: centers short modals, lets tall ones be reached. */}
       <div

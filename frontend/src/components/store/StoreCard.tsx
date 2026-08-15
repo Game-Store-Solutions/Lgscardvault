@@ -66,7 +66,7 @@ export function StoreCard({ store, index = 0, className }: StoreCardProps) {
           {blurb || 'Magic: The Gathering singles and sealed product.'}
         </p>
 
-        {/* Trust signals — muted metadata; hierarchy via weight/color, not size */}
+        {/* Trust signals. Muted metadata; hierarchy via weight/color, not size */}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-muted">
           {verified && (
             <span className="inline-flex items-center gap-1 font-medium text-success-700">

@@ -190,7 +190,7 @@ export default function PlatformAdminPage() {
     )
     if (typed == null) return
     if (typed.trim() !== store.slug) {
-      window.alert('Slug did not match — store was not deleted.')
+      window.alert('Slug did not match. Store was not deleted.')
       return
     }
     deleteStore.mutate({ id: store.id, confirmSlug: store.slug })
@@ -350,7 +350,7 @@ export default function PlatformAdminPage() {
             <Card>
               <CardHeader
                 title="Store applications"
-                subtitle={`${pending.length} awaiting review — approve to take the storefront live.`}
+                subtitle={`${pending.length} awaiting review. Approve to take the storefront live.`}
               />
               <CardBody className="space-y-4">
                 {pending.map((store) => (

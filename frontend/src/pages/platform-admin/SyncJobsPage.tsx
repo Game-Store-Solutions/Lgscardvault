@@ -142,7 +142,7 @@ export default function SyncJobsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Sync jobs"
-        subtitle="Queue catalog refreshes. Production workers run continuously — queue a job and watch it in the history table."
+        subtitle="Queue catalog refreshes. Production workers run continuously. Queue a job and watch it in the history table."
         actions={
           <Button
             variant="secondary"
@@ -192,7 +192,7 @@ export default function SyncJobsPage() {
             </div>
             {scryfallMutation.data?.status === 'queued' && (
               <p className="text-sm text-success-700">
-                Queued {scryfallMutation.data.type === 'default_cards' ? 'all printings' : 'unique cards'} — watch
+                Queued {scryfallMutation.data.type === 'default_cards' ? 'all printings' : 'unique cards'}. Watch
                 progress in Run history.
               </p>
             )}
@@ -251,7 +251,7 @@ export default function SyncJobsPage() {
             <EmptyState
               icon={RefreshCw}
               title="No syncs yet"
-              description="Queue a Scryfall or TCGCSV sync above — the run appears here immediately."
+              description="Queue a Scryfall or TCGCSV sync above. The run appears here immediately."
             />
           ) : (
             <div className="overflow-x-auto">

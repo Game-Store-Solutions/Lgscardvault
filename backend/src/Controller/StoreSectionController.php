@@ -97,7 +97,7 @@ final class StoreSectionController extends AbstractController
 
         $case = $this->caseRepository->findOneForStore($store, (int) ($payload['caseId'] ?? 0));
         if (!$case instanceof StoreCase) {
-            return $this->json(['detail' => 'A valid caseId is required — create a display case first.'], 422);
+            return $this->json(['detail' => 'A valid caseId is required. Create a display case first.'], 422);
         }
 
         $section = new StoreSection();

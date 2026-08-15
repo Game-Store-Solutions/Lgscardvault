@@ -652,7 +652,7 @@ final class StoreCsvImportController extends AbstractController
         // Drop stale "bad quantity" errors once qty is valid so the table
         // reflects the edit; Resolve / Retry still required to import.
         if ($row->getQuantity() >= 0 && is_string($row->getError()) && str_contains($row->getError(), 'Quantity must be zero or greater')) {
-            $row->setError('Edited — click Resolve or Retry failed cards to import.');
+            $row->setError('Edited. Click Resolve or Retry failed cards to import.');
         }
 
         $this->entityManager->flush();
@@ -700,7 +700,7 @@ final class StoreCsvImportController extends AbstractController
         $jobGameCode = $job->resolvedGameCode();
         if ($card->resolvedGameCode() !== $jobGameCode) {
             return $this->json(['detail' => sprintf(
-                'That card is not from this import\'s game — pick a card from the %s catalog.',
+                'That card is not from this import\'s game. Pick a card from the %s catalog.',
                 $job->getGame()?->getName() ?? $jobGameCode,
             )], 422);
         }

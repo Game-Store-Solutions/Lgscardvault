@@ -146,7 +146,7 @@ export default function EventsTab({ slug }: { slug: string }) {
           <CardBody className="space-y-4">
             <ul className="divide-y divide-border rounded-card border border-border">
               {form.items.length === 0 ? (
-                <li className="px-4 py-6 text-center text-sm text-fg-muted">No events yet — add one below.</li>
+                <li className="px-4 py-6 text-center text-sm text-fg-muted">No events yet. Add one below.</li>
               ) : (
                 form.items.map((event) => (
                   <li key={event.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -264,7 +264,7 @@ export default function EventsTab({ slug }: { slug: string }) {
           </Button>
           {saveMutation.isSuccess && (
             <p className="text-sm font-medium text-success-700" role="status">
-              Saved — storefront calendar updated.
+              Saved. Storefront calendar updated.
             </p>
           )}
           {errorMessage ? (

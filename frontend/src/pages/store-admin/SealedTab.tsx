@@ -163,7 +163,7 @@ export default function SealedTab({ slug }: { slug: string }) {
       <Card>
         <CardHeader
           title={`${activeGameName} sealed catalog`}
-          subtitle={`Every ${activeGameName} sealed product in the catalog — add what you stock.`}
+          subtitle={`Every ${activeGameName} sealed product in the catalog. Add what you stock.`}
         />
         <CardBody className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -353,7 +353,7 @@ function AddSealedModal({
             <Input value={priceText} onChange={(event) => setPriceText(event.target.value)} placeholder="Market price" />
           </Field>
         </div>
-        <Field label="Cost per unit ($, optional)" hint="What you paid — powers margin reporting.">
+        <Field label="Cost per unit ($, optional)" hint="What you paid. Powers margin reporting.">
           <Input value={costText} onChange={(event) => setCostText(event.target.value)} placeholder="0.00" />
         </Field>
         <div className="flex justify-end gap-2">

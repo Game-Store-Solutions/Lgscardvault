@@ -274,11 +274,11 @@ export function SquarePaymentPanel({
       <p className="rounded-btn bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
         {isDevBuild ? (
           <>
-            Test mode — use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry, CVV{' '}
+            Test mode. Use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry, CVV{' '}
             <span className="font-mono">111</span>, postal <span className="font-mono">94103</span>.
           </>
         ) : (
-          <>Test mode — cards are not charged. Use Square sandbox test card numbers.</>
+          <>Test mode. Cards are not charged. Use Square sandbox test card numbers.</>
         )}
       </p>
     ) : null
@@ -307,7 +307,7 @@ export function SquarePaymentPanel({
           />
         </div>
         {walletsChecked && !googlePay && !applePay && (
-          <p className="text-xs leading-5 text-fg-muted">Wallets aren&apos;t available in this browser — use your card below.</p>
+          <p className="text-xs leading-5 text-fg-muted">Wallets aren&apos;t available in this browser. Use your card below.</p>
         )}
       </div>
     ) : null

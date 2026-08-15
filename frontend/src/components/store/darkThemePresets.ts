@@ -49,7 +49,7 @@ const DARK_MANA_PRESETS: ThemePreset[] = [
     'dark-mana-red',
     'Red',
     darkFull('#EF4444', '#F59E0B', '#140808', '#221010', '#FEE2E2', '#B8866B', '#451A1A'),
-    'Ember and chaos — gold spark on crimson shadow.',
+    'Ember and chaos. Gold spark on crimson shadow.',
   ),
   darkPreset(
     'dark-mana-green',
@@ -61,7 +61,7 @@ const DARK_MANA_PRESETS: ThemePreset[] = [
     'dark-mana-colorless',
     'Colorless',
     darkFull('#94A3B8', '#CBD5E1', '#0F1115', '#181B22', '#E2E8F0', '#64748B', '#334155'),
-    'Artifact vault — gunmetal and silver.',
+    'Artifact vault. Gunmetal and silver.',
   ),
 ]
 
@@ -96,7 +96,7 @@ const DARK_SIGNATURE_PRESETS: ThemePreset[] = [
     'dark-holographic-foil',
     'Holographic Foil',
     darkFull('#C084FC', '#E879F9', '#121218', '#1A1A24', '#F8FAFC', '#94A3B8', '#334155'),
-    'Midnight foil — silver base with iridescent violet accent.',
+    'Midnight foil. Silver base with iridescent violet accent.',
   ),
   darkPreset(
     'dark-artifact',
@@ -108,7 +108,7 @@ const DARK_SIGNATURE_PRESETS: ThemePreset[] = [
     'dark-vintage-lgs',
     'Vintage LGS',
     darkFull('#B8860B', '#D4AF37', '#1A1612', '#252019', '#F5EDD6', '#A89078', '#3D3428'),
-    'After-hours LGS — walnut shadow and antique gold.',
+    'After-hours LGS. Walnut shadow and antique gold.',
   ),
   darkPreset(
     'dark-modern-minimal',
@@ -120,25 +120,25 @@ const DARK_SIGNATURE_PRESETS: ThemePreset[] = [
     'dark-dragon',
     'Dragon',
     darkFull('#EF4444', '#FACC15', '#0C0A0A', '#1C1414', '#FEF2F2', '#A8A29E', '#44403C'),
-    'Crimson hoard — charcoal depths and treasure gold.',
+    'Crimson hoard. Charcoal depths and treasure gold.',
   ),
   darkPreset(
     'dark-arcane',
     'Arcane',
     darkFull('#A78BFA', '#22D3EE', '#0A0612', '#141024', '#F5F3FF', '#C4B5FD', '#3730A3'),
-    'Spell night — purple mana and cyan arc lightning.',
+    'Spell night. Purple mana and cyan arc lightning.',
   ),
   darkPreset(
     'dark-neon-cyber',
     'Neon Cyber',
     darkFull('#C084FC', '#67E8F9', '#0A0A0F', '#121218', '#F8FAFC', '#94A3B8', '#475569'),
-    'LAN-party neon — purple and cyan on graphite.',
+    'LAN-party neon. Purple and cyan on graphite.',
   ),
   darkPreset(
     'dark-eldrazi',
     'Eldrazi',
     darkFull('#A78BFA', '#DDD6FE', '#050508', '#0F0A14', '#EDE9FE', '#7C3AED', '#5B21B6'),
-    'Cosmic horror — void black and lavender warp.',
+    'Cosmic horror. Void black and lavender warp.',
   ),
 ]
 
@@ -147,7 +147,7 @@ const DARK_CLASSIC_PRESETS: ThemePreset[] = [
     'dark-classic-midnight',
     'Midnight',
     darkFull('#8B8CF7', '#F472B6', '#0F1220', '#191D2E', '#F4F5FB', '#A6ABC8', '#2C3146'),
-    'Platform classic dark — soft violet and pink accent.',
+    'Platform classic dark. Soft violet and pink accent.',
   ),
   darkPreset(
     'dark-classic-forest',
@@ -173,7 +173,7 @@ export const DARK_THEME_PRESET_CATEGORIES: ThemePresetCategory[] = [
   {
     id: 'mana',
     title: 'Mana colors',
-    subtitle: 'Dark-mode MTG identity — same mana identities as light themes, built for night shopping.',
+    subtitle: 'Dark-mode MTG identity. Same mana identities as light themes, built for night shopping.',
     featured: true,
     defaultOpen: true,
     presets: DARK_MANA_PRESETS,

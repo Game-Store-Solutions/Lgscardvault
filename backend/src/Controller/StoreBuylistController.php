@@ -294,7 +294,7 @@ final class StoreBuylistController extends AbstractController
                 $offerCents = $entry->getOfferCents()
                     ?? $this->tradeRates->offerCents((int) $marketCents, $buylistRatePercent);
                 if (null === $entry->getOfferCents() && null === $marketCents) {
-                    return $this->json(['detail' => sprintf('No market price for "%s" — ask the store at the counter.', $card?->getName() ?? 'that card')], 422);
+                    return $this->json(['detail' => sprintf('No market price for "%s". Ask the store at the counter.', $card?->getName() ?? 'that card')], 422);
                 }
 
                 // Clamp the entry's cap across every line of the entry, so
@@ -318,7 +318,7 @@ final class StoreBuylistController extends AbstractController
                 $isFoil = FinishVocabulary::isFoil($finish);
                 $marketCents = $this->marketPrices->marketPriceCents($card, $isFoil);
                 if (null === $marketCents) {
-                    return $this->json(['detail' => sprintf('No market price for "%s"%s — ask the store at the counter.', $card->getName(), $isFoil ? ' ('.$finish.')' : '')], 422);
+                    return $this->json(['detail' => sprintf('No market price for "%s"%s. Ask the store at the counter.', $card->getName(), $isFoil ? ' ('.$finish.')' : '')], 422);
                 }
                 $offerCents = $this->tradeRates->offerCents($marketCents, $ratePercent);
                 $quantity = $line['quantity'];
@@ -340,7 +340,7 @@ final class StoreBuylistController extends AbstractController
         }
 
         if ($submission->getItems()->isEmpty()) {
-            return $this->json(['detail' => 'Nothing left to submit — the buy list caps for these cards are already met.'], 422);
+            return $this->json(['detail' => 'Nothing left to submit. The buy list caps for these cards are already met.'], 422);
         }
 
         $submission->setTotalOfferCents($totalOffer);
@@ -445,7 +445,7 @@ final class StoreBuylistController extends AbstractController
                 $totalMarket += $accepted * $item->getMarketPriceCents();
             }
             if (0 === $totalOffer && 0 === $totalMarket) {
-                return $this->json(['detail' => 'Accepting a submission needs at least one accepted copy — decline it instead.'], 422);
+                return $this->json(['detail' => 'Accepting a submission needs at least one accepted copy. Decline it instead.'], 422);
             }
             $submission->setTotalOfferCents($totalOffer);
             $submission->setTotalMarketCents($totalMarket);

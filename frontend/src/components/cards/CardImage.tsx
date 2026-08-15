@@ -51,7 +51,7 @@ export function CardImage({
   return (
     <span
       role="img"
-      aria-label={`${alt} — image not available`}
+      aria-label={`${alt}. Image not available`}
       // Deliberately light in both themes: this stands in for the card face
       // itself, and a blank card is white, not dark.
       className={cx(

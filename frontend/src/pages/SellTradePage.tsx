@@ -321,7 +321,7 @@ export default function SellTradePage() {
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
-      <BackButton to={`/s/${slug}`}>Back to {store?.name ?? 'store'}</BackButton>
+      <BackButton to={`/s/${slug}`}>Back to store</BackButton>
 
       <div>
         <h1 className="inline-flex items-center gap-3 font-display text-3xl font-bold tracking-tight text-fg">
@@ -334,7 +334,7 @@ export default function SellTradePage() {
           {store?.name ?? 'This store'} pays{' '}
           <strong className="text-fg">{cashPercent}% cash</strong> or{' '}
           <strong className="text-fg">{creditPercent}% store credit</strong> of market price for your cards
-          {showBuylistBonus ? ' — with premium rates on the buy list below' : ''}. Build your list and submit it; the
+          {showBuylistBonus ? '. With premium rates on the buy list below' : ''}. Build your list and submit it; the
           store confirms every offer in person.
         </p>
       </div>
@@ -347,7 +347,7 @@ export default function SellTradePage() {
             <BadgeCheck aria-hidden className="mx-auto size-10 text-success-600" />
             <h2 className="font-display text-xl font-bold text-fg">Submission received!</h2>
             <p className="mx-auto max-w-lg text-sm text-fg-muted">
-              Bring your cards to the counter — staff will verify names and conditions before paying out. All offers
+              Bring your cards to the counter. Staff will verify names and conditions before paying out. All offers
               are subject to final approval on inspection.
             </p>
             <Button variant="secondary" onClick={() => setSubmitted(false)}>
@@ -391,7 +391,7 @@ export default function SellTradePage() {
               {bulkOpen && (
                 <div className="space-y-3 rounded-card border border-border bg-bg p-3">
                   <Textarea
-                    label="One card per line — quantities like “4x” are optional"
+                    label="One card per line. Quantities like “4x” are optional"
                     rows={6}
                     value={bulkText}
                     onChange={(e) => setBulkText(e.target.value)}
@@ -406,7 +406,7 @@ export default function SellTradePage() {
 
               {unmatched.length > 0 && (
                 <p className="rounded-btn border border-warning-500/30 bg-warning-50 px-3 py-2 text-sm text-warning-700">
-                  No priced match for: {unmatched.join(', ')} — search for them individually or ask at the counter.
+                  No priced match for: {unmatched.join(', ')}. Search for them individually or ask at the counter.
                 </p>
               )}
 
@@ -436,7 +436,7 @@ export default function SellTradePage() {
               title={
                 <span className="inline-flex items-center gap-2">
                   <Sparkles aria-hidden className="size-4 text-brand-600" />
-                  Buy list — premium rates
+                  Buy list. Premium rates
                 </span>
               }
               subtitle={`Cards ${store?.name ?? 'the store'} is actively hunting. ${
@@ -577,7 +577,7 @@ function SearchResultRow({
         </p>
         <p className="mt-1 text-sm">
           {offer == null ? (
-            <span className="text-fg-muted">No market price — ask at the counter</span>
+            <span className="text-fg-muted">No market price. Ask at the counter</span>
           ) : (
             <>
               <span className="font-bold text-success-700">{formatPrice(offer)}</span>{' '}

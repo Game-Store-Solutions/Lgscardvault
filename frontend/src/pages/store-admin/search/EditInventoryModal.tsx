@@ -211,7 +211,7 @@ function EditInventoryModalBody({
                 value={editCostText}
                 onChange={(e) => setEditCostText(e.target.value)}
                 inputMode="decimal"
-                placeholder="What you paid — powers profit reports"
+                placeholder="What you paid. Powers profit reports"
               />
             </div>
 
@@ -226,7 +226,7 @@ function EditInventoryModalBody({
               </div>
             )}
 
-            {/* Variants — placed beside the card so it fills the column instead
+            {/* Variants. Placed beside the card so it fills the column instead
                 of leaving a bare gap under the price field. */}
             <div className="border-t border-border pt-5">
               <div className="flex flex-wrap items-center justify-between gap-3">

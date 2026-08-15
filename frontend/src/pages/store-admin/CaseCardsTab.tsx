@@ -60,7 +60,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
       <Card>
         <CardHeader
           title="Display cases"
-          subtitle="A case is a physical display in your store. Divide each one into sections — every section tracks its own cards, quantities, and pull sheet."
+          subtitle="A case is a physical display in your store. Divide each one into sections. Every section tracks its own cards, quantities, and pull sheet."
         />
         <CardBody>
           <form
@@ -167,8 +167,8 @@ function CaseEditor({ slug, storeCase }: { slug: string; storeCase: StoreCaseSum
           maxLength={120}
         />
         <Select label="Fill mode" value={mode} onChange={(e) => setMode(e.target.value as StoreSectionMode)}>
-          <option value="auto">Auto — pull by filters</option>
-          <option value="manual">Manual — pick cards</option>
+          <option value="auto">Auto (pull by filters)</option>
+          <option value="manual">Manual (pick cards)</option>
         </Select>
         <Button type="submit" loading={createSection.isPending} disabled={!title.trim()}>
           <Plus className="size-4" aria-hidden />
@@ -182,7 +182,7 @@ function CaseEditor({ slug, storeCase }: { slug: string; storeCase: StoreCaseSum
       )}
 
       {storeCase.sections.length === 0 ? (
-        <p className="text-sm text-fg-muted">No sections yet — add one above.</p>
+        <p className="text-sm text-fg-muted">No sections yet. Add one above.</p>
       ) : (
         <div className="space-y-6">
           {storeCase.sections.map((section) => (
@@ -359,7 +359,7 @@ function SectionEditor({
                 </span>
               )}
               <span className="text-xs text-fg-muted">
-                Pulls 1 copy per card; cards already promised to other sections are skipped. Re-pull any time — sold cards stay tracked.
+                Pulls 1 copy per card; cards already promised to other sections are skipped. Re-pull any time. Sold cards stay tracked.
               </span>
             </div>
           </div>
@@ -402,8 +402,8 @@ function SectionEditor({
         {section.cards.length === 0 ? (
           <p className="text-sm text-fg-muted">
             {section.mode === 'auto'
-              ? 'No cards yet — set your filters and pull from inventory.'
-              : 'No cards yet — add some from your inventory.'}
+              ? 'No cards yet. Set your filters and pull from inventory.'
+              : 'No cards yet. Add some from your inventory.'}
           </p>
         ) : (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -487,7 +487,7 @@ function PullSheetModal({ slug, section, onClose }: { slug: string; section: Sto
     <Modal
       open
       onClose={onClose}
-      title={`Pull sheet — ${sheet?.caseName ?? ''} / ${section.title}`}
+      title={`Pull sheet: ${sheet?.caseName ?? ''} / ${section.title}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -581,7 +581,7 @@ function StockingSheetModal({
     <Modal
       open
       onClose={onClose}
-      title={`Stocking sheet — ${sheet?.caseName ?? ''} / ${section.title}`}
+      title={`Stocking sheet: ${sheet?.caseName ?? ''} / ${section.title}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -701,7 +701,7 @@ function printStockingSheet(sheet: StockingSheet) {
     <!doctype html>
     <html>
       <head>
-        <title>Stocking sheet — ${escapeHtml(sheet.caseName ?? '')} / ${escapeHtml(sheet.sectionTitle)}</title>
+        <title>Stocking sheet: ${escapeHtml(sheet.caseName ?? '')} / ${escapeHtml(sheet.sectionTitle)}</title>
         <style>
           body { color: #111827; font-family: Arial, sans-serif; margin: 32px; }
           header { border-bottom: 2px solid #111827; margin-bottom: 20px; padding-bottom: 12px; }
@@ -716,7 +716,7 @@ function printStockingSheet(sheet: StockingSheet) {
       </head>
       <body>
         <header>
-          <h1>Stocking Sheet — ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
+          <h1>Stocking Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
           <div class="muted">${sheet.totalCards} cop${sheet.totalCards === 1 ? 'y' : 'ies'} to place in the case · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
         </header>
         <table>
@@ -775,7 +775,7 @@ function printPullSheet(sheet: PullSheet) {
     <!doctype html>
     <html>
       <head>
-        <title>Pull sheet — ${escapeHtml(sheet.caseName ?? '')} / ${escapeHtml(sheet.sectionTitle)}</title>
+        <title>Pull sheet: ${escapeHtml(sheet.caseName ?? '')} / ${escapeHtml(sheet.sectionTitle)}</title>
         <style>
           body { color: #111827; font-family: Arial, sans-serif; margin: 32px; }
           header { border-bottom: 2px solid #111827; margin-bottom: 20px; padding-bottom: 12px; }
@@ -790,7 +790,7 @@ function printPullSheet(sheet: PullSheet) {
       </head>
       <body>
         <header>
-          <h1>Pull Sheet — ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
+          <h1>Pull Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
           <div class="muted">${sheet.totalCards} card${sheet.totalCards === 1 ? '' : 's'} to pull · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
         </header>
         <table>

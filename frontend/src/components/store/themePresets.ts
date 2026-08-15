@@ -31,13 +31,13 @@ const neutralLight = (
 
 const MANA_PRESETS: ThemePreset[] = [
   preset('mana-white', 'White', neutralLight('#B45309', '#CA8A04', '#FFFDF7', '#FFFFFF', '#1C1917', '#78716C', '#E7E5E4'), {
-    description: 'Warm ivory shop — amber gold primary, soft borders.',
+    description: 'Warm ivory shop. Amber gold primary, soft borders.',
   }),
   preset('mana-blue', 'Blue', neutralLight('#1D4ED8', '#94A3B8', '#F0F9FF', '#FFFFFF', '#0F172A', '#64748B', '#BAE6FD'), {
     description: 'Crisp sky background with royal blue buttons.',
   }),
   preset('mana-black', 'Black', neutralLight('#374151', '#9CA3AF', '#F4F4F5', '#FFFFFF', '#18181B', '#71717A', '#D4D4D8'), {
-    description: 'Sleek zinc gray — power without muddy contrast.',
+    description: 'Sleek zinc gray. Power without muddy contrast.',
   }),
   preset('mana-red', 'Red', neutralLight('#DC2626', '#F59E0B', '#FEF2F2', '#FFFFFF', '#450A0A', '#B91C1C', '#FECACA'), {
     description: 'Bold red primary on a light rose page.',
@@ -46,7 +46,7 @@ const MANA_PRESETS: ThemePreset[] = [
     description: 'Fresh forest green with golden accent.',
   }),
   preset('mana-colorless', 'Colorless', neutralLight('#475569', '#CBD5E1', '#F8FAFC', '#FFFFFF', '#0F172A', '#64748B', '#E2E8F0'), {
-    description: 'Artifact steel — neutral, professional, readable.',
+    description: 'Artifact steel. Neutral, professional, readable.',
   }),
 ]
 
@@ -124,7 +124,7 @@ const SIGNATURE_PRESETS: ThemePreset[] = [
     'vintage-lgs',
     'Vintage LGS',
     neutralLight('#78350F', '#B45309', '#FAF5EB', '#FFFCF5', '#292524', '#78716C', '#E7E5E4'),
-    { description: 'Parchment walls and walnut brown — cozy LGS.' },
+    { description: 'Parchment walls and walnut brown. Cozy LGS.' },
   ),
   preset(
     'modern-minimal',
@@ -137,7 +137,7 @@ const SIGNATURE_PRESETS: ThemePreset[] = [
     'Dragon',
     neutralLight('#B91C1C', '#EAB308', '#1C1414', '#2A2222', '#FEF2F2', '#A8A29E', '#44403C'),
     {
-      description: 'Dark crimson hoard — use with dark mode toggle.',
+      description: 'Dark crimson hoard. Use with dark mode toggle.',
       darkPalette: {
         primaryColor: '#EF4444',
         accentColor: '#FACC15',
@@ -188,7 +188,7 @@ const SIGNATURE_PRESETS: ThemePreset[] = [
     'Eldrazi',
     neutralLight('#5B21B6', '#C4B5FD', '#0F0A14', '#1A1225', '#EDE9FE', '#8B5CF6', '#4C1D95'),
     {
-      description: 'Cosmic void violet — eerie but readable.',
+      description: 'Cosmic void violet. Eerie but readable.',
       darkPalette: {
         primaryColor: '#8B5CF6',
         accentColor: '#DDD6FE',
@@ -311,7 +311,7 @@ export const THEME_PRESET_CATEGORIES: ThemePresetCategory[] = [
   {
     id: 'mana',
     title: 'Mana colors',
-    subtitle: 'MTG-native identity — pick White, Blue, Black, Red, Green, or Colorless as your store primary.',
+    subtitle: 'MTG-native identity. Pick White, Blue, Black, Red, Green, or Colorless as your store primary.',
     featured: true,
     defaultOpen: true,
     presets: MANA_PRESETS,
@@ -319,7 +319,7 @@ export const THEME_PRESET_CATEGORIES: ThemePresetCategory[] = [
   {
     id: 'guild',
     title: 'Guild themes',
-    subtitle: 'Two-color guild palettes with metallic accents — Azorius through Simic.',
+    subtitle: 'Two-color guild palettes with metallic accents. Azorius through Simic.',
     featured: true,
     defaultOpen: false,
     presets: GUILD_PRESETS,
@@ -335,7 +335,7 @@ export const THEME_PRESET_CATEGORIES: ThemePresetCategory[] = [
   {
     id: 'classic',
     title: 'Seasonal & classic',
-    subtitle: 'Original platform presets — light, dark, and seasonal palettes.',
+    subtitle: 'Original platform presets. Light, dark, and seasonal palettes.',
     defaultOpen: false,
     presets: CLASSIC_PRESETS,
   },

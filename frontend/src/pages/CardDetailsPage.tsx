@@ -347,8 +347,8 @@ export default function CardDetailsPage() {
     <div className={cx(bleed, 'pb-12')}>
       <div className={cx(inset, 'flex flex-wrap items-center justify-between gap-3 py-4')}>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
-          <BackButton to={backTo} tone="soft" className="shrink-0">
-            {backLabel ? `Back to ${backLabel}` : store?.name ?? 'Store'}
+          <BackButton to={backTo} className="shrink-0">
+            {backLabel ? `Back to ${backLabel}` : 'Back to store'}
           </BackButton>
           <span aria-hidden className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
           <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1.5 text-sm text-fg-muted sm:flex">
@@ -391,7 +391,7 @@ export default function CardDetailsPage() {
       <div className={inset}>
         <article className="product-detail-sheet">
         <div className="flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)_minmax(20rem,28rem)] xl:grid-cols-[minmax(17rem,24rem)_minmax(0,1fr)_minmax(22rem,30rem)] lg:items-start lg:gap-0">
-          {/* Card art — left */}
+          {/* Card art. Left */}
           <div className={cx(colPad, 'order-1 lg:col-start-1 lg:row-start-1')}>
             <div className="mx-auto w-full max-w-[20rem] sm:max-w-[22rem] lg:mx-0 lg:max-w-none">
               {multiFace ? (
@@ -439,7 +439,7 @@ export default function CardDetailsPage() {
             </p>
           </div>
 
-          {/* Details + market — center */}
+          {/* Details + market. Center */}
           <div className={cx(colPad, 'order-2 min-w-0 lg:col-start-2 lg:row-start-1')}>
             <header className="mb-5 max-w-3xl">
               <h1 className="text-2xl font-bold leading-snug text-fg lg:text-[1.65rem]">{productTitle}</h1>
@@ -645,7 +645,7 @@ export default function CardDetailsPage() {
             </section>
           </div>
 
-          {/* Buy column — TCGplayer Direct-style stacked modules */}
+          {/* Buy column. TCGplayer Direct-style stacked modules */}
           <aside className={cx(colPad, 'order-3 space-y-3 lg:col-start-3 lg:row-start-1')}>
             <div className="space-y-3 lg:sticky lg:top-16">
               <div className="tcg-buy-box overflow-hidden">
@@ -695,7 +695,7 @@ export default function CardDetailsPage() {
 
                   {!user && (
                     <p className="mt-2 text-center text-xs text-fg-muted">
-                      No account needed — add to cart and pay in store at pickup.
+                      No account needed. Add to cart and pay in store at pickup.
                     </p>
                   )}
 

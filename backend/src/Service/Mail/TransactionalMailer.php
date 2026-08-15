@@ -88,7 +88,7 @@ final class TransactionalMailer
             subject: 'Welcome to LGS Card Vault',
             htmlTemplate: 'emails/platform/welcome.html.twig',
             context: [
-                'preheader' => 'Your account is ready — shop local game stores in one place.',
+                'preheader' => 'Your account is ready. Shop local game stores in one place.',
                 'displayName' => $name,
                 'isOwner' => $isOwner,
                 'ctaUrl' => $ctaUrl,
@@ -130,7 +130,7 @@ final class TransactionalMailer
                 'footerNote' => "You're receiving this because you applied to open a store on LGS Card Vault.",
             ],
             textBody: sprintf(
-                "Great news — %s has been approved and is now live.\n\nStorefront: %s\nDashboard: %s\n",
+                "Great news. %s has been approved and is now live.\n\nStorefront: %s\nDashboard: %s\n",
                 $name,
                 $storeUrl,
                 $adminUrl,
@@ -184,7 +184,7 @@ final class TransactionalMailer
 
         $this->sendHtml(
             to: $email,
-            subject: sprintf('Ready for pickup — %s', $ref),
+            subject: sprintf('Ready for pickup: %s', $ref),
             htmlTemplate: 'emails/store/order_fulfilled.html.twig',
             context: [
                 'preheader' => sprintf('Your order %s from %s is ready for pickup.', $ref, $storeName),

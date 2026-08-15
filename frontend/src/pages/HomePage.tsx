@@ -114,7 +114,7 @@ export default function HomePage() {
             Find singles from trusted local stores
           </h1>
           <p className="mt-3 max-w-xl text-base text-fg-muted">
-            Magic, Pokémon, One Piece, Flesh &amp; Blood — browse verified storefronts and shop with confidence.
+            Magic, Pokémon, One Piece, Flesh &amp; Blood. Browse verified storefronts and shop with confidence.
           </p>
 
           <div className="relative mt-7 max-w-xl">
@@ -136,7 +136,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured store — only when a platform admin has selected one */}
+      {/* Featured store. Only when a platform admin has selected one */}
       {!searching && featured && (
         <section>
           <PageHeader title="Featured store" subtitle="Hand-picked by the LGS Card Vault team." className="mb-4" />
@@ -162,7 +162,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* All stores — sortable, searchable grid */}
+      {/* All stores. Sortable, searchable grid */}
       <section>
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <PageHeader

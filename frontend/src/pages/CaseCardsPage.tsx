@@ -40,13 +40,13 @@ export default function CaseCardsPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <BackButton to={`/s/${slug}`}>Back to {store?.name ?? 'store'}</BackButton>
+        <BackButton to={`/s/${slug}`}>Back to store</BackButton>
 
         <div>
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg">{CASE_CARDS_LABEL}</h1>
           <div className="mt-2 h-1 w-12 rounded-full bg-brand-500" aria-hidden />
           <p className="mt-3 max-w-xl text-sm text-fg-muted">
-            The singles in {store?.name ?? 'the store'}'s display cases — hand-picked and ready to go.
+            The singles in {store?.name ?? 'the store'}'s display cases. Hand-picked and ready to go.
           </p>
         </div>
       </div>

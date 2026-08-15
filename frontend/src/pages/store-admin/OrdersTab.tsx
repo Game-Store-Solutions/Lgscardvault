@@ -348,7 +348,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
             <EmptyState
               icon={ReceiptText}
               title="No orders yet"
-              description="Customer orders will appear here — or ring up the first sale at the kiosk."
+              description="Customer orders will appear here. Or ring up the first sale at the kiosk."
               action={
                 <Button size="sm" onClick={() => setKioskOpen(true)}>
                   <Monitor className="size-4" aria-hidden />
@@ -972,7 +972,7 @@ function printOrderSheet(order: Order) {
       const caseQuantity = line.caseQuantity ?? 0
       const caseBadge =
         caseQuantity > 0
-          ? `<div class="case-badge">CASE CARD — ${escapeHtml(line.caseName ?? 'Case')} / ${escapeHtml(line.sectionTitle ?? 'Section')}${
+          ? `<div class="case-badge">CASE CARD. ${escapeHtml(line.caseName ?? 'Case')} / ${escapeHtml(line.sectionTitle ?? 'Section')}${
               caseQuantity < line.quantity ? ` · pull ${caseQuantity} of ${line.quantity} from case` : ''
             }</div>`
           : ''

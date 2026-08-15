@@ -239,7 +239,7 @@ export default function SearchTab({ slug }: { slug: string }) {
       <Card>
         <CardHeader
           title={`Add ${activeGameName} inventory`}
-          subtitle={`Searches the ${activeGameName} catalog — every printing that exists, not just what you stock. Results are limited to ${activeGameName}.`}
+          subtitle={`Searches the ${activeGameName} catalog. Every printing that exists, not just what you stock. Results are limited to ${activeGameName}.`}
         />
         <CardBody className="space-y-5">
           {mutationError && (

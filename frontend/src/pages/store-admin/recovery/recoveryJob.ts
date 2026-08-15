@@ -18,9 +18,9 @@ export function recoveryJobCopy(job: RecoveryJob): { title: string; hint: string
     case 'quantity':
       return { title: 'Fix the quantity', hint: 'Set how many copies to add. We match the printing from the sheet.' }
     case 'price':
-      return { title: 'Set a sell price', hint: 'This printing has no market price. We fill one in from another printing when we have it — edit it, or pick that printing.' }
+      return { title: 'Set a sell price', hint: 'This printing has no market price. We fill one in from another printing when we have it. Edit it, or pick that printing.' }
     case 'match':
-      return { title: 'Find the card', hint: 'Pick a printing from the catalog. Browse all printings of the name — no extra tab.' }
+      return { title: 'Find the card', hint: 'Pick a printing from the catalog. Browse all printings of the name. No extra tab.' }
     case 'online':
       return { title: 'Online-only printing', hint: 'Skip this Alchemy/Arena row, or switch to the paper printing.' }
     default:

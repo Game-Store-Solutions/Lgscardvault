@@ -257,7 +257,7 @@ export default function SellTradeTab({ slug }: { slug: string }) {
                 <p className="px-5 py-16 text-center text-sm text-fg-muted">
                   {queueTab === 'review'
                     ? 'No new submissions waiting for review.'
-                    : 'No accepted submissions awaiting payout. Completed deals may be in the archive below — use Restore on archived accepted rows.'}
+                    : 'No accepted submissions awaiting payout. Completed deals may be in the archive below. Use Restore on archived accepted rows.'}
                 </p>
               ) : (
                 <>
@@ -458,7 +458,7 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
             (rates.buylistCashPercent > rates.cashPercent || rates.buylistCreditPercent > rates.creditPercent
               ? `, boosted to ${rates.buylistCashPercent}% / ${rates.buylistCreditPercent}% on your buy list`
               : '') +
-            (rates.promoActive ? ' — promo rates are LIVE.' : '.')
+            (rates.promoActive ? '. Promo rates are LIVE.' : '.')
           : 'Percent of market price paid for trade-ins.'
       }
     >
@@ -667,7 +667,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
         {isLoading ? (
           <LoadingPanel />
         ) : buylist.length === 0 ? (
-          <EmptyState icon={WalletCards} title="Your buy list is empty" description="Add the cards you want to buy — they appear on your public Sell/Trade page at premium rates." />
+          <EmptyState icon={WalletCards} title="Your buy list is empty" description="Add the cards you want to buy. They appear on your public Sell/Trade page at premium rates." />
         ) : (
           <ul className="space-y-2">
             {buylist.map((entry) => (
@@ -956,7 +956,7 @@ function ReviewSubmissionModal({
     <Modal
       open
       onClose={onClose}
-      title={`${isPending ? 'Review' : 'Submission'} #${submission.id} — ${submission.customerName ?? 'Customer'}`}
+      title={`${isPending ? 'Review' : 'Submission'} #${submission.id}: ${submission.customerName ?? 'Customer'}`}
       className="max-w-3xl"
     >
       <div className="space-y-4">
@@ -1166,7 +1166,7 @@ function printReviewSheet(submission: SellSubmission, reviewed: ReviewedLine[]) 
       </head>
       <body>
         <header>
-          <h1>Sell submission #${submission.id} — ${escapeHtml(submission.customerName ?? 'Customer')}</h1>
+          <h1>Sell submission #${submission.id}. ${escapeHtml(submission.customerName ?? 'Customer')}</h1>
           <div class="muted">
             ${escapeHtml(new Date(submission.createdAt).toLocaleString())}
             · payout ${submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}

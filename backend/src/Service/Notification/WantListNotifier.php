@@ -55,7 +55,7 @@ final class WantListNotifier
         }
 
         $title = sprintf('%s is in stock', $cardName);
-        $body = sprintf('%s — from your want list — is now available at %s.', $cardName, $store->getName() ?? 'a store');
+        $body = sprintf('%s from your want list is now available at %s.', $cardName, $store->getName() ?? 'a store');
 
         $notified = [];
         foreach ($entries as $entry) {

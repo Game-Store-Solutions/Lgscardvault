@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
-  ArrowLeft,
   Check,
   Crown,
   Layers,
@@ -23,7 +22,7 @@ import {
   useStoreTheme,
 } from '../hooks'
 import type { CommanderSummary, SpellbookCombo } from '../hooks'
-import { Button, buttonVariants, EmptyState, Input } from '../components/ui'
+import { Button, BackButton, buttonVariants, EmptyState, Input } from '../components/ui'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
@@ -143,13 +142,7 @@ export default function CommanderSynergyPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <Link
-        to={`/s/${slug}`}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-fg-muted hover:text-brand-600"
-      >
-        <ArrowLeft aria-hidden className="size-4" />
-        Back to {store.name}
-      </Link>
+      <BackButton to={`/s/${slug}`}>Back to store</BackButton>
 
       <header className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>

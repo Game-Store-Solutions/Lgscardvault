@@ -51,7 +51,7 @@ export default function App() {
 
             <Route element={<AppLayout />}>
               <Route index element={<HomePage />} />
-              {/* Global identity settings + "your stores" — one account across the marketplace */}
+              {/* Global identity settings + "your stores". One account across the marketplace */}
               <Route
                 path="account"
                 element={
@@ -80,7 +80,7 @@ export default function App() {
                 }
               />
             </Route>
-            {/* Store admin — slug lives on the layout route so the sidebar can build section links */}
+            {/* Store admin. Slug lives on the layout route so the sidebar can build section links */}
             <Route
               path="s/:slug/admin"
               element={

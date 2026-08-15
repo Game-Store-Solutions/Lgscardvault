@@ -30,7 +30,7 @@ export function TradePromoBanner({ slug, showSellLink = false }: { slug: string;
       <Timer aria-hidden className="size-5 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="font-display font-bold">
-          Boosted trade-in rates are live — {rates.cashPercent}% cash / {rates.creditPercent}% store credit of market
+          Boosted trade-in rates are live. {rates.cashPercent}% cash / {rates.creditPercent}% store credit of market
           price!
         </p>
         {countdown && <p className="text-sm text-white/85">Ends in {countdown}</p>}

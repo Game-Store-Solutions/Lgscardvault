@@ -124,7 +124,7 @@ export default function CustomerProfilePage() {
     <ProfileLayout
       nav={
         <div className="space-y-3">
-          <BackButton to={`/s/${slug}`} tone="soft" className="w-full justify-start">
+          <BackButton to={`/s/${slug}`} className="w-full justify-start">
             Back to store
           </BackButton>
           <ProfileSideNav title="My activity" items={navItems} value={tab} onChange={(id) => setTab(id as TabId)} />
@@ -207,7 +207,7 @@ export default function CustomerProfilePage() {
         <Card className="mt-6 rounded-2xl">
           <CardBody className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-fg-muted">
-              Your name, profile image, and password are platform-wide — manage them once for every store.
+              Your name, profile image, and password are platform-wide. Manage them once for every store.
             </p>
             <Link to="/account" className="text-sm font-bold text-brand-600 hover:underline">
               Account settings →
@@ -690,7 +690,7 @@ function WantListPanel({
         <ErrorState title="Could not load your want list." onRetry={() => void query.refetch()} />
       ) : entries.length === 0 ? (
         <p className="rounded-2xl bg-bg/80 px-4 py-8 text-center text-sm text-fg-muted">
-          Nothing on your list yet — search above to tell the store what you&apos;re looking for.
+          Nothing on your list yet. Search above to tell the store what you&apos;re looking for.
         </p>
       ) : (
         <ul className="overflow-hidden rounded-2xl bg-surface shadow-sm ring-1 ring-border/80">

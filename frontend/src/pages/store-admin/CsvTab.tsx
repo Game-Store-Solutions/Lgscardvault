@@ -118,8 +118,8 @@ export default function CsvTab({ slug }: { slug: string }) {
                     <span className="font-medium text-fg">
                       {queuedRows} row{queuedRows === 1 ? '' : 's'} waiting in the queue
                     </span>
-                    — batches of ~40 cards resolve against Scryfall, so large files take a few minutes. If nothing
-                    changes for over a minute, the background worker may be stuck — refresh this page or retry the
+                   . Batches of ~40 cards resolve against Scryfall, so large files take a few minutes. If nothing
+                    changes for over a minute, the background worker may be stuck. Refresh this page or retry the
                     import; production workers run continuously and do not need to be started by hand.
                   </>
                 )}
@@ -145,13 +145,13 @@ export default function CsvTab({ slug }: { slug: string }) {
                   {failedCount > 0 ? (
                     <>
                       <span className="font-bold">{failedCount}</span> failed card
-                      {failedCount === 1 ? '' : 's'} — match them to real printings, or skip the ones that cannot be
+                      {failedCount === 1 ? '' : 's'}. Match them to real printings, or skip the ones that cannot be
                       fixed.
                     </>
                   ) : (
                     <>
                       <span className="font-bold">{skippedCount}</span> skipped card
-                      {skippedCount === 1 ? '' : 's'} — review them or put them back in the queue.
+                      {skippedCount === 1 ? '' : 's'}. Review them or put them back in the queue.
                     </>
                   )}
                 </p>

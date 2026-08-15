@@ -153,7 +153,7 @@ export function CardRecoverySearch({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void submitReference()
               }}
-              placeholder="scryfall.com/card/clb/532 — or clb/532"
+              placeholder="scryfall.com/card/clb/532. Or clb/532"
             />
             <Button variant="secondary" loading={resolveByReference.isPending} onClick={() => void submitReference()}>
               Use link

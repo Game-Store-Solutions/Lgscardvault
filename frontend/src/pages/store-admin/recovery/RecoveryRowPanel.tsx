@@ -394,10 +394,10 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
                     placeholder="0.00"
                     hint={
                       selectedMarketCents
-                        ? `Market price ${formatPrice(selectedMarketCents)} — edit to override`
+                        ? `Market price ${formatPrice(selectedMarketCents)}. Edit to override`
                         : siblingMarketCents
-                          ? `From another printing (${formatPrice(siblingMarketCents)}) — edit to override`
-                          : 'No market price for this printing — set what you will sell it for'
+                          ? `From another printing (${formatPrice(siblingMarketCents)}). Edit to override`
+                          : 'No market price for this printing. Set what you will sell it for'
                     }
                   />
                 </>

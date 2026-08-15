@@ -618,7 +618,7 @@ final class StoreCustomerController extends AbstractController
         }
 
         if ($this->checkoutGateway->isReady($store)) {
-            return $this->json(['detail' => 'Online card checkout is available — use Pay with card instead.'], 422);
+            return $this->json(['detail' => 'Online card checkout is available. Use Pay with card instead.'], 422);
         }
 
         $user = $this->getUser();
