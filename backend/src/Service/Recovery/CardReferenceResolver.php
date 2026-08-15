@@ -19,7 +19,9 @@ use Symfony\Component\Uid\Uuid;
 final readonly class CardReferenceResolver
 {
     private const UUID_BODY = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-    private const SET_COLLECTOR_PATTERN = '~^([a-z0-9]{2,10})[/ ]([a-z0-9\-\x{2605}]{1,20})$~iu';
+    // Collector must contain a digit (or a star) so two-word names like
+    // "Snapping Gnarlid" are not parsed as set + collector.
+    private const SET_COLLECTOR_PATTERN = '~^([a-z0-9]{2,10})[/ ]((?=[a-z0-9\\-\x{2605}]*[0-9\x{2605}])[a-z0-9\\-\x{2605}]{1,20})$~iu';
     private const PAGE_URL_PATTERN = '~https?://(?:www\.)?scryfall\.com/card/([a-z0-9]{2,10})/([^/?#\s]+)~i';
     private const API_SET_URL_PATTERN = '~https?://api\.scryfall\.com/cards/([a-z0-9]{2,10})/([^/?#\s]+)~i';
     private const API_ID_URL_PATTERN = '~https?://api\.scryfall\.com/cards/('.self::UUID_BODY.')~i';

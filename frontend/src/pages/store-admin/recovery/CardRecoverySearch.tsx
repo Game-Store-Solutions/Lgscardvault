@@ -141,7 +141,7 @@ export function CardRecoverySearch({
             className={showLink ? 'ring-1 ring-fg/20' : undefined}
           >
             <Link2 aria-hidden className="size-4" />
-            Scryfall
+            Paste link
           </Button>
         </div>
 

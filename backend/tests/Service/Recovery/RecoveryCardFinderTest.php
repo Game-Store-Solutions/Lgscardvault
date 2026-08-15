@@ -152,7 +152,7 @@ final class RecoveryCardFinderTest extends KernelTestCase
         self::assertStringContainsString('paper', strtolower($result->rejected[0]['reason']));
     }
 
-    public function testPaperPrintingsOfListsSiblingsWithoutTheCardItself(): void
+    public function testPaperPrintingsOfLeadsWithTheCardThenSiblings(): void
     {
         $oracle = '11112222-3333-4444-5555-666677778888';
         $first = $this->paperCard(41, [
@@ -171,8 +171,9 @@ final class RecoveryCardFinderTest extends KernelTestCase
 
         $siblings = $this->finder->paperPrintingsOf($first);
 
-        self::assertCount(1, $siblings);
-        self::assertSame('lea', $siblings[0]->getSetCode());
+        self::assertSame('c21', $siblings[0]->getSetCode());
+        self::assertSame('lea', $siblings[1]->getSetCode());
+        self::assertCount(2, $siblings);
     }
 
     public function testBrowsePrintingsReturnsEverySetAndIgnoresTheSheetFilter(): void

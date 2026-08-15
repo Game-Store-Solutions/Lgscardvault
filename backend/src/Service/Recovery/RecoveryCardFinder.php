@@ -396,7 +396,8 @@ final class RecoveryCardFinder
      * one-click path from "close, but the wrong printing" to the right one.
      *
      * Pulls Scryfall's oracle-id prints list first so the picker is not stuck
-     * on whatever happened to be in the local catalog.
+     * on whatever happened to be in the local catalog. The original printing
+     * is included when a refresh gives it a market price (stale $0 rows).
      *
      * @return list<Card>
      */
@@ -411,16 +412,20 @@ final class RecoveryCardFinder
             // Local siblings are still useful when Scryfall is down.
         }
 
-        $siblings = [];
+        $fresh = $this->cardRepository->find($card->getId()) ?? $card;
+        $printings = [];
+        if ($this->stockablePrintingPolicy->isStoredStockable($fresh)) {
+            $printings[] = $fresh;
+        }
         foreach ($this->cardRepository->findPrintingsByOracleId($card->getOracleId()) as $printing) {
-            if ((string) $printing->getId() === (string) $card->getId()) {
+            if ((string) $printing->getId() === (string) $fresh->getId()) {
                 continue;
             }
             if ($this->stockablePrintingPolicy->isStoredStockable($printing)) {
-                $siblings[] = $printing;
+                $printings[] = $printing;
             }
         }
 
-        return $siblings;
+        return $printings;
     }
 }

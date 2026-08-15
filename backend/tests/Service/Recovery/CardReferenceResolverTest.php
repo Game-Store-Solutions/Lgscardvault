@@ -57,4 +57,29 @@ final class CardReferenceResolverTest extends KernelTestCase
     {
         self::assertNull($this->resolver->resolve('http://169.254.169.254/latest/meta-data/'));
     }
+
+    public function testTwoWordCardNameIsNotASetCollectorPair(): void
+    {
+        self::assertNull($this->resolver->resolve('Snapping Gnarlid'));
+        self::assertNull($this->resolver->resolve('Lightning Bolt'));
+        self::assertNull($this->resolver->resolve('Sol Ring'));
+        self::assertNull($this->resolver->resolve('Fire/Ice'));
+        self::assertNull($this->resolver->resolve('Pharika\'s Libation'));
+    }
+
+    public function testResolvesSpaceSeparatedSetAndCollector(): void
+    {
+        $this->fixtures->card(263, [
+            'name' => 'Sol Ring',
+            'set' => 'c21',
+            'collector_number' => '263',
+            'games' => ['paper'],
+            'prices' => ['usd' => '1.50'],
+        ]);
+
+        $card = $this->resolver->resolve('c21 263');
+
+        self::assertNotNull($card);
+        self::assertSame('Sol Ring', $card->getName());
+    }
 }
