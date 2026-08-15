@@ -175,6 +175,23 @@ final class RecoveryCardFinderTest extends KernelTestCase
         self::assertSame('lea', $siblings[0]->getSetCode());
     }
 
+    public function testBrowsePrintingsReturnsEverySetAndIgnoresTheSheetFilter(): void
+    {
+        $this->paperCard(61, [
+            'name' => 'Sol Ring', 'set' => 'c21', 'collector_number' => '263',
+        ]);
+        $this->paperCard(62, [
+            'name' => 'Sol Ring', 'set' => 'lea', 'collector_number' => '270',
+        ]);
+
+        $result = $this->finder->browsePrintings(new RecoveryQuery($this->mtg, 'Sol Ring', 'c21', '263'));
+
+        $sets = array_map(static fn (Card $card): string => $card->getSetCode(), $result->items);
+        sort($sets);
+        self::assertSame(['c21', 'lea'], $sets);
+        self::assertSame([], $result->relaxed);
+    }
+
     public function testUnpricedPaperPrintingIsRejectedNotOffered(): void
     {
         $this->paperCard(50, [

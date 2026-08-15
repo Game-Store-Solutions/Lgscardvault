@@ -158,6 +158,33 @@ final class StoreImportRecoveryControllerTest extends WebTestCase
         self::assertSame('A-Guide of Souls', $body['rejected'][0]['card']['name']);
     }
 
+    public function testBrowseSearchReturnsEveryPrintingOfTheName(): void
+    {
+        $job = $this->jobWithFailedRows([
+            ['name' => 'Sol Ring', 'set' => 'c21', 'collector' => '263', 'error' => 'No matching printing found.'],
+        ]);
+        $this->fixtures->card(1, [
+            'name' => 'Browseprintings Uniqueaxolotl', 'set' => 'c21', 'collector_number' => '263',
+            'games' => ['paper'], 'prices' => ['usd' => '1.50'],
+        ]);
+        $this->fixtures->card(2, [
+            'name' => 'Browseprintings Uniqueaxolotl', 'set' => 'lea', 'collector_number' => '270',
+            'games' => ['paper'], 'prices' => ['usd' => '80.00'],
+        ]);
+
+        $body = $this->get($this->base($job).'/search', [
+            'q' => 'Browseprintings Uniqueaxolotl',
+            'set' => 'c21',
+            'collectorNumber' => '263',
+            'browse' => '1',
+            'finish' => 'nonfoil',
+        ]);
+
+        $sets = array_map(static fn (array $card): string => $card['setCode'], $body['items']);
+        sort($sets);
+        self::assertSame(['c21', 'lea'], $sets);
+    }
+
     public function testReferenceResolvesSetAndCollectorPair(): void
     {
         $job = $this->jobWithFailedRows([

@@ -27,8 +27,9 @@ export interface CardRecoverySearchProps {
 }
 
 /**
- * Catalog search for one failed row. Results are the page; filters and the
- * Scryfall-paste escape hatch stay out of the way until needed.
+ * Catalog search for one failed row. With set filters this is the ladder
+ * (confirm the sheet's printing). Without them it is the in-app Scryfall
+ * prints grid — same unique=prints list, click to use, no extra tab.
  */
 export function CardRecoverySearch({
   slug,
@@ -47,12 +48,14 @@ export function CardRecoverySearch({
 
   const debouncedTerm = useDebouncedValue(term, 350)
   const isReference = looksLikeCardReference(debouncedTerm)
+  const browsing = !filters.set && !filters.collectorNumber
   const { data, isFetching, refetch } = useRecoverySearch(
     slug,
     importId,
     debouncedTerm,
     filters,
     !isReference,
+    browsing,
   )
   const { resolveByReference } = useRecoveryActions(slug, importId)
 
@@ -124,20 +127,21 @@ export function CardRecoverySearch({
                 if (looksLikeCardReference(term)) return
                 void refetch()
               }}
-              placeholder="Search printings or paste a Scryfall link"
-              aria-label="Search printings or paste a Scryfall link"
+              placeholder="Search printings"
+              aria-label="Search printings by name"
               className="h-11 w-full rounded-[var(--radius-input)] border border-border bg-surface pl-10 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
             />
           </div>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => setShowLink((open) => !open)}
             aria-expanded={showLink}
+            title="Last resort when search cannot place this row"
             className={showLink ? 'ring-1 ring-fg/20' : undefined}
           >
             <Link2 aria-hidden className="size-4" />
-            Paste link
+            Scryfall
           </Button>
         </div>
 
@@ -191,8 +195,11 @@ export function CardRecoverySearch({
           />
           {hasNarrowingFilters && (
             <button type="button" onClick={clearAllFilters} className="text-xs font-medium text-fg-muted hover:text-fg">
-              Name only
+              All printings
             </button>
+          )}
+          {browsing && !hasNarrowingFilters && (
+            <span className="text-xs text-fg-muted">Every paper printing of this name</span>
           )}
           {relaxationNotice && <span className="text-xs text-fg-muted">{relaxationNotice}</span>}
         </div>
@@ -201,6 +208,49 @@ export function CardRecoverySearch({
       {(isFetching || (isReference && resolveByReference.isPending)) && items.length === 0 ? (
         <div className="flex justify-center py-16">
           <Spinner />
+        </div>
+      ) : browsing ? (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+          {items.map((card, index) => {
+            const selected = card.id === selectedCardId
+            return (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => onSelect(card)}
+                className={cx(
+                  'group relative overflow-hidden rounded-card border text-left transition-colors',
+                  selected
+                    ? 'border-fg/30 bg-bg shadow-sm ring-1 ring-fg/15'
+                    : 'border-border bg-surface hover:border-fg/20 hover:bg-bg',
+                )}
+              >
+                {index < 6 && (
+                  <span
+                    aria-hidden
+                    className="absolute left-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-btn border border-border bg-bg/90 text-[10px] font-bold text-fg-muted"
+                  >
+                    {index + 1}
+                  </span>
+                )}
+                <CardImage
+                  src={cardImage(card)}
+                  alt={card.name}
+                  fit="cover"
+                  showLabel={false}
+                  className="aspect-[5/7] w-full"
+                />
+                <span className="block px-2 py-1.5">
+                  <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg">
+                    {(card.setCode ?? '-').toUpperCase()} #{card.collectorNumber ?? '-'}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-bold text-fg">
+                    {formatScryfallPrice(card, filters.finish)}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
         </div>
       ) : (
         <div className={cx('grid gap-3', items.length === 1 ? 'grid-cols-1' : 'sm:grid-cols-2')}>
@@ -255,7 +305,9 @@ export function CardRecoverySearch({
         rejected.length === 0 &&
         debouncedTerm.trim() !== '' && (
           <p className="rounded-card border border-dashed border-border px-4 py-8 text-center text-sm text-fg-muted">
-            No stockable printing found. Paste a Scryfall link, or skip this row.
+            {browsing
+              ? 'No paper printing of this name. Try another spelling, or skip.'
+              : 'No printing matched those filters. Open all printings, or skip.'}
           </p>
         )}
 

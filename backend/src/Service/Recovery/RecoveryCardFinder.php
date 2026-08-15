@@ -312,13 +312,105 @@ final class RecoveryCardFinder
     }
 
     /**
+     * Every paper printing of this name, from the local catalog and Scryfall.
+     *
+     * This is the in-app stand-in for opening scryfall.com: their site sends
+     * X-Frame-Options that block an iframe, but `unique=prints` is the same
+     * list their card page shows. The operator clicks a printing here instead
+     * of copying a URL out of another tab.
+     */
+    public function browsePrintings(RecoveryQuery $original): RecoveryResult
+    {
+        [$query] = $this->normalize($original);
+        $name = trim($query->name);
+        if ('' === $name) {
+            return new RecoveryResult();
+        }
+
+        $key = 'browse|'.$query->game->getCode().'|'.mb_strtolower($name).'|'.$query->finish;
+
+        return $this->memo[$key] ??= $this->doBrowse($query, $name);
+    }
+
+    private function doBrowse(RecoveryQuery $query, string $name): RecoveryResult
+    {
+        /** @var array<string, Card> $merged */
+        $merged = [];
+        $rejected = [];
+
+        if ($query->isMagic()) {
+            foreach ($this->cardRepository->searchByName($name, self::LOCAL_NAME_LIMIT) as $card) {
+                $merged[(string) $card->getId()] = $card;
+            }
+            foreach ($this->remotePrints($name) as $card) {
+                $merged[(string) $card->getId()] = $card;
+            }
+        } else {
+            foreach ($this->cardRepository->searchByNameForGame($query->game, $name, self::LOCAL_NAME_LIMIT) as $card) {
+                $merged[(string) $card->getId()] = $card;
+            }
+        }
+
+        [$items, $rejected] = $this->partition(
+            array_values($merged),
+            $query->game->getCode(),
+            $query->finish,
+            $rejected,
+        );
+
+        usort(
+            $items,
+            static fn (Card $a, Card $b): int => ($b->getReleasedAt()?->getTimestamp() ?? 0)
+                <=> ($a->getReleasedAt()?->getTimestamp() ?? 0),
+        );
+
+        return new RecoveryResult($items, array_values($rejected), []);
+    }
+
+    /**
+     * Scryfall's prints list for one name (`!"Lightning Bolt"` + unique=prints).
+     *
+     * @return list<Card>
+     */
+    private function remotePrints(string $name): array
+    {
+        $front = trim(explode('//', str_replace('"', '', $name), 2)[0]);
+        if ('' === $front) {
+            return [];
+        }
+
+        try {
+            $exact = $this->scryfallClient->searchRemoteAndUpsert(sprintf('!"%s"', $front), self::REMOTE_LIMIT);
+            if ([] !== $exact) {
+                return $exact;
+            }
+
+            return $this->scryfallClient->searchRemoteAndUpsert($front, self::REMOTE_LIMIT);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
      * Every stockable paper printing of a matched card, newest first — the
      * one-click path from "close, but the wrong printing" to the right one.
+     *
+     * Pulls Scryfall's oracle-id prints list first so the picker is not stuck
+     * on whatever happened to be in the local catalog.
      *
      * @return list<Card>
      */
     public function paperPrintingsOf(Card $card): array
     {
+        try {
+            $this->scryfallClient->searchRemoteAndUpsert(
+                'oracleid:'.$card->getOracleId()->toRfc4122(),
+                self::REMOTE_LIMIT,
+            );
+        } catch (\Throwable) {
+            // Local siblings are still useful when Scryfall is down.
+        }
+
         $siblings = [];
         foreach ($this->cardRepository->findPrintingsByOracleId($card->getOracleId()) as $printing) {
             if ((string) $printing->getId() === (string) $card->getId()) {

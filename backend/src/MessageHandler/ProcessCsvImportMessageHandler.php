@@ -207,6 +207,9 @@ final readonly class ProcessCsvImportMessageHandler
                 if (null !== $reject) {
                     $row->setStatus(CsvImportRow::STATUS_ERROR);
                     $row->setError($reject);
+                    // Keep the printing we actually resolved so recovery can
+                    // show it instead of sending the operator to Scryfall.
+                    $row->setCard($this->catalogCardResolver->serializeCard($card));
                     ++$failed;
                     $this->importLogger->log($job, 'row_failed', [
                         'rowIndex' => $row->getRowIndex(),

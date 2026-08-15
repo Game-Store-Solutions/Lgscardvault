@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useSt
 import { CircleSlash, RotateCcw, Search } from 'lucide-react'
 import { cardImage, extractErrorMessage, formatScryfallPrice } from '../../../api/client'
 import type { CardSummary, CsvImportRow } from '../../../api/types'
-import { Badge, Button, Input } from '../../../components/ui'
+import { Badge, Button, Input, Spinner } from '../../../components/ui'
 import { CardImage } from '../../../components/cards'
 import {
   CONDITIONS,
@@ -15,7 +15,7 @@ import { CardRecoverySearch } from './CardRecoverySearch'
 import { recoveryJob, recoveryJobCopy } from './recoveryJob'
 import { shortRowReason } from './shortReason'
 import { isStockableRecoveryCard } from './stockableCard'
-import { useCardPrintings, useRecoveryActions, type RecoveryFilters } from './useImportRecovery'
+import { useCardPrintings, useRecoveryActions, useRecoverySearch, type RecoveryFilters } from './useImportRecovery'
 
 export interface RecoveryRowPanelProps {
   slug: string
@@ -79,7 +79,7 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     )
     const [searchResults, setSearchResults] = useState<CardSummary[]>([])
     const [error, setError] = useState<string | null>(null)
-    const [editingSheet, setEditingSheet] = useState(() => job === 'quantity' && !seedCard)
+    const [editingSheet, setEditingSheet] = useState(false)
     const [showSearch, setShowSearch] = useState(() => job === 'match' || job === 'other')
     const [applySimilar, setApplySimilar] = useState(true)
 
@@ -95,7 +95,7 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
       setTerm(initialTerm(row))
       setFilters(initialFilters(row))
       setError(null)
-      setEditingSheet(nextJob === 'quantity' && !row.card)
+      setEditingSheet(false)
       setShowSearch(nextJob === 'match' || nextJob === 'other')
       setApplySimilar(true)
       setSearchResults([])
@@ -104,6 +104,14 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     }, [row])
 
     const { resolveRow, saveRow, skipRow } = useRecoveryActions(slug, importId)
+    const matchFromSheet = !seedCard && job !== 'match' && job !== 'other' && !showSearch
+    const { data: sheetMatch, isFetching: matchingSheet } = useRecoverySearch(
+      slug,
+      importId,
+      term,
+      filters,
+      matchFromSheet,
+    )
     const printingsCardId = selectedCard?.id ?? seedCard?.id ?? null
     const { data: printings = [] } = useCardPrintings(slug, importId, printingsCardId)
 
@@ -121,12 +129,20 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     )
     const pickList = searchResults.length > 0 ? searchResults : pricedPrintings
     const similarCount = similarRows.length
+    const previewCard =
+      seedCard && isStockableRecoveryCard(seedCard, filters.finish) ? seedCard : selectedCard
 
     useEffect(() => {
       if (selectedCard) return
       const priced = pricedPrintings[0]
       if (priced) setSelectedCard(priced)
     }, [pricedPrintings, selectedCard])
+
+    useEffect(() => {
+      if (selectedCard || showSearch) return
+      const hit = sheetMatch?.items[0]
+      if (hit) setSelectedCard(hit)
+    }, [sheetMatch, selectedCard, showSearch])
 
     const handleResults = useCallback((items: CardSummary[]) => {
       setSearchResults(items)
@@ -208,9 +224,20 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {job !== 'match' && job !== 'other' && (
-              <Button variant="ghost" size="sm" onClick={() => setShowSearch((open) => !open)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (showSearch) {
+                    setShowSearch(false)
+                    return
+                  }
+                  setFilters({ ...filters, set: '', collectorNumber: '', rarity: '' })
+                  setShowSearch(true)
+                }}
+              >
                 <Search aria-hidden className="size-4" />
-                {showSearch ? 'Hide search' : 'Find printing'}
+                {showSearch ? 'Hide printings' : 'Browse printings'}
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={() => setEditingSheet((open) => !open)}>
@@ -269,18 +296,38 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
         )}
 
         <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
-          {job === 'quantity' && seedCard && !showSearch && (
-            <MatchedCardPreview card={seedCard} finish={filters.finish} />
+          {job === 'quantity' && !showSearch && (
+            previewCard ? (
+              <MatchedCardPreview card={previewCard} finish={filters.finish} />
+            ) : matchingSheet ? (
+              <SheetMatchStatus />
+            ) : (
+              <p className="rounded-card border border-dashed border-border px-4 py-8 text-center text-sm text-fg-muted">
+                Couldn&apos;t match this row from the sheet.{' '}
+                <button
+                  type="button"
+                  className="font-medium text-fg underline-offset-2 hover:underline"
+                  onClick={() => setShowSearch(true)}
+                >
+                  Find a printing
+                </button>
+                , or skip.
+              </p>
+            )
           )}
 
           {job === 'price' && !showSearch && (
-            <PrintingPicker
-              printings={pricedPrintings}
-              selectedId={selectedCard?.id ?? null}
-              finish={filters.finish}
-              onSelect={setSelectedCard}
-              empty="No priced printing of this card. Find another printing, or skip."
-            />
+            matchingSheet && pricedPrintings.length === 0 ? (
+              <SheetMatchStatus />
+            ) : (
+              <PrintingPicker
+                printings={pricedPrintings}
+                selectedId={selectedCard?.id ?? null}
+                finish={filters.finish}
+                onSelect={setSelectedCard}
+                empty="No priced printing of this card. Find another printing, or skip."
+              />
+            )
           )}
 
           {job === 'online' && !showSearch && (
@@ -288,13 +335,17 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
               <p className="rounded-card border border-border bg-bg/70 px-4 py-3 text-sm text-fg">
                 This looks like an Alchemy or Arena-only printing. Skip it, or pick the paper version below.
               </p>
-              <PrintingPicker
-                printings={pricedPrintings}
-                selectedId={selectedCard?.id ?? null}
-                finish={filters.finish}
-                onSelect={setSelectedCard}
-                empty="No paper printing in the catalog for this name."
-              />
+              {matchingSheet && pricedPrintings.length === 0 ? (
+                <SheetMatchStatus />
+              ) : (
+                <PrintingPicker
+                  printings={pricedPrintings}
+                  selectedId={selectedCard?.id ?? null}
+                  finish={filters.finish}
+                  onSelect={setSelectedCard}
+                  empty="No paper printing in the catalog for this name."
+                />
+              )}
             </div>
           )}
 
@@ -374,6 +425,14 @@ export const RecoveryRowPanel = forwardRef<RecoveryRowPanelHandle, RecoveryRowPa
     )
   },
 )
+
+function SheetMatchStatus() {
+  return (
+    <div className="flex justify-center py-16">
+      <Spinner label="Matching printing from the sheet" />
+    </div>
+  )
+}
 
 function MatchedCardPreview({ card, finish }: { card: CardSummary; finish: 'foil' | 'nonfoil' }) {
   return (

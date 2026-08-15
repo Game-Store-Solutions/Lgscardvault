@@ -16,11 +16,11 @@ export function recoveryJob(row: CsvImportRow): RecoveryJob {
 export function recoveryJobCopy(job: RecoveryJob): { title: string; hint: string } {
   switch (job) {
     case 'quantity':
-      return { title: 'Fix the quantity', hint: 'This printing already matched. Set how many copies to add.' }
+      return { title: 'Fix the quantity', hint: 'Set how many copies to add. We match the printing from the sheet.' }
     case 'price':
       return { title: 'Pick a priced printing', hint: 'This finish has no market price. Choose another printing, or skip.' }
     case 'match':
-      return { title: 'Find the card', hint: 'Search or paste a Scryfall link, then add it.' }
+      return { title: 'Find the card', hint: 'Pick a printing from the catalog. Browse all printings of the name — no extra tab.' }
     case 'online':
       return { title: 'Online-only printing', hint: 'Skip this Alchemy/Arena row, or switch to the paper printing.' }
     default:

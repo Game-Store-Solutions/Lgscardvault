@@ -125,6 +125,11 @@ final class StoreImportRecoveryController extends AbstractController
      * The recovery search ladder. Unlike /api/catalog/search this reports what
      * it had to relax, and returns online-only printings as rejected-with-
      * reason instead of hiding them behind an empty result.
+     *
+     * `browse=1` skips the row's set/collector filters and returns every
+     * paper printing of the name (the in-app Scryfall prints view). Scryfall's
+     * website cannot be iframed, so this is how the operator browses printings
+     * without opening another tab.
      */
     #[Route('/search', name: 'api_store_import_recovery_search', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
@@ -158,7 +163,9 @@ final class StoreImportRecoveryController extends AbstractController
             $finish,
         );
 
-        $result = $this->finder->find($query);
+        $result = filter_var($request->query->get('browse', false), FILTER_VALIDATE_BOOLEAN)
+            ? $this->finder->browsePrintings($query)
+            : $this->finder->find($query);
 
         return $this->json([
             'items' => array_map(

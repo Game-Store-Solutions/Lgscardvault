@@ -54,17 +54,22 @@ export function useRecoverySearch(
   term: string,
   filters: RecoveryFilters,
   enabled: boolean,
+  browse = false,
 ) {
   return useQuery({
-    queryKey: [...recoveryKey(slug, importId), 'search', term, filters],
+    queryKey: [...recoveryKey(slug, importId), 'search', term, filters, browse],
     queryFn: async () => {
       const { data } = await api.get<RecoverySearchResponse>(`${base(slug, importId)}/search`, {
         params: {
           q: term,
-          ...(filters.set ? { set: filters.set } : {}),
-          ...(filters.collectorNumber ? { collectorNumber: filters.collectorNumber } : {}),
-          ...(filters.rarity ? { rarity: filters.rarity } : {}),
           finish: filters.finish,
+          ...(browse
+            ? { browse: 1 }
+            : {
+                ...(filters.set ? { set: filters.set } : {}),
+                ...(filters.collectorNumber ? { collectorNumber: filters.collectorNumber } : {}),
+                ...(filters.rarity ? { rarity: filters.rarity } : {}),
+              }),
         },
       })
       return data
