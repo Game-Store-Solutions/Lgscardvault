@@ -7,6 +7,7 @@ import type {
   RecoveryRelaxation,
   RecoverySearchResponse,
 } from '../../../api/types'
+import { looksLikeCardReference } from './looksLikeCardReference'
 
 /**
  * Data layer for the Fix failed cards workspace.
@@ -68,7 +69,7 @@ export function useRecoverySearch(
       })
       return data
     },
-    enabled: enabled && term.trim() !== '',
+    enabled: enabled && term.trim() !== '' && !looksLikeCardReference(term),
     // Recovery is a burst of searches by one operator; keep recent terms warm
     // so stepping back to a previous row is instant.
     staleTime: 60_000,
@@ -178,5 +179,5 @@ export function describeRelaxations(relaxed: RecoveryRelaxation[]): string | nul
       ? parts[0]
       : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 
-  return `Widened the search — ignored ${list} from this row.`
+  return `Ignored ${list}.`
 }

@@ -173,6 +173,23 @@ final class StoreImportRecoveryControllerTest extends WebTestCase
         self::assertSame('Sol Ring', $body['card']['name']);
     }
 
+    public function testReferenceResolvesAFullScryfallUrl(): void
+    {
+        $job = $this->jobWithFailedRows([
+            ['name' => 'Sol Ring', 'set' => '', 'collector' => '', 'error' => 'No matching printing found.'],
+        ]);
+        $this->fixtures->card(1, [
+            'name' => 'Sol Ring', 'set' => 'c21', 'collector_number' => '263',
+            'games' => ['paper'], 'prices' => ['usd' => '1.50'],
+        ]);
+
+        $body = $this->get($this->base($job).'/reference', [
+            'ref' => 'https://scryfall.com/card/c21/263/sol-ring',
+        ]);
+
+        self::assertSame('Sol Ring', $body['card']['name']);
+    }
+
     public function testReferenceResolvesCardId(): void
     {
         $job = $this->jobWithFailedRows([

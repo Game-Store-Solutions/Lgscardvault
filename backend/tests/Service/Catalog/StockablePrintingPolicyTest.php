@@ -87,6 +87,22 @@ final class StockablePrintingPolicyTest extends TestCase
         self::assertNotNull($policy->rejectionReason($card, false, 500));
     }
 
+    public function testEtchedOnlyPriceCountsAsStockable(): void
+    {
+        $card = $this->card([
+            'name' => 'Dynaheir, Invoker Adept',
+            'collector_number' => '532',
+            'set' => 'clb',
+            'games' => ['paper'],
+            'prices' => ['usd' => null, 'usd_foil' => null, 'usd_etched' => '0.31'],
+        ]);
+
+        $policy = new StockablePrintingPolicy($this->prices(null));
+
+        self::assertNull($policy->storedRejectionReason($card, false));
+        self::assertNull($policy->storedRejectionReason($card, true));
+    }
+
     private function prices(?int $cents): MarketPriceSource
     {
         return new class($cents) implements MarketPriceSource {

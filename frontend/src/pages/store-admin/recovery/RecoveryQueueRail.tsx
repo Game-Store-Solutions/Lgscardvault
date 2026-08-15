@@ -1,6 +1,5 @@
-import { Check, CircleSlash, TriangleAlert } from 'lucide-react'
+import { Check, CircleSlash } from 'lucide-react'
 import type { CsvImportRow, RecoveryErrorGroup } from '../../../api/types'
-import { Badge } from '../../../components/ui'
 import { cx } from '../../../lib/cx'
 
 export interface RecoveryQueueRailProps {
@@ -15,12 +14,8 @@ export interface RecoveryQueueRailProps {
 }
 
 /**
- * The work queue.
- *
- * A 500-row import fails for three or four reasons, not 500, so the rail leads
- * with those buckets: fixing "No market price (42)" as a group is a completely
- * different job from hunting one missing printing, and the operator should be
- * able to see which they are in for before they start.
+ * Compact work queue: reason pills on top, then names. Metadata stays
+ * one quiet line so seventy rows do not become a wall of chrome.
  */
 export function RecoveryQueueRail({
   rows,
@@ -36,15 +31,15 @@ export function RecoveryQueueRail({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="space-y-1.5 border-b border-border p-3">
-        <GroupButton
-          label="All unresolved"
+      <div className="flex flex-wrap gap-1 border-b border-border p-2">
+        <GroupPill
+          label="All"
           count={total}
           active={activeGroup === null}
           onClick={() => onGroupChange(null)}
         />
         {groups.map((group) => (
-          <GroupButton
+          <GroupPill
             key={group.reason}
             label={group.reason}
             count={group.count}
@@ -59,21 +54,24 @@ export function RecoveryQueueRail({
           const isActive = row.rowIndex === activeRowIndex
           const isSkipped = row.status === 'skipped'
           const isDone = row.status === 'imported'
+          const meta = [row.set ? row.set.toUpperCase() : null, row.collectorNumber ? `#${row.collectorNumber}` : null]
+            .filter(Boolean)
+            .join(' ')
 
           return (
             <li key={row.rowIndex}>
               <div
                 className={cx(
-                  'flex items-start gap-2 border-b border-border px-3 py-2 transition-colors',
-                  isActive ? 'bg-brand-50/70' : 'hover:bg-bg',
+                  'flex items-center gap-2 px-2.5 py-1.5 transition-colors',
+                  isActive ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-bg',
                 )}
               >
                 <input
                   type="checkbox"
-                  className="mt-1"
+                  className="shrink-0"
                   checked={selectedRowIndexes.includes(row.rowIndex)}
                   onChange={() => onToggleSelected(row.rowIndex)}
-                  aria-label={`Select row ${row.rowIndex + 1}`}
+                  aria-label={`Select ${row.name || `row ${row.rowIndex + 1}`}`}
                 />
                 <button
                   type="button"
@@ -82,35 +80,30 @@ export function RecoveryQueueRail({
                 >
                   <span
                     className={cx(
-                      'block truncate text-sm font-bold',
-                      isSkipped ? 'text-fg-muted line-through' : 'text-fg',
+                      'block truncate text-sm',
+                      isSkipped ? 'text-fg-muted line-through' : 'font-medium text-fg',
                     )}
                   >
                     {row.name || `Row ${row.rowIndex + 1}`}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs text-fg-muted">
-                    Row {row.rowIndex + 1}
-                    {row.set ? ` · ${row.set.toUpperCase()}` : ''}
-                    {row.collectorNumber ? ` #${row.collectorNumber}` : ''}
-                  </span>
+                  {meta && <span className="block truncate text-xs text-fg-muted">{meta}</span>}
                 </button>
-                <RowStateIcon done={isDone} skipped={isSkipped} />
+                {isDone && <Check aria-label="Added" className="size-3.5 shrink-0 text-success-700" />}
+                {isSkipped && <CircleSlash aria-label="Skipped" className="size-3.5 shrink-0 text-fg-muted" />}
               </div>
             </li>
           )
         })}
 
         {rows.length === 0 && (
-          <li className="p-4 text-sm text-fg-muted">
-            Nothing left here. Every row in this bucket is resolved or skipped.
-          </li>
+          <li className="p-4 text-sm text-fg-muted">Nothing left in this bucket.</li>
         )}
       </ul>
     </div>
   )
 }
 
-function GroupButton({
+function GroupPill({
   label,
   count,
   active,
@@ -126,18 +119,12 @@ function GroupButton({
       type="button"
       onClick={onClick}
       className={cx(
-        'flex w-full items-center justify-between gap-2 rounded-btn px-2.5 py-1.5 text-left text-sm font-bold transition-colors',
-        active ? 'bg-brand-500 text-white' : 'text-fg hover:bg-bg',
+        'inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
+        active ? 'bg-brand-500 text-white' : 'bg-bg text-fg-muted hover:text-fg',
       )}
     >
       <span className="truncate">{label}</span>
-      <Badge tone={active ? 'neutral' : 'danger'}>{count}</Badge>
+      <span className={cx('tabular-nums', active ? 'text-white/80' : 'text-fg-muted')}>{count}</span>
     </button>
   )
-}
-
-function RowStateIcon({ done, skipped }: { done: boolean; skipped: boolean }) {
-  if (done) return <Check aria-label="Added" className="mt-0.5 size-4 text-success-700" />
-  if (skipped) return <CircleSlash aria-label="Skipped" className="mt-0.5 size-4 text-fg-muted" />
-  return <TriangleAlert aria-label="Needs match" className="mt-0.5 size-4 text-danger-700" />
 }

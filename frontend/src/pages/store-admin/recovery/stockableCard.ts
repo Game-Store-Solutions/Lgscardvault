@@ -16,5 +16,8 @@ export function isStockableRecoveryCard(
   if (card.collectorNumber && /^A[-.]/i.test(card.collectorNumber)) return false
   const games = card.games
   if (Array.isArray(games) && games.length > 0 && !games.includes('paper')) return false
-  return (scryfallPriceCents(card, finish) ?? 0) > 0
+  return (
+    (scryfallPriceCents(card, finish) ?? 0) > 0 ||
+    (scryfallPriceCents(card, finish === 'foil' ? 'nonfoil' : 'foil') ?? 0) > 0
+  )
 }

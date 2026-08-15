@@ -39,7 +39,9 @@ final class MarketPriceResolver implements MarketPriceSource
      */
     public function ensurePriced(Card $card): Card
     {
-        if (null !== $this->fromPrices($card->getPrices(), false) || null !== $this->fromPrices($card->getPrices(), true)) {
+        if (null !== $this->fromPrices($card->getPrices(), false)
+            || null !== $this->fromPrices($card->getPrices(), true)
+        ) {
             return $card;
         }
 
@@ -82,6 +84,7 @@ final class MarketPriceResolver implements MarketPriceSource
     {
         $prices ??= [];
         $raw = $prices[$isFoil ? 'usd_foil' : 'usd'] ?? null;
+        $raw ??= $prices['usd_etched'] ?? null;
         $raw ??= $prices[$isFoil ? 'usd' : 'usd_foil'] ?? null;
         if (!is_numeric($raw)) {
             return null;

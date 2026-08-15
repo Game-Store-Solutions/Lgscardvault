@@ -95,6 +95,7 @@ final readonly class StockablePrintingPolicy
     {
         $prices = $card->getPrices() ?? [];
         $raw = $prices[$isFoil ? 'usd_foil' : 'usd'] ?? null;
+        $raw ??= $prices['usd_etched'] ?? null;
         $raw ??= $prices[$isFoil ? 'usd' : 'usd_foil'] ?? null;
         if (!is_numeric($raw)) {
             return null;

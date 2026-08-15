@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CircleSlash, RotateCcw, Save } from 'lucide-react'
+import { CircleSlash, RotateCcw } from 'lucide-react'
 import { cardImage, extractErrorMessage, formatScryfallPrice } from '../../../api/client'
 import type { CardSummary, CsvImportRow } from '../../../api/types'
-import { Badge, Button, Input } from '../../../components/ui'
+import { Button, Input } from '../../../components/ui'
 import {
   CONDITIONS,
   ConditionSegmented,
@@ -10,6 +10,7 @@ import {
   type Condition,
 } from '../../../components/inventory'
 import { CardRecoverySearch } from './CardRecoverySearch'
+import { shortRowReason } from './shortReason'
 import { isStockableRecoveryCard } from './stockableCard'
 import { useCardPrintings, useRecoveryActions, type RecoveryFilters } from './useImportRecovery'
 
@@ -17,11 +18,9 @@ export interface RecoveryRowPanelProps {
   slug: string
   importId: string
   row: CsvImportRow
-  /** Called after the row is stocked or skipped, so the queue can advance. */
   onResolved: () => void
 }
 
-/** Alchemy rows read "A-Guide of Souls"; the paper card is just "Guide of Souls". */
 function initialTerm(row: CsvImportRow): string {
   return row.name.trim().replace(/^A-/i, '')
 }
@@ -36,12 +35,8 @@ function initialFilters(row: CsvImportRow): RecoveryFilters {
 }
 
 /**
- * Resolve one failed row: correct what the sheet said, find the real printing,
- * confirm exactly what will be stocked, then move on.
- *
- * Selecting a card deliberately does not import it. The old modal stocked
- * inventory on click, which turned a misclick into a wrong listing the owner
- * had to hunt down later.
+ * One failed row: pick a stockable printing, confirm qty/condition, move on.
+ * Sheet-field editing stays behind a disclosure — most recoveries never need it.
  */
 export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRowPanelProps) {
   const [name, setName] = useState(row.name)
@@ -58,8 +53,8 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
     seedCard && isStockableRecoveryCard(seedCard, initialFilters(row).finish) ? seedCard : null,
   )
   const [error, setError] = useState<string | null>(null)
+  const [editingSheet, setEditingSheet] = useState(() => /quantity/i.test(row.error ?? ''))
 
-  // Re-seed everything when the operator moves to another row.
   useEffect(() => {
     setName(row.name)
     setSet(row.set)
@@ -71,6 +66,7 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
     setTerm(initialTerm(row))
     setFilters(initialFilters(row))
     setError(null)
+    setEditingSheet(/quantity/i.test(row.error ?? ''))
   }, [row])
 
   const { resolveRow, saveRow, skipRow } = useRecoveryActions(slug, importId)
@@ -84,10 +80,11 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
     () => (selectedCard ? formatScryfallPrice(selectedCard, filters.finish) : null),
     [selectedCard, filters.finish],
   )
+  const reason = shortRowReason(row.error)
+  const printingMeta = [row.set ? row.set.toUpperCase() : null, row.collectorNumber ? `#${row.collectorNumber}` : null]
+    .filter(Boolean)
+    .join(' ')
 
-  // The failed row often already points at the $0 / digital printing. Pull
-  // sibling paper printings of that card and pick the first one that can
-  // actually be stocked, so Add is never armed with the card that just failed.
   useEffect(() => {
     if (selectedCard) return
     const priced = printings.find((printing) => isStockableRecoveryCard(printing, filters.finish))
@@ -122,54 +119,26 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
   }
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-card border border-border bg-bg p-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input label="Set" value={set} onChange={(e) => setSet(e.target.value)} className="uppercase" />
-          <Input
-            label="Collector #"
-            value={collectorNumber}
-            onChange={(e) => setCollectorNumber(e.target.value)}
-          />
-          <div>
-            <p className="mb-1.5 text-sm font-bold text-fg">Quantity</p>
-            <QuantityStepper value={quantity} onChange={setQuantity} />
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-xl font-bold leading-tight text-fg">{row.name}</h2>
+          <p className="mt-0.5 text-sm text-fg-muted">
+            {printingMeta}
+            {printingMeta ? ' · ' : ''}
+            <span title={row.error ?? undefined}>{reason}</span>
+          </p>
         </div>
-
-        <div className="mt-3">
-          <p className="mb-1.5 text-sm font-bold text-fg">Condition</p>
-          <ConditionSegmented value={condition} onChange={setCondition} />
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={saveRow.isPending}
-            onClick={() =>
-              void run(
-                () =>
-                  saveRow.mutateAsync({
-                    rowIndex: row.rowIndex,
-                    name,
-                    set,
-                    collectorNumber,
-                    quantity,
-                    condition,
-                    isFoil,
-                  }),
-                'Could not save this row.',
-              )
-            }
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            className="text-xs text-fg-muted hover:text-fg hover:underline"
+            onClick={() => setEditingSheet((open) => !open)}
           >
-            <Save aria-hidden className="size-4" />
-            Save row edits
-          </Button>
-
+            {editingSheet ? 'Hide sheet' : 'Edit sheet'}
+          </button>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             loading={skipRow.isPending}
             onClick={async () => {
@@ -183,23 +152,53 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
             {isSkipped ? (
               <>
                 <RotateCcw aria-hidden className="size-4" />
-                Put back in the queue
+                Restore
               </>
             ) : (
               <>
                 <CircleSlash aria-hidden className="size-4" />
-                Skip this row
+                Skip
               </>
             )}
           </Button>
         </div>
-
-        {row.error && (
-          <p className="mt-3 rounded-card border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700">
-            {row.error}
-          </p>
-        )}
       </div>
+
+      {editingSheet && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input label="Set" value={set} onChange={(e) => setSet(e.target.value)} className="uppercase" />
+          <Input
+            label="Collector #"
+            value={collectorNumber}
+            onChange={(e) => setCollectorNumber(e.target.value)}
+          />
+          <div className="flex items-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={saveRow.isPending}
+              onClick={() =>
+                void run(
+                  () =>
+                    saveRow.mutateAsync({
+                      rowIndex: row.rowIndex,
+                      name,
+                      set,
+                      collectorNumber,
+                      quantity,
+                      condition,
+                      isFoil,
+                    }),
+                  'Could not save this row.',
+                )
+              }
+            >
+              Save sheet
+            </Button>
+          </div>
+        </div>
+      )}
 
       <CardRecoverySearch
         slug={slug}
@@ -213,62 +212,49 @@ export function RecoveryRowPanel({ slug, importId, row, onResolved }: RecoveryRo
       />
 
       {error && (
-        <p role="alert" className="text-sm font-medium text-danger-700">
+        <p role="alert" className="text-sm text-danger-700">
           {error}
         </p>
       )}
 
       {selectedCard && (
-        <div className="sticky bottom-0 space-y-3 rounded-card border border-brand-300 bg-surface p-4 shadow-lg">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="sticky bottom-0 space-y-3 rounded-card border border-border bg-surface p-3">
+          <div className="flex flex-wrap items-center gap-3">
             {cardImage(selectedCard) && (
-              <img src={cardImage(selectedCard)} alt="" className="h-24 rounded-btn" />
+              <img src={cardImage(selectedCard)} alt="" className="h-16 rounded-btn" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-display text-lg font-bold text-fg">{selectedCard.name}</p>
-              <p className="text-xs uppercase tracking-wide text-fg-muted">
-                {(selectedCard.setCode ?? '-').toUpperCase()} #{selectedCard.collectorNumber ?? '-'}
+              <p className="truncate font-medium text-fg">{selectedCard.name}</p>
+              <p className="text-xs text-fg-muted">
+                {(selectedCard.setCode ?? '-').toUpperCase()} #{selectedCard.collectorNumber ?? '-'} · {marketPrice}
               </p>
-              {/* Say exactly what is about to happen, so Add is never a guess. */}
-              <p className="mt-1.5 text-sm text-fg-muted">
-                Stocking <span className="font-bold text-fg">{quantity}</span> ×{' '}
-                <span className="font-bold text-fg">{condition}</span>{' '}
-                <span className="font-bold text-fg">{isFoil ? 'foil' : 'nonfoil'}</span> at{' '}
-                <span className="font-bold text-fg">{marketPrice}</span>
-              </p>
-              {!canStockSelected && (
-                <p className="mt-1 text-sm font-medium text-danger-700">
-                  This printing cannot be stocked — pick a paper printing with a market price.
-                </p>
-              )}
+            </div>
+            <QuantityStepper value={quantity} onChange={setQuantity} />
+            <div className="w-52 shrink-0">
+              <ConditionSegmented value={condition} onChange={setCondition} />
             </div>
             <Button
               loading={resolveRow.isPending}
               disabled={!canStockSelected}
               onClick={() => void addToInventory()}
             >
-              Add to inventory
+              Add
             </Button>
           </div>
 
           {printings.length > 0 && (
-            <div className="border-t border-border pt-3">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-fg-muted">
-                Other paper printings
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {printings.slice(0, 10).map((printing) => (
-                  <button
-                    key={printing.id}
-                    type="button"
-                    onClick={() => setSelectedCard(printing)}
-                    className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs font-bold text-fg hover:border-brand-400"
-                  >
-                    {(printing.setCode ?? '-').toUpperCase()} #{printing.collectorNumber ?? '-'}
-                    <Badge tone="neutral">{formatScryfallPrice(printing, filters.finish)}</Badge>
-                  </button>
-                ))}
-              </div>
+            <div className="flex flex-wrap gap-1.5">
+              {printings.slice(0, 8).map((printing) => (
+                <button
+                  key={printing.id}
+                  type="button"
+                  onClick={() => setSelectedCard(printing)}
+                  className="rounded-full border border-border px-2.5 py-0.5 text-xs text-fg-muted hover:border-brand-400 hover:text-fg"
+                >
+                  {(printing.setCode ?? '-').toUpperCase()} #{printing.collectorNumber ?? '-'}{' '}
+                  {formatScryfallPrice(printing, filters.finish)}
+                </button>
+              ))}
             </div>
           )}
         </div>
