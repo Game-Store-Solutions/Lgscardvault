@@ -8,6 +8,7 @@ use App\Service\Catalog\SearchTextNormalizer;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * @extends ServiceEntityRepository<Card>
@@ -293,6 +294,31 @@ class CardRepository extends ServiceEntityRepository
             ->andWhere('LOWER(c.collectorNumber) = :collectorNumber')
             ->setParameter('setCode', strtolower(trim($setCode)))
             ->setParameter('collectorNumber', strtolower(trim($collectorNumber)))
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Every Magic printing of one card, newest first.
+     *
+     * Backs the failed-row recovery "other printings" list: once a row matches
+     * any printing, the operator can jump to the right one (Alchemy to paper,
+     * wrong collector to right collector) without searching again.
+     *
+     * Paper-versus-digital is decided in PHP by {@see \App\Service\Catalog\PaperPrinting},
+     * which reads the JSON `games` / `scryfall_data` payload, so callers filter
+     * the result rather than the query doing it.
+     *
+     * @return list<Card>
+     */
+    public function findPrintingsByOracleId(Uuid $oracleId, int $limit = 60): array
+    {
+        return $this->magicScoped()
+            ->andWhere('c.oracleId = :oracleId')
+            ->setParameter('oracleId', $oracleId, 'uuid')
+            ->orderBy('c.releasedAt', 'DESC')
+            ->addOrderBy('c.collectorNumber', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();

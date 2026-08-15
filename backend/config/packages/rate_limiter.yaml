@@ -15,6 +15,17 @@ framework:
             limit: 300
             interval: '1 minute'
 
+        # Failed-row recovery gets its OWN budget rather than sharing
+        # catalog_search. Working a large failed list is a burst of searches by
+        # one operator, and it must not be able to lock the storefront and
+        # admin search out of their window (or be locked out by them). The
+        # ladder can also cost several Scryfall calls per search, which the
+        # host-global ScryfallRateLimiter still governs.
+        import_recovery:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 minute'
+
         # CSV uploads are heavy (parse + queue up to 50k rows). Keep a single
         # store from flooding the import pipeline. Does not affect processing
         # speed of an already-accepted import — only how often new uploads start.

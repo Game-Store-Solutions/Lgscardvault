@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useParams } from 'react-router'
-import { Search } from 'lucide-react'
-import api, { cardImage, formatScryfallPrice } from '../../api/client'
-import { inventoryKey } from '../../hooks'
-import type { CardSummary, CsvImportJob, CsvImportRow } from '../../api/types'
+import { Link, useParams } from 'react-router'
+import { Wrench } from 'lucide-react'
+import api, { cardImage } from '../../api/client'
+import type { CsvImportJob, CsvImportRow } from '../../api/types'
 import {
   BackButton,
   Card,
@@ -19,12 +18,10 @@ import {
   EmptyRow,
   Badge,
   Button,
-  Input,
-  Modal,
+  buttonVariants,
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
-import { CONDITIONS, FailedRowsTable } from './FailedRowsTable'
-import { BatchRecoveryModal, type BatchRecoveryResult } from './BatchRecoveryModal'
+import { FailedRowsTable } from './FailedRowsTable'
 
 const ROW_LIMIT = 100
 
@@ -33,8 +30,6 @@ export default function ImportRunDetailsPage() {
   const queryClient = useQueryClient()
   const [rowOffset, setRowOffset] = useState(0)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [recoveringRow, setRecoveringRow] = useState<CsvImportRow | null>(null)
-  const [batchRecoveryResults, setBatchRecoveryResults] = useState<BatchRecoveryResult[] | null>(null)
 
   const summaryQueryKey = ['csv-import-run', slug, importId, 'summary']
   const {
@@ -102,33 +97,6 @@ export default function ImportRunDetailsPage() {
       setActionError(error.message === 'Network Error' ? 'Could not reach the server. Check that the API is running.' : (error.message ?? 'Import action failed'))
     },
   })
-
-  const previewFailedMutation = useMutation({
-    mutationFn: async () => {
-      setActionError(null)
-      const { data } = await api.post<{ results: BatchRecoveryResult[] }>(
-        `/stores/${slug}/csv-imports/${importId}/failed/preview`,
-      )
-      return data.results
-    },
-    onSuccess: (results) => {
-      setBatchRecoveryResults(results)
-    },
-    onError: (error: { response?: { data?: { detail?: string } }; message?: string }) => {
-      setActionError(error.response?.data?.detail ?? error.message ?? 'Could not resolve failed cards.')
-    },
-  })
-
-  async function refreshImportRun() {
-    await queryClient.invalidateQueries({ queryKey: ['csv-import-run', slug, importId] })
-    await queryClient.invalidateQueries({ queryKey: ['csv-import-runs', slug] })
-    await queryClient.invalidateQueries({ queryKey: ['csv-import-current', slug] })
-    await queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
-    await queryClient.invalidateQueries({ queryKey: ['inventory', slug] })
-    await refetchSummary()
-    await refetchImported()
-    await refetchFailed()
-  }
 
   const totalRows = job?.totalRows ?? 0
   const processedRows = job?.processedRows ?? 0
@@ -201,14 +169,13 @@ export default function ImportRunDetailsPage() {
                 </Button>
               )}
               {job.failedRows > 0 && !isActive(job.status) && job.status !== 'cancelled' && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => previewFailedMutation.mutate()}
-                  loading={previewFailedMutation.isPending}
+                <Link
+                  to={`/s/${slug}/admin/imports/${importId}/fix`}
+                  className={buttonVariants({ variant: 'primary', size: 'sm' })}
                 >
-                  Retry failed cards
-                </Button>
+                  <Wrench aria-hidden className="size-4" />
+                  Fix failed cards
+                </Link>
               )}
               {!['completed', 'failed', 'cancelled'].includes(job.status) && (
                 <Button
@@ -247,18 +214,23 @@ export default function ImportRunDetailsPage() {
           subtitle={
             failedRows.length === 0
               ? 'No failed cards in this run.'
-              : `Edit name, set, collector #, qty, condition, or foil below — then Save or Resolve. Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}.`
+              : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}. Open the workspace to match them to real printings.`
+          }
+          actions={
+            failedRows.length > 0 ? (
+              <Link
+                to={`/s/${slug}/admin/imports/${importId}/fix`}
+                className={buttonVariants({ variant: 'primary', size: 'sm' })}
+              >
+                <Wrench aria-hidden className="size-4" />
+                Fix failed cards
+              </Link>
+            ) : undefined
           }
         />
         {failedRows.length > 0 && (
           <CardBody className="p-0">
-            <FailedRowsTable
-              slug={slug}
-              importId={importId}
-              rows={failedRows}
-              onRecover={setRecoveringRow}
-              onSaved={() => void refreshImportRun()}
-            />
+            <FailedRowsTable rows={failedRows} />
           </CardBody>
         )}
       </Card>
@@ -297,29 +269,6 @@ export default function ImportRunDetailsPage() {
         </CardBody>
       </Card>
 
-      <ManualImportModal
-        slug={slug}
-        importId={importId}
-        gameCode={job?.gameCode ?? 'mtg'}
-        row={recoveringRow}
-        onClose={() => setRecoveringRow(null)}
-        onResolved={async () => {
-          setRecoveringRow(null)
-          await refreshImportRun()
-        }}
-      />
-
-      <BatchRecoveryModal
-        slug={slug}
-        importId={importId}
-        gameCode={job?.gameCode ?? 'mtg'}
-        results={batchRecoveryResults}
-        onClose={() => setBatchRecoveryResults(null)}
-        onResolved={async () => {
-          setBatchRecoveryResults(null)
-          await refreshImportRun()
-        }}
-      />
     </div>
   )
 }
@@ -392,206 +341,3 @@ function ImportRowsTable({ rows }: { rows: CsvImportRow[] }) {
     </div>
   )
 }
-
-function scryfallSearchTerm(row: CsvImportRow): string {
-  // Alchemy rows are named "A-Guide of Souls" — strip that prefix so catalog /
-  // Scryfall search finds the paper printing ("Guide of Souls").
-  return row.name.trim().replace(/^A-/i, '')
-}
-
-/** Collector numbers like A-29 only exist on digital Alchemy printings. */
-function isDigitalCollectorNumber(value: string): boolean {
-  return /^A[-.]/i.test(value.trim())
-}
-
-function ManualImportModal({
-  slug,
-  importId,
-  gameCode,
-  row,
-  onClose,
-  onResolved,
-}: {
-  slug: string
-  importId: string
-  /** The import's game — recovery may only pick cards from its catalog. */
-  gameCode: string
-  row: CsvImportRow | null
-  onClose: () => void
-  onResolved: () => Promise<void>
-}) {
-  const [search, setSearch] = useState('')
-  const [quantity, setQuantity] = useState(0)
-  const [condition, setCondition] = useState('NM')
-  const [isFoil, setIsFoil] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (row) {
-      setSearch(scryfallSearchTerm(row))
-      setQuantity(Math.max(0, row.quantity))
-      setCondition(row.condition || 'NM')
-      setIsFoil(row.isFoil)
-      setError(null)
-    }
-  }, [row])
-
-  const { data: results = [], isFetching, refetch } = useQuery({
-    queryKey: ['csv-row-manual-card-search', row?.rowIndex, search, gameCode, isFoil],
-    enabled: Boolean(row),
-    queryFn: async () => {
-      if (!row || !search.trim()) return []
-      const { data } = await api.get<CardSummary[]>('/catalog/search', {
-        params: {
-          q: search,
-          // Scoped to the import's game — suggesting Magic printings for a
-          // Pokemon row is how game-less listings used to get created.
-          game: gameCode,
-          ...(row.set.trim() ? { set: row.set.trim() } : {}),
-          // Never lock an Alchemy collector (#A-29): that printing is rejected
-          // as online-only, and the lock hides every paper variant.
-          ...(!isDigitalCollectorNumber(row.collectorNumber) && row.collectorNumber.trim()
-            ? { collectorNumber: row.collectorNumber.trim() }
-            : {}),
-          ...(row.rarity.trim() && !isDigitalCollectorNumber(row.collectorNumber)
-            ? { rarity: row.rarity.trim() }
-            : {}),
-          finish: isFoil ? 'foil' : 'nonfoil',
-        },
-      })
-      return data
-    },
-  })
-
-  const importMutation = useMutation({
-    mutationFn: async (card: CardSummary) => {
-      if (!row) return
-      await api.post(`/stores/${slug}/csv-imports/${importId}/rows/${row.rowIndex}/manual-import`, {
-        cardId: card.id,
-        quantity,
-        condition,
-        isFoil,
-      })
-    },
-    onMutate: () => setError(null),
-    onSuccess: onResolved,
-    onError: (err: { response?: { data?: { detail?: string } }; message?: string }) => {
-      setError(err.response?.data?.detail ?? err.message ?? 'Could not add this row to inventory.')
-    },
-  })
-
-  if (!row) return null
-
-  return (
-    <Modal open onClose={onClose} title={`Resolve row ${row.rowIndex + 1}`} className="max-w-5xl">
-      <div className="space-y-5">
-        <div className="rounded-card border border-border bg-bg p-4">
-          <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            <Fact label="Name" value={row.name} />
-            <Fact label="Set" value={row.set || '-'} />
-            <Fact label="Collector" value={row.collectorNumber || '-'} />
-            <label className="grid gap-1">
-              <span className="text-xs uppercase tracking-wide text-fg-muted">Qty</span>
-              <input
-                type="number"
-                min={0}
-                className="rounded-btn border border-border bg-surface px-2 py-1.5 text-sm font-bold text-fg"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-              />
-            </label>
-            <label className="grid gap-1">
-              <span className="text-xs uppercase tracking-wide text-fg-muted">Condition</span>
-              <select
-                className="rounded-btn border border-border bg-surface px-2 py-1.5 text-sm font-bold text-fg"
-                value={condition}
-                onChange={(e) => setCondition(e.target.value)}
-              >
-                {CONDITIONS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1">
-              <span className="text-xs uppercase tracking-wide text-fg-muted">Foil</span>
-              <select
-                className="rounded-btn border border-border bg-surface px-2 py-1.5 text-sm font-bold text-fg"
-                value={isFoil ? 'yes' : 'no'}
-                onChange={(e) => setIsFoil(e.target.value === 'yes')}
-              >
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
-            </label>
-          </div>
-          {row.error && <p className="mt-3 text-sm font-medium text-danger-700">{row.error}</p>}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-          <Input
-            label="Card search (catalog · Scryfall · MTGJSON)"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void refetch()}
-          />
-          <Button variant="secondary" onClick={() => void refetch()} loading={isFetching}>
-            <Search aria-hidden className="size-4" />
-            Search
-          </Button>
-        </div>
-
-        {error && (
-          <p role="alert" className="text-sm font-medium text-danger-700">
-            {error}
-          </p>
-        )}
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {results.map((card) => (
-            <button
-              key={card.id}
-              type="button"
-              onClick={() => importMutation.mutate(card)}
-              disabled={importMutation.isPending}
-              className="flex min-h-32 items-start gap-3 rounded-card border border-border bg-surface p-3 text-left transition-colors hover:border-brand-300 disabled:cursor-wait disabled:opacity-60"
-            >
-              {cardImage(card) && <img src={cardImage(card)} alt={card.name} className="h-28 rounded-btn" />}
-              <span className="min-w-0 flex-1">
-                <span className="block font-display font-bold leading-snug text-fg">{card.name}</span>
-                <span className="mt-0.5 block text-xs uppercase tracking-wide text-fg-muted">
-                  {card.setCode?.toUpperCase() ?? '-'} - #{card.collectorNumber ?? '-'}
-                </span>
-                {card.setName && <span className="mt-1 block text-xs text-fg-muted">{card.setName}</span>}
-                <span className="mt-2 block text-sm font-bold text-brand-600">
-                  {formatScryfallPrice(card, isFoil ? 'foil' : 'nonfoil')}
-                </span>
-                <span className="mt-2 inline-flex">
-                  <Badge tone="brand">Add to inventory</Badge>
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {!isFetching && results.length === 0 && (
-          <p className="text-sm text-fg-muted">
-            No matches found in the catalog, Scryfall, or MTGJSON. Try loosening the search — the set and printing
-            filters from the row still apply.
-          </p>
-        )}
-      </div>
-    </Modal>
-  )
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-fg-muted">{label}</p>
-      <p className="font-bold text-fg">{value}</p>
-    </div>
-  )
-}
-

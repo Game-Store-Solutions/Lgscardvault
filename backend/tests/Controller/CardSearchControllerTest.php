@@ -76,19 +76,17 @@ final class CardSearchControllerTest extends WebTestCase
         self::assertSame('Lightning Bolt', $results[0]['name']);
     }
 
-    public function testWrongCollectorNumberWidensToNameAndSetMatch(): void
+    public function testWrongCollectorNumberReturnsNoLocalMatch(): void
     {
-        $this->fixtures->card(1, [
-            'name' => 'Lightning Bolt',
-            'set' => 'clb',
-            'collector_number' => '187',
-            'games' => ['paper'],
-            'finishes' => ['nonfoil', 'foil'],
-        ]);
+        $this->fixtures->card(1, ['name' => 'Lightning Bolt', 'set' => 'clb', 'collector_number' => '187']);
 
-        // Wrong collector used to hard-empty the result. Recovery now widens
-        // past a dead collector key so the paper printing in that set still
-        // appears (Scryfall has it; the CSV key was just wrong).
+        // Right name + set, wrong collector: the name branch is filtered out by
+        // the collector mismatch and the natural-key branch finds nothing local
+        // (remote unavailable in tests), so the result is empty — not a 500.
+        //
+        // Interactive search stays literal on purpose. Widening a dead
+        // collector key is failed-row recovery's job, and it lives in
+        // App\Service\Recovery so it cannot change this answer.
         $results = $this->search([
             'q' => 'Lightning Bolt',
             'set' => 'clb',
@@ -96,9 +94,7 @@ final class CardSearchControllerTest extends WebTestCase
             'finish' => 'nonfoil',
         ]);
 
-        self::assertNotEmpty($results);
-        self::assertSame('Lightning Bolt', $results[0]['name']);
-        self::assertSame('187', $results[0]['collectorNumber']);
+        self::assertSame([], $results);
     }
 
     public function testNameOnlySearchStillWorks(): void
@@ -126,17 +122,8 @@ final class CardSearchControllerTest extends WebTestCase
         self::assertStringContainsString('Adéwalé', $results[0]['name']);
     }
 
-    public function testWidensPastDigitalCollectorToPaperPrinting(): void
+    public function testOnlineOnlyPrintingsNeverAppear(): void
     {
-        // Paper printing of the same card — different collector number.
-        $this->fixtures->card(20, [
-            'name' => 'Guide of Souls',
-            'set' => 'mh3',
-            'collector_number' => '20',
-            'games' => ['paper', 'arena', 'mtgo'],
-            'prices' => ['usd' => '2.50'],
-        ]);
-        // Digital-only Alchemy printing the CSV row keyed on.
         $this->fixtures->card(29, [
             'name' => 'A-Guide of Souls',
             'set' => 'mh3',
@@ -146,26 +133,34 @@ final class CardSearchControllerTest extends WebTestCase
             'prices' => ['usd' => null],
         ]);
 
-        // Recovery UI still sends the failed row's Alchemy collector number.
-        // Search must surface the paper printing, not an empty list.
-        $results = $this->search([
-            'q' => 'Guide of Souls',
-            'set' => 'mh3',
-            'collectorNumber' => 'A-29',
-            'finish' => 'nonfoil',
-        ]);
-
-        self::assertNotEmpty($results);
-        self::assertSame('Guide of Souls', $results[0]['name']);
-        self::assertSame('20', $results[0]['collectorNumber']);
-        self::assertFalse(
-            in_array('A-29', array_column($results, 'collectorNumber'), true),
-            'Alchemy printing must stay out of paper-only search results',
-        );
+        // No screen may stock a digital printing, so no screen offers one.
+        // This rule is global, unlike the recovery ladder.
+        self::assertSame([], $this->search(['q' => 'A-Guide of Souls', 'set' => 'mh3']));
     }
 
     public function testEmptyQueryReturnsEmpty(): void
     {
         self::assertSame([], $this->search(['q' => '']));
+    }
+
+    /**
+     * Contract guard. Seven screens read this endpoint as a bare JSON array of
+     * cards. Failed-row recovery needs a richer payload (relaxed filters,
+     * rejected printings), and it must add that to its own endpoint rather
+     * than wrapping this one and breaking every other caller.
+     */
+    public function testResponseIsABareArrayOfCards(): void
+    {
+        $this->fixtures->card(1, ['name' => 'Counterspell', 'set' => 'mh2', 'collector_number' => '267']);
+
+        $this->client->request('GET', '/api/catalog/search?'.http_build_query(['q' => 'Counterspell']));
+        self::assertResponseIsSuccessful();
+
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+
+        self::assertIsList($payload);
+        self::assertArrayHasKey('id', $payload[0]);
+        self::assertArrayNotHasKey('items', $payload);
+        self::assertArrayNotHasKey('relaxed', $payload);
     }
 }

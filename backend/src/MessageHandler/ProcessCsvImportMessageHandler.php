@@ -523,10 +523,7 @@ final readonly class ProcessCsvImportMessageHandler
 
     private function syncCounters(CsvImportJob $job): void
     {
-        $counts = $this->rowRepository->countByStatus($job);
-        $job->setImportedRows($counts['imported']);
-        $job->setFailedRows($counts['error']);
-        $job->setProcessedRows($counts['imported'] + $counts['error']);
+        $this->rowRepository->syncJobCounters($job);
     }
 
     private function markJobFailed(int $jobId, \Throwable $e): void

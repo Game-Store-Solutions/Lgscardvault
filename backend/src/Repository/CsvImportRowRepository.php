@@ -34,6 +34,32 @@ class CsvImportRowRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    /**
+     * All rows in any of the given statuses, in sheet order.
+     *
+     * Backs the recovery queue, which shows failed and skipped rows together
+     * so a skipped row stays visible (and restorable) instead of vanishing.
+     *
+     * @param list<string> $statuses
+     *
+     * @return list<CsvImportRow>
+     */
+    public function findByStatuses(CsvImportJob $job, array $statuses): array
+    {
+        if ([] === $statuses) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('row')
+            ->andWhere('row.job = :job')
+            ->andWhere('row.status IN (:statuses)')
+            ->setParameter('job', $job)
+            ->setParameter('statuses', $statuses)
+            ->orderBy('row.rowIndex', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return list<CsvImportRow> */
     public function findNextQueued(CsvImportJob $job, int $limit): array
     {
@@ -121,7 +147,6 @@ class CsvImportRowRepository extends ServiceEntityRepository
         });
     }
 
-    /** @return array{queued: int, processing: int, imported: int, error: int} */
     /**
      * The row a "recovered from CSV import row #N in import #J" note points
      * at. The note is 1-based for humans; storage is 0-based.
@@ -131,6 +156,7 @@ class CsvImportRowRepository extends ServiceEntityRepository
         return $this->findOneBy(['job' => $jobId, 'rowIndex' => $oneBasedRow - 1]);
     }
 
+    /** @return array{queued: int, processing: int, imported: int, error: int, skipped: int} */
     public function countByStatus(CsvImportJob $job): array
     {
         $counts = [
@@ -138,6 +164,7 @@ class CsvImportRowRepository extends ServiceEntityRepository
             CsvImportRow::STATUS_PROCESSING => 0,
             CsvImportRow::STATUS_IMPORTED => 0,
             CsvImportRow::STATUS_ERROR => 0,
+            CsvImportRow::STATUS_SKIPPED => 0,
         ];
 
         $rows = $this->createQueryBuilder('row')
@@ -160,7 +187,40 @@ class CsvImportRowRepository extends ServiceEntityRepository
             'processing' => $counts[CsvImportRow::STATUS_PROCESSING],
             'imported' => $counts[CsvImportRow::STATUS_IMPORTED],
             'error' => $counts[CsvImportRow::STATUS_ERROR],
+            'skipped' => $counts[CsvImportRow::STATUS_SKIPPED],
         ];
+    }
+
+    /**
+     * Write imported/failed/processed from live row statuses.
+     *
+     * Skipped rows are settled work: they count as processed so a run the
+     * operator emptied via skip can reach 100%. When $completeIfSettled is
+     * true and nothing remains queued, processing, or failed, the job is
+     * marked completed.
+     *
+     * @return array{queued: int, processing: int, imported: int, error: int, skipped: int}
+     */
+    public function syncJobCounters(CsvImportJob $job, bool $completeIfSettled = false): array
+    {
+        $counts = $this->countByStatus($job);
+        $job->setImportedRows($counts['imported']);
+        $job->setFailedRows($counts['error']);
+        $job->setProcessedRows($counts['imported'] + $counts['error'] + $counts['skipped']);
+
+        if (
+            $completeIfSettled
+            && CsvImportJob::STATUS_CANCELLED !== $job->getStatus()
+            && 0 === $counts['queued']
+            && 0 === $counts['processing']
+            && 0 === $counts['error']
+        ) {
+            $job->setStatus(CsvImportJob::STATUS_COMPLETED);
+            $job->setErrorMessage(null);
+            $job->setFinishedAt(new \DateTimeImmutable());
+        }
+
+        return $counts;
     }
 
     public function retryFailedRows(CsvImportJob $job): int

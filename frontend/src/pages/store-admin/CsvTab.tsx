@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import api, { cardImage } from '../../api/client'
-import { sealedInventoryKey, useCatalogGames, useStoreGameStats } from '../../hooks'
+import { sealedInventoryKey } from '../../hooks'
 import type { CsvImportJob, CsvImportJobSummary, CsvImportRow } from '../../api/types'
 import {
   Card,
@@ -20,12 +20,10 @@ import {
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
 import ImportWizard from './ImportWizard'
 import { CardImage } from '../../components/cards'
-import { GameWorkspaceHeader } from '../../components/catalog'
 
 export default function CsvTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [historyGame, setHistoryGame] = useState('')
 
   const { data: job = null } = useQuery({
     queryKey: ['csv-import-current', slug],
@@ -72,31 +70,8 @@ export default function CsvTab({ slug }: { slug: string }) {
   const progress = totalRows === 0 ? 0 : Math.min(processedRows / totalRows, 1)
   const sealedJob = job?.importType === 'sealed'
 
-  const { data: games = [] } = useCatalogGames()
-  const gameOptions = useMemo(() => games.map((game) => ({ code: game.code, name: game.name })), [games])
-  const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, historyGame)
-
-  useEffect(() => {
-    if (!historyGame && gameOptions.length > 0) {
-      setHistoryGame(gameOptions[0].code)
-    }
-  }, [historyGame, gameOptions])
-  const visibleRuns = useMemo(
-    () => (historyGame ? importRuns.filter((run) => (run.gameCode ?? 'mtg') === historyGame) : importRuns),
-    [importRuns, historyGame],
-  )
-
   return (
     <div className="space-y-6">
-      <GameWorkspaceHeader
-        games={gameOptions}
-        value={historyGame}
-        onChange={setHistoryGame}
-        stats={gameStats}
-        loading={statsLoading}
-        label="Imports for"
-      />
-
       <ImportWizard slug={slug} busy={isActive(job?.status)} onImported={refreshImports} />
 
       {job && (
@@ -167,10 +142,10 @@ export default function CsvTab({ slug }: { slug: string }) {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-danger-200 bg-danger-50 px-4 py-3">
                 <p className="text-sm text-danger-800">
                   <span className="font-bold">{failedCount}</span> failed card
-                  {failedCount === 1 ? '' : 's'} — edit qty/name/set and resolve them on the run details page.
+                  {failedCount === 1 ? '' : 's'} — match them to real printings, or skip the ones that cannot be fixed.
                 </p>
                 <Link
-                  to={`/s/${slug}/admin/imports/${job.id}`}
+                  to={`/s/${slug}/admin/imports/${job.id}/fix`}
                   className="inline-flex items-center rounded-btn bg-brand-500 px-3 py-1.5 text-sm font-bold text-white hover:bg-brand-600"
                 >
                   Fix failed cards
@@ -249,7 +224,7 @@ export default function CsvTab({ slug }: { slug: string }) {
               </TR>
             </THead>
             <TBody>
-              {visibleRuns.map((run) => (
+              {importRuns.map((run) => (
                 <TR
                   key={run.id}
                   className="cursor-pointer"
@@ -279,7 +254,7 @@ export default function CsvTab({ slug }: { slug: string }) {
                   <TD className="text-fg-muted">{new Date(run.updatedAt).toLocaleTimeString()}</TD>
                 </TR>
               ))}
-              {visibleRuns.length === 0 && <EmptyRow colSpan={7}>No import runs yet.</EmptyRow>}
+              {importRuns.length === 0 && <EmptyRow colSpan={7}>No import runs yet.</EmptyRow>}
             </TBody>
           </Table>
         </CardBody>

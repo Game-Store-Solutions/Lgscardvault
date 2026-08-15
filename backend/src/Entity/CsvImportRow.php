@@ -17,6 +17,15 @@ class CsvImportRow
     public const STATUS_ERROR = 'error';
 
     /**
+     * Set aside by the operator during failed-row recovery.
+     *
+     * Counts as finished work: a row nobody can fix (a card that does not
+     * exist, a line of junk in the sheet) must be able to leave the queue,
+     * otherwise its import can never reach completed.
+     */
+    public const STATUS_SKIPPED = 'skipped';
+
+    /**
      * Whether a CSV "game" value just says Magic — the default on this
      * platform, so import note writers skip it instead of stamping
      * "Game: Magic" onto every inventory listing.

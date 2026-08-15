@@ -24,6 +24,7 @@ import CustomerProfilePage from './pages/CustomerProfilePage'
 import StoreEventsPage from './pages/StoreEventsPage'
 import StoreAdminPage from './pages/StoreAdminPage'
 import ImportRunDetailsPage from './pages/store-admin/ImportRunDetailsPage'
+import FixFailedCardsPage from './pages/store-admin/recovery/FixFailedCardsPage'
 import PlatformAdminPage from './pages/PlatformAdminPage'
 import SyncJobsPage from './pages/platform-admin/SyncJobsPage'
 import PlatformReportsPage from './pages/platform-admin/PlatformReportsPage'
@@ -90,6 +91,7 @@ export default function App() {
             >
               <Route index element={<StoreAdminPage />} />
               <Route path="imports/:importId" element={<ImportRunDetailsPage />} />
+              <Route path="imports/:importId/fix" element={<FixFailedCardsPage />} />
               <Route path=":section" element={<StoreAdminPage />} />
             </Route>
             {/* Platform admin */}

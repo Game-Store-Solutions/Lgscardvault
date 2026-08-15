@@ -64,6 +64,7 @@ final class StoreCsvImportController extends AbstractController
         private readonly GameRepository $gameRepository,
         private readonly StoreInventoryWriter $inventoryWriter,
         private readonly StockablePrintingPolicy $stockablePrintingPolicy,
+        private readonly \App\Service\CsvImport\ImportRowSerializer $rowSerializer,
         private readonly ScryfallClient $scryfallClient,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
@@ -812,21 +813,7 @@ final class StoreCsvImportController extends AbstractController
 
     private function syncJobCounters(CsvImportJob $job): void
     {
-        $counts = $this->rowRepository->countByStatus($job);
-        $job->setImportedRows($counts['imported']);
-        $job->setFailedRows($counts['error']);
-        $job->setProcessedRows($counts['imported'] + $counts['error']);
-
-        if (
-            CsvImportJob::STATUS_CANCELLED !== $job->getStatus()
-            && 0 === $counts['queued']
-            && 0 === $counts['processing']
-            && 0 === $counts['error']
-        ) {
-            $job->setStatus(CsvImportJob::STATUS_COMPLETED);
-            $job->setErrorMessage(null);
-            $job->setFinishedAt(new \DateTimeImmutable());
-        }
+        $this->rowRepository->syncJobCounters($job, true);
     }
 
     /**
@@ -898,7 +885,7 @@ final class StoreCsvImportController extends AbstractController
         $requestedOffset = $request->query->getInt('rowOffset', -1);
         $totalRows = $job->getTotalRows();
         $statusCounts = $this->rowRepository->countByStatus($job);
-        $finishedRows = $statusCounts['imported'] + $statusCounts['error'];
+        $finishedRows = $statusCounts['imported'] + $statusCounts['error'] + $statusCounts['skipped'];
         $processedRows = $finishedRows + $statusCounts['processing'];
         $rowOffset = max(0, $requestedOffset);
         if ($requestedOffset < 0) {
@@ -991,22 +978,6 @@ final class StoreCsvImportController extends AbstractController
     /** @return array<string, mixed> */
     private function serializeRow(CsvImportRow $row): array
     {
-        return [
-            'rowIndex' => $row->getRowIndex(),
-            'name' => $row->getName(),
-            'game' => $row->getGame(),
-            'set' => $row->getSetCode(),
-            'condition' => $row->getCondition(),
-            'finish' => $row->getFinish(),
-            'isFoil' => $row->isFoil(),
-            'rarity' => $row->getRarity(),
-            'quantity' => $row->getQuantity(),
-            'variant' => $row->getVariant(),
-            'collectorNumber' => $row->getCollectorNumber(),
-            'status' => $row->getStatus(),
-            'card' => $row->getCard(),
-            'error' => $row->getError(),
-            'importedItemId' => $row->getImportedItemId(),
-        ];
+        return $this->rowSerializer->serialize($row);
     }
 }

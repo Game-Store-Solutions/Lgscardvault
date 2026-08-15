@@ -532,7 +532,8 @@ export interface CustomerWantListEntry {
 
 export type CsvImportJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'paused' | 'cancelled'
 
-export type CsvImportRowStatus = 'queued' | 'processing' | 'imported' | 'error'
+/** `skipped` is set by the operator during failed-row recovery: settled work. */
+export type CsvImportRowStatus = 'queued' | 'processing' | 'imported' | 'error' | 'skipped'
 
 export interface CsvImportRow {
   rowIndex: number
@@ -575,6 +576,49 @@ export interface CsvImportJob {
   finishedAt?: string | null
   rowOffset: number
   rowLimit: number
+  rows: CsvImportRow[]
+}
+
+/* ---------- Failed-row recovery ----------
+ * Served by the isolated recovery API
+ * (/api/stores/{slug}/csv-imports/{id}/recovery), which is deliberately
+ * separate from /catalog/search so recovery behaviour cannot leak into the
+ * other screens that read the shared catalog. */
+
+/** Which filter the search ladder had to drop to find anything. */
+export type RecoveryRelaxation = 'alchemyName' | 'collectorNumber' | 'rarity' | 'set' | 'fuzzyName'
+
+/** A printing that matched but may not be stocked, and why. */
+export interface RecoveryRejectedCard {
+  card: CardSummary
+  reason: string
+}
+
+export interface RecoverySearchResponse {
+  items: CardSummary[]
+  rejected: RecoveryRejectedCard[]
+  relaxed: RecoveryRelaxation[]
+}
+
+/** Failed rows bucketed by cause, biggest bucket first. */
+export interface RecoveryErrorGroup {
+  reason: string
+  count: number
+  rowIndexes: number[]
+}
+
+export interface RecoveryRowCounts {
+  queued: number
+  processing: number
+  imported: number
+  error: number
+  skipped: number
+}
+
+export interface RecoveryQueue {
+  gameCode: string
+  counts: RecoveryRowCounts
+  groups: RecoveryErrorGroup[]
   rows: CsvImportRow[]
 }
 

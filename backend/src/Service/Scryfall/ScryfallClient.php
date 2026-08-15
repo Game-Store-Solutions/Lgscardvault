@@ -14,6 +14,7 @@ class ScryfallClient
     private const SEARCH_URL = 'https://api.scryfall.com/cards/search';
     private const CARD_URL = 'https://api.scryfall.com/cards/';
     private const COLLECTION_URL = 'https://api.scryfall.com/cards/collection';
+    private const NAMED_URL = 'https://api.scryfall.com/cards/named';
 
     /**
      * `oracle_cards` is one representative printing per Oracle ID (~35k rows,
@@ -408,6 +409,48 @@ class ScryfallClient
         $this->cardUpserter->upsertOne($data);
 
         return $this->loadFreshCard($id);
+    }
+
+    /**
+     * Typo-tolerant single-card lookup via Scryfall's fuzzy `named` endpoint.
+     *
+     * `/cards/search` matches substrings, so a misspelled CSV name ("Guide of
+     * Soul", "Lighting Bolt") returns nothing at all. The named endpoint runs
+     * Scryfall's own fuzzy matcher and answers with the one card it is
+     * confident about, which is the last rung of failed-row recovery.
+     *
+     * Returns null when Scryfall finds no match or the name is too ambiguous
+     * (it answers 404 in both cases).
+     */
+    public function fetchByFuzzyName(string $name, ?string $setCode = null): ?Card
+    {
+        $name = trim($name);
+        if ('' === $name) {
+            return null;
+        }
+
+        $query = ['fuzzy' => $name];
+        if (null !== $setCode && '' !== trim($setCode)) {
+            $query['set'] = strtolower(trim($setCode));
+        }
+
+        $response = $this->requestWithRateLimit('GET', self::NAMED_URL, [
+            'headers' => self::DEFAULT_HEADERS,
+            'query' => $query,
+        ]);
+
+        if (200 !== $response->getStatusCode()) {
+            return null;
+        }
+
+        $data = $response->toArray(false);
+        if (($data['object'] ?? null) === 'error' || !isset($data['id'])) {
+            return null;
+        }
+
+        $this->cardUpserter->upsertOne($data);
+
+        return $this->loadFreshCard(Uuid::fromString((string) $data['id']));
     }
 
     /**

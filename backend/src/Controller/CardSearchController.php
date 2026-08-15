@@ -87,18 +87,6 @@ class CardSearchController extends AbstractController
             return $this->json(['detail' => 'Unknown game.'], 404);
         }
 
-        // Alchemy CSV names are "A-Guide of Souls". Searching that literally
-        // often only hits the digital printing; strip so paper printings match.
-        if ($game->isMtg() && (str_starts_with($query, 'A-') || str_starts_with($query, 'a-'))) {
-            $query = substr($query, 2);
-        }
-
-        // Digital Alchemy collectors (#A-29) only exist online — locking search
-        // to them hides every paper variant. Drop the lock up front.
-        if ($game->isMtg() && 1 === preg_match('/^a[-.]/i', $collectorNumber)) {
-            $collectorNumber = '';
-        }
-
         if (!$game->isMtg()) {
             // The same filters the Magic path honors. Skipping them here meant
             // a Pokemon workspace's set / rarity / finish pickers changed
@@ -187,54 +175,18 @@ class CardSearchController extends AbstractController
 
         // Belt and braces: the legacy helpers are Magic-scoped, but remote
         // upserts join the merge too — nothing non-Magic may leave this path.
-        // Also drop Alchemy / Arena-only printings; stores only stock paper.
+        //
+        // The paper filter is a platform rule, not a search preference: no
+        // screen may stock an Alchemy/Arena printing, so none of them should
+        // offer one. Failed-row recovery needs to go further than this (it
+        // relaxes the row's own filters and explains digital hits instead of
+        // hiding them), and that behaviour deliberately lives in
+        // App\Service\Recovery so it can never reshape this endpoint.
         $results = array_values(array_filter(
             array_values($merged),
             static fn (\App\Entity\Card $card): bool => $card->resolvedGameCode() === $game->getCode()
                 && PaperPrinting::isPaper($card),
         ));
-
-        // Failed-row recovery often locks the CSV collector number. When that
-        // key is digital-only (e.g. MH3 #A-29), every paper printing of the
-        // same card fails the collector filter and the paper gate empties the
-        // list — even though Scryfall has the paper Guide of Souls. Widen by
-        // dropping collector (+ rarity) so the operator can pick the paper one.
-        if ([] === $results && '' !== $collectorNumber) {
-            $widened = [];
-            foreach ($this->cardRepository->searchByName($query, 60) as $card) {
-                if (
-                    $card->resolvedGameCode() === $game->getCode()
-                    && PaperPrinting::isPaper($card)
-                    && $this->catalogCardResolver->matchesFilters($card, $setCode, '', '', $finish)
-                ) {
-                    $widened[(string) $card->getId()] = $card;
-                }
-            }
-
-            if (count($widened) < self::REMOTE_FALLBACK_THRESHOLD) {
-                try {
-                    $remote = $this->scryfallClient->searchRemoteAndUpsert(
-                        $query,
-                        40,
-                        '' !== $setCode ? $setCode : null,
-                        '' !== $finish ? $finish : null,
-                    );
-                    foreach ($remote as $card) {
-                        if (
-                            $card->resolvedGameCode() === $game->getCode()
-                            && PaperPrinting::isPaper($card)
-                            && $this->catalogCardResolver->matchesFilters($card, $setCode, '', '', $finish)
-                        ) {
-                            $widened[(string) $card->getId()] = $card;
-                        }
-                    }
-                } catch (\Throwable) {
-                    // Best-effort; empty widened stays empty.
-                }
-            }
-
-            $results = array_values($widened);
-        }
 
         return $this->json(array_map(
             $this->catalogCardResolver->serializeCard(...),
