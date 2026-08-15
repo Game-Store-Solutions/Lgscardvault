@@ -23,6 +23,7 @@ import {
   Modal,
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice } from './csv-shared'
+import { CONDITIONS, FailedRowsTable } from './FailedRowsTable'
 
 const ROW_LIMIT = 100
 
@@ -132,6 +133,7 @@ export default function ImportRunDetailsPage() {
     await queryClient.invalidateQueries({ queryKey: ['csv-import-runs', slug] })
     await queryClient.invalidateQueries({ queryKey: ['csv-import-current', slug] })
     await queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+    await queryClient.invalidateQueries({ queryKey: ['inventory', slug] })
     await refetchSummary()
     await refetchImported()
     await refetchFailed()
@@ -259,7 +261,13 @@ export default function ImportRunDetailsPage() {
         />
         {failedRows.length > 0 && (
           <CardBody className="p-0">
-            <ImportRowsTable rows={failedRows} onRecover={setRecoveringRow} />
+            <FailedRowsTable
+              slug={slug}
+              importId={importId}
+              rows={failedRows}
+              onRecover={setRecoveringRow}
+              onSaved={() => void refreshImportRun()}
+            />
           </CardBody>
         )}
       </Card>
@@ -337,7 +345,7 @@ function RowStatus({ row }: { row: CsvImportRow }) {
   return <Badge tone="neutral">Queued</Badge>
 }
 
-function ImportRowsTable({ rows, onRecover }: { rows: CsvImportRow[]; onRecover?: (row: CsvImportRow) => void }) {
+function ImportRowsTable({ rows }: { rows: CsvImportRow[] }) {
   return (
     <div className="max-h-[32rem] overflow-auto">
       <Table>
@@ -352,7 +360,6 @@ function ImportRowsTable({ rows, onRecover }: { rows: CsvImportRow[]; onRecover?
             <TH>Condition</TH>
             <TH>Foil</TH>
             <TH>Status</TH>
-            <TH>Actions</TH>
           </TR>
         </THead>
         <TBody>
@@ -385,24 +392,9 @@ function ImportRowsTable({ rows, onRecover }: { rows: CsvImportRow[]; onRecover?
               <TD>
                 <RowStatus row={row} />
               </TD>
-              <TD>
-                {row.status === 'error' && onRecover ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onRecover(row)}
-                    title="Search Scryfall and add this failed row to inventory"
-                  >
-                    <Search aria-hidden className="size-4" />
-                    Resolve
-                  </Button>
-                ) : (
-                  <span className="text-fg-muted">-</span>
-                )}
-              </TD>
             </TR>
           ))}
-          {rows.length === 0 && <EmptyRow colSpan={10}>No cards to display.</EmptyRow>}
+          {rows.length === 0 && <EmptyRow colSpan={9}>No cards to display.</EmptyRow>}
         </TBody>
       </Table>
     </div>
@@ -430,17 +422,23 @@ function ManualImportModal({
   onResolved: () => Promise<void>
 }) {
   const [search, setSearch] = useState('')
+  const [quantity, setQuantity] = useState(0)
+  const [condition, setCondition] = useState('NM')
+  const [isFoil, setIsFoil] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (row) {
       setSearch(scryfallSearchTerm(row))
+      setQuantity(Math.max(0, row.quantity))
+      setCondition(row.condition || 'NM')
+      setIsFoil(row.isFoil)
       setError(null)
     }
   }, [row])
 
   const { data: results = [], isFetching, refetch } = useQuery({
-    queryKey: ['csv-row-manual-card-search', row?.rowIndex, search, gameCode],
+    queryKey: ['csv-row-manual-card-search', row?.rowIndex, search, gameCode, isFoil],
     enabled: Boolean(row),
     queryFn: async () => {
       if (!row || !search.trim()) return []
@@ -453,7 +451,7 @@ function ManualImportModal({
           ...(row.set.trim() ? { set: row.set.trim() } : {}),
           ...(row.collectorNumber.trim() ? { collectorNumber: row.collectorNumber.trim() } : {}),
           ...(row.rarity.trim() ? { rarity: row.rarity.trim() } : {}),
-          finish: row.isFoil ? 'foil' : 'nonfoil',
+          finish: isFoil ? 'foil' : 'nonfoil',
         },
       })
       return data
@@ -465,9 +463,9 @@ function ManualImportModal({
       if (!row) return
       await api.post(`/stores/${slug}/csv-imports/${importId}/rows/${row.rowIndex}/manual-import`, {
         cardId: card.id,
-        quantity: row.quantity,
-        condition: row.condition,
-        isFoil: row.isFoil,
+        quantity,
+        condition,
+        isFoil,
       })
     },
     onMutate: () => setError(null),
@@ -483,11 +481,45 @@ function ManualImportModal({
     <Modal open onClose={onClose} title={`Resolve row ${row.rowIndex + 1}`} className="max-w-5xl">
       <div className="space-y-5">
         <div className="rounded-card border border-border bg-bg p-4">
-          <div className="grid gap-3 text-sm sm:grid-cols-4">
+          <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <Fact label="Name" value={row.name} />
             <Fact label="Set" value={row.set || '-'} />
             <Fact label="Collector" value={row.collectorNumber || '-'} />
-            <Fact label="Qty" value={String(row.quantity)} />
+            <label className="grid gap-1">
+              <span className="text-xs uppercase tracking-wide text-fg-muted">Qty</span>
+              <input
+                type="number"
+                min={0}
+                className="rounded-btn border border-border bg-surface px-2 py-1.5 text-sm font-bold text-fg"
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs uppercase tracking-wide text-fg-muted">Condition</span>
+              <select
+                className="rounded-btn border border-border bg-surface px-2 py-1.5 text-sm font-bold text-fg"
+                value={condition}
+                onChange={(e) => setCondition(e.target.value)}
+              >
+                {CONDITIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs uppercase tracking-wide text-fg-muted">Foil</span>
+              <select
+                className="rounded-btn border border-border bg-surface px-2 py-1.5 text-sm font-bold text-fg"
+                value={isFoil ? 'yes' : 'no'}
+                onChange={(e) => setIsFoil(e.target.value === 'yes')}
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </label>
           </div>
           {row.error && <p className="mt-3 text-sm font-medium text-danger-700">{row.error}</p>}
         </div>
@@ -528,7 +560,7 @@ function ManualImportModal({
                 </span>
                 {card.setName && <span className="mt-1 block text-xs text-fg-muted">{card.setName}</span>}
                 <span className="mt-2 block text-sm font-bold text-brand-600">
-                  {formatScryfallPrice(card, row.isFoil ? 'foil' : 'nonfoil')}
+                  {formatScryfallPrice(card, isFoil ? 'foil' : 'nonfoil')}
                 </span>
                 <span className="mt-2 inline-flex">
                   <Badge tone="brand">Add to inventory</Badge>

@@ -746,9 +746,10 @@ final class StoreCustomerController extends AbstractController
         $amountDue = $order->getTotalCents() - $order->getCreditAppliedCents();
 
         // Store credit can cover the whole basket, in which case there is
-        // nothing to charge and no card is required.
+        // nothing to charge and no card is required. Status stays pending so
+        // staff still accept → fulfill (payment is recorded via paidCents).
         if ($amountDue <= 0) {
-            $order->setStatus(OrderStatus::PAID)->setPaidCents(0);
+            $order->setPaidCents(0);
             $this->entityManager->flush();
 
             return $this->json($this->customerOrderSerializer->serialize($order), 201);
@@ -763,8 +764,8 @@ final class StoreCustomerController extends AbstractController
         try {
             $payment = $this->captureCheckoutPayment(
                 $store,
+                $order,
                 $amountDue,
-                $order->getReference(),
                 $sourceId,
                 $verificationToken,
                 $user->getEmail(),
@@ -782,9 +783,9 @@ final class StoreCustomerController extends AbstractController
         }
 
         $order
-            ->setStatus(OrderStatus::PAID)
             ->setPaidCents($amountDue)
-            ->setPaymentReference($payment['paymentId']);
+            ->setPaymentReference($payment['paymentId'])
+            ->setSquareOrderId($payment['squareOrderId'] ?? null);
 
         $this->entityManager->flush();
 
@@ -792,12 +793,12 @@ final class StoreCustomerController extends AbstractController
     }
 
     /**
-     * @return array{paymentId: string, status: string, receiptUrl: string|null}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
      */
     private function captureCheckoutPayment(
         Store $store,
+        Order $order,
         int $amountDue,
-        string $orderReference,
         string $sourceId,
         ?string $verificationToken,
         string $buyerEmail,
@@ -811,12 +812,33 @@ final class StoreCustomerController extends AbstractController
             $store,
             $amountDue,
             $sourceId,
-            $orderReference,
+            $order->getReference(),
             $verificationToken,
-            $orderReference,
+            $order->getReference(),
             $buyerEmail,
             $squareCustomerId,
+            $this->squareLineItems($order),
+            $order->getCreditAppliedCents(),
+            $order->getCustomerName(),
+            $order->getFulfillment(),
         );
+    }
+
+    /**
+     * @return list<array{name: string, quantity: int, priceCents: int}>
+     */
+    private function squareLineItems(Order $order): array
+    {
+        $items = [];
+        foreach ($order->getLines() as $line) {
+            $items[] = [
+                'name' => $line->getCardName(),
+                'quantity' => $line->getQuantity(),
+                'priceCents' => $line->getPriceCents(),
+            ];
+        }
+
+        return $items;
     }
 
     /** Public Square configuration the cart needs to render its payment form. */

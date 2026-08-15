@@ -23,9 +23,10 @@ interface CheckoutGatewayInterface
     public function isReady(Store $store): bool;
 
     /**
-     * @param string $idempotencyKey stable per order, so a retry cannot double-charge
+     * @param string                                                              $idempotencyKey stable per order, so a retry cannot double-charge
+     * @param list<array{name: string, quantity: int, priceCents: int}>|null       $lineItems      when set, creates a Square Order then pays it
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
      *
      * @throws \RuntimeException when the store is not connected or the payment is declined
      */
@@ -38,10 +39,16 @@ interface CheckoutGatewayInterface
         ?string $referenceId = null,
         ?string $buyerEmail = null,
         ?string $customerId = null,
+        ?array $lineItems = null,
+        int $creditCents = 0,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
     ): array;
 
     /**
-     * @return array{paymentId: string, status: string, receiptUrl: string|null}
+     * @param list<array{name: string, quantity: int, priceCents: int}>|null $lineItems
+     *
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
      */
     public function chargeVaultedCard(
         Store $store,
@@ -51,6 +58,10 @@ interface CheckoutGatewayInterface
         string $idempotencyKey,
         ?string $referenceId = null,
         ?string $buyerEmail = null,
+        ?array $lineItems = null,
+        int $creditCents = 0,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
     ): array;
 
     /**

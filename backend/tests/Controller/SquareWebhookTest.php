@@ -169,7 +169,7 @@ final class SquareWebhookTest extends WebTestCase
         self::assertSame('ignored', $body['status']);
 
         $this->em->clear();
-        self::assertSame('paid', $this->em->getRepository(Order::class)->find($order['id'])->getStatus()->value);
+        self::assertSame('pending', $this->em->getRepository(Order::class)->find($order['id'])->getStatus()->value);
         self::assertSame(3, $this->em->getRepository(InventoryItem::class)->find($item->getId())->getQuantity());
     }
 

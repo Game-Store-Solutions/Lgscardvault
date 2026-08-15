@@ -164,7 +164,7 @@ export default function CartPage() {
   )
   const paymentReady = Boolean((kioskMode ? kioskCustomerName : contactName).trim())
 
-  const { data: inventory = [] } = useInventory(slug)
+  const { data: inventory = [] } = useInventory(slug, { inStockOnly: true })
   const picks = useMemo(
     () =>
       inventory

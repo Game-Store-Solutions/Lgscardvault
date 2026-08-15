@@ -108,8 +108,43 @@ final class SquareWebhookController extends AbstractController
             'oauth.authorization.revoked' => $this->handleRevocation($merchantId),
             'refund.created', 'refund.updated' => $this->handleRefund($data),
             'dispute.created' => $this->handleDispute($data),
+            'payment.updated', 'payment.created' => $this->handlePayment($data),
             default => [SquareWebhookEvent::STATUS_IGNORED, 'No handler for this type.'],
         };
+    }
+
+    /**
+     * Correlate Square payment events to our storefront orders for the admin ledger.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function handlePayment(array $data): array
+    {
+        $payment = is_array($data['object']['payment'] ?? null) ? $data['object']['payment'] : [];
+        $paymentId = $this->nullableString($payment['id'] ?? null);
+        if (null === $paymentId) {
+            return [SquareWebhookEvent::STATUS_IGNORED, 'Payment event without id.'];
+        }
+
+        $order = $this->orders->findOneBy(['paymentReference' => $paymentId]);
+        if (!$order instanceof Order) {
+            return [SquareWebhookEvent::STATUS_IGNORED, 'No LGS order for payment '.$paymentId];
+        }
+
+        $status = (string) ($payment['status'] ?? 'UNKNOWN');
+        $squareOrderId = $this->nullableString($payment['order_id'] ?? null);
+        if (null !== $squareOrderId && null === $order->getSquareOrderId()) {
+            $order->setSquareOrderId($squareOrderId);
+        }
+
+        return [SquareWebhookEvent::STATUS_PROCESSED, sprintf(
+            'Payment %s (%s) for order %s',
+            $paymentId,
+            $status,
+            $order->getReference(),
+        )];
     }
 
     /**

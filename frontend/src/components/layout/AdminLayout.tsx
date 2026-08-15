@@ -114,6 +114,14 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
 
         {
 
+          heading: 'Commerce',
+
+          items: [{ to: '/platform/admin/reports', label: 'Reports', icon: TrendingUp }],
+
+        },
+
+        {
+
           heading: 'Platform',
 
           items: [{ to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone }],

@@ -552,6 +552,75 @@ final class StoreCsvImportController extends AbstractController
         return $this->json($this->serializeJob($job, $request));
     }
 
+    #[Route('/{id}/rows/{rowIndex}', name: 'api_store_csv_import_update_row', methods: ['PATCH'])]
+    #[IsGranted('ROLE_USER')]
+    public function updateFailedRow(Request $request, string $slug, int $id, int $rowIndex): JsonResponse
+    {
+        $job = $this->findManagedJob($slug, $id);
+        if (!$job instanceof CsvImportJob) {
+            return $this->json(['detail' => 'Import job not found.'], 404);
+        }
+
+        $row = $this->rowRepository->findOneBy(['job' => $job, 'rowIndex' => $rowIndex]);
+        if (!$row instanceof CsvImportRow) {
+            return $this->json(['detail' => 'Import row not found.'], 404);
+        }
+
+        if (CsvImportRow::STATUS_ERROR !== $row->getStatus()) {
+            return $this->json(['detail' => 'Only failed rows can be edited.'], 409);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->json(['detail' => 'Request body must be JSON.'], 400);
+        }
+
+        if (array_key_exists('name', $payload)) {
+            $row->setName($this->truncate(trim((string) $payload['name']), 255));
+        }
+        if (array_key_exists('set', $payload)) {
+            $row->setSetCode($this->truncate(trim((string) $payload['set']), 120));
+        }
+        if (array_key_exists('collectorNumber', $payload)) {
+            $row->setCollectorNumber($this->truncate(trim((string) $payload['collectorNumber']), 80));
+        }
+        if (array_key_exists('condition', $payload)) {
+            $condition = CardCondition::tryFrom(strtoupper(trim((string) $payload['condition'])));
+            if (!$condition instanceof CardCondition) {
+                return $this->json(['detail' => 'Condition must be NM, LP, MP, HP, or DMG.'], 422);
+            }
+            $row->setCondition($condition->value);
+        }
+        if (array_key_exists('quantity', $payload)) {
+            if (!is_numeric($payload['quantity'])) {
+                return $this->json(['detail' => 'Quantity must be a number.'], 422);
+            }
+            $quantity = (int) $payload['quantity'];
+            if ($quantity < 0) {
+                return $this->json(['detail' => 'Quantity must be zero or greater.'], 422);
+            }
+            $row->setQuantity($quantity);
+        }
+        if (array_key_exists('isFoil', $payload) || array_key_exists('finish', $payload)) {
+            if (array_key_exists('finish', $payload) && null !== $payload['finish'] && '' !== trim((string) $payload['finish'])) {
+                $row->setFinish((string) $payload['finish']);
+            } else {
+                $foil = filter_var($payload['isFoil'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $row->setFinish($foil ? FinishVocabulary::DEFAULT_FOIL : FinishVocabulary::DEFAULT_PLAIN);
+            }
+        }
+
+        // Drop stale "bad quantity" errors once qty is valid so the table
+        // reflects the edit; Resolve / Retry still required to import.
+        if ($row->getQuantity() >= 0 && is_string($row->getError()) && str_contains($row->getError(), 'Quantity must be zero or greater')) {
+            $row->setError('Edited — click Resolve or Retry failed cards to import.');
+        }
+
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeRow($row));
+    }
+
     #[Route('/{id}/rows/{rowIndex}/manual-import', name: 'api_store_csv_import_manual_import_row', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
     public function manualImportRow(Request $request, string $slug, int $id, int $rowIndex): JsonResponse

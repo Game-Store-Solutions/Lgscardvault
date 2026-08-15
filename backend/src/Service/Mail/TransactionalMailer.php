@@ -184,10 +184,10 @@ final class TransactionalMailer
 
         $this->sendHtml(
             to: $email,
-            subject: sprintf('Order fulfilled — %s', $ref),
+            subject: sprintf('Ready for pickup — %s', $ref),
             htmlTemplate: 'emails/store/order_fulfilled.html.twig',
             context: [
-                'preheader' => sprintf('Your order %s from %s is fulfilled.', $ref, $storeName),
+                'preheader' => sprintf('Your order %s from %s is ready for pickup.', $ref, $storeName),
                 'customerName' => $customerName,
                 'storeName' => $storeName,
                 'orderReference' => $ref,
@@ -196,7 +196,7 @@ final class TransactionalMailer
                 'footerNote' => sprintf('Order updates from %s.', $storeName),
             ],
             textBody: sprintf(
-                "Your order %s from %s has been fulfilled.\n\nTotal: $%s\nView: %s\n",
+                "Your order %s from %s is ready for pickup.\n\nTotal: $%s\nView: %s\n",
                 $ref,
                 $storeName,
                 $total,

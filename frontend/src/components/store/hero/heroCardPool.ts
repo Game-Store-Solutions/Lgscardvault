@@ -26,7 +26,7 @@ export function buildHeroCardPool(inventory: InventoryItem[], count = 20): HeroC
   const seen = new Set<string>()
   const pool: HeroCardImage[] = []
 
-  const shuffled = [...inventory].sort(() => Math.random() - 0.5)
+  const shuffled = [...inventory].filter((item) => item.quantity > 0).sort(() => Math.random() - 0.5)
   for (const item of shuffled) {
     const url = cardImage(item.card)
     if (!url || seen.has(url)) continue

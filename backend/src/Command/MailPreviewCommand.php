@@ -79,7 +79,7 @@ final class MailPreviewCommand extends Command
             ->setStatus(OrderStatus::FULFILLED)
             ->setTotalCents(4299);
 
-        $io->section('Store — order fulfilled [store branding]');
+        $io->section('Store — order fulfilled [store branding / ready for pickup]');
         $this->mail->sendOrderFulfilled($order, $customer, $brandedStore);
 
         $io->success(sprintf(

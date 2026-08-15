@@ -10,7 +10,7 @@ export function OrderWorkflow({ status }: { status: OrderStatus }) {
 
   return (
     <div className="grid gap-2">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {ORDER_WORKFLOW.map((step, index) => {
           const complete = !isStopped && activeIndex >= index
           const current = !isStopped && activeIndex === index

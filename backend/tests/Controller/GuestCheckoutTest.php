@@ -75,7 +75,7 @@ final class GuestCheckoutTest extends WebTestCase
         ]);
 
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
-        self::assertSame('paid', $response['status'] ?? null);
+        self::assertSame('pending', $response['status'] ?? null);
         self::assertSame('Walk-in Pat', $response['customerName'] ?? null);
 
         $this->em->refresh($item);

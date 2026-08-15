@@ -147,7 +147,12 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      * Charge the shopper. `$idempotencyKey` must be stable for a given order so
      * a retried request can never take the money twice.
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null}
+     * When `$lineItems` is provided, creates an itemized Square Order (PICKUP
+     * fulfillment when applicable) and links CreatePayment to that order_id.
+     *
+     * @param list<array{name: string, quantity: int, priceCents: int}>|null $lineItems
+     *
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
      *
      * @throws \RuntimeException when the store is not connected or Square declines
      */
@@ -160,6 +165,10 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         ?string $referenceId = null,
         ?string $buyerEmail = null,
         ?string $customerId = null,
+        ?array $lineItems = null,
+        int $creditCents = 0,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
     ): array {
         if ($amountCents <= 0) {
             throw new \RuntimeException('There is nothing to charge.');
@@ -175,6 +184,29 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             throw new \RuntimeException('This store has not finished its payment setup.');
         }
 
+        $squareOrderId = null;
+        if (null !== $lineItems && [] !== $lineItems) {
+            try {
+                $squareOrderId = $this->createSquareOrder(
+                    $account,
+                    $locationId,
+                    $idempotencyKey.'-order',
+                    $lineItems,
+                    $creditCents,
+                    $referenceId,
+                    $buyerEmail,
+                    $buyerName,
+                    $fulfillment,
+                );
+            } catch (\RuntimeException $e) {
+                // Checkout must still succeed if Orders API hiccups; payment alone is enough.
+                $this->logger->warning('Square CreateOrder failed; charging without order_id', [
+                    'store' => $store->getSlug(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $payload = [
             'idempotency_key' => $idempotencyKey,
             'source_id' => $sourceId,
@@ -182,6 +214,9 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             'autocomplete' => true,
             'amount_money' => ['amount' => $amountCents, 'currency' => $this->credentials->currency()],
         ];
+        if (null !== $squareOrderId) {
+            $payload['order_id'] = $squareOrderId;
+        }
         if (null !== $verificationToken && '' !== $verificationToken) {
             $payload['verification_token'] = $verificationToken;
         }
@@ -206,6 +241,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             'paymentId' => $paymentId,
             'status' => (string) ($response['payment']['status'] ?? 'UNKNOWN'),
             'receiptUrl' => isset($response['payment']['receipt_url']) ? (string) $response['payment']['receipt_url'] : null,
+            'squareOrderId' => $squareOrderId,
         ];
     }
 
@@ -217,6 +253,10 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         string $idempotencyKey,
         ?string $referenceId = null,
         ?string $buyerEmail = null,
+        ?array $lineItems = null,
+        int $creditCents = 0,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
     ): array {
         return $this->charge(
             $store,
@@ -227,7 +267,91 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             $referenceId,
             $buyerEmail,
             $customerId,
+            $lineItems,
+            $creditCents,
+            $buyerName,
+            $fulfillment,
         );
+    }
+
+    /**
+     * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     */
+    private function createSquareOrder(
+        StorePaymentAccount $account,
+        string $locationId,
+        string $idempotencyKey,
+        array $lineItems,
+        int $creditCents,
+        ?string $referenceId,
+        ?string $buyerEmail,
+        ?string $buyerName,
+        string $fulfillment,
+    ): string {
+        $currency = $this->credentials->currency();
+        $squareLines = [];
+        foreach ($lineItems as $i => $item) {
+            $qty = max(1, (int) $item['quantity']);
+            $name = trim((string) $item['name']);
+            if ('' === $name) {
+                $name = 'Item';
+            }
+            $squareLines[] = [
+                'uid' => 'line-'.$i,
+                'name' => mb_substr($name, 0, 512),
+                'quantity' => (string) $qty,
+                'base_price_money' => [
+                    'amount' => max(0, (int) $item['priceCents']),
+                    'currency' => $currency,
+                ],
+            ];
+        }
+
+        $orderPayload = [
+            'location_id' => $locationId,
+            'line_items' => $squareLines,
+        ];
+        if (null !== $referenceId && '' !== $referenceId) {
+            $orderPayload['reference_id'] = substr($referenceId, 0, 40);
+        }
+        if ($creditCents > 0) {
+            $orderPayload['discounts'] = [[
+                'uid' => 'store-credit',
+                'name' => 'Store credit',
+                'type' => 'FIXED_AMOUNT',
+                'amount_money' => ['amount' => $creditCents, 'currency' => $currency],
+                'scope' => 'ORDER',
+            ]];
+        }
+
+        if ('pickup' === $fulfillment) {
+            $recipient = array_filter([
+                'display_name' => null !== $buyerName && '' !== trim($buyerName) ? mb_substr(trim($buyerName), 0, 255) : null,
+                'email_address' => null !== $buyerEmail && '' !== trim($buyerEmail) ? trim($buyerEmail) : null,
+            ], static fn (?string $v): bool => null !== $v && '' !== $v);
+
+            $orderPayload['fulfillments'] = [[
+                'uid' => 'pickup',
+                'type' => 'PICKUP',
+                'state' => 'PROPOSED',
+                'pickup_details' => array_filter([
+                    'schedule_type' => 'ASAP',
+                    'recipient' => [] !== $recipient ? $recipient : null,
+                ], static fn (mixed $v): bool => null !== $v),
+            ]];
+        }
+
+        $response = $this->request($account, 'POST', '/v2/orders', [
+            'idempotency_key' => $idempotencyKey,
+            'order' => $orderPayload,
+        ]);
+
+        $orderId = $response['order']['id'] ?? null;
+        if (!is_string($orderId) || '' === $orderId) {
+            throw new \RuntimeException('Square did not return an order id.');
+        }
+
+        return $orderId;
     }
 
     /**

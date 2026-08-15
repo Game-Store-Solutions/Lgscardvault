@@ -51,9 +51,9 @@ final class SquareCheckoutTest extends WebTestCase
         $this->bearer = static::getContainer()->get(JWTTokenManagerInterface::class)->create($user);
     }
 
-    private function jsonRequest(string $method, string $url, ?array $body = null): array
+    private function jsonRequest(string $method, string $url, ?array $body = null, string $contentType = 'application/json'): array
     {
-        $server = ['CONTENT_TYPE' => 'application/json'];
+        $server = ['CONTENT_TYPE' => $contentType];
         if (null !== $this->bearer) {
             $server['HTTP_AUTHORIZATION'] = 'Bearer '.$this->bearer;
         }
@@ -97,7 +97,7 @@ final class SquareCheckoutTest extends WebTestCase
         ]);
 
         self::assertSame(201, $this->responseCode());
-        self::assertSame('paid', $order['status']);
+        self::assertSame('pending', $order['status']);
         self::assertSame(5000, $order['totalCents']);
         self::assertSame(5000, $order['paidCents']);
 
@@ -168,7 +168,7 @@ final class SquareCheckoutTest extends WebTestCase
         ]);
 
         self::assertSame(201, $this->responseCode());
-        self::assertSame('paid', $order['status']);
+        self::assertSame('pending', $order['status']);
         self::assertSame(1000, $order['creditAppliedCents']);
         self::assertSame(0, $order['paidCents']);
         self::assertSame([], $this->gateway->charges, 'nothing is due, so nothing is charged');
@@ -229,6 +229,65 @@ final class SquareCheckoutTest extends WebTestCase
         $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", ['token' => 'cnon:card-nonce-ok']);
 
         self::assertSame(422, $this->responseCode());
+    }
+
+    public function testStaffRefundPushesSquareRefundAndRestoresStock(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 2500);
+        $this->fillCart($store, $customer, $item, 2);
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'fulfillment' => 'pickup',
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+        self::assertSame(201, $this->responseCode());
+
+        $this->authenticate($store->getOwner());
+        $updated = $this->jsonRequest(
+            'PATCH',
+            "/api/stores/{$store->getSlug()}/orders/{$order['id']}",
+            ['status' => 'refunded'],
+            'application/merge-patch+json',
+        );
+
+        self::assertSame(200, $this->responseCode());
+        self::assertSame('refunded', $updated['status']);
+        self::assertCount(1, $this->gateway->refunds);
+        self::assertSame(5000, $this->gateway->refunds[0]['amount']);
+        self::assertSame('refund-'.$order['reference'], $this->gateway->refunds[0]['idempotencyKey']);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(5, $fresh->getQuantity(), 'a Square refund restores stock');
+    }
+
+    public function testStaffRefundFailureLeavesOrderAndStockUnchanged(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 4, priceCents: 1500);
+        $this->fillCart($store, $customer, $item, 1);
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+        self::assertSame(201, $this->responseCode());
+
+        $this->gateway->refundDeclineWith = 'Square refund failed.';
+        $this->authenticate($store->getOwner());
+        $body = $this->jsonRequest(
+            'PATCH',
+            "/api/stores/{$store->getSlug()}/orders/{$order['id']}",
+            ['status' => 'refunded'],
+            'application/merge-patch+json',
+        );
+
+        self::assertSame(400, $this->responseCode());
+        self::assertSame('Square refund failed.', $body['detail']);
+
+        $this->em->clear();
+        $freshOrder = $this->em->getRepository(Order::class)->find($order['id']);
+        self::assertSame('pending', $freshOrder->getStatus()->value);
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(3, $fresh->getQuantity(), 'a failed Square refund must not restock');
     }
 
     public function testConfigEndpointExposesNoSecrets(): void
