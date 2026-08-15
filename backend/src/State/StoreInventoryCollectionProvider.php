@@ -49,6 +49,10 @@ final readonly class StoreInventoryCollectionProvider implements ProviderInterfa
         // showing one. Omitted = every game (existing callers unchanged).
         $gameCode = is_string($filters['game'] ?? null) ? trim($filters['game']) : null;
 
+        // Storefront passes inStockOnly=1 so sold-out singles never leave the API.
+        // Admin inventory omits it and still sees quantity 0 for restocking.
+        $inStockOnly = filter_var($filters['inStockOnly'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
         // Keyset path (preferred; used by the frontend walk): ?afterId=N
         // returns the next id-ordered slice. O(page) via the (store_id, id)
         // index, no COUNT query, and immune to concurrent-write page drift
@@ -57,12 +61,12 @@ final readonly class StoreInventoryCollectionProvider implements ProviderInterfa
         if (isset($filters['afterId'])) {
             $afterId = max(0, (int) $filters['afterId']);
 
-            return $this->inventoryRepository->findByStoreAfterId($store, $afterId, $itemsPerPage, $gameCode);
+            return $this->inventoryRepository->findByStoreAfterId($store, $afterId, $itemsPerPage, $gameCode, $inStockOnly);
         }
 
         $page = max(1, (int) ($filters['page'] ?? 1));
-        $items = $this->inventoryRepository->findPageByStore($store, ($page - 1) * $itemsPerPage, $itemsPerPage, $gameCode);
-        $total = $this->inventoryRepository->countByStore($store, $gameCode);
+        $items = $this->inventoryRepository->findPageByStore($store, ($page - 1) * $itemsPerPage, $itemsPerPage, $gameCode, $inStockOnly);
+        $total = $this->inventoryRepository->countByStore($store, $gameCode, $inStockOnly);
 
         return new TraversablePaginator(new \ArrayIterator($items), $page, $itemsPerPage, $total);
     }

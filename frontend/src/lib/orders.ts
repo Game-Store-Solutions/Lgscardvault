@@ -3,11 +3,11 @@ import type { Order, OrderLine, OrderStatus } from '../api/types'
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Pending',
-  received: 'Received',
-  fulfilled: 'Fulfilled',
-  paid: 'Paid',
-  shipped: 'Shipped',
-  completed: 'Fulfilled',
+  received: 'Accepted',
+  fulfilled: 'Ready for pickup',
+  paid: 'Accepted',
+  shipped: 'Out for delivery',
+  completed: 'Delivered',
   cancelled: 'Cancelled',
   refunded: 'Refunded',
 }
@@ -23,12 +23,12 @@ export const ORDER_STATUS_TONES: Record<OrderStatus, 'neutral' | 'brand' | 'succ
   refunded: 'neutral',
 }
 
-export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ['pending', 'received', 'fulfilled', 'cancelled', 'refunded']
-export const ORDER_WORKFLOW: OrderStatus[] = ['pending', 'received', 'fulfilled']
+export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ['pending', 'received', 'fulfilled', 'completed', 'cancelled', 'refunded']
+export const ORDER_WORKFLOW: OrderStatus[] = ['pending', 'received', 'fulfilled', 'completed']
 
 export function normalizeWorkflowStatus(status: OrderStatus): OrderStatus {
-  if (status === 'paid' || status === 'shipped') return 'received'
-  if (status === 'completed') return 'fulfilled'
+  if (status === 'paid') return 'received'
+  if (status === 'shipped') return 'fulfilled'
   return status
 }
 

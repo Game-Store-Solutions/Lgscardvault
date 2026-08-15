@@ -10,6 +10,7 @@ enum AdminOrderQueue: string
     case Pending = 'pending';
     case Processing = 'processing';
     case Delivery = 'delivery';
+    case Ready = 'ready';
     case Delivered = 'delivered';
 
     /** @return list<OrderStatus>|null null = all orders (no status filter) */
@@ -19,7 +20,8 @@ enum AdminOrderQueue: string
             self::Pending => [OrderStatus::PENDING],
             self::Processing => [OrderStatus::RECEIVED, OrderStatus::PAID],
             self::Delivery => [OrderStatus::SHIPPED],
-            self::Delivered => [OrderStatus::FULFILLED, OrderStatus::COMPLETED],
+            self::Ready => [OrderStatus::FULFILLED],
+            self::Delivered => [OrderStatus::COMPLETED],
         };
     }
 

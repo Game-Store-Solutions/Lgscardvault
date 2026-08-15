@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Store as StoreIcon } from 'lucide-react'
 import type { HeroLayout } from '../../api/types'
 import { cx } from '../../lib/cx'
+import { isDarkHex } from '../../lib/storeTheme'
 import { normalizeHeroLayout } from './hero/heroLayouts'
 import { SignatureHeroLayout } from './hero/HeroSignatureLayouts'
 
@@ -71,11 +72,12 @@ export function HeroLogo({
 }
 
 export function HeroTagline({ tagline, accent, light }: { tagline: string; accent: string; light?: boolean }) {
+  const accentIsDark = isDarkHex(accent)
   return (
     <span
       className={cx(
         'inline-flex max-w-full items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] shadow-sm',
-        light && 'text-white',
+        light || accentIsDark ? 'text-white' : 'text-fg',
       )}
       style={{ backgroundColor: accent }}
     >

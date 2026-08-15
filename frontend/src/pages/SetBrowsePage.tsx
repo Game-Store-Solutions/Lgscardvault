@@ -48,13 +48,16 @@ export default function SetBrowsePage() {
   const setCodeNorm = normalizeSetCode(decodeURIComponent(setCodeParam))
   const { data: store } = useStore(slug)
   useStoreTheme(store)
-  const { data: inventory = [], isLoading } = useInventory(slug)
+  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
 
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortMode>('collector')
 
   const inSet = useMemo(
-    () => inventory.filter((item) => normalizeSetCode(item.card.setCode ?? '') === setCodeNorm),
+    () =>
+      inventory.filter(
+        (item) => item.quantity > 0 && normalizeSetCode(item.card.setCode ?? '') === setCodeNorm,
+      ),
     [inventory, setCodeNorm],
   )
 

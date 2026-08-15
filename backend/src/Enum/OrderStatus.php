@@ -23,11 +23,13 @@ enum OrderStatus: string
     public function allowedTransitions(): array
     {
         return match ($this) {
-            self::PENDING => [self::RECEIVED, self::PAID, self::CANCELLED],
+            self::PENDING => [self::RECEIVED, self::PAID, self::CANCELLED, self::REFUNDED],
             self::RECEIVED => [self::FULFILLED, self::PAID, self::SHIPPED, self::CANCELLED, self::REFUNDED],
             self::PAID => [self::RECEIVED, self::FULFILLED, self::SHIPPED, self::CANCELLED, self::REFUNDED],
             self::SHIPPED => [self::FULFILLED, self::COMPLETED, self::REFUNDED],
-            self::FULFILLED, self::COMPLETED => [self::REFUNDED],
+            // Ready for pickup → customer collected (delivered) or refund.
+            self::FULFILLED => [self::COMPLETED, self::REFUNDED],
+            self::COMPLETED => [self::REFUNDED],
             self::CANCELLED, self::REFUNDED => [],
         };
     }
@@ -49,10 +51,10 @@ enum OrderStatus: string
         return self::FULFILLED === $this || self::COMPLETED === $this;
     }
 
-    /** Admin sidebar badge — in-progress orders; fulfilled/cancelled/refunded are excluded. */
+    /** Admin sidebar badge — still waiting on staff/customer; delivered/closed excluded. */
     public function isOpenForStoreBadge(): bool
     {
-        return !$this->isFulfilled()
+        return self::COMPLETED !== $this
             && self::CANCELLED !== $this
             && self::REFUNDED !== $this;
     }

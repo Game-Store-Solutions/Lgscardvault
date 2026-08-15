@@ -62,6 +62,7 @@ function matchLine(line: RequestLine, inventory: InventoryItem[]): LineResult {
   const wanted = line.name.toLowerCase()
   const listings = inventory
     .filter((item) => {
+      if (item.quantity <= 0) return false
       const full = item.card.name.toLowerCase()
       return full === wanted || full.split(' // ')[0].trim() === wanted
     })
@@ -103,7 +104,7 @@ export default function MassSearchPage() {
   const { data: store } = useStore(slug)
   useStoreTheme(store)
 
-  const { data: inventory = [], isLoading } = useInventory(slug)
+  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))

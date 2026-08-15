@@ -116,7 +116,7 @@ export default function CardDetailsPage() {
   })
 
   // Shared cache key with StorePage — usually warm — powers the recommendations rail.
-  const { data: inventory = [], isLoading: inventoryLoading } = useInventory(slug)
+  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
 
   const { data: favorites = [] } = useCustomerFavorites(slug, Boolean(user))
   const { data: wantList = [] } = useCustomerWantList(slug, Boolean(user))
@@ -262,7 +262,7 @@ export default function CardDetailsPage() {
   const inCart = Boolean(cartEntry)
   const outOfStock = item.quantity < 1
 
-  const related = inventory.filter((i) => i.id !== item.id).slice(0, 10)
+  const related = inventory.filter((i) => i.id !== item.id && i.quantity > 0).slice(0, 10)
 
   const powerToughness = card.power || card.toughness ? `${card.power ?? '—'} / ${card.toughness ?? '—'}` : ''
   const specs = (

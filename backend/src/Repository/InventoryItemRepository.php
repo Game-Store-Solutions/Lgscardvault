@@ -28,8 +28,16 @@ class InventoryItemRepository extends ServiceEntityRepository
      *
      * @return list<InventoryItem>
      */
-    public function findPageByStore(Store $store, int $offset, int $limit, ?string $gameCode = null): array
-    {
+    /**
+     * @return list<InventoryItem>
+     */
+    public function findPageByStore(
+        Store $store,
+        int $offset,
+        int $limit,
+        ?string $gameCode = null,
+        bool $inStockOnly = false,
+    ): array {
         $qb = $this->createQueryBuilder('i')
             ->andWhere('i.store = :store')
             ->setParameter('store', $store)
@@ -40,6 +48,10 @@ class InventoryItemRepository extends ServiceEntityRepository
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
+
         if (null !== $gameCode && '' !== $gameCode) {
             $this->scopeToGame($qb, $gameCode);
         }
@@ -47,12 +59,16 @@ class InventoryItemRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
-    public function countByStore(Store $store, ?string $gameCode = null): int
+    public function countByStore(Store $store, ?string $gameCode = null, bool $inStockOnly = false): int
     {
         $qb = $this->createQueryBuilder('i')
             ->select('COUNT(i.id)')
             ->andWhere('i.store = :store')
             ->setParameter('store', $store);
+
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
 
         if (null !== $gameCode && '' !== $gameCode) {
             $qb->join('i.card', 'c');
@@ -115,8 +131,13 @@ class InventoryItemRepository extends ServiceEntityRepository
      *
      * @return list<InventoryItem>
      */
-    public function findByStoreAfterId(Store $store, int $afterId, int $limit, ?string $gameCode = null): array
-    {
+    public function findByStoreAfterId(
+        Store $store,
+        int $afterId,
+        int $limit,
+        ?string $gameCode = null,
+        bool $inStockOnly = false,
+    ): array {
         $qb = $this->createQueryBuilder('i')
             ->andWhere('i.store = :store')
             ->andWhere('i.id > :afterId')
@@ -126,6 +147,10 @@ class InventoryItemRepository extends ServiceEntityRepository
             ->addSelect('c')
             ->orderBy('i.id', 'ASC')
             ->setMaxResults($limit);
+
+        if ($inStockOnly) {
+            $qb->andWhere('i.quantity > 0');
+        }
 
         if (null !== $gameCode && '' !== $gameCode) {
             $this->scopeToGame($qb, $gameCode);

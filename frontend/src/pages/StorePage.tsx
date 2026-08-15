@@ -79,13 +79,17 @@ export default function StorePage() {
   useStoreTheme(store)
   const cardDisplayStyle = store?.cardDisplayStyle ?? 'gallery'
 
-  const { data: allInventory = [], isLoading } = useInventory(slug)
+  const { data: allInventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
   const { data: storeGames = [] } = useStoreGames(slug)
 
   // Every list below (search, filters, sets, colors, spotlight, counts) works
   // off this, so picking a game scopes the whole page in one place.
+  // Out-of-stock listings stay in admin inventory but are hidden on the storefront.
   const inventory = useMemo(
-    () => (gameFilter ? allInventory.filter((item) => (item.card.gameCode ?? 'mtg') === gameFilter) : allInventory),
+    () =>
+      allInventory.filter(
+        (item) => item.quantity > 0 && (!gameFilter || (item.card.gameCode ?? 'mtg') === gameFilter),
+      ),
     [allInventory, gameFilter],
   )
   const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))

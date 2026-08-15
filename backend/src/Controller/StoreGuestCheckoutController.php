@@ -86,7 +86,7 @@ final class StoreGuestCheckoutController extends AbstractController
 
         $amountDue = $order->getTotalCents() - $order->getCreditAppliedCents();
         if ($amountDue <= 0) {
-            $order->setStatus(OrderStatus::PAID)->setPaidCents(0);
+            $order->setPaidCents(0);
             $this->entityManager->flush();
 
             return $this->json($this->serializeOrder($order), 201);
@@ -100,6 +100,15 @@ final class StoreGuestCheckoutController extends AbstractController
         $this->entityManager->flush();
 
         try {
+            $lineItems = [];
+            foreach ($order->getLines() as $line) {
+                $lineItems[] = [
+                    'name' => $line->getCardName(),
+                    'quantity' => $line->getQuantity(),
+                    'priceCents' => $line->getPriceCents(),
+                ];
+            }
+
             $payment = $this->checkoutGateway->charge(
                 $store,
                 $amountDue,
@@ -108,6 +117,11 @@ final class StoreGuestCheckoutController extends AbstractController
                 trim((string) ($payload['verificationToken'] ?? '')) ?: null,
                 $order->getReference(),
                 $customerEmail,
+                null,
+                $lineItems,
+                $order->getCreditAppliedCents(),
+                $order->getCustomerName(),
+                $order->getFulfillment(),
             );
         } catch (\RuntimeException $e) {
             $this->stockReleaser->release($order);
@@ -118,9 +132,9 @@ final class StoreGuestCheckoutController extends AbstractController
         }
 
         $order
-            ->setStatus(OrderStatus::PAID)
             ->setPaidCents($amountDue)
-            ->setPaymentReference($payment['paymentId']);
+            ->setPaymentReference($payment['paymentId'])
+            ->setSquareOrderId($payment['squareOrderId'] ?? null);
 
         $this->entityManager->flush();
 

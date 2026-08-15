@@ -43,6 +43,12 @@ export function isDarkPalette(p: StorePalette): boolean {
   return reference ? relativeLuminance(reference) < 0.4 : false
 }
 
+/** True when a hex color is dark enough that white/light text is required. */
+export function isDarkHex(hex?: string | null): boolean {
+  const color = norm(hex)
+  return color ? relativeLuminance(color) < 0.45 : false
+}
+
 /**
  * Build the CSS-variable overrides for a palette. Keys are token variable
  * names. `forceDark` picks the dark brand-ramp direction even when the

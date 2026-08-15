@@ -150,6 +150,11 @@ class Order
     #[ORM\Column(length: 128, nullable: true)]
     private ?string $paymentReference = null;
 
+    /** Square Orders API id (itemized order linked to the payment). */
+    #[ORM\Column(length: 128, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $squareOrderId = null;
+
     #[ORM\Column]
     #[Groups(['order:read'])]
     private \DateTimeImmutable $createdAt;
@@ -325,6 +330,18 @@ class Order
     public function setPaymentReference(?string $paymentReference): static
     {
         $this->paymentReference = $paymentReference;
+
+        return $this;
+    }
+
+    public function getSquareOrderId(): ?string
+    {
+        return $this->squareOrderId;
+    }
+
+    public function setSquareOrderId(?string $squareOrderId): static
+    {
+        $this->squareOrderId = $squareOrderId;
 
         return $this;
     }

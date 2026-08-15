@@ -13,6 +13,7 @@ export interface StoreOrderQueueCounts {
   pending: number
   processing: number
   delivery: number
+  ready: number
   delivered: number
   /** Every order in the store (all statuses) — for All tab pagination. */
   total: number
@@ -23,6 +24,7 @@ const EMPTY_QUEUE_COUNTS: StoreOrderQueueCounts = {
   pending: 0,
   processing: 0,
   delivery: 0,
+  ready: 0,
   delivered: 0,
   total: 0,
 }
@@ -33,10 +35,11 @@ function parseQueueCounts(data: unknown): StoreOrderQueueCounts {
   const pending = Math.max(0, Number(row.pending) || 0)
   const processing = Math.max(0, Number(row.processing) || 0)
   const delivery = Math.max(0, Number(row.delivery) || 0)
+  const ready = Math.max(0, Number(row.ready) || 0)
   const delivered = Math.max(0, Number(row.delivered) || 0)
   const total = Math.max(0, Number(row.total) || 0)
-  const openCount = Math.max(0, Number(row.openCount) || pending + processing + delivery)
-  return { openCount, pending, processing, delivery, delivered, total }
+  const openCount = Math.max(0, Number(row.openCount) || pending + processing + delivery + ready)
+  return { openCount, pending, processing, delivery, ready, delivered, total }
 }
 
 /** Admin order table page size — must not exceed the API's itemsPerPage cap (200). */
@@ -105,6 +108,8 @@ export function resolveOrdersListTotal(
         return queueCounts?.processing ?? 0
       case 'delivery':
         return queueCounts?.delivery ?? 0
+      case 'ready':
+        return queueCounts?.ready ?? 0
       case 'delivered':
         return queueCounts?.delivered ?? 0
       default:

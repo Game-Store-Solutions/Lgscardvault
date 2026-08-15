@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { BadgeCheck, Box, Dices, Sparkles } from 'lucide-react'
 import { cx } from '../../../lib/cx'
+import { isDarkHex } from '../../../lib/storeTheme'
 import type { StoreHeroProps } from '../StoreHero'
 import { HeroLogo, HeroTagline, useHeroTokens } from '../StoreHero'
 import { HeroOptionalPhoto } from './HeroBackdrop'
@@ -62,7 +63,7 @@ function IdentityHeader({
   const { accent, heading } = tokens
   const { logoUrl, tagline, heroSubheading, verified } = props
   return (
-    <div className={cx('space-y-3', light && 'text-white')}>
+    <div className={cx('space-y-3', light ? 'text-white' : 'text-fg')}>
       <div className="flex flex-wrap items-center gap-3">
         <HeroLogo logoUrl={logoUrl} className="size-14" glass={light} />
         {verified ? (
@@ -78,7 +79,12 @@ function IdentityHeader({
         ) : null}
         {tagline?.trim() ? <HeroTagline tagline={tagline.trim()} accent={accent} light={light} /> : null}
       </div>
-      <h1 className={cx('font-display text-3xl font-bold tracking-tight sm:text-4xl', light && 'drop-shadow-sm')}>
+      <h1
+        className={cx(
+          'font-display text-3xl font-bold tracking-tight sm:text-4xl',
+          light ? 'text-white drop-shadow-sm' : 'text-fg',
+        )}
+      >
         {heading}
       </h1>
       {heroSubheading?.trim() ? (
@@ -173,16 +179,21 @@ export function TradingTableHero({ props, tokens }: { props: StoreHeroProps; tok
 }
 
 export function EventBoardHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
+  // No hero photo → solid primary fill. In light mode that primary is often
+  // navy/black while --color-fg is near-black, so title/subcopy must flip to
+  // white. With a photo + token scrim the field is page-colored — use normal fg.
+  const lightCopy = !tokens.hasImage && isDarkHex(tokens.primary)
+
   return (
     <HeroShell
       props={props}
       tokens={tokens}
       layout="event-board"
-      photoScrim="token"
+      photoScrim={lightCopy ? 'dark' : 'token'}
       className="dark:border-white/12 dark:bg-surface/40 dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.55)]"
     >
       <div className="grid gap-6 p-6 lg:grid-cols-2 lg:items-start lg:p-8">
-        <IdentityHeader props={props} tokens={tokens} />
+        <IdentityHeader props={props} tokens={tokens} light={lightCopy} />
         <CommunityBoard events={props.communityEvents} compact slug={props.slug} className="lg:rotate-2" />
       </div>
     </HeroShell>

@@ -53,7 +53,7 @@ export default function ArtistBrowsePage() {
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
-  const { data: inventory = [], isLoading } = useInventory(slug)
+  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
 
   const [search, setSearch] = useState('')
   const [noStockModalOpen, setNoStockModalOpen] = useState(true)

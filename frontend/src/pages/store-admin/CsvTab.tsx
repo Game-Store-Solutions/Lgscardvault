@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import api, { cardImage } from '../../api/client'
-import { inventoryKey, sealedInventoryKey, useCatalogGames, useStoreGameStats } from '../../hooks'
+import { sealedInventoryKey, useCatalogGames, useStoreGameStats } from '../../hooks'
 import type { CsvImportJob, CsvImportJobSummary, CsvImportRow } from '../../api/types'
 import {
   Card,
@@ -53,11 +53,14 @@ export default function CsvTab({ slug }: { slug: string }) {
   }
 
   useEffect(() => {
-    if (job?.status === 'completed') {
-      void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+    if (!job) return
+    // Refresh inventory as rows land — not only when the whole job finishes —
+    // so admin + storefront catch up while the worker is still running.
+    if (isActive(job.status) || job.status === 'completed') {
+      void queryClient.invalidateQueries({ queryKey: ['inventory', slug] })
       void queryClient.invalidateQueries({ queryKey: sealedInventoryKey(slug) })
     }
-  }, [job?.status, queryClient, slug])
+  }, [job?.status, job?.importedRows, queryClient, slug])
 
   const rows = job?.rows ?? []
   const queuedRows = job?.queuedRows ?? 0

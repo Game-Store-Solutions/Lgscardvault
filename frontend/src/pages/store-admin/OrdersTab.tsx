@@ -45,7 +45,7 @@ const ORDER_TABLE_ROW_H = 'h-[4.75rem]'
 
 function tabQueueCount(
   tabId: OrderListTab,
-  counts: { pending: number; processing: number; delivery: number; delivered: number } | undefined,
+  counts: { pending: number; processing: number; delivery: number; ready: number; delivered: number } | undefined,
 ): number {
   if (!counts) return 0
   switch (tabId) {
@@ -55,6 +55,8 @@ function tabQueueCount(
       return counts.processing
     case 'delivery':
       return counts.delivery
+    case 'ready':
+      return counts.ready
     case 'delivered':
       return counts.delivered
     default:
@@ -65,15 +67,24 @@ function tabQueueCount(
 function statusActions(status: OrderStatus): { status: OrderStatus; label: string; icon: typeof CheckCircle2 }[] {
   if (status === 'pending') {
     return [
-      { status: 'received', label: 'Mark received', icon: CheckCircle2 },
+      { status: 'received', label: 'Accept order', icon: CheckCircle2 },
       { status: 'cancelled', label: 'Cancel', icon: XCircle },
     ]
   }
   if (status === 'received' || status === 'paid' || status === 'shipped') {
     return [
-      { status: 'fulfilled', label: 'Mark fulfilled', icon: PackageCheck },
+      { status: 'fulfilled', label: 'Ready for pickup', icon: PackageCheck },
       { status: 'refunded', label: 'Refund', icon: RotateCcw },
     ]
+  }
+  if (status === 'fulfilled') {
+    return [
+      { status: 'completed', label: 'Mark delivered', icon: CheckCircle2 },
+      { status: 'refunded', label: 'Refund', icon: RotateCcw },
+    ]
+  }
+  if (status === 'completed') {
+    return [{ status: 'refunded', label: 'Refund', icon: RotateCcw }]
   }
   return []
 }
@@ -168,7 +179,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
       newOrders: tab === 'all' ? (queueCounts?.total ?? orderTotal) : orderTotal,
       newTrend: percentChange(last7, prev7),
       pending: queueCounts?.pending ?? data.filter((o) => o.status === 'pending').length,
-      completed: data.filter((o) => o.status === 'fulfilled' || o.status === 'completed').length,
+      completed: data.filter((o) => o.status === 'completed').length,
       canceled: data.filter((o) => o.status === 'cancelled' || o.status === 'refunded').length,
     }
   }, [data, orderTotal, queueCounts?.pending, queueCounts?.total, tab])

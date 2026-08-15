@@ -20,6 +20,152 @@ class OrderRepository extends ServiceEntityRepository
     }
 
     /**
+     * Recent storefront orders that captured a Square payment (shopper → store).
+     * Used by platform admin reports — not subscription charges.
+     *
+     * @param array{
+     *   store?: string|null,
+     *   status?: string|null,
+     *   q?: string|null,
+     *   from?: string|null,
+     *   to?: string|null,
+     *   limit?: int,
+     *   offset?: int
+     * } $filters
+     *
+     * @return array{
+     *   transactions: list<array{
+     *     orderId: int,
+     *     reference: string,
+     *     storeSlug: string|null,
+     *     storeName: string|null,
+     *     status: string,
+     *     paidCents: int,
+     *     paymentReference: string,
+     *     squareOrderId: string|null,
+     *     customerEmail: string|null,
+     *     createdAt: \DateTimeImmutable
+     *   }>,
+     *   summary: array{count: int, totalPaidCents: int},
+     *   limit: int,
+     *   offset: int
+     * }
+     */
+    public function findSquareShopperPayments(array $filters = []): array
+    {
+        $limit = max(1, min(200, (int) ($filters['limit'] ?? 50)));
+        $offset = max(0, (int) ($filters['offset'] ?? 0));
+
+        $qb = $this->createQueryBuilder('o')
+            ->innerJoin('o.store', 's')
+            ->andWhere('o.paymentReference IS NOT NULL')
+            ->andWhere('o.paymentReference <> \'\'')
+            ->andWhere('o.paidCents > 0');
+
+        $store = trim((string) ($filters['store'] ?? ''));
+        if ('' !== $store) {
+            $qb->andWhere('LOWER(s.name) LIKE :store OR LOWER(s.slug) LIKE :store')
+                ->setParameter('store', '%'.mb_strtolower($store).'%');
+        }
+
+        $status = trim((string) ($filters['status'] ?? ''));
+        if ('' !== $status) {
+            $qb->andWhere('o.status = :status')
+                ->setParameter('status', $status);
+        }
+
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ('' !== $q) {
+            $qb->andWhere(
+                'LOWER(o.reference) LIKE :q OR LOWER(COALESCE(o.customerEmail, \'\')) LIKE :q OR LOWER(COALESCE(o.paymentReference, \'\')) LIKE :q OR LOWER(COALESCE(o.squareOrderId, \'\')) LIKE :q',
+            )->setParameter('q', '%'.mb_strtolower($q).'%');
+        }
+
+        $from = trim((string) ($filters['from'] ?? ''));
+        if ('' !== $from) {
+            try {
+                $qb->andWhere('o.createdAt >= :from')
+                    ->setParameter('from', new \DateTimeImmutable($from.' 00:00:00'));
+            } catch (\Exception) {
+                // ignore invalid date
+            }
+        }
+
+        $to = trim((string) ($filters['to'] ?? ''));
+        if ('' !== $to) {
+            try {
+                $qb->andWhere('o.createdAt <= :to')
+                    ->setParameter('to', new \DateTimeImmutable($to.' 23:59:59'));
+            } catch (\Exception) {
+                // ignore invalid date
+            }
+        }
+
+        $summaryRow = (clone $qb)
+            ->select('COUNT(o.id) AS cnt', 'COALESCE(SUM(o.paidCents), 0) AS totalPaid')
+            ->getQuery()
+            ->getSingleResult();
+
+        $rows = $qb
+            ->select(
+                'o.id AS orderId',
+                'o.reference AS reference',
+                's.slug AS storeSlug',
+                's.name AS storeName',
+                'o.status AS status',
+                'o.paidCents AS paidCents',
+                'o.paymentReference AS paymentReference',
+                'o.squareOrderId AS squareOrderId',
+                'o.customerEmail AS customerEmail',
+                'o.createdAt AS createdAt',
+            )
+            ->orderBy('o.createdAt', 'DESC')
+            ->addOrderBy('o.id', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        $transactions = array_map(static function (array $row): array {
+            $status = $row['status'];
+            if ($status instanceof OrderStatus) {
+                $status = $status->value;
+            }
+
+            return [
+                'orderId' => (int) $row['orderId'],
+                'reference' => (string) $row['reference'],
+                'storeSlug' => $row['storeSlug'] ?? null,
+                'storeName' => $row['storeName'] ?? null,
+                'status' => (string) $status,
+                'paidCents' => (int) $row['paidCents'],
+                'paymentReference' => (string) $row['paymentReference'],
+                'squareOrderId' => $row['squareOrderId'] ?? null,
+                'customerEmail' => $row['customerEmail'] ?? null,
+                'createdAt' => $row['createdAt'] instanceof \DateTimeImmutable
+                    ? $row['createdAt']
+                    : new \DateTimeImmutable((string) $row['createdAt']),
+            ];
+        }, $rows);
+
+        return [
+            'transactions' => $transactions,
+            'summary' => [
+                'count' => (int) ($summaryRow['cnt'] ?? 0),
+                'totalPaidCents' => (int) ($summaryRow['totalPaid'] ?? 0),
+            ],
+            'limit' => $limit,
+            'offset' => $offset,
+        ];
+    }
+
+    /** @deprecated use findSquareShopperPayments */
+    public function findRecentSquareShopperPayments(int $limit = 50): array
+    {
+        return $this->findSquareShopperPayments(['limit' => $limit])['transactions'];
+    }
+
+    /**
      * One page of a store's orders, newest first, with lines AND their cards
      * fetch-joined (serializing lines without the card join caused one lazy
      * card SELECT per order line — N+1).
@@ -97,11 +243,10 @@ class OrderRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
-    /** Orders still in the store queue (pending → shipped); not fulfilled/closed. */
+    /** Orders still in the store queue (pending → ready for pickup); not delivered/closed. */
     public function countOpenByStore(Store $store): int
     {
         $closed = [
-            OrderStatus::FULFILLED->value,
             OrderStatus::COMPLETED->value,
             OrderStatus::CANCELLED->value,
             OrderStatus::REFUNDED->value,
@@ -138,19 +283,21 @@ class OrderRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
-    /** @return array{openCount: int, pending: int, processing: int, delivery: int, delivered: int, total: int} */
+    /** @return array{openCount: int, pending: int, processing: int, delivery: int, ready: int, delivered: int, total: int} */
     public function countQueueSummaryByStore(Store $store): array
     {
         $pending = $this->countByStoreAndStatuses($store, [OrderStatus::PENDING]);
         $processing = $this->countByStoreAndStatuses($store, [OrderStatus::RECEIVED, OrderStatus::PAID]);
         $delivery = $this->countByStoreAndStatuses($store, [OrderStatus::SHIPPED]);
-        $delivered = $this->countByStoreAndStatuses($store, [OrderStatus::FULFILLED, OrderStatus::COMPLETED]);
+        $ready = $this->countByStoreAndStatuses($store, [OrderStatus::FULFILLED]);
+        $delivered = $this->countByStoreAndStatuses($store, [OrderStatus::COMPLETED]);
 
         return [
-            'openCount' => $pending + $processing + $delivery,
+            'openCount' => $pending + $processing + $delivery + $ready,
             'pending' => $pending,
             'processing' => $processing,
             'delivery' => $delivery,
+            'ready' => $ready,
             'delivered' => $delivered,
             'total' => $this->countByStore($store),
         ];

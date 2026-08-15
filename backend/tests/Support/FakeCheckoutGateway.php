@@ -17,8 +17,14 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     /** Message thrown instead of charging; null means the charge succeeds. */
     public ?string $declineWith = null;
 
-    /** @var list<array{amount: int, sourceId: string, idempotencyKey: string}> */
+    /** @var list<array{amount: int, sourceId: string, idempotencyKey: string, lineItems: ?array}> */
     public array $charges = [];
+
+    /** @var list<array{paymentId: string, amount: int, idempotencyKey: string, reason: ?string}> */
+    public array $refunds = [];
+
+    /** Message thrown instead of refunding; null means the refund succeeds. */
+    public ?string $refundDeclineWith = null;
 
     public function checkoutConfig(Store $store): array
     {
@@ -48,6 +54,10 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
         ?string $referenceId = null,
         ?string $buyerEmail = null,
         ?string $customerId = null,
+        ?array $lineItems = null,
+        int $creditCents = 0,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
     ): array {
         if (null !== $this->declineWith) {
             throw new \RuntimeException($this->declineWith);
@@ -57,12 +67,16 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
             'amount' => $amountCents,
             'sourceId' => $sourceId,
             'idempotencyKey' => $idempotencyKey,
+            'lineItems' => $lineItems,
         ];
 
+        $n = count($this->charges);
+
         return [
-            'paymentId' => 'sqpmt_'.count($this->charges),
+            'paymentId' => 'sqpmt_'.$n,
             'status' => 'COMPLETED',
             'receiptUrl' => 'https://squareup.com/receipt/test',
+            'squareOrderId' => null !== $lineItems && [] !== $lineItems ? 'sqord_'.$n : null,
         ];
     }
 
@@ -74,13 +88,44 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
         string $idempotencyKey,
         ?string $referenceId = null,
         ?string $buyerEmail = null,
+        ?array $lineItems = null,
+        int $creditCents = 0,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
     ): array {
-        return $this->charge($store, $amountCents, $cardId, $idempotencyKey, null, $referenceId, $buyerEmail, $customerId);
+        return $this->charge(
+            $store,
+            $amountCents,
+            $cardId,
+            $idempotencyKey,
+            null,
+            $referenceId,
+            $buyerEmail,
+            $customerId,
+            $lineItems,
+            $creditCents,
+            $buyerName,
+            $fulfillment,
+        );
     }
 
     public function refund(Store $store, string $paymentId, int $amountCents, string $idempotencyKey, ?string $reason = null): array
     {
-        return ['refundId' => 'sqrfd_1', 'status' => 'COMPLETED'];
+        if (null !== $this->refundDeclineWith) {
+            throw new \RuntimeException($this->refundDeclineWith);
+        }
+
+        $this->refunds[] = [
+            'paymentId' => $paymentId,
+            'amount' => $amountCents,
+            'idempotencyKey' => $idempotencyKey,
+            'reason' => $reason,
+        ];
+
+        return [
+            'refundId' => 'sqrfd_'.count($this->refunds),
+            'status' => 'COMPLETED',
+        ];
     }
 
     public function vaultPaymentMethod(
