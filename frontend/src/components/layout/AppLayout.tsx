@@ -416,7 +416,7 @@ function AppMain({ contentShell }: { contentShell: string }) {
   const flush = layout?.flushMain ?? false
 
   return (
-    <main className={cx(flush ? FLUSH_APP_SHELL : contentShell, 'flex-1', flush ? 'py-0' : 'py-8')}>
+    <main className={cx(flush ? FLUSH_APP_SHELL : contentShell, 'flex-1', flush ? 'py-0' : 'py-5 sm:py-8')}>
       <Outlet />
     </main>
   )

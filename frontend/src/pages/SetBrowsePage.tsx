@@ -116,12 +116,12 @@ export default function SetBrowsePage() {
   const releasedLabel = setMeta?.releasedAt ? formatDate(setMeta.releasedAt) : null
 
   return (
-    <div className="storefront-atmosphere space-y-8 pb-12">
+    <div className="storefront-atmosphere space-y-6 pb-12 sm:space-y-8">
       <div className="space-y-4">
         <BackButton to={`/s/${slug}`}>Back to store</BackButton>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card dark:glass-card">
-          <div className="relative px-6 py-8 sm:px-10 sm:py-10">
+          <div className="relative px-4 py-5 sm:px-10 sm:py-10">
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-500/8 via-transparent to-accent-500/6"
@@ -132,7 +132,7 @@ export default function SetBrowsePage() {
                   <Badge tone="brand">{setCodeNorm.toUpperCase()}</Badge>
                   <span className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-muted">{gameLabel}</span>
                 </div>
-                <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">{setName}</h1>
+                <h1 className="font-display text-2xl font-extrabold tracking-tight text-fg sm:text-4xl">{setName}</h1>
                 <p className="max-w-2xl text-sm leading-relaxed text-fg-muted">
                   Every card {store?.name ?? 'this store'} has in stock from this set. Browse by collector number, compare
                   prices, and jump straight to a listing.
@@ -181,16 +181,22 @@ export default function SetBrowsePage() {
         />
       ) : (
         <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <Input
               id="set-browse-search"
               label="Search this set"
               placeholder="Search by name, number, or type…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="sm:max-w-md"
+              wrapperClassName="min-w-0 flex-1"
             />
-            <Select label="Sort by" value={sort} onChange={(e) => setSort(e.target.value as SortMode)} className="sm:w-48">
+            <Select
+              label="Sort by"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortMode)}
+              wrapperClassName="w-full shrink-0 sm:w-52"
+              className="w-full"
+            >
               <option value="collector">Collector number</option>
               <option value="name">Name (A–Z)</option>
               <option value="price-asc">Price (low to high)</option>
@@ -205,7 +211,7 @@ export default function SetBrowsePage() {
               description="Try a different search term or clear the filter."
             />
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {grouped.map((entry) => (
                 <SetCardTile key={entry.representative.card.id} slug={slug} entry={entry} />
               ))}

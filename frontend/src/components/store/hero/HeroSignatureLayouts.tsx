@@ -81,7 +81,7 @@ function IdentityHeader({
       </div>
       <h1
         className={cx(
-          'font-display text-3xl font-bold tracking-tight sm:text-4xl',
+          'font-display text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl',
           light ? 'text-white drop-shadow-sm' : 'text-fg',
         )}
       >
@@ -105,7 +105,7 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
   return (
     <div
       className={cx(
-        'relative isolate flex min-h-80 items-end overflow-hidden rounded-card border border-border sm:min-h-95',
+        'relative isolate flex min-h-64 items-end overflow-hidden rounded-card border border-border sm:min-h-80 lg:min-h-95',
         className,
       )}
     >
@@ -126,21 +126,21 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
         className="pointer-events-none absolute -right-16 -top-20 -z-10 size-72 rounded-full opacity-50 blur-3xl"
         style={{ backgroundColor: accent }}
       />
-      <div className="relative w-full p-6 text-white sm:p-8 lg:p-10">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="relative w-full p-5 text-white sm:p-8 lg:p-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <HeroLogo logoUrl={logoUrl} className="size-14" glass />
+              <HeroLogo logoUrl={logoUrl} className="size-12 sm:size-14" glass />
               {tagline?.trim() ? <HeroTagline tagline={tagline.trim()} accent={accent} light /> : null}
             </div>
-            <h1 className="mt-5 max-w-2xl font-display text-4xl font-bold leading-[1.05] tracking-tight drop-shadow-sm sm:text-5xl">
+            <h1 className="mt-3 max-w-2xl font-display text-3xl font-bold leading-[1.05] tracking-tight drop-shadow-sm sm:mt-5 sm:text-4xl lg:text-5xl">
               {heading}
             </h1>
             {heroSubheading?.trim() ? (
-              <p className="mt-3 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">{heroSubheading}</p>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/85 sm:mt-3 sm:text-base lg:text-lg">{heroSubheading}</p>
             ) : null}
           </div>
-          {actions ? <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div> : null}
+          {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">{actions}</div> : null}
         </div>
       </div>
     </div>
@@ -150,7 +150,7 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
 export function TradingTableHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
   const { primary, accent } = tokens
   return (
-    <HeroShell props={props} tokens={tokens} layout="trading-table" photoScrim="dark" minClass="min-h-[24rem]">
+    <HeroShell props={props} tokens={tokens} layout="trading-table" photoScrim="dark" minClass="min-h-[18rem] sm:min-h-[24rem]">
       <div
         aria-hidden
         className="absolute inset-0 -z-[5] opacity-90"
@@ -158,15 +158,15 @@ export function TradingTableHero({ props, tokens }: { props: StoreHeroProps; tok
           backgroundImage: `radial-gradient(ellipse at center, ${primary}44 0%, transparent 70%), linear-gradient(135deg, #1a1208 0%, #0f172a 100%)`,
         }}
       />
-      <div className="relative flex min-h-[24rem] flex-col justify-between p-6 text-white sm:p-8">
+      <div className="relative flex min-h-[18rem] flex-col justify-between p-5 text-white sm:min-h-[24rem] sm:p-8">
         <div className="flex justify-between opacity-80">
           <Dices aria-hidden className="size-8 rotate-12" />
           <Box aria-hidden className="size-10 -rotate-6" />
           <Sparkles aria-hidden className="size-7 rotate-45" />
         </div>
-        <div className="mx-auto max-w-lg rounded-2xl border border-white/15 bg-black/35 px-6 py-8 text-center backdrop-blur-md">
+        <div className="mx-auto max-w-lg rounded-2xl border border-white/15 bg-black/35 px-4 py-5 text-center backdrop-blur-md sm:px-6 sm:py-8">
           <HeroLogo logoUrl={props.logoUrl} className="mx-auto size-12" glass />
-          <h1 className="mt-4 font-display text-3xl font-bold">{tokens.heading}</h1>
+          <h1 className="mt-4 font-display text-2xl font-bold sm:text-3xl">{tokens.heading}</h1>
           {props.heroSubheading?.trim() ? <p className="mt-2 text-sm text-white/80">{props.heroSubheading}</p> : null}
           {props.actions ? <div className="mt-4 flex flex-wrap justify-center gap-2">{props.actions}</div> : null}
         </div>
@@ -192,7 +192,7 @@ export function EventBoardHero({ props, tokens }: { props: StoreHeroProps; token
       photoScrim={lightCopy ? 'dark' : 'token'}
       className="dark:border-white/12 dark:bg-surface/40 dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.55)]"
     >
-      <div className="grid gap-6 p-6 lg:grid-cols-2 lg:items-start lg:p-8">
+      <div className="grid gap-5 p-5 lg:grid-cols-2 lg:items-start lg:p-8">
         <IdentityHeader props={props} tokens={tokens} light={lightCopy} />
         <CommunityBoard events={props.communityEvents} compact slug={props.slug} className="lg:rotate-2" />
       </div>
@@ -202,9 +202,9 @@ export function EventBoardHero({ props, tokens }: { props: StoreHeroProps; token
 
 export function FloatingCardsHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
   return (
-    <HeroShell props={props} tokens={tokens} layout="floating-cards" photoScrim="dark" minClass="min-h-[26rem]">
+    <HeroShell props={props} tokens={tokens} layout="floating-cards" photoScrim="dark" minClass="min-h-[18rem] sm:min-h-[26rem]">
       <FloatingCardsLayer cards={props.showcaseCards ?? []} count={20} />
-      <div className="relative flex min-h-[26rem] flex-col justify-end p-6 text-white sm:p-10">
+      <div className="relative flex min-h-[18rem] flex-col justify-end p-5 text-white sm:min-h-[26rem] sm:p-10">
         <IdentityHeader props={props} tokens={tokens} light />
       </div>
     </HeroShell>

@@ -58,15 +58,15 @@ export function CardTile({ item, slug }: CardTileProps) {
           )}
 
           {/* Price chip */}
-          <span className="absolute bottom-2 right-2 z-10 rounded-full bg-black/70 px-2.5 py-1 text-sm font-bold text-white backdrop-blur-sm">
+          <span className="absolute bottom-2 right-2 z-10 rounded-full bg-black/70 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-sm">
             {price}
           </span>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="flex flex-1 flex-col p-3">
-        <h3 className="truncate font-display text-sm font-bold tracking-tight text-fg group-hover:text-brand-600">
+      <div className="flex flex-1 flex-col p-2.5 sm:p-3">
+        <h3 className="truncate font-display text-xs font-bold tracking-tight text-fg group-hover:text-brand-600 sm:text-sm">
           {item.card.name}
         </h3>
         <p className="mt-0.5 truncate text-xs text-fg-muted">

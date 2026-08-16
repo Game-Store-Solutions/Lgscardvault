@@ -8,7 +8,7 @@ import type {
 import { Eye, EyeOff } from 'lucide-react'
 import { cx } from '../../lib/cx'
 
-const fieldShell = 'flex flex-col gap-1.5'
+const fieldStack = 'flex min-w-0 flex-col gap-1.5'
 
 function Label({ id, children, required }: { id: string; children: ReactNode; required?: boolean }) {
   return (
@@ -51,10 +51,12 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode
   error?: ReactNode
   hint?: ReactNode
+  /** Classes for the label + control stack (grow in toolbars with `flex-1`). */
+  wrapperClassName?: string
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, hint, className, id, required, type, ...props },
+  { label, error, hint, className, wrapperClassName, id, required, type, ...props },
   ref,
 ) {
   const generatedId = useId()
@@ -64,7 +66,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const isPassword = type === 'password'
   const resolvedType = isPassword && revealed ? 'text' : type
   return (
-    <div className={fieldShell}>
+    <div className={cx(fieldStack, 'w-full', wrapperClassName)}>
       {label != null && (
         <Label id={inputId} required={required}>
           {label}
@@ -113,7 +115,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   const inputId = id ?? generatedId
   const descId = error || hint ? `${inputId}-desc` : undefined
   return (
-    <div className={fieldShell}>
+    <div className={cx(fieldStack, 'w-full')}>
       {label != null && (
         <Label id={inputId} required={required}>
           {label}
@@ -138,17 +140,18 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: ReactNode
   error?: ReactNode
   hint?: ReactNode
+  wrapperClassName?: string
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { label, error, hint, className, id, required, children, ...props },
+  { label, error, hint, className, wrapperClassName, id, required, children, ...props },
   ref,
 ) {
   const generatedId = useId()
   const inputId = id ?? generatedId
   const descId = error || hint ? `${inputId}-desc` : undefined
   return (
-    <div className={fieldShell}>
+    <div className={cx(fieldStack, wrapperClassName)}>
       {label != null && (
         <Label id={inputId} required={required}>
           {label}

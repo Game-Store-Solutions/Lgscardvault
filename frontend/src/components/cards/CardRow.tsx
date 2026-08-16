@@ -26,11 +26,11 @@ export function CardRow({ item, slug }: CardRowProps) {
     <Link
       to={`/s/${slug}/cards/${item.id}`}
       className={cx(
-        'group flex items-center gap-4 rounded-card border border-border bg-surface p-3 shadow-card dark:glass-card ui-lift hover:border-brand-500/25',
+        'group flex items-center gap-3 rounded-card border border-border bg-surface p-2.5 shadow-card dark:glass-card ui-lift hover:border-brand-500/25 sm:gap-4 sm:p-3',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
       )}
     >
-      <div className="relative grid h-24 w-[4.35rem] shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-surface-elevated dark:bg-[#18181B]">
+      <div className="relative grid h-20 w-[3.6rem] shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-surface-elevated sm:h-24 sm:w-[4.35rem] dark:bg-[#18181B]">
         <CardImage src={image} alt={item.card.name} fit="contain" className="size-full" showLabel={false} />
       </div>
 
@@ -64,7 +64,7 @@ export function CardRow({ item, slug }: CardRowProps) {
 
       <div className="shrink-0 text-right">
         <p className="text-[0.7rem] uppercase tracking-wide text-fg-muted">Market</p>
-        <p className="font-display text-xl font-bold text-fg">{price}</p>
+        <p className="font-display text-base font-bold text-fg sm:text-xl">{price}</p>
         <p className="text-xs text-fg-muted">{item.quantity} available</p>
       </div>
     </Link>

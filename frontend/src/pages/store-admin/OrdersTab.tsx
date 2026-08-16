@@ -313,7 +313,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
             )})}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+            <div className="relative min-w-0 flex-1 sm:max-w-xl">
               <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
               <input
                 type="search"

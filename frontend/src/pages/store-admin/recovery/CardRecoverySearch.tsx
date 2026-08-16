@@ -154,6 +154,7 @@ export function CardRecoverySearch({
                 if (event.key === 'Enter') void submitReference()
               }}
               placeholder="scryfall.com/card/clb/532. Or clb/532"
+              wrapperClassName="min-w-0 flex-1"
             />
             <Button variant="secondary" loading={resolveByReference.isPending} onClick={() => void submitReference()}>
               Use link

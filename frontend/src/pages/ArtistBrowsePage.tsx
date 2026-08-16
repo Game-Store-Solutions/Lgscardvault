@@ -141,7 +141,7 @@ export default function ArtistBrowsePage() {
           </p>
         </div>
         {inStore.length > 0 && (
-          <div className="w-full max-w-md">
+          <div className="w-full min-w-0 sm:max-w-xl sm:flex-1">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -169,7 +169,7 @@ export default function ArtistBrowsePage() {
           description="Try a different filter."
         />
       ) : (
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {grouped.map((entry) => (
             <ArtistCardTile key={entry.representative.card.id} slug={slug} artist={artist} entry={entry} />
           ))}

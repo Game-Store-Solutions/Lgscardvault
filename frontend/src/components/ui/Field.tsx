@@ -31,7 +31,7 @@ export function Field({
   const describedById = hint || error ? `${id}-desc` : undefined
 
   return (
-    <div className={cx('flex flex-col gap-1.5', className)}>
+    <div className={cx('flex w-full min-w-0 flex-col gap-1.5', className)}>
       {label != null && (
         <label htmlFor={id} className="text-sm font-bold text-fg">
           {label}

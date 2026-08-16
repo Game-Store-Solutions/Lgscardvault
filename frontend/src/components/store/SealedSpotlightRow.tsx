@@ -32,13 +32,13 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
     <section aria-label="Sealed products">
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
-          <h2 className="inline-flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-fg">
+          <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">
             <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
               <Package aria-hidden className="size-4" />
             </span>
             Sealed products
           </h2>
-          <p className="mt-1 text-sm text-fg-muted">Boxes, bundles, and decks in stock</p>
+          <p className="mt-1 hidden text-sm text-fg-muted sm:block">Boxes, bundles, and decks in stock</p>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
           <p className="text-sm text-fg-muted">
@@ -73,7 +73,7 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
         </button>
         <div
           ref={railRef}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-14 pb-2 pl-14 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
         >
           {lines.map((line) => (
             <SealedProductCard

@@ -28,7 +28,7 @@ export function MarketplaceCard({
   const outOfStock = item.quantity < 1
 
   return (
-    <article className="@container/market-card group flex min-h-56 min-w-0 gap-4 rounded-card border border-border bg-surface p-4 shadow-card dark:glass-card ui-lift hover:border-brand-500/30 sm:gap-5 sm:p-5">
+    <article className="@container/market-card group flex min-h-0 min-w-0 gap-3 rounded-card border border-border bg-surface p-3 shadow-card dark:glass-card ui-lift hover:border-brand-500/30 sm:min-h-56 sm:gap-5 sm:p-5">
       <Link
         to={`/s/${slug}/cards/${item.id}`}
         className="w-[5.25rem] shrink-0 self-center sm:w-24"
@@ -49,7 +49,7 @@ export function MarketplaceCard({
         <div className="min-w-0 space-y-1">
           <Link
             to={`/s/${slug}/cards/${item.id}`}
-            className="block overflow-hidden text-lg font-semibold leading-snug text-fg hover:text-brand-600 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [overflow-wrap:anywhere]"
+            className="block overflow-hidden text-base font-semibold leading-snug text-fg hover:text-brand-600 sm:text-lg [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [overflow-wrap:anywhere]"
           >
             {item.card.name}
           </Link>
@@ -75,7 +75,7 @@ export function MarketplaceCard({
             {item.condition} / {finishName(item.card, item.isFoil, item.finish)}
           </p>
 
-          <div className="mt-auto w-full max-w-[10.5rem] pt-4">
+          <div className="mt-auto w-full max-w-none pt-3 sm:max-w-[10.5rem] sm:pt-4">
             {inCartQuantity ? (
               <Link to={`/s/${slug}/cart`} className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} w-full`}>
                 <Check aria-hidden className="size-4" />

@@ -294,7 +294,8 @@ export default function SellTradeTab({ slug }: { slug: string }) {
                     label="Status"
                     value={archiveStatus}
                     onChange={(e) => setArchiveStatus(e.target.value as typeof archiveStatus)}
-                    className="w-36"
+                    wrapperClassName="w-full shrink-0 sm:w-40"
+                    className="w-full"
                   >
                     <option value="all">All</option>
                     <option value="accepted">Accepted</option>

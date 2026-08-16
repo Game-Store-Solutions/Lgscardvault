@@ -234,7 +234,7 @@ function CommanderSearchField({
   autoFocus?: boolean
 }) {
   return (
-    <div className={cx(compact ? 'w-full max-w-md' : 'w-full max-w-xl')}>
+    <div className={cx('w-full min-w-0', compact && 'lg:max-w-xl lg:flex-1')}>
       {!compact && (
         <p className="mb-2.5 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-fg-muted">
           Search commanders

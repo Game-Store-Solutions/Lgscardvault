@@ -109,7 +109,8 @@ export default function SealedBrowsePage() {
             setSort(event.target.value as SortMode)
             setPage(1)
           }}
-          className="w-full sm:w-52"
+          wrapperClassName="w-full shrink-0 sm:w-52"
+          className="w-full"
         >
           <option value="name">Name</option>
           <option value="price-asc">Price: Low to High</option>
@@ -132,7 +133,7 @@ export default function SealedBrowsePage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {visible.map((line) => (
               <SealedProductCard
                 key={line.id}

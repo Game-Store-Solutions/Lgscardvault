@@ -141,6 +141,20 @@ export default function StorePage() {
     setSelectedColors([])
   }, [gameFilter])
 
+  useEffect(() => {
+    if (!advancedOpen) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAdvancedOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = previous
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [advancedOpen])
+
   const resultsPageCount = Math.max(1, Math.ceil(resultTotal / RESULTS_PAGE_SIZE))
   const currentResultsPage = Math.min(page, resultsPageCount)
   const visibleResults = inventory
@@ -170,7 +184,7 @@ export default function StorePage() {
   }
 
   function focusVisibleSearchInput() {
-    const inputs = ['store-search-sidebar', 'store-search-drawer']
+    const inputs = ['store-search-sidebar', 'store-search-mobile', 'store-search-drawer']
       .map((id) => document.getElementById(id) as HTMLInputElement | null)
       .filter((el): el is HTMLInputElement => Boolean(el))
     const visible = inputs.find((el) => el.offsetParent !== null)
@@ -181,8 +195,6 @@ export default function StorePage() {
     searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     window.setTimeout(focusVisibleSearchInput, 350)
   }
-
-  const advancedCount = (setFilter ? 1 : 0) + (typeFilter.trim() ? 1 : 0) + (minPrice.trim() ? 1 : 0) + (maxPrice.trim() ? 1 : 0)
 
   const chips: { label: string; onClear: () => void }[] = []
 
@@ -214,11 +226,33 @@ export default function StorePage() {
 
   if (maxPrice.trim()) chips.push({ label: `Max $${maxPrice.trim()}`, onClear: () => setMaxPrice('') })
 
+  function renderSearchField(searchId: string, labeled = true) {
+    return (
+      <div className="min-w-0 w-full">
+        <label htmlFor={searchId} className={labeled ? 'text-sm font-bold text-fg' : 'sr-only'}>
+          Search inventory
+        </label>
+        <div className={cx('relative', labeled && 'mt-1.5')}>
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+          <input
+            id={searchId}
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name, type, color, or set"
+            aria-label="Search inventory"
+            className="h-10 w-full rounded-btn border border-border bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          />
+        </div>
+      </div>
+    )
+  }
+
   function renderFilterControls(searchId: string) {
     return (
       <div className="space-y-6">
         {gameOptions.length > 1 && (
-          <Select label="Game" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}>
+          <Select label="Game" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)} wrapperClassName="w-full">
             {gameOptions.map((game) => (
               <option key={game.code} value={game.code}>
                 {game.name}
@@ -227,23 +261,7 @@ export default function StorePage() {
           </Select>
         )}
 
-        <div>
-          <label htmlFor={searchId} className="text-sm font-bold text-fg">
-            Search
-          </label>
-          <div className="relative mt-1.5">
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
-            <input
-              id={searchId}
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, type, color, or set"
-              aria-label="Search inventory"
-              className="h-10 w-full rounded-btn border border-border bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-            />
-          </div>
-        </div>
+        {renderSearchField(searchId)}
 
         <div>
           <p className="mb-2 text-sm font-bold text-fg">Finish</p>
@@ -290,7 +308,7 @@ export default function StorePage() {
         </div>
 
         <div className="space-y-3 border-t border-border pt-5">
-          <Select label="Set" value={setFilter} onChange={(e) => setSetFilter(e.target.value)}>
+          <Select label="Set" value={setFilter} onChange={(e) => setSetFilter(e.target.value)} wrapperClassName="w-full">
             <option value="">All sets</option>
             {availableSets.map((set) => (
               <option key={set.code} value={set.code}>
@@ -298,7 +316,7 @@ export default function StorePage() {
               </option>
             ))}
           </Select>
-          <Select label="Card type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          <Select label="Card type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} wrapperClassName="w-full">
             <option value="">All types</option>
             {CARD_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -320,7 +338,7 @@ export default function StorePage() {
   }
 
   return (
-    <div className="storefront-atmosphere relative space-y-10">
+    <div className="storefront-atmosphere relative space-y-6 sm:space-y-10">
       <StoreHero
         name={store?.name ?? slug}
         slug={slug}
@@ -386,16 +404,16 @@ export default function StorePage() {
         <p className="mx-auto max-w-2xl text-center text-sm text-fg/75 sm:text-base">
           Browse thousands of in-stock singles, build decks, sell or trade your collection.
         </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'group flex flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface px-4 py-8 text-fg shadow-card ui-lift hover:border-brand-500/40 dark:border-white/10 dark:bg-white/[0.04]'
+              'group flex flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface px-2 py-3 text-fg shadow-card ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:border-white/10 dark:bg-white/[0.04]'
             const content = (
               <>
-                <span className="grid size-12 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] dark:text-brand-300">
-                  <Icon aria-hidden className="size-6" />
+                <span className="grid size-9 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] sm:size-12 dark:text-brand-300">
+                  <Icon aria-hidden className="size-4 sm:size-6" />
                 </span>
-                <span className="text-sm font-bold">{label}</span>
+                <span className="text-center text-[11px] font-bold leading-tight sm:text-sm">{label}</span>
               </>
             )
             return path ? (
@@ -428,7 +446,7 @@ export default function StorePage() {
         <section>
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <h2 className="inline-flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-fg">
+              <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">
                 <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
                   <Sparkles aria-hidden className="size-4" />
                 </span>
@@ -441,7 +459,7 @@ export default function StorePage() {
           </div>
           {spotlightLoading ? (
             <div
-              className="flex gap-4 overflow-hidden pl-14"
+              className="flex gap-4 overflow-hidden pl-4 sm:pl-14"
               aria-busy="true"
               aria-label="Loading spotlight"
             >
@@ -471,7 +489,7 @@ export default function StorePage() {
               </button>
               <div
                 ref={railRef}
-                className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-14 pb-2 pl-14 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
               >
                 {spotlightItems.map((item, i) => (
                   <SpotlightCard key={item.id} item={item} slug={slug} ribbon={i === 0 ? 'Featured' : undefined} />
@@ -504,9 +522,11 @@ export default function StorePage() {
         </aside>
 
         <main className="min-w-0 space-y-5">
-          <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="font-display text-2xl font-bold tracking-tight text-fg">Singles</h2>
+          <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:border-b lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
+            <div className="lg:hidden">{renderSearchField('store-search-mobile', false)}</div>
+            <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center sm:justify-between lg:border-b lg:border-border lg:pb-4">
+              <div className="min-w-0">
+              <h2 className="font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">Singles</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm text-fg-muted">
                   <span className="font-bold text-fg">{resultTotal}</span> {resultTotal === 1 ? 'result' : 'results'}
@@ -529,28 +549,20 @@ export default function StorePage() {
                   </button>
                 )}
               </div>
-            </div>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {gameOptions.length > 1 && (
-                <Select
-                  aria-label="Filter by game"
-                  value={gameFilter}
-                  onChange={(e) => setGameFilter(e.target.value)}
-                  className="w-full min-w-[10rem] sm:w-44 lg:hidden"
-                >
-                  {gameOptions.map((game) => (
-                    <option key={game.code} value={game.code}>
-                      {game.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-              <Button variant="secondary" size="md" className="lg:hidden" onClick={() => setAdvancedOpen(true)}>
+              <div className="flex min-w-0 items-center gap-2">
+              <Button variant="secondary" size="md" className="shrink-0 lg:hidden" onClick={() => setAdvancedOpen(true)}>
                 <SlidersHorizontal aria-hidden className="size-4" />
-                Filters{advancedCount > 0 || chips.length > 0 ? ` (${chips.length})` : ''}
+                Filters{chips.length > 0 ? ` (${chips.length})` : ''}
               </Button>
-              <Select aria-label="Sort cards" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-44">
+              <Select
+                aria-label="Sort cards"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                wrapperClassName="min-w-0 flex-1 sm:flex-none sm:w-52"
+                className="w-full"
+              >
                 {SORTS.map((s) => (
                   <option key={s.value} value={s.value}>
                     Sort: {s.label}
@@ -558,7 +570,7 @@ export default function StorePage() {
                 ))}
               </Select>
               {cardDisplayStyle === 'gallery' ? (
-                <div className="flex overflow-hidden rounded-btn border border-border">
+                <div className="flex shrink-0 overflow-hidden rounded-btn border border-border">
                   <button
                     type="button"
                     onClick={() => setView('grid')}
@@ -579,11 +591,12 @@ export default function StorePage() {
                   </button>
                 </div>
               ) : (
-                <span className="inline-flex h-10 items-center gap-2 rounded-btn border border-border bg-brand-50 px-3 text-sm font-bold text-brand-700">
+                <span className="inline-flex h-10 shrink-0 items-center gap-2 rounded-btn border border-border bg-brand-50 px-3 text-sm font-bold text-brand-700">
                   <ShoppingCart aria-hidden className="size-4" />
-                  Marketplace cards
+                  <span className="hidden sm:inline">Marketplace cards</span>
                 </span>
               )}
+              </div>
             </div>
           </div>
 
@@ -619,7 +632,7 @@ export default function StorePage() {
                   ))}
                 </div>
               ) : view === 'grid' ? (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                   {visibleResults.map((item) => (
                     <CardTile key={item.id} item={item} slug={slug} />
                   ))}
@@ -640,8 +653,13 @@ export default function StorePage() {
       {/* Advanced filters. Mobile bottom-sheet drawer */}
       {advancedOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/40" aria-hidden onClick={() => setAdvancedOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-card border-t border-border bg-surface p-5 shadow-xl dark:glass-card-elevated">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close filters"
+            onClick={() => setAdvancedOpen(false)}
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-card border-t border-border bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl dark:glass-card-elevated">
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border" aria-hidden />
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-fg">Filters</h2>

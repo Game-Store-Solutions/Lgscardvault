@@ -48,7 +48,7 @@ export function GameSelector({
       {/* Mobile: a native picker. Reliable, no horizontal scrolling. */}
       <label className="block sm:hidden">
         <span className="sr-only">{label}</span>
-        <Select value={value} onChange={(event) => onChange(event.target.value)}>
+        <Select value={value} onChange={(event) => onChange(event.target.value)} wrapperClassName="w-full" className="w-full">
           {includeAll && <option value="">{allLabel}</option>}
           {games.map((game) => (
             <option key={game.code} value={game.code}>

@@ -333,7 +333,7 @@ export default function CardDetailsPage() {
   const setDisplay = card.setName ?? (card.setCode ? card.setCode.toUpperCase() : '')
   const setPageUrl = card.setCode ? setBrowsePath(slug, card.setCode) : null
   const productTitle = setDisplay ? `${card.name} - ${setDisplay}` : card.name
-  const colPad = 'px-5 py-8 sm:px-8 lg:px-10'
+  const colPad = 'px-4 py-5 sm:px-8 sm:py-8 lg:px-10'
   const displayArtist = resolveCardArtist(card, faceIndex)
 
   const openArtistBrowse = () => {
@@ -456,9 +456,9 @@ export default function CardDetailsPage() {
           </div>
 
           {/* Details + market. Center */}
-          <div className={cx(colPad, 'order-2 min-w-0 lg:col-start-2 lg:row-start-1')}>
+          <div className={cx(colPad, 'order-3 min-w-0 lg:order-2 lg:col-start-2 lg:row-start-1')}>
             <header className="mb-5 max-w-3xl">
-              <h1 className="text-2xl font-bold leading-snug text-fg lg:text-[1.65rem]">{productTitle}</h1>
+              <h1 className="text-xl font-bold leading-snug text-fg sm:text-2xl lg:text-[1.65rem]">{productTitle}</h1>
               {setDisplay && setPageUrl && (
                 <Link
                   to={setPageUrl}
@@ -662,7 +662,7 @@ export default function CardDetailsPage() {
           </div>
 
           {/* Buy column. TCGplayer Direct-style stacked modules */}
-          <aside className={cx(colPad, 'order-3 space-y-3 lg:col-start-3 lg:row-start-1')}>
+          <aside className={cx(colPad, 'order-2 space-y-3 lg:order-3 lg:col-start-3 lg:row-start-1')}>
             <div className="space-y-3 lg:sticky lg:top-16">
               <div className="tcg-buy-box overflow-hidden">
                 <div className="flex items-center gap-2 border-b border-brand-200/90 bg-brand-50 px-3 py-2.5 dark:border-brand-500/25 dark:bg-brand-500/10">

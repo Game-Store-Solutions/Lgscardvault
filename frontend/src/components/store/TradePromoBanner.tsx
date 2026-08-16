@@ -26,10 +26,10 @@ export function TradePromoBanner({ slug, showSellLink = false }: { slug: string;
   if (!rates?.promoActive) return null
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card bg-gradient-to-r from-brand-500 to-brand-700 px-4 py-3 text-white shadow-card">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card bg-gradient-to-r from-brand-500 to-brand-700 px-3 py-3 text-white shadow-card sm:px-4">
       <Timer aria-hidden className="size-5 shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="font-display font-bold">
+        <p className="font-display text-sm font-bold sm:text-base">
           Boosted trade-in rates are live. {rates.cashPercent}% cash / {rates.creditPercent}% store credit of market
           price!
         </p>

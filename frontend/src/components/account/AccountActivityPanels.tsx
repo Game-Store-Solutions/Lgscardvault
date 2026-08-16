@@ -483,6 +483,7 @@ export function StoreFilterSelect({
       label="Filter by store"
       value={value ?? ''}
       onChange={(event) => onChange(event.target.value)}
+      wrapperClassName="w-full"
       className="w-full min-w-0"
     >
       <option value="">All stores</option>
