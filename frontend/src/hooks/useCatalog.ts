@@ -8,6 +8,7 @@ import type {
   CatalogArtistBrowseResult,
   SealedInventoryLine,
   SealedSearchResult,
+  SealedSpotlight,
   StoreGameStats,
   StoreGameShelf,
   ScryfallSyncRun,
@@ -21,6 +22,7 @@ export const gameSetsKey = (gameCode: string) => ['catalog', 'sets', gameCode] a
 export const sealedSearchKey = (params: SealedSearchParams) =>
   ['catalog', 'sealed', params.game ?? '', params.setId ?? 0, params.q ?? '', params.page ?? 1] as const
 export const sealedInventoryKey = (slug: string, game?: string) => ['sealed-inventory', slug, game ?? ''] as const
+export const sealedPublicKey = (slug: string, game?: string) => ['sealed-public', slug, game ?? ''] as const
 export const sealedSpotlightKey = (slug: string) => ['sealed-spotlight', slug] as const
 export const syncRunsKey = ['catalog', 'sync-runs'] as const
 export const scryfallSyncRunsKey = ['scryfall', 'sync-runs'] as const
@@ -155,6 +157,21 @@ export function useStoreSealedInventory(slug: string, game?: string) {
   })
 }
 
+/** Storefront: every in-stock sealed line, optionally one game. */
+export function useStoreSealedPublic(slug: string, gameCode?: string) {
+  return useQuery({
+    queryKey: sealedPublicKey(slug, gameCode),
+    enabled: Boolean(slug),
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<SealedInventoryLine[]>(`/stores/${slug}/sealed`, {
+        params: { game: gameCode || undefined },
+      })
+      return data
+    },
+  })
+}
+
 /** Storefront: freshest in-stock sealed lines for the spotlight row. */
 export function useSealedSpotlight(slug: string, gameCode?: string) {
   return useQuery({
@@ -162,7 +179,7 @@ export function useSealedSpotlight(slug: string, gameCode?: string) {
     enabled: Boolean(slug),
     staleTime: 60 * 1000,
     queryFn: async () => {
-      const { data } = await api.get<SealedInventoryLine[]>(`/stores/${slug}/sealed/spotlight`, {
+      const { data } = await api.get<SealedSpotlight>(`/stores/${slug}/sealed/spotlight`, {
         params: { game: gameCode || undefined },
       })
       return data

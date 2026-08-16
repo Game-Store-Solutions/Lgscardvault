@@ -57,11 +57,15 @@ final class StoreSealedInventoryController extends AbstractController
         }
 
         $gameCode = trim((string) $request->query->get('game', ''));
+        $filter = '' !== $gameCode ? $gameCode : null;
 
-        return $this->json(array_map(
-            $this->serializer->sealedInventoryItem(...),
-            $this->items->findSpotlightForStore($store, gameCode: '' !== $gameCode ? $gameCode : null),
-        ));
+        return $this->json([
+            'items' => array_map(
+                $this->serializer->sealedInventoryItem(...),
+                $this->items->findSpotlightForStore($store, gameCode: $filter),
+            ),
+            'total' => $this->items->countInStockForStore($store, $filter),
+        ]);
     }
 
     /** Staff: every line including sold-out (?game=code to narrow). */

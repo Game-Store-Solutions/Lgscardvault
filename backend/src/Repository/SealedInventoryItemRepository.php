@@ -96,12 +96,30 @@ class SealedInventoryItemRepository extends ServiceEntityRepository
         return array_values(array_map(static fn (array $row): string => (string) $row['code'], $rows));
     }
 
+    public function countInStockForStore(Store $store, ?string $gameCode = null): int
+    {
+        $qb = $this->createQueryBuilder('i')
+            ->select('COUNT(i.id)')
+            ->andWhere('i.store = :store')
+            ->andWhere('i.quantity > 0')
+            ->setParameter('store', $store);
+
+        if (null !== $gameCode && '' !== $gameCode) {
+            $qb->join('i.sealedProduct', 'p')
+                ->join('p.game', 'g')
+                ->andWhere('g.code = :gameCode')
+                ->setParameter('gameCode', strtolower($gameCode));
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
     /**
      * Storefront spotlight: the store's freshest in-stock sealed lines.
      *
      * @return list<SealedInventoryItem>
      */
-    public function findSpotlightForStore(Store $store, int $limit = 12, ?string $gameCode = null): array
+    public function findSpotlightForStore(Store $store, int $limit = 10, ?string $gameCode = null): array
     {
         $qb = $this->createQueryBuilder('i')
             ->join('i.sealedProduct', 'p')->addSelect('p')

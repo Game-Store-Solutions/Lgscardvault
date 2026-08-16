@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'
 import AppLayout from './components/layout/AppLayout'
+import { ScrollToTop } from './components/layout/ScrollToTop'
 import AuthLayout from './components/layout/AuthLayout'
 import AdminLayout from './components/layout/AdminLayout'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -13,6 +14,7 @@ import RegisterPage from './pages/RegisterPage'
 import OwnerOnboardingWizard from './pages/OwnerOnboardingWizard'
 import SsoCallbackPage from './pages/SsoCallbackPage'
 import StorePage from './pages/StorePage'
+import SealedBrowsePage from './pages/SealedBrowsePage'
 import MassSearchPage from './pages/MassSearchPage'
 import CommanderSynergyPage from './pages/CommanderSynergyPage'
 import CartPage from './pages/CartPage'
@@ -40,6 +42,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             {/* Full-screen auth flow (no app navbar) */}
             <Route element={<AuthLayout />}>
@@ -63,6 +66,7 @@ export default function App() {
                 }
               />
               <Route path="s/:slug" element={<StorePage />} />
+              <Route path="s/:slug/sealed" element={<SealedBrowsePage />} />
               <Route path="s/:slug/mass-search" element={<MassSearchPage />} />
               <Route path="s/:slug/deck-builder" element={<CommanderSynergyPage />} />
               <Route path="s/:slug/sell" element={<SellTradePage />} />

@@ -960,6 +960,12 @@ export interface SealedInventoryLine {
   product: SealedProduct | null
 }
 
+/** Storefront spotlight: a short rail plus the in-stock total. */
+export interface SealedSpotlight {
+  items: SealedInventoryLine[]
+  total: number
+}
+
 export interface CatalogSyncRun {
   id: number
   gameCode: string | null

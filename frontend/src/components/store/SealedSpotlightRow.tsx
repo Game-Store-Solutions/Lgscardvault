@@ -1,23 +1,26 @@
-import { ChevronLeft, ChevronRight, Package, ShoppingCart } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Package } from 'lucide-react'
 import { useRef } from 'react'
-import { formatPrice } from '../../api/client'
-import type { SealedInventoryLine } from '../../api/types'
+import { Link } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
 import { useSealedSpotlight, useStoreCart } from '../../hooks'
-import { Badge, Button } from '../ui'
-import { CardImage } from '../cards'
-import { cx } from '../../lib/cx'
+import { SealedProductCard } from './SealedProductCard'
+
+const VIEW_ALL_AFTER = 10
 
 /** In-stock sealed row — same tile width and rail as the singles spotlight. */
 export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?: string }) {
   const { user } = useAuth()
-  const { data: lines = [] } = useSealedSpotlight(slug, gameCode)
+  const { data } = useSealedSpotlight(slug, gameCode)
   const { query: cartQuery, setSealedItem } = useStoreCart(slug, Boolean(user))
   const railRef = useRef<HTMLDivElement>(null)
+
+  const lines = data?.items ?? []
+  const total = data?.total ?? lines.length
 
   if (lines.length === 0) return null
 
   const cart = cartQuery.data ?? []
+  const viewAllTo = gameCode ? `/s/${slug}/sealed?game=${encodeURIComponent(gameCode)}` : `/s/${slug}/sealed`
 
   function scrollRail(direction: -1 | 1) {
     const el = railRef.current
@@ -37,9 +40,16 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
           </h2>
           <p className="mt-1 text-sm text-fg-muted">Boxes, bundles, and decks in stock</p>
         </div>
-        <p className="text-sm text-fg-muted">
-          <span className="font-bold text-fg">{lines.length}</span> items
-        </p>
+        <div className="flex shrink-0 items-center gap-2.5">
+          <p className="text-sm text-fg-muted">
+            <span className="font-bold text-fg">{total}</span> {total === 1 ? 'item' : 'items'}
+          </p>
+          {total > VIEW_ALL_AFTER ? (
+            <Link to={viewAllTo} className="text-sm font-bold text-brand-600 hover:underline">
+              View all
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="relative">
@@ -68,6 +78,7 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
           {lines.map((line) => (
             <SealedProductCard
               key={line.id}
+              className="w-40 shrink-0 snap-start sm:w-52"
               line={line}
               cartQty={cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0}
               pending={setSealedItem.isPending}
@@ -82,67 +93,6 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
         </div>
       </div>
     </section>
-  )
-}
-
-function SealedProductCard({
-  line,
-  cartQty,
-  pending,
-  onAdd,
-}: {
-  line: SealedInventoryLine
-  cartQty: number
-  pending: boolean
-  onAdd: () => void
-}) {
-  const product = line.product
-  if (!product) return null
-
-  const lowStock = line.quantity <= 3
-
-  return (
-    <article className="group relative w-40 shrink-0 snap-start sm:w-52">
-      <div
-        className={cx(
-          'relative flex aspect-[5/7] w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-surface/80 p-3',
-          'transition-colors group-hover:border-brand-300',
-        )}
-      >
-        <CardImage src={product.imageUrl} alt={product.name} fit="contain" className="max-h-full max-w-full" />
-        {lowStock && (
-          <Badge tone="warning" className="absolute left-2 top-2">
-            Low stock
-          </Badge>
-        )}
-        {cartQty > 0 && (
-          <span className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-brand-500 text-xs font-bold text-white shadow-sm">
-            {cartQty}
-          </span>
-        )}
-      </div>
-      <div className="mt-2 px-0.5">
-        <h3
-          className="line-clamp-2 min-h-[2.5rem] font-display text-sm font-bold leading-snug tracking-tight text-fg"
-          title={product.name}
-        >
-          {product.name}
-        </h3>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <span className="font-display text-sm font-bold text-fg">{formatPrice(line.priceCents)}</span>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={pending || line.quantity < 1}
-            onClick={onAdd}
-            className="shrink-0"
-            aria-label={cartQty > 0 ? `Add another ${product.name}` : `Add ${product.name} to cart`}
-          >
-            <ShoppingCart aria-hidden className="size-4" />
-          </Button>
-        </div>
-      </div>
-    </article>
   )
 }
 

@@ -142,7 +142,8 @@ final class SealedCatalogTest extends WebTestCase
         self::assertCount(1, $public);
         self::assertSame('Romance Dawn Booster Box', $public[0]['product']['name']);
         $spotlight = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/sealed/spotlight");
-        self::assertCount(1, $spotlight);
+        self::assertSame(1, $spotlight['total'] ?? null);
+        self::assertCount(1, $spotlight['items'] ?? []);
 
         // Delete removes the line.
         $this->authenticate($store->getOwner());
