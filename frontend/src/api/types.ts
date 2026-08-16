@@ -146,6 +146,8 @@ export interface SquareConnectResponse {
 export interface SsoStatus {
   configured: boolean
   providerName: string
+  /** Public callback Google must allowlist. Shown so operators can copy it. */
+  redirectUri?: string
 }
 
 export interface IntegrationStatus {
@@ -656,6 +658,8 @@ export interface UserProfile {
   avatarUrl?: string | null
   roles: string[]
   ownedStores: Pick<Store, 'id' | 'name' | 'slug'>[]
+  /** Stores this user administers as staff (not as the owner). */
+  managedStores?: Pick<Store, 'id' | 'name' | 'slug'>[]
   paymentBrand?: string | null
   paymentLast4?: string | null
   paymentExpires?: string | null

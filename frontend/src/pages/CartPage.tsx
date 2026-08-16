@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import {
+  CheckCircle2,
   Minus,
   PackageCheck,
   Plus,
@@ -39,6 +40,7 @@ interface RemovedLine {
 
 export default function CartPage() {
   const { slug = '' } = useParams()
+  const navigate = useNavigate()
   const { user, isSuperAdmin } = useAuth()
   const canManage = useCanManageStore(slug)
   const showOwnerCheckoutDiagnostics = canManage || isSuperAdmin
@@ -115,6 +117,15 @@ export default function CartPage() {
     },
     [queryClient, slug, isGuest],
   )
+
+  useEffect(() => {
+    if (!kioskMode || !createdOrder) return
+    const timer = window.setTimeout(() => {
+      setCreatedOrder(null)
+      navigate(`/s/${slug}`)
+    }, 5000)
+    return () => window.clearTimeout(timer)
+  }, [createdOrder, kioskMode, navigate, slug])
 
   const testOrder = useMutation({
     mutationFn: async () => {
@@ -233,6 +244,8 @@ export default function CartPage() {
 
       {isLoading ? (
         <StorePageLoader label="Loading your cart…" />
+      ) : kioskMode && createdOrder ? (
+        <KioskOrderComplete reference={createdOrder.reference} />
       ) : cart.length === 0 ? (
         <EmptyCart slug={slug} storeName={store?.name ?? 'the store'} picks={picks} />
       ) : (
@@ -389,6 +402,19 @@ export default function CartPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function KioskOrderComplete({ reference }: { reference: string }) {
+  return (
+    <div className="rounded-card border border-border bg-surface px-6 py-16 text-center shadow-card">
+      <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-50 text-success-700">
+        <CheckCircle2 aria-hidden className="size-7" />
+      </span>
+      <h2 className="mt-4 font-display text-2xl font-bold text-fg">Kiosk order placed</h2>
+      <p className="mt-2 text-sm text-fg-muted">{reference}</p>
+      <p className="mt-4 text-sm font-medium text-fg">Returning to the store in 5 seconds…</p>
     </div>
   )
 }
@@ -589,7 +615,7 @@ function OrderSummary({
         </p>
       )}
 
-      {createdOrder && (
+      {createdOrder && !kioskMode && (
         <Link to={`/s/${slug}/admin/orders`} className={`${buttonVariants({ variant: 'secondary', size: 'md' })} mt-3 w-full`}>
           View {createdOrder.reference}
         </Link>

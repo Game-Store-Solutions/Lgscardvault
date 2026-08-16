@@ -83,6 +83,10 @@ class Store
     #[Groups(['store:read', 'store:admin', 'store:admin_write'])]
     private ?User $owner = null;
 
+    /** @var Collection<int, StoreStaff> */
+    #[ORM\OneToMany(mappedBy: 'store', targetEntity: StoreStaff::class, cascade: ['persist'], orphanRemoval: true)]
+    private Collection $staff;
+
     #[ORM\Column]
     #[Groups(['store:read', 'store:admin', 'store:admin_write'])]
     private bool $isActive = true;
@@ -373,6 +377,7 @@ class Store
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->inventoryItems = new ArrayCollection();
+        $this->staff = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -414,6 +419,17 @@ class Store
         $this->owner = $owner;
 
         return $this;
+    }
+
+    /** @return Collection<int, StoreStaff> */
+    public function getStaff(): Collection
+    {
+        return $this->staff;
+    }
+
+    public function isOwnedBy(User $user): bool
+    {
+        return $this->owner?->getId() === $user->getId();
     }
 
     public function isActive(): bool

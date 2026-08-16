@@ -40,6 +40,8 @@ import {
 
   TrendingUp,
 
+  Users,
+
   Wallet,
 
   WalletCards,
@@ -199,6 +201,7 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
           { to: `${base}/spotlight`, label: 'Spotlight', icon: Sparkles },
 
           { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
+          { to: `${base}/users`, label: 'Users', icon: Users },
 
         ],
 

@@ -89,6 +89,7 @@ Each **store** still completes **Connect Square** in admin (per-merchant OAuth);
 | `SSO_OIDC_CLIENT_ID` | ↑ |
 | `SSO_OIDC_CLIENT_SECRET` | ↑ |
 | `SSO_OIDC_SCOPES` | ↑ (default `openid email profile`) |
+| `SSO_OIDC_REDIRECT_URI` | Optional override. Must match Google Console exactly, e.g. `https://your-domain/api/auth/sso/callback`. Defaults to `APP_FRONTEND_URL` + that path. |
 | `SSO_PROVIDER_NAME` | ↑ UI label (e.g. `Google`) |
 | `MAPBOX_ACCESS_TOKEN` | Address autocomplete in store onboarding (mock if empty) |
 

@@ -110,11 +110,9 @@ export function freshStatusPresentation(status: OrderStatus): { label: string; c
 
 export function customerTierLabel(order: Order): string {
 
-  if (order.channel === 'kiosk') return 'Walk-in'
+  if (order.channel === 'kiosk') return 'Kiosk'
 
-  if (!order.customerEmail) return 'Guest'
-
-  return 'Customer'
+  return 'Online'
 
 }
 

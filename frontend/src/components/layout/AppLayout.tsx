@@ -7,6 +7,7 @@ import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants } from '../ui'
 import { BrandLogo } from '../BrandLogo'
 import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
+import { manageableStores } from '../../lib/manageableStores'
 import { AppShellLayoutProvider, useAppShellLayout } from './AppShellLayout'
 import { cx } from '../../lib/cx'
 import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShieldCheck, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
@@ -15,7 +16,7 @@ export default function AppLayout() {
   const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { kioskMode, enterKioskMode, exitKioskMode } = useKioskMode()
-  const ownedStores = user?.ownedStores ?? []
+  const ownedStores = manageableStores(user)
   // The customer profile + cart are per-store, so only surface those links when
   // the current route is within a store (e.g. /s/:slug, /s/:slug/cards/:id).
   const storeMatch = useMatch('/s/:slug/*')

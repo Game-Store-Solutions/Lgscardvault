@@ -1,14 +1,14 @@
 import { useAuth } from '../context/AuthContext'
+import { canManageStore } from '../lib/manageableStores'
 
 /**
  * useCanManageStore — true when the current user may manage the given store:
- * either a super admin, or an owner of a store with the matching slug.
+ * super admin, the owner, or staff with admin access.
  */
 export function useCanManageStore(slug?: string): boolean {
   const { user, isSuperAdmin } = useAuth()
   if (isSuperAdmin) return true
-  if (!slug) return false
-  return user?.ownedStores?.some((store) => store.slug === slug) ?? false
+  return canManageStore(user, slug)
 }
 
 export default useCanManageStore

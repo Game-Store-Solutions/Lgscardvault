@@ -90,7 +90,7 @@ export default function App() {
             <Route
               path="s/:slug/admin"
               element={
-                <ProtectedRoute requireStoreOwner>
+                <ProtectedRoute requireStoreManage>
                   <AdminLayout />
                 </ProtectedRoute>
               }

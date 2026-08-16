@@ -14,9 +14,10 @@ import SellTradeTab from './store-admin/SellTradeTab'
 import StoreCreditTab from './store-admin/StoreCreditTab'
 import SealedTab from './store-admin/SealedTab'
 import EventsTab from './store-admin/EventsTab'
+import TeamTab from './store-admin/TeamTab'
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
-type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade' | 'store-credit' | 'events'
+type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade' | 'store-credit' | 'events' | 'users'
 
 const SECTIONS: Record<Section, { label: string; render: (slug: string) => React.ReactNode }> = {
   inventory: { label: 'Singles', render: (slug) => <SearchTab slug={slug} /> },
@@ -32,6 +33,7 @@ const SECTIONS: Record<Section, { label: string; render: (slug: string) => React
   'store-credit': { label: 'Store credit', render: (slug) => <StoreCreditTab slug={slug} /> },
   'patch-notes': { label: 'Patch notes', render: () => <PatchNotesTab /> },
   events: { label: 'Events', render: (slug) => <EventsTab slug={slug} /> },
+  users: { label: 'Users', render: (slug) => <TeamTab slug={slug} /> },
 }
 
 function resolveSection(value?: string): Section {

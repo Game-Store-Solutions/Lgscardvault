@@ -8,6 +8,7 @@ import { BrandLogo } from '../components/BrandLogo'
 import { SsoOption, useSsoStatus } from '../components/SsoOption'
 import { useAuth } from '../context/AuthContext'
 import type { UserProfile } from '../api/types'
+import { canManageStore, manageableStores } from '../lib/manageableStores'
 
 /**
  * Where to send a user right after login. Honors the pre-login `from` path only
@@ -31,8 +32,7 @@ function safeDestination(from: string, user: UserProfile | null): string {
   const adminMatch = from.match(/^\/s\/([^/]+)\/admin/)
   if (adminMatch) {
     const slug = adminMatch[1]
-    const ownsStore = user.ownedStores.some((store) => store.slug === slug)
-    return isSuperAdmin || ownsStore ? from : roleHome
+    return isSuperAdmin || canManageStore(user, slug) ? from : roleHome
   }
 
   // Public / customer routes are fine for anyone.
@@ -43,7 +43,8 @@ function safeDestination(from: string, user: UserProfile | null): string {
 function defaultHome(user: UserProfile | null): string {
   if (!user) return '/'
   if (user.roles.includes('ROLE_SUPER_ADMIN')) return '/platform/admin'
-  if (user.ownedStores.length > 0) return `/s/${user.ownedStores[0].slug}/admin`
+  const stores = manageableStores(user)
+  if (stores.length > 0) return `/s/${stores[0].slug}/admin`
   return '/'
 }
 
@@ -111,7 +112,8 @@ export default function LoginPage() {
 
           {ssoParam === 'failed' && (
             <p role="alert" className="mt-6 rounded-btn bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
-              Single sign-on failed. Please try again or use your email and password.
+              Single sign-on failed. If Google said the request was invalid, add this exact redirect URI in the Google Cloud Console:{' '}
+              <span className="break-all font-mono text-xs">{sso?.redirectUri ?? `${window.location.origin}/api/auth/sso/callback`}</span>
             </p>
           )}
           {ssoParam === 'unconfigured' && (

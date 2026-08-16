@@ -348,7 +348,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
             <EmptyState
               icon={ReceiptText}
               title="No orders yet"
-              description="Customer orders will appear here. Or ring up the first sale at the kiosk."
+              description="Online orders will appear here. Or ring up the first sale at the kiosk."
               action={
                 <Button size="sm" onClick={() => setKioskOpen(true)}>
                   <Monitor className="size-4" aria-hidden />
@@ -732,7 +732,7 @@ function OrderDetailModal({
             <p className="mt-0.5 text-sm text-fg-muted">{order.customerEmail ?? '—'}</p>
             {order.channel && (
               <p className="mt-3 text-xs text-fg-muted">
-                Channel: <span className="font-semibold text-fg">{order.channel === 'kiosk' ? 'In-store kiosk' : 'Online'}</span>
+                Channel: <span className="font-semibold text-fg">{order.channel === 'kiosk' ? 'Kiosk' : 'Online'}</span>
               </p>
             )}
           </div>

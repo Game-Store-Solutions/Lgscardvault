@@ -11,6 +11,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
 import type { UserProfile } from '../api/types'
+import { manageableStores } from '../lib/manageableStores'
 
 interface AuthContextValue {
   user: UserProfile | null
@@ -116,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSuperAdmin: user?.roles.includes('ROLE_SUPER_ADMIN') ?? false,
       isStoreOwner:
         (user?.roles.includes('ROLE_STORE_OWNER') ?? false) ||
-        (user?.ownedStores?.length ?? 0) > 0,
+        manageableStores(user).length > 0,
     }),
     [user, token, loading, login, loginWithToken, register, logout, refreshUser],
   )

@@ -800,7 +800,7 @@ function SubmissionTableRow({
           <div className="min-w-0">
             <p className="truncate font-semibold text-fg">{submission.customerName ?? 'Guest'}</p>
             <p className="truncate text-xs text-fg-muted">
-              {submission.channel === 'kiosk' ? 'Walk-in' : submission.customerEmail ?? 'Customer'}
+              {submission.channel === 'kiosk' ? 'Kiosk' : submission.customerEmail ?? 'Online'}
             </p>
           </div>
         </div>

@@ -15,7 +15,6 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 /**
  * OpenID Connect single sign-on. All routes are public (the point is to log in).
@@ -44,6 +43,7 @@ class SsoController extends AbstractController
         return $this->json([
             'configured' => $this->oidc->isConfigured(),
             'providerName' => $this->oidc->providerName(),
+            'redirectUri' => $this->callbackUri(),
         ]);
     }
 
@@ -54,7 +54,7 @@ class SsoController extends AbstractController
             return new RedirectResponse($this->frontendUrl().'/login?sso=unconfigured');
         }
 
-        $redirectUri = $this->generateUrl('api_sso_callback', [], UrlGeneratorInterface::ABSOLUTE_URL);
+        $redirectUri = $this->callbackUri();
         $state = $this->state->create(self::STATE_PROVIDER, '', 0);
 
         return new RedirectResponse($this->oidc->authorizationUrl($redirectUri, $state));
@@ -74,7 +74,7 @@ class SsoController extends AbstractController
                 throw new \RuntimeException('SSO authorization was cancelled.');
             }
 
-            $redirectUri = $this->generateUrl('api_sso_callback', [], UrlGeneratorInterface::ABSOLUTE_URL);
+            $redirectUri = $this->callbackUri();
             $accessToken = $this->oidc->exchangeCode($code, $redirectUri);
             $profile = $this->oidc->fetchUserInfo($accessToken);
 
@@ -118,6 +118,22 @@ class SsoController extends AbstractController
         }
 
         return $user;
+    }
+
+    /**
+     * Google (and every OIDC provider) compares this byte-for-byte with the
+     * Authorized redirect URI in the console. Prefer the public site URL over
+     * Symfony's generated absolute URL, which inside Docker is often
+     * http://backend:8000 and triggers redirect_uri_mismatch.
+     */
+    private function callbackUri(): string
+    {
+        $explicit = trim((string) ($_ENV['SSO_OIDC_REDIRECT_URI'] ?? $_SERVER['SSO_OIDC_REDIRECT_URI'] ?? ''));
+        if ('' !== $explicit) {
+            return $explicit;
+        }
+
+        return $this->frontendUrl().'/api/auth/sso/callback';
     }
 
     private function frontendUrl(): string

@@ -169,6 +169,42 @@ final class TransactionalMailer
         );
     }
 
+    /** Store-branded — owner added this person as staff. */
+    public function sendStaffInvite(Store $store, User $user, bool $newAccount): void
+    {
+        $to = $user->getEmail();
+        if (null === $to || '' === $to) {
+            return;
+        }
+
+        $storeName = $store->getName() ?? 'the store';
+        $adminUrl = $this->frontendUrl().'/s/'.$store->getSlug().'/admin';
+        $loginUrl = $this->frontendUrl().'/login';
+
+        $this->sendHtml(
+            to: $to,
+            subject: sprintf('You were added to %s', $storeName),
+            htmlTemplate: 'emails/store/staff_invite.html.twig',
+            context: [
+                'preheader' => sprintf('%s added you as a store user.', $storeName),
+                'displayName' => $user->getDisplayName() ?: 'there',
+                'storeName' => $storeName,
+                'newAccount' => $newAccount,
+                'adminUrl' => $adminUrl,
+                'loginUrl' => $loginUrl,
+                'footerNote' => sprintf("You're receiving this because %s added you as a store user.", $storeName),
+            ],
+            textBody: sprintf(
+                "Hi %s,\n\n%s added you as a store user.\n\nSign in: %s\nDashboard: %s\n",
+                $user->getDisplayName() ?: 'there',
+                $storeName,
+                $loginUrl,
+                $adminUrl,
+            ),
+            store: $store,
+        );
+    }
+
     /** Store-branded — fulfillment notice from the selling store. */
     public function sendOrderFulfilled(\App\Entity\Order $order, User $user, Store $store): void
     {

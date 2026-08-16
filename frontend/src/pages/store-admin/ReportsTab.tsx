@@ -324,7 +324,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
             <DonutChart
               segments={[
                 { label: 'Online storefront', value: channelBreakdown.online },
-                { label: 'In-store kiosk', value: channelBreakdown.kiosk },
+                { label: 'Kiosk', value: channelBreakdown.kiosk },
               ]}
               centerValue={formatPrice(channelBreakdown.online + channelBreakdown.kiosk)}
               centerLabel="Revenue"

@@ -12,6 +12,7 @@ use App\Repository\OrderRepository;
 use App\Repository\SellSubmissionRepository;
 use App\Repository\StoreCreditTransactionRepository;
 use App\Repository\StoreRepository;
+use App\Repository\StoreStaffRepository;
 use App\Service\Customer\ActivityListPagination;
 use App\Service\Customer\MarketplaceActivitySerializer;
 use App\Service\Credit\StoreCreditLedger;
@@ -53,6 +54,7 @@ class MeController extends AbstractController
         private readonly StoreCreditTransactionRepository $creditTransactions,
         private readonly StoreCreditLedger $creditLedger,
         private readonly MarketplaceActivitySerializer $activitySerializer,
+        private readonly StoreStaffRepository $staffRepository,
     ) {
     }
 
@@ -516,6 +518,19 @@ class MeController extends AbstractController
             ];
         }
 
+        $managedStores = [];
+        foreach ($this->staffRepository->findAdminMemberships($user) as $membership) {
+            $store = $membership->getStore();
+            if (null === $store) {
+                continue;
+            }
+            $managedStores[] = [
+                'id' => $store->getId(),
+                'name' => $store->getName(),
+                'slug' => $store->getSlug(),
+            ];
+        }
+
         return [
             'id' => $user->getId(),
             'email' => $user->getEmail(),
@@ -523,6 +538,7 @@ class MeController extends AbstractController
             'avatarUrl' => $user->getAvatarUrl(),
             'roles' => $user->getRoles(),
             'ownedStores' => $ownedStores,
+            'managedStores' => $managedStores,
             'paymentBrand' => $user->getPaymentBrand(),
             'paymentLast4' => $user->getPaymentLast4(),
             'paymentExpires' => $user->getPaymentExpires(),
