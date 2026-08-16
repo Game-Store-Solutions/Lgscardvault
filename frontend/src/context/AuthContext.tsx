@@ -93,10 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     accountType: 'owner' | 'customer' | 'admin',
   ) => {
     await api.post('/register', { email, password, displayName, accountType })
-    if (accountType !== 'customer') {
-      await login(email, password)
-    }
-  }, [login])
+  }, [])
 
   const logout = useCallback(() => {
     localStorage.removeItem('token')

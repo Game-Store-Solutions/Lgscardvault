@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import api, { extractErrorMessage } from '../../api/client'
 import type { GeocodeSuggestion, Plan } from '../../api/types'
@@ -20,6 +21,7 @@ import {
  */
 export function useOnboarding() {
   const { register, user, refreshUser } = useAuth()
+  const navigate = useNavigate()
 
   const [data, setData] = useState<OnboardingData>(() => ({
     ...EMPTY_ONBOARDING,
@@ -96,14 +98,15 @@ export function useOnboarding() {
     if (STEPS[step].key === 'account' && !accountCreated) {
       setBusy(true)
       try {
+        sessionStorage.setItem('verify-next', '/register/owner')
         await register(data.email, data.password, data.displayName, 'owner')
-        setAccountCreated(true)
+        navigate(`/verify-email/sent?email=${encodeURIComponent(data.email)}`)
+        return
       } catch (e) {
         setError(extractErrorMessage(e, 'Could not create your account. The email may already be in use.'))
         setBusy(false)
         return
       }
-      setBusy(false)
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }

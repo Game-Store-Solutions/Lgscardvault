@@ -82,29 +82,21 @@ class AuthController extends AbstractController
             $roles[] = 'ROLE_STORE_OWNER';
         }
 
-        $isOwner = 'owner' === $accountType;
-        // Owners stay in the onboarding wizard after this request, so they are
-        // marked verified and get a welcome email. Shoppers must confirm the
-        // inbox before they can sign in.
         $user = (new User())
             ->setEmail($email)
             ->setDisplayName($displayName)
             ->setRoles($roles)
-            ->setEmailVerified($isOwner);
+            ->setEmailVerified(false);
 
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
         $this->userRepository->save($user, true);
 
         try {
-            if ($isOwner) {
-                $this->mail->sendWelcome($user);
-            } else {
-                $token = $this->emailVerification->issueToken($user);
-                $this->mail->sendEmailVerification($user, $token);
-            }
+            $token = $this->emailVerification->issueToken($user);
+            $this->mail->sendEmailVerification($user, $token);
         } catch (\Throwable $e) {
-            $this->logger->error($isOwner ? 'Welcome email failed.' : 'Verification email failed.', [
+            $this->logger->error('Verification email failed.', [
                 'user' => $user->getId(),
                 'error' => $e->getMessage(),
             ]);
@@ -115,7 +107,7 @@ class AuthController extends AbstractController
             'email' => $user->getEmail(),
             'displayName' => $user->getDisplayName(),
             'roles' => $user->getRoles(),
-            'emailVerified' => $isOwner,
+            'emailVerified' => false,
         ], Response::HTTP_CREATED);
     }
 

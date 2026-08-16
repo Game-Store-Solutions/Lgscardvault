@@ -128,7 +128,7 @@ final class AuthEmailVerificationTest extends WebTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
     }
 
-    public function testOwnerSignupStaysVerifiedAndCanContinue(): void
+    public function testOwnerSignupAlsoRequiresVerification(): void
     {
         $email = $this->uniqueEmail('verify-owner');
         $created = $this->jsonRequest('POST', '/api/register', [
@@ -138,14 +138,19 @@ final class AuthEmailVerificationTest extends WebTestCase
             'accountType' => 'owner',
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode(), json_encode($created));
-        self::assertTrue($created['emailVerified'] ?? false);
+        self::assertFalse($created['emailVerified'] ?? true);
         self::assertEmailCount(1);
-        $this->assertEmailSubjectContains($this->getMailerMessage(), 'Welcome to LGS Card Vault');
+        $this->assertEmailSubjectContains($this->getMailerMessage(), 'Confirm your LGS Card Vault email');
+        $token = $this->tokenFromLastEmail();
 
         $this->jsonRequest('POST', '/api/login', [
             'email' => $email,
             'password' => 'owner-pass-1',
         ]);
-        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame(403, $this->client->getResponse()->getStatusCode());
+
+        $verified = $this->jsonRequest('POST', '/api/auth/verify-email', ['token' => $token]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode(), json_encode($verified));
+        self::assertArrayHasKey('token', $verified);
     }
 }
