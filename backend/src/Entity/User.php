@@ -20,6 +20,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
 #[ORM\UniqueConstraint(name: 'UNIQ_USER_EMAIL', fields: ['email'])]
+#[ORM\Index(name: 'idx_user_password_reset_token', fields: ['passwordResetToken'])]
+#[ORM\Index(name: 'idx_user_email_verify_token', fields: ['emailVerifyToken'])]
 #[ApiResource(
     operations: [
         new GetCollection(
@@ -64,6 +66,27 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column]
     private ?string $password = null;
+
+    /** HMAC-SHA256 hex of a one-time reset token; never store the raw token. */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $passwordResetToken = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $passwordResetExpiresAt = null;
+
+    /**
+     * Existing accounts and SSO/staff-created users start verified.
+     * Public email+password signup sets this false until the inbox is confirmed.
+     */
+    #[ORM\Column(options: ['default' => true])]
+    #[Groups(['user:read', 'user:admin'])]
+    private bool $emailVerified = true;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $emailVerifyToken = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $emailVerifyExpiresAt = null;
 
     /** @var list<string> */
     #[ORM\Column]
@@ -155,6 +178,83 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPassword(string $password): static
     {
         $this->password = $password;
+
+        return $this;
+    }
+
+    public function getPasswordResetToken(): ?string
+    {
+        return $this->passwordResetToken;
+    }
+
+    public function setPasswordResetToken(?string $passwordResetToken): static
+    {
+        $this->passwordResetToken = $passwordResetToken;
+
+        return $this;
+    }
+
+    public function getPasswordResetExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->passwordResetExpiresAt;
+    }
+
+    public function setPasswordResetExpiresAt(?\DateTimeImmutable $passwordResetExpiresAt): static
+    {
+        $this->passwordResetExpiresAt = $passwordResetExpiresAt;
+
+        return $this;
+    }
+
+    public function clearPasswordReset(): static
+    {
+        $this->passwordResetToken = null;
+        $this->passwordResetExpiresAt = null;
+
+        return $this;
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->emailVerified;
+    }
+
+    public function setEmailVerified(bool $emailVerified): static
+    {
+        $this->emailVerified = $emailVerified;
+
+        return $this;
+    }
+
+    public function getEmailVerifyToken(): ?string
+    {
+        return $this->emailVerifyToken;
+    }
+
+    public function setEmailVerifyToken(?string $emailVerifyToken): static
+    {
+        $this->emailVerifyToken = $emailVerifyToken;
+
+        return $this;
+    }
+
+    public function getEmailVerifyExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->emailVerifyExpiresAt;
+    }
+
+    public function setEmailVerifyExpiresAt(?\DateTimeImmutable $emailVerifyExpiresAt): static
+    {
+        $this->emailVerifyExpiresAt = $emailVerifyExpiresAt;
+
+        return $this;
+    }
+
+    public function markEmailVerified(): static
+    {
+        $this->emailVerified = true;
+        $this->emailVerifyToken = null;
+        $this->emailVerifyExpiresAt = null;
 
         return $this;
     }

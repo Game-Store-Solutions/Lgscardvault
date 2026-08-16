@@ -95,6 +95,11 @@ class SsoController extends AbstractController
     {
         $user = $this->userRepository->findOneBy(['email' => $email]);
         if ($user instanceof User) {
+            if (!$user->isEmailVerified()) {
+                $user->markEmailVerified();
+                $this->userRepository->save($user, true);
+            }
+
             return $user;
         }
 

@@ -8,6 +8,7 @@ use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class StoreStaffControllerTest extends WebTestCase
 {
@@ -55,21 +56,61 @@ final class StoreStaffControllerTest extends WebTestCase
             'email' => 'clerk@test.local',
             'displayName' => 'Casey Clerk',
             'role' => 'admin',
+            'password' => 'clerk-pass-1',
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
         $emails = array_column(array_column($payload, 'user'), 'email');
         self::assertContains($owner->getEmail(), $emails);
         self::assertContains('clerk@test.local', $emails);
 
-        $clerk = $this->em->getRepository(User::class)->findOneBy(['email' => 'clerk@test.local']);
-        self::assertInstanceOf(User::class, $clerk);
+        $this->bearer = null;
+        $this->jsonRequest('POST', '/api/login', [
+            'email' => 'clerk@test.local',
+            'password' => 'clerk-pass-1',
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $login = json_decode($this->client->getResponse()->getContent() ?: '[]', true);
+        self::assertIsArray($login);
+        self::assertArrayHasKey('token', $login);
 
-        $this->authenticate($clerk);
+        $this->bearer = (string) $login['token'];
         $me = $this->jsonRequest('GET', '/api/me');
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
         self::assertSame('staff-store', $me['managedStores'][0]['slug'] ?? null);
 
         $this->jsonRequest('GET', '/api/stores/staff-store/staff');
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testNewEmployeeRequiresPasswordExistingKeepsTheirs(): void
+    {
+        $store = $this->fixtures->store('staff-pw');
+        $owner = $store->getOwner();
+        self::assertInstanceOf(User::class, $owner);
+        $this->authenticate($owner);
+
+        $this->jsonRequest('POST', '/api/stores/staff-pw/staff', [
+            'email' => 'needs-pass@test.local',
+            'role' => 'admin',
+        ]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+
+        $existing = $this->fixtures->user(['ROLE_USER'], 'already@test.local');
+        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
+        $existing->setPassword($hasher->hashPassword($existing, 'keep-this-1'));
+        $this->em->flush();
+
+        $this->jsonRequest('POST', '/api/stores/staff-pw/staff', [
+            'email' => 'already@test.local',
+            'role' => 'admin',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+
+        $this->bearer = null;
+        $this->jsonRequest('POST', '/api/login', [
+            'email' => 'already@test.local',
+            'password' => 'keep-this-1',
+        ]);
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
     }
 

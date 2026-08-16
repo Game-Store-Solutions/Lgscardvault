@@ -16,11 +16,12 @@ security:
             pattern: ^/api/login
             stateless: true
             provider: app_user_provider
+            user_checker: App\Security\UserChecker
             json_login:
                 check_path: /api/login
                 username_path: email
                 password_path: password
-                success_handler: lexik_jwt_authentication.handler.authentication_success
+                success_handler: App\Security\AuthenticationSuccessHandler
                 failure_handler: App\Security\AuthenticationFailureHandler
             # Brute-force protection: after too many failed logins from the same
             # IP+username, further attempts get 429 until the window passes.
@@ -37,7 +38,7 @@ security:
     access_control:
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
-        - { path: ^/api/auth/sso, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth, roles: PUBLIC_ACCESS }
         # Square calls these server-to-server with no session. The OAuth callback
         # is guarded by its signed state parameter and the webhook by its HMAC
         # signature, so neither relies on the firewall for authentication.

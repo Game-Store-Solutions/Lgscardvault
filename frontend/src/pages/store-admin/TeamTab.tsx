@@ -42,6 +42,7 @@ export default function TeamTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [password, setPassword] = useState('')
   const [role, setRole] = useState<'admin' | 'member'>('admin')
 
   const query = useQuery({
@@ -57,6 +58,7 @@ export default function TeamTab({ slug }: { slug: string }) {
       const { data } = await api.post<StoreTeamMember[]>(`/stores/${slug}/staff`, {
         email: email.trim(),
         displayName: displayName.trim() || undefined,
+        password: password || undefined,
         role,
       })
       return data
@@ -64,6 +66,7 @@ export default function TeamTab({ slug }: { slug: string }) {
     onSuccess: async () => {
       setEmail('')
       setDisplayName('')
+      setPassword('')
       setRole('admin')
       await queryClient.invalidateQueries({ queryKey: teamKey(slug) })
     },
@@ -103,10 +106,13 @@ export default function TeamTab({ slug }: { slug: string }) {
     <div className="space-y-6">
       {canEdit && (
         <Card>
-          <CardHeader title="Add an employee" subtitle="They can sign in with this email. Admin access opens the store dashboard." />
+          <CardHeader
+            title="Add an employee"
+            subtitle="Set a password for new accounts. Admin access opens the store dashboard."
+          />
           <CardBody>
             <form
-              className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)_8rem_auto] sm:items-end"
+              className="grid gap-3 sm:grid-cols-2 sm:items-end"
               onSubmit={(event) => {
                 event.preventDefault()
                 if (email.trim()) add.mutate()
@@ -126,19 +132,31 @@ export default function TeamTab({ slug }: { slug: string }) {
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder="Casey"
               />
-              <Select
-                label="Access"
-                value={role}
-                onChange={(event) => setRole(event.target.value as 'admin' | 'member')}
-                wrapperClassName="w-full"
-              >
-                <option value="admin">Admin</option>
-                <option value="member">Member</option>
-              </Select>
-              <Button type="submit" loading={add.isPending} disabled={!email.trim()}>
-                <UserPlus aria-hidden className="size-4" />
-                Add
-              </Button>
+              <Input
+                label="Password"
+                type="password"
+                autoComplete="new-password"
+                hint="Required for a new email. Existing accounts keep their current password."
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                minLength={8}
+                placeholder="At least 8 characters"
+              />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <Select
+                  label="Access"
+                  value={role}
+                  onChange={(event) => setRole(event.target.value as 'admin' | 'member')}
+                  wrapperClassName="w-full"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="member">Member</option>
+                </Select>
+                <Button type="submit" loading={add.isPending} disabled={!email.trim()}>
+                  <UserPlus aria-hidden className="size-4" />
+                  Add
+                </Button>
+              </div>
             </form>
             {add.isError && (
               <p role="alert" className="mt-3 text-sm text-danger-700">

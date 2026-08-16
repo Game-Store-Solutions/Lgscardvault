@@ -93,7 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     accountType: 'owner' | 'customer' | 'admin',
   ) => {
     await api.post('/register', { email, password, displayName, accountType })
-    await login(email, password)
+    if (accountType !== 'customer') {
+      await login(email, password)
+    }
   }, [login])
 
   const logout = useCallback(() => {

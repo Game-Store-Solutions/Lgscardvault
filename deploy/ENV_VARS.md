@@ -20,11 +20,12 @@ server (`lexik:jwt:generate-keypair`); see [`LAUNCH.md`](LAUNCH.md).
 | `DATABASE_URL` | PostgreSQL 16 DSN (compose: host `db`). |
 | `JWT_PASSPHRASE` | Passphrase for the JWT `.pem` keypair. |
 | `CORS_ALLOW_ORIGIN` | Regex for allowed browser origins (your public site URL). |
-| `MAILER_DSN` | SMTP (or provider) for transactional mail. |
+| `MAILER_DSN` | Resend: `resend+api://YOUR_API_KEY@default` (URL-encode special characters in the key). |
 | `MESSENGER_TRANSPORT_DSN` | Async queue (default: Doctrine `csv_import`). |
 | `MESSENGER_FAILED_TRANSPORT_DSN` | Dead-letter queue (default: Doctrine `failed`). |
 | `APP_FRONTEND_URL` | Public SPA URL (emails, SSO return, owner redirects). |
 | `DEFAULT_URI` | Base URL for Symfony link generation (usually same as frontend). |
+| `APP_MAIL_FROM` | From header on a Resend-verified domain, e.g. `LGS Card Vault <noreply@your-domain>`. |
 
 ### Docker Compose only (bundled Postgres)
 
@@ -75,7 +76,6 @@ Each **store** still completes **Connect Square** in admin (per-merchant OAuth);
 
 | Variable | Purpose |
 |----------|---------|
-| `APP_MAIL_FROM` | From header for approval/rejection emails (e.g. `Shop <noreply@domain>`). |
 | `SENTRY_DSN` | Error tracking (empty = off). |
 | `SENTRY_RELEASE` | Optional release tag in Sentry. |
 
@@ -110,7 +110,7 @@ Each **store** still completes **Connect Square** in admin (per-merchant OAuth);
 **No.** Minimum live stack:
 
 1. **PostgreSQL** (`DATABASE_URL`)
-2. **Email** (`MAILER_DSN`, plus `APP_MAIL_FROM` for readable From addresses)
+2. **Email** (`MAILER_DSN` via Resend, plus `APP_MAIL_FROM` on a verified domain)
 3. **Square** (full block above) for online checkout and **platform subscription billing**
 
 Optional: **Sentry**, **OIDC SSO**, **Mapbox**.

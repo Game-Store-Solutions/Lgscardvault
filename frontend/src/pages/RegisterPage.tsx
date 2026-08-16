@@ -64,8 +64,11 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
     setError('')
     setLoading(true)
     try {
+      sessionStorage.setItem('verify-next', from)
       await register(email, password, displayName, accountType)
-      navigate(from)
+      const sent = new URLSearchParams({ email })
+      if (storeSlug) sent.set('store', storeSlug)
+      navigate(`/verify-email/sent?${sent.toString()}`)
     } catch (e) {
       const message =
         (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??

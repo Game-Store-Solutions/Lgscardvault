@@ -10,6 +10,10 @@ import HomePage from './pages/HomePage'
 import StoreDirectoryPage from './pages/StoreDirectoryPage'
 import AccountPage from './pages/AccountPage'
 import LoginPage from './pages/LoginPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import VerifyEmailSentPage from './pages/VerifyEmailSentPage'
 import RegisterPage from './pages/RegisterPage'
 import OwnerOnboardingWizard from './pages/OwnerOnboardingWizard'
 import SsoCallbackPage from './pages/SsoCallbackPage'
@@ -47,6 +51,10 @@ export default function App() {
             {/* Full-screen auth flow (no app navbar) */}
             <Route element={<AuthLayout />}>
               <Route path="login" element={<LoginPage />} />
+              <Route path="forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="reset-password" element={<ResetPasswordPage />} />
+              <Route path="verify-email/sent" element={<VerifyEmailSentPage />} />
+              <Route path="verify-email" element={<VerifyEmailPage />} />
               <Route path="register" element={<Navigate to="/register/customer" replace />} />
               <Route path="register/owner" element={<OwnerOnboardingWizard />} />
               <Route path="register/customer" element={<RegisterPage accountType="customer" />} />

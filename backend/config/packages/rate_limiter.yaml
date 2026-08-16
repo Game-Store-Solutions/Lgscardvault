@@ -33,3 +33,20 @@ framework:
             policy: 'sliding_window'
             limit: 20
             interval: '1 minute'
+
+        # Public forgot-password: stop inbox flooding and email enumeration via
+        # volume. Shared factory is keyed separately by IP and by email hash.
+        forgot_password:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '15 minutes'
+
+        reset_password:
+            policy: 'sliding_window'
+            limit: 20
+            interval: '15 minutes'
+
+        email_verification:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '15 minutes'

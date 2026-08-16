@@ -8,6 +8,7 @@ import { BrandLogo } from '../components/BrandLogo'
 import { SsoOption, useSsoStatus } from '../components/SsoOption'
 import { useAuth } from '../context/AuthContext'
 import type { UserProfile } from '../api/types'
+import { extractErrorMessage, httpStatus } from '../api/client'
 import { canManageStore, manageableStores } from '../lib/manageableStores'
 
 /**
@@ -58,16 +59,20 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [unverified, setUnverified] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const ssoParam = searchParams.get('sso')
+  const resetOk = searchParams.get('reset') === '1'
   const sso = useSsoStatus()
+  const forgotTo = storeSlug ? `/forgot-password?store=${encodeURIComponent(storeSlug)}` : '/forgot-password'
 
   const from = (location.state as { from?: string } | null)?.from ?? (storeSlug ? `/s/${storeSlug}` : '/')
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
+    setUnverified(false)
     setLoading(true)
     try {
       const loggedInUser = await login(email, password)
@@ -75,8 +80,13 @@ export default function LoginPage() {
       // otherwise a logout→login as a different account would land on the
       // previous user's store admin. Fall back to a role-appropriate home.
       navigate(safeDestination(from, loggedInUser))
-    } catch {
-      setError('Invalid email or password.')
+    } catch (err) {
+      if (httpStatus(err) === 403) {
+        setUnverified(true)
+        setError(extractErrorMessage(err, 'Please verify your email before signing in.'))
+      } else {
+        setError('Invalid email or password.')
+      }
     } finally {
       setLoading(false)
     }
@@ -110,6 +120,11 @@ export default function LoginPage() {
             </Link>
           </p>
 
+          {resetOk && (
+            <p role="status" className="mt-6 rounded-btn bg-brand-50 px-3 py-2 text-sm font-medium text-fg">
+              Password updated. Sign in with your new password.
+            </p>
+          )}
           {ssoParam === 'failed' && (
             <p role="alert" className="mt-6 rounded-btn bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
               Single sign-on failed. If Google said the request was invalid, add this exact redirect URI in the Google Cloud Console:{' '}
@@ -135,18 +150,36 @@ export default function LoginPage() {
               aria-invalid={hasError || undefined}
               required
             />
-            <Input
-              label="Password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              aria-invalid={hasError || undefined}
-              required
-            />
+            <div className="space-y-1.5">
+              <Input
+                label="Password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                aria-invalid={hasError || undefined}
+                required
+              />
+              <p className="text-right">
+                <Link to={forgotTo} className="text-sm font-bold text-brand-600 hover:underline">
+                  Forgot password?
+                </Link>
+              </p>
+            </div>
             {hasError && (
               <p role="alert" aria-live="polite" className="rounded-btn bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
                 {error}
+                {unverified && (
+                  <>
+                    {' '}
+                    <Link
+                      to={`/verify-email/sent?email=${encodeURIComponent(email)}`}
+                      className="font-bold underline"
+                    >
+                      Resend verification email
+                    </Link>
+                  </>
+                )}
               </p>
             )}
             <Button type="submit" size="lg" loading={loading} className="w-full">

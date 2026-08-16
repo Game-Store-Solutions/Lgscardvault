@@ -413,6 +413,7 @@ class MeController extends AbstractController
         }
 
         $user->setPassword($this->passwordHasher->hashPassword($user, $new));
+        $user->clearPasswordReset();
         $this->entityManager->flush();
 
         return $this->json(['detail' => 'Password updated.']);
@@ -537,6 +538,7 @@ class MeController extends AbstractController
             'displayName' => $user->getDisplayName(),
             'avatarUrl' => $user->getAvatarUrl(),
             'roles' => $user->getRoles(),
+            'emailVerified' => $user->isEmailVerified(),
             'ownedStores' => $ownedStores,
             'managedStores' => $managedStores,
             'paymentBrand' => $user->getPaymentBrand(),

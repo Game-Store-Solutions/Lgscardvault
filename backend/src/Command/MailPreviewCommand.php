@@ -62,6 +62,9 @@ final class MailPreviewCommand extends Command
         $io->section('Platform — welcome (owner) [LGS branding]');
         $this->mail->sendWelcome($owner);
 
+        $io->section('Platform — email verification [LGS branding]');
+        $this->mail->sendEmailVerification($customer, str_repeat('a', 64));
+
         // Content only for approve/reject — branding stays platform (LGS).
         $namedStore = $this->stores->findOneBy([]) ?? $this->namedStore($owner);
 
@@ -96,7 +99,7 @@ final class MailPreviewCommand extends Command
         $this->mail->sendSellTradeDeclined($sellTrade, $customer, $brandedStore);
 
         $io->success(sprintf(
-            'Sent 7 sample emails to %s. Open Mailpit at http://127.0.0.1:8025',
+            'Sent 8 sample emails to %s. Open Mailpit at http://127.0.0.1:8025',
             $to,
         ));
         $io->writeln('Platform mails: LGS logo + navy/gold. Store mail: store colors/name (and store logo when set).');

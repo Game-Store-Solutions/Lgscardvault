@@ -107,6 +107,66 @@ final class TransactionalMailer
         );
     }
 
+    /** Platform — confirm a new email+password signup. */
+    public function sendEmailVerification(User $user, string $rawToken): void
+    {
+        $email = $user->getEmail();
+        if (null === $email || '' === $email) {
+            return;
+        }
+
+        $name = $user->getDisplayName() ?: 'there';
+        $verifyUrl = $this->frontendUrl().'/verify-email?token='.rawurlencode($rawToken);
+
+        $this->sendHtml(
+            to: $email,
+            subject: 'Confirm your LGS Card Vault email',
+            htmlTemplate: 'emails/platform/email_verification.html.twig',
+            context: [
+                'preheader' => 'Confirm your email to finish creating your account. This link expires in 24 hours.',
+                'displayName' => $name,
+                'verifyUrl' => $verifyUrl,
+                'footerNote' => "You're receiving this because an LGS Card Vault account was created with this address.",
+            ],
+            textBody: sprintf(
+                "Hi %s,\n\nConfirm your LGS Card Vault email (expires in 24 hours):\n%s\n",
+                $name,
+                $verifyUrl,
+            ),
+            store: null,
+        );
+    }
+
+    /** Platform — one-time password reset link. */
+    public function sendPasswordReset(User $user, string $rawToken): void
+    {
+        $email = $user->getEmail();
+        if (null === $email || '' === $email) {
+            return;
+        }
+
+        $name = $user->getDisplayName() ?: 'there';
+        $resetUrl = $this->frontendUrl().'/reset-password?token='.rawurlencode($rawToken);
+
+        $this->sendHtml(
+            to: $email,
+            subject: 'Reset your LGS Card Vault password',
+            htmlTemplate: 'emails/platform/password_reset.html.twig',
+            context: [
+                'preheader' => 'Choose a new password. This link expires in one hour.',
+                'displayName' => $name,
+                'resetUrl' => $resetUrl,
+                'footerNote' => "You're receiving this because a password reset was requested for this account.",
+            ],
+            textBody: sprintf(
+                "Hi %s,\n\nReset your LGS Card Vault password (expires in one hour):\n%s\n\nIf you did not ask for this, you can ignore this email.\n",
+                $name,
+                $resetUrl,
+            ),
+            store: null,
+        );
+    }
+
     /** Platform — marketplace approved the store application. */
     public function sendStoreApproved(Store $store): void
     {
@@ -195,9 +255,12 @@ final class TransactionalMailer
                 'footerNote' => sprintf("You're receiving this because %s added you as a store user.", $storeName),
             ],
             textBody: sprintf(
-                "Hi %s,\n\n%s added you as a store user.\n\nSign in: %s\nDashboard: %s\n",
+                "Hi %s,\n\n%s added you as a store user.\n\n%s\nSign in: %s\nDashboard: %s\n",
                 $user->getDisplayName() ?: 'there',
                 $storeName,
+                $newAccount
+                    ? 'Sign in with the email and password your manager set, or with Google using this email.'
+                    : 'Use your existing LGS Card Vault sign-in.',
                 $loginUrl,
                 $adminUrl,
             ),

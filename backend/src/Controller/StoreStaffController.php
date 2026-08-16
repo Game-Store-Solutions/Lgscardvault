@@ -78,6 +78,10 @@ final class StoreStaffController extends AbstractController
         $user = $this->users->findOneBy(['email' => $email]);
         $created = false;
         if (!$user instanceof User) {
+            $password = (string) ($payload['password'] ?? '');
+            if (mb_strlen($password) < 8) {
+                return $this->json(['detail' => 'Set a password of at least 8 characters for new employees.'], 422);
+            }
             $displayName = trim((string) ($payload['displayName'] ?? ''));
             if ('' === $displayName) {
                 $displayName = explode('@', $email)[0];
@@ -86,7 +90,7 @@ final class StoreStaffController extends AbstractController
                 ->setEmail($email)
                 ->setDisplayName(mb_substr($displayName, 0, 255))
                 ->setRoles(['ROLE_USER']);
-            $user->setPassword($this->passwordHasher->hashPassword($user, bin2hex(random_bytes(32))));
+            $user->setPassword($this->passwordHasher->hashPassword($user, $password));
             $this->entityManager->persist($user);
             $created = true;
         }

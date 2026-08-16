@@ -657,6 +657,7 @@ export interface UserProfile {
   displayName: string
   avatarUrl?: string | null
   roles: string[]
+  emailVerified?: boolean
   ownedStores: Pick<Store, 'id' | 'name' | 'slug'>[]
   /** Stores this user administers as staff (not as the owner). */
   managedStores?: Pick<Store, 'id' | 'name' | 'slug'>[]

@@ -29,7 +29,7 @@ via an env file (`/etc/mtgstore/prod.env`) or a secrets manager. Required:
 | `JWT_PASSPHRASE` | passphrase for the JWT keypair (below) |
 | `MESSENGER_TRANSPORT_DSN` / `MESSENGER_FAILED_TRANSPORT_DSN` | queue + dead-letter |
 | `CORS_ALLOW_ORIGIN` | regex for the real frontend origin(s) |
-| `MAILER_DSN` | production SMTP / provider |
+| `MAILER_DSN` | Resend: `resend+api://YOUR_API_KEY@default` |
 | `SENTRY_DSN` | optional; enables error tracking when set |
 
 **JWT keypair** is not committed (gitignored). Generate it once in the target
