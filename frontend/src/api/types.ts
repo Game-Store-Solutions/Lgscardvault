@@ -673,6 +673,7 @@ export interface AdminUser {
   email: string
   displayName: string
   roles: string[]
+  emailVerified: boolean
 }
 
 export interface ScryfallSyncResult {

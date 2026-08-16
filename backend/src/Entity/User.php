@@ -79,7 +79,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * Public email+password signup sets this false until the inbox is confirmed.
      */
     #[ORM\Column(options: ['default' => true])]
-    #[Groups(['user:read', 'user:admin'])]
+    #[Groups(['user:read', 'user:admin', 'user:admin_write'])]
     private bool $emailVerified = true;
 
     #[ORM\Column(length: 64, nullable: true)]
@@ -90,6 +90,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /** @var list<string> */
     #[ORM\Column]
+    #[Assert\All([
+        new Assert\Choice(choices: ['ROLE_USER', 'ROLE_STORE_OWNER', 'ROLE_SUPER_ADMIN']),
+    ])]
     #[Groups(['user:read', 'user:admin', 'user:admin_write'])]
     private array $roles = [];
 
@@ -268,6 +271,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     #[Groups(['user:admin_write'])]
+    #[Assert\Length(min: 8, max: 4096)]
     private ?string $plainPassword = null;
 
     public function getPlainPassword(): ?string

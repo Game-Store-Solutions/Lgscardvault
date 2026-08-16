@@ -55,6 +55,22 @@ class UserRepository extends ServiceEntityRepository implements UserProviderInte
             ->getOneOrNullResult();
     }
 
+    /**
+     * Platform admins are rare; CAST(roles AS TEXT) keeps the check portable
+     * across PostgreSQL (prod) and SQLite (some local setups).
+     */
+    public function countSuperAdmins(?int $excludingUserId = null): int
+    {
+        $sql = 'SELECT COUNT(*) FROM users WHERE CAST(roles AS TEXT) LIKE :role';
+        $params = ['role' => '%ROLE_SUPER_ADMIN%'];
+        if (null !== $excludingUserId) {
+            $sql .= ' AND id <> :excludeId';
+            $params['excludeId'] = $excludingUserId;
+        }
+
+        return (int) $this->getEntityManager()->getConnection()->fetchOne($sql, $params);
+    }
+
     public function save(User $user, bool $flush = false): void
     {
         $this->getEntityManager()->persist($user);

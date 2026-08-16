@@ -128,7 +128,10 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
 
           heading: 'Platform',
 
-          items: [{ to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone }],
+          items: [
+            { to: '/platform/admin/users', label: 'Users', icon: Users },
+            { to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone },
+          ],
 
         },
 

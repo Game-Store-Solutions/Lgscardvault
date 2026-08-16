@@ -47,13 +47,12 @@ import { StoreApplicationModal } from './platform-admin/StoreApplicationModal'
 import { BillingPanel } from './platform-admin/BillingPanel'
 import { isDevBuild } from '../lib/runtimeEnv'
 
-type PlatformAdminTab = 'overview' | 'billing' | 'stores' | 'users' | 'platform'
+type PlatformAdminTab = 'overview' | 'billing' | 'stores' | 'platform'
 
 const PLATFORM_TABS: { id: PlatformAdminTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'billing', label: 'Billing', icon: CreditCard },
   { id: 'stores', label: 'Stores', icon: StoreIcon },
-  { id: 'users', label: 'Users', icon: UsersIcon },
   { id: 'platform', label: 'Integrations', icon: Plug },
 ]
 
@@ -511,52 +510,6 @@ export default function PlatformAdminPage() {
                             )}
                           </p>
                         ) : null}
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            )}
-          </Card>
-        </TabPanel>
-
-        <TabPanel when="users" value={activeTab} className="pt-6">
-          <Card>
-            <CardHeader title="Users" subtitle={`${users.length} total`} />
-            {usersQuery.isLoading ? (
-              <CardBody>
-                <LoadingPanel label="Loading users…" className="border-0 shadow-none" />
-              </CardBody>
-            ) : usersQuery.isError ? (
-              <CardBody>
-                <ErrorState description="Could not load users." onRetry={() => usersQuery.refetch()} />
-              </CardBody>
-            ) : users.length === 0 ? (
-              <CardBody>
-                <EmptyState icon={UsersIcon} title="No users yet" />
-              </CardBody>
-            ) : (
-              <Table>
-                <THead>
-                  <TR>
-                    <TH>Name</TH>
-                    <TH>Email</TH>
-                    <TH>Roles</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {users.map((user) => (
-                    <TR key={user.id}>
-                      <TD className="font-medium">{user.displayName}</TD>
-                      <TD className="text-fg-muted">{user.email}</TD>
-                      <TD>
-                        <div className="flex flex-wrap gap-1.5">
-                          {user.roles.map((role) => (
-                            <Badge key={role} tone="brand">
-                              {role}
-                            </Badge>
-                          ))}
-                        </div>
                       </TD>
                     </TR>
                   ))}

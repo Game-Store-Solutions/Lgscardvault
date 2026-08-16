@@ -33,6 +33,7 @@ import StoreAdminPage from './pages/StoreAdminPage'
 import ImportRunDetailsPage from './pages/store-admin/ImportRunDetailsPage'
 import FixFailedCardsPage from './pages/store-admin/recovery/FixFailedCardsPage'
 import PlatformAdminPage from './pages/PlatformAdminPage'
+import PlatformUsersPage from './pages/platform-admin/PlatformUsersPage'
 import SyncJobsPage from './pages/platform-admin/SyncJobsPage'
 import PlatformReportsPage from './pages/platform-admin/PlatformReportsPage'
 import PatchNotesTab from './pages/store-admin/PatchNotesTab'
@@ -118,6 +119,7 @@ export default function App() {
               }
             >
               <Route index element={<PlatformAdminPage />} />
+              <Route path="users" element={<PlatformUsersPage />} />
               <Route path="reports" element={<PlatformReportsPage />} />
               <Route path="patch-notes" element={<PatchNotesTab />} />
               <Route path="sync-jobs" element={<SyncJobsPage />} />
