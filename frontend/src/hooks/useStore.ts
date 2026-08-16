@@ -1,6 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
-import api from '../api/client'
+import api, { unwrapCollection } from '../api/client'
 import type { Store } from '../api/types'
+
+export const activeStoresKey = ['stores'] as const
+
+/** Public list of active marketplace stores (`GET /stores`). */
+export function useActiveStores(enabled = true) {
+  return useQuery({
+    queryKey: activeStoresKey,
+    queryFn: async () => {
+      const { data } = await api.get('/stores')
+      return unwrapCollection<Store>(data)
+    },
+    enabled,
+  })
+}
 
 /**
  * useStore — fetch a single store by slug.

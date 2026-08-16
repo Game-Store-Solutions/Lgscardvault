@@ -53,8 +53,10 @@ export function ProfileSideNav({
   title?: string
 }) {
   return (
-    <nav aria-label={title} className="rounded-2xl border border-border bg-surface p-2 shadow-sm">
-      <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wide text-fg-muted">{title}</p>
+    <nav aria-label={title || 'Account'} className="rounded-2xl border border-border bg-surface p-2 shadow-sm">
+      {title ? (
+        <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wide text-fg-muted">{title}</p>
+      ) : null}
       <ul className="space-y-0.5">
         {items.map((item) => {
           const active = item.id === value
@@ -65,7 +67,7 @@ export function ProfileSideNav({
                 type="button"
                 onClick={() => onChange(item.id)}
                 className={cx(
-                  'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-colors',
+                  'flex w-full items-center gap-2.5 rounded-xl px-3 py-3 text-left text-sm font-bold transition-colors lg:py-2.5',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
                   // In dark theme brand-100 is a deep purple — never use it for
                   // both bg and text or the label disappears (icon stayed visible).

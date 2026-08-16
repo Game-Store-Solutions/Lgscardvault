@@ -5,6 +5,7 @@ namespace App\Service\Inventory;
 use App\Entity\Card;
 use App\Entity\InventoryItem;
 use App\Entity\Store;
+use App\Entity\User;
 use App\Enum\CardCondition;
 use App\Repository\InventoryItemRepository;
 use App\Service\Catalog\FinishVocabulary;
@@ -45,6 +46,7 @@ final readonly class StoreInventoryWriter
         bool $flush = true,
         ?int $acquisitionCostCents = null,
         ?int $priceCents = null,
+        ?User $exceptWantListUser = null,
     ): InventoryItem {
         // Enrich based on missing price/Scryfall data regardless of flush mode.
         // The import path calls write(flush: false); without this it would never enrich.
@@ -66,7 +68,7 @@ final readonly class StoreInventoryWriter
         // the CSV handler flush + recover the whole batch on conflict (it owns
         // the transaction boundary and requeues contended rows).
         if (!$flush) {
-            return $this->applyWrite($store, $card, $quantity, $condition, $finish, $notes, $acquisitionCostCents, $priceCents);
+            return $this->applyWrite($store, $card, $quantity, $condition, $finish, $notes, $acquisitionCostCents, $priceCents, $exceptWantListUser);
         }
 
         // Immediate path (flush=true, web add/edit/manual-import): a native
@@ -74,7 +76,7 @@ final readonly class StoreInventoryWriter
         // (store, card, condition, foil) tuple can neither 500 on the unique
         // constraint (the old check-then-insert race) nor lose an increment
         // (the old read-modify-write) — the quantity is summed in-database.
-        return $this->upsertLine($store, $card, $quantity, $condition, $finish, $notes, $acquisitionCostCents, $priceCents);
+        return $this->upsertLine($store, $card, $quantity, $condition, $finish, $notes, $acquisitionCostCents, $priceCents, $exceptWantListUser);
     }
 
     /**
@@ -95,6 +97,7 @@ final readonly class StoreInventoryWriter
         ?string $notes,
         ?int $acquisitionCostCents = null,
         ?int $priceCents = null,
+        ?User $exceptWantListUser = null,
     ): InventoryItem {
         $finish = $this->canonicalFinish($finish);
         $priceCents ??= $this->resolvePriceCents($card, FinishVocabulary::isFoil($finish));
@@ -144,7 +147,7 @@ final readonly class StoreInventoryWriter
         // available here. The native upsert path doesn't flush the unit of
         // work, so flush the persisted notifications explicitly.
         if ($item->getQuantity() > 0) {
-            $this->wantListNotifier->notifyAvailability($store, $card);
+            $this->wantListNotifier->notifyAvailability($store, $card, $exceptWantListUser);
             $this->entityManager->flush();
         }
 
@@ -164,6 +167,7 @@ final readonly class StoreInventoryWriter
         ?string $notes,
         ?int $acquisitionCostCents = null,
         ?int $priceCents = null,
+        ?User $exceptWantListUser = null,
     ): InventoryItem {
         $finish = $this->canonicalFinish($finish);
         $item = $this->inventoryItemRepository->findOneBy([
@@ -200,7 +204,7 @@ final readonly class StoreInventoryWriter
         // Batch path: notifications join the caller's unit of work and flush
         // with the batch (the CSV handler owns the transaction boundary).
         if ($item->getQuantity() > 0) {
-            $this->wantListNotifier->notifyAvailability($store, $card);
+            $this->wantListNotifier->notifyAvailability($store, $card, $exceptWantListUser);
         }
 
         return $item;

@@ -17,12 +17,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Store-scoped commander synergy recommendations.
+ * Store-scoped commander deck builder.
  *
- * Commander typeahead reads the weekly-synced `commanders` table (Scryfall
- * `is:commander`) — not store inventory — so shoppers can pick any legal
- * commander. Recommendations themselves still filter to in-stock listings.
- * Combo sniffing proxies Commander Spellbook and intersects with stock.
+ * Commander typeahead reads the weekly-synced `commanders` table. After the
+ * shopper picks a commander (and a strategy that commander supports),
+ * recommendations return in-stock enabler / fuel / payoff packages grouped
+ * by card type. Spellbook combo and full-deck assembly stay available.
  */
 #[Route('/api/stores/{slug}/recommend')]
 final class CommanderRecommendController extends AbstractController
@@ -58,7 +58,32 @@ final class CommanderRecommendController extends AbstractController
         ));
     }
 
-    /** Ranked in-stock synergies for one commander printing. */
+    /** Strategies this commander supports (for the strategy picker). */
+    #[Route('/commander/{cardId}/strategies', name: 'api_store_recommend_commander_strategies', methods: ['GET'])]
+    public function strategies(string $slug, string $cardId): JsonResponse
+    {
+        if (!$this->requireStore($slug) instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $commanderCard = $this->resolveListedCommander($cardId);
+        if ($commanderCard instanceof JsonResponse) {
+            return $commanderCard;
+        }
+
+        return $this->json([
+            'commander' => [
+                'id' => (string) $commanderCard->getId(),
+                'name' => $commanderCard->getName(),
+            ],
+            'strategies' => $this->recommender->strategiesFor($commanderCard),
+        ]);
+    }
+
+    /**
+     * Strategy-scoped in-stock deck package for one commander.
+     * Query: ?strategy=proliferate&limit=80
+     */
     #[Route('/commander/{cardId}', name: 'api_store_recommend_for_commander', methods: ['GET'])]
     public function recommend(string $slug, string $cardId, Request $request): JsonResponse
     {
@@ -67,21 +92,24 @@ final class CommanderRecommendController extends AbstractController
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        $commanderCard = $this->cards->findOneMagicById($cardId);
-        if (!$commanderCard instanceof Card) {
-            return $this->json(['detail' => 'Commander not found.'], 404);
+        $commanderCard = $this->resolveListedCommander($cardId);
+        if ($commanderCard instanceof JsonResponse) {
+            return $commanderCard;
         }
 
-        // Prefer an explicit commanders-table membership; fall back to type
-        // line for freshly seeded printings that have not been weekly-synced yet.
-        $listed = $this->commanders->findOneByOracleId($commanderCard->getOracleId());
-        if (!$listed instanceof Commander && !$this->looksLikeCommander($commanderCard)) {
-            return $this->json(['detail' => 'That card is not a legal commander.'], 422);
+        $strategy = trim((string) $request->query->get('strategy', ''));
+        $limit = (int) $request->query->get('limit', 80);
+
+        try {
+            return $this->json($this->recommender->recommendForStore(
+                $store,
+                $commanderCard,
+                '' === $strategy ? null : $strategy,
+                $limit,
+            ));
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
         }
-
-        $limit = (int) $request->query->get('limit', 24);
-
-        return $this->json($this->recommender->recommendForStore($store, $commanderCard, $limit));
     }
 
     /**
@@ -98,12 +126,9 @@ final class CommanderRecommendController extends AbstractController
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        $commanderCard = $this->resolveCommanderCard($cardId);
-        if (!$commanderCard instanceof Card) {
-            return $this->json(['detail' => 'Commander not found.'], 404);
-        }
-        if (!$this->isListedCommander($commanderCard)) {
-            return $this->json(['detail' => 'That card is not a legal commander.'], 422);
+        $commanderCard = $this->resolveListedCommander($cardId);
+        if ($commanderCard instanceof JsonResponse) {
+            return $commanderCard;
         }
 
         $extra = [];
@@ -132,27 +157,27 @@ final class CommanderRecommendController extends AbstractController
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        $commanderCard = $this->resolveCommanderCard($cardId);
-        if (!$commanderCard instanceof Card) {
-            return $this->json(['detail' => 'Commander not found.'], 404);
-        }
-        if (!$this->isListedCommander($commanderCard)) {
-            return $this->json(['detail' => 'That card is not a legal commander.'], 422);
+        $commanderCard = $this->resolveListedCommander($cardId);
+        if ($commanderCard instanceof JsonResponse) {
+            return $commanderCard;
         }
 
         return $this->json($this->deckAssembler->assemble($store, $commanderCard));
     }
 
-    private function resolveCommanderCard(string $cardId): ?Card
+    private function resolveListedCommander(string $cardId): Card|JsonResponse
     {
-        return $this->cards->findOneMagicById($cardId);
-    }
+        $commanderCard = $this->cards->findOneMagicById($cardId);
+        if (!$commanderCard instanceof Card) {
+            return $this->json(['detail' => 'Commander not found.'], 404);
+        }
 
-    private function isListedCommander(Card $commanderCard): bool
-    {
         $listed = $this->commanders->findOneByOracleId($commanderCard->getOracleId());
+        if (!$listed instanceof Commander && !$this->looksLikeCommander($commanderCard)) {
+            return $this->json(['detail' => 'That card is not a legal commander.'], 422);
+        }
 
-        return $listed instanceof Commander || $this->looksLikeCommander($commanderCard);
+        return $commanderCard;
     }
 
     private function requireStore(string $slug): ?Store

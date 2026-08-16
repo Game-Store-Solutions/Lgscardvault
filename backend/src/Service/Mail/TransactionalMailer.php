@@ -2,6 +2,7 @@
 
 namespace App\Service\Mail;
 
+use App\Entity\SellSubmission;
 use App\Entity\Store;
 use App\Entity\User;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -202,6 +203,91 @@ final class TransactionalMailer
                 $total,
                 $orderUrl,
             ),
+            store: $store,
+        );
+    }
+
+    /** Store-branded — staff accepted the shopper's sell/trade offer. */
+    public function sendSellTradeAccepted(SellSubmission $submission, User $user, Store $store): void
+    {
+        $this->sendSellTradeDecision(
+            $submission,
+            $user,
+            $store,
+            accepted: true,
+        );
+    }
+
+    /** Store-branded — staff declined the shopper's sell/trade offer. */
+    public function sendSellTradeDeclined(SellSubmission $submission, User $user, Store $store): void
+    {
+        $this->sendSellTradeDecision(
+            $submission,
+            $user,
+            $store,
+            accepted: false,
+        );
+    }
+
+    private function sendSellTradeDecision(
+        SellSubmission $submission,
+        User $user,
+        Store $store,
+        bool $accepted,
+    ): void {
+        $email = $user->getEmail();
+        if (null === $email || '' === $email) {
+            return;
+        }
+
+        $storeName = $store->getName() ?? 'Store';
+        $customerName = $user->getDisplayName() ?: 'there';
+        $total = number_format($submission->getTotalOfferCents() / 100, 2);
+        $accountUrl = $this->frontendUrl().'/account?section=selltrade&store='.$store->getSlug();
+        $payoutLabel = SellSubmission::PAYOUT_CREDIT === $submission->getPayoutMethod()
+            ? 'Store credit'
+            : 'Cash';
+        $ref = null !== $submission->getId() ? sprintf('#%d', $submission->getId()) : '';
+
+        if ($accepted) {
+            $subject = sprintf('%s accepted your sell/trade', $storeName);
+            $preheader = sprintf('%s accepted your sell/trade for $%s.', $storeName, $total);
+            $textBody = sprintf(
+                "%s accepted your sell/trade%s.\n\nOffer: $%s (%s)\nView: %s\n",
+                $storeName,
+                '' !== $ref ? ' '.$ref : '',
+                $total,
+                strtolower($payoutLabel),
+                $accountUrl,
+            );
+            $template = 'emails/store/sell_trade_accepted.html.twig';
+        } else {
+            $subject = sprintf('Update on your sell/trade at %s', $storeName);
+            $preheader = sprintf('%s declined your sell/trade.', $storeName);
+            $textBody = sprintf(
+                "%s declined your sell/trade%s.\n\nOriginal offer: $%s\nView: %s\n",
+                $storeName,
+                '' !== $ref ? ' '.$ref : '',
+                $total,
+                $accountUrl,
+            );
+            $template = 'emails/store/sell_trade_declined.html.twig';
+        }
+
+        $this->sendHtml(
+            to: $email,
+            subject: $subject,
+            htmlTemplate: $template,
+            context: [
+                'preheader' => $preheader,
+                'customerName' => $customerName,
+                'storeName' => $storeName,
+                'totalFormatted' => $total,
+                'payoutLabel' => $payoutLabel,
+                'accountUrl' => $accountUrl,
+                'footerNote' => sprintf('Sell/trade updates from %s.', $storeName),
+            ],
+            textBody: $textBody,
             store: $store,
         );
     }

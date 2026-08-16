@@ -12,6 +12,18 @@ class CustomerNotification
 {
     public const TYPE_ORDER_FULFILLED = 'order_fulfilled';
     public const TYPE_WANT_LIST_MATCH = 'want_list_match';
+    public const TYPE_SELL_TRADE_ACCEPTED = 'sell_trade_accepted';
+    public const TYPE_SELL_TRADE_DECLINED = 'sell_trade_declined';
+    public const TYPE_SELL_TRADE_COMPLETED = 'sell_trade_completed';
+
+    /** @var list<string> */
+    public const TYPES = [
+        self::TYPE_ORDER_FULFILLED,
+        self::TYPE_WANT_LIST_MATCH,
+        self::TYPE_SELL_TRADE_ACCEPTED,
+        self::TYPE_SELL_TRADE_DECLINED,
+        self::TYPE_SELL_TRADE_COMPLETED,
+    ];
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

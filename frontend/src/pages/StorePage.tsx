@@ -351,7 +351,7 @@ export default function StorePage() {
               Event calendar
             </Link>
             {user && (
-              <Link to={`/s/${slug}/account`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
                 <UserCircle aria-hidden className="size-4" />
                 My account
               </Link>

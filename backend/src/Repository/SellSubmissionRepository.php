@@ -30,6 +30,27 @@ class SellSubmissionRepository extends ServiceEntityRepository
         return $this->findBy(['user' => $user, 'store' => $store], ['createdAt' => 'DESC', 'id' => 'DESC'], 100);
     }
 
+    /** @return list<SellSubmission> newest first */
+    public function findForUser(User $user, ?Store $store = null, ?int $offset = null, ?int $limit = 200): array
+    {
+        $criteria = ['user' => $user];
+        if ($store instanceof Store) {
+            $criteria['store'] = $store;
+        }
+
+        return $this->findBy($criteria, ['createdAt' => 'DESC', 'id' => 'DESC'], $limit, $offset);
+    }
+
+    public function countForUser(User $user, ?Store $store = null): int
+    {
+        $criteria = ['user' => $user];
+        if ($store instanceof Store) {
+            $criteria['store'] = $store;
+        }
+
+        return $this->count($criteria);
+    }
+
     public function countPendingByStore(Store $store): int
     {
         return (int) $this->createQueryBuilder('s')

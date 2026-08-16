@@ -363,31 +363,39 @@ class OrderRepository extends ServiceEntityRepository
         return $this->findPageByCustomerEmail($email, 0, $limit);
     }
 
-    public function countByCustomerEmail(string $email): int
+    public function countByCustomerEmail(string $email, ?Store $store = null): int
     {
-        return (int) $this->createQueryBuilder('o')
+        $qb = $this->createQueryBuilder('o')
             ->select('COUNT(o.id)')
             ->andWhere('LOWER(o.customerEmail) = LOWER(:email)')
-            ->setParameter('email', $email)
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->setParameter('email', $email);
+
+        if ($store instanceof Store) {
+            $qb->andWhere('o.store = :store')->setParameter('store', $store);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
     /**
      * @return list<Order>
      */
-    public function findPageByCustomerEmail(string $email, int $offset, int $limit): array
+    public function findPageByCustomerEmail(string $email, int $offset, int $limit, ?Store $store = null): array
     {
-        $ids = $this->createQueryBuilder('o')
+        $qb = $this->createQueryBuilder('o')
             ->select('o.id')
             ->andWhere('LOWER(o.customerEmail) = LOWER(:email)')
             ->setParameter('email', $email)
             ->orderBy('o.createdAt', 'DESC')
             ->addOrderBy('o.id', 'DESC')
             ->setFirstResult(max(0, $offset))
-            ->setMaxResults(max(1, $limit))
-            ->getQuery()
-            ->getSingleColumnResult();
+            ->setMaxResults(max(1, $limit));
+
+        if ($store instanceof Store) {
+            $qb->andWhere('o.store = :store')->setParameter('store', $store);
+        }
+
+        $ids = $qb->getQuery()->getSingleColumnResult();
 
         if ([] === $ids) {
             return [];

@@ -6,6 +6,7 @@ import AuthLayout from './components/layout/AuthLayout'
 import AdminLayout from './components/layout/AdminLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import HomePage from './pages/HomePage'
+import StoreDirectoryPage from './pages/StoreDirectoryPage'
 import AccountPage from './pages/AccountPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -51,6 +52,7 @@ export default function App() {
 
             <Route element={<AppLayout />}>
               <Route index element={<HomePage />} />
+              <Route path="stores" element={<StoreDirectoryPage />} />
               {/* Global identity settings + "your stores". One account across the marketplace */}
               <Route
                 path="account"

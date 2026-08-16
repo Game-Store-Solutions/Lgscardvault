@@ -51,6 +51,9 @@ export default api
 /** Customer-facing order list page size (must match backend default unless overridden). */
 export const CUSTOMER_ORDERS_PAGE_SIZE = 15
 
+/** Profile activity lists (want list, favorites, notifications, sell/trade, credit). */
+export const ACCOUNT_PAGE_SIZE = 20
+
 export function unwrapCollection<T>(data: T[] | { member?: T[]; 'hydra:member'?: T[] }): T[] {
   if (Array.isArray(data)) {
     return data

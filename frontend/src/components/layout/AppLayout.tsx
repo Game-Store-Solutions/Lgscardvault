@@ -20,14 +20,10 @@ export default function AppLayout() {
   // the current route is within a store (e.g. /s/:slug, /s/:slug/cards/:id).
   const storeMatch = useMatch('/s/:slug/*')
   const exactStoreMatch = useMatch('/s/:slug')
-  const cardDetailMatch = useMatch('/s/:slug/cards/:id')
-  const artistBrowseMatch = useMatch('/s/:slug/artists')
-  const deckBuilderMatch = useMatch('/s/:slug/deck-builder')
   const accountMatch = useMatch({ path: '/account', end: false })
   const storeAccountMatch = useMatch('/s/:slug/account')
   const storeSlug = storeMatch?.params.slug ?? exactStoreMatch?.params.slug
   const fullWidthAccount = Boolean(accountMatch || storeAccountMatch)
-  const routeFlush = Boolean(cardDetailMatch || artistBrowseMatch || deckBuilderMatch)
   const headerShell = fullWidthAccount
     ? FULL_WIDTH_APP_SHELL
     : storeSlug
@@ -113,7 +109,7 @@ export default function AppLayout() {
   // platform admin) can leave it; the terminal stays signed in as the owner.
   if (kioskMode) {
     return (
-      <AppShellLayoutProvider routeFlush={routeFlush}>
+      <AppShellLayoutProvider>
         <div className="flex min-h-screen flex-col bg-bg text-fg">
           <header className="sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl">
             <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
@@ -144,7 +140,7 @@ export default function AppLayout() {
   }
 
   return (
-    <AppShellLayoutProvider routeFlush={routeFlush}>
+    <AppShellLayoutProvider>
     <div className="flex min-h-screen flex-col bg-bg text-fg">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl">
         <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
@@ -227,26 +223,14 @@ export default function AppLayout() {
                       <p className="truncate text-sm font-bold text-fg">{user.displayName}</p>
                       <p className="truncate text-xs text-fg-muted">{user.email}</p>
                     </div>
-                    {/* In a store, "My account" means your activity AT that store;
-                        the global settings page gets its own entry below. */}
                     <Link
-                      to={storeSlug ? `/s/${storeSlug}/account` : '/account'}
+                      to={storeSlug ? `/account?store=${storeSlug}` : '/account'}
                       onClick={() => setUserMenuOpen(false)}
                       className="mt-1 flex items-center gap-2 rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
                     >
                       <UserCircle aria-hidden className="size-4 text-fg-muted" />
                       My account
                     </Link>
-                    {storeSlug && (
-                      <Link
-                        to="/account"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
-                      >
-                        <Store aria-hidden className="size-4 text-fg-muted" />
-                        Account settings &amp; stores
-                      </Link>
-                    )}
                     {/* Kiosk terminals belong to stores: their owners flip the mode. */}
                     {isStoreOwner && (
                       <button
@@ -370,14 +354,8 @@ export default function AppLayout() {
               ))}
 
               {user && (
-                <Link to={storeSlug ? `/s/${storeSlug}/account` : '/account'} onClick={closeMobile} className={mobileLinkClass}>
+                <Link to={storeSlug ? `/account?store=${storeSlug}` : '/account'} onClick={closeMobile} className={mobileLinkClass}>
                   My account
-                </Link>
-              )}
-
-              {user && storeSlug && (
-                <Link to="/account" onClick={closeMobile} className={mobileLinkClass}>
-                  Account settings &amp; stores
                 </Link>
               )}
 

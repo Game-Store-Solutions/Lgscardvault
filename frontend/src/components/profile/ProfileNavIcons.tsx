@@ -1,4 +1,17 @@
 import type { ComponentType, ReactNode, SVGProps } from 'react'
+import {
+  ArrowLeftRight,
+  Bell,
+  BookOpen,
+  CreditCard,
+  Heart,
+  LayoutDashboard,
+  List,
+  Package,
+  Settings,
+  Store,
+  Wallet,
+} from 'lucide-react'
 import { cx } from '../../lib/cx'
 
 export type ProfileIconProps = SVGProps<SVGSVGElement>
@@ -161,29 +174,29 @@ export function tintIcon(Icon: IconComponent, tintClasses: string): IconComponen
 
 /** Store customer profile — sidebar + stats */
 export const storeActivityIcons = {
-  profile: tintIcon(IconShieldBadge, 'text-amber-600 dark:text-amber-400'),
-  orders: tintIcon(IconPackageStack, 'text-sky-600 dark:text-sky-400'),
-  favorites: tintIcon(IconHeartCrystal, 'text-pink-600 dark:text-pink-400'),
-  wantlist: tintIcon(IconScroll, 'text-amber-700 dark:text-amber-400'),
-  selltrade: tintIcon(IconCrossingCards, 'text-emerald-600 dark:text-emerald-400'),
-  credit: tintIcon(IconTreasureChest, 'text-rose-600 dark:text-rose-400'),
-  notifications: tintIcon(IconMagicBell, 'text-violet-600 dark:text-violet-400'),
+  profile: LayoutDashboard,
+  orders: Package,
+  favorites: Heart,
+  wantlist: List,
+  selltrade: ArrowLeftRight,
+  credit: Wallet,
+  notifications: Bell,
 } as const
 
 export const storeAsideIcons = {
-  browse: tintIcon(IconBinder, 'text-brand-600'),
-  sellTrade: tintIcon(IconCrossingCards, 'text-emerald-600'),
-  cart: tintIcon(IconDeckBox, 'text-sky-600'),
-  account: tintIcon(IconShieldBadge, 'text-amber-600'),
-  payments: tintIcon(IconCoinStack, 'text-amber-700'),
+  browse: BookOpen,
+  sellTrade: ArrowLeftRight,
+  cart: Package,
+  account: LayoutDashboard,
+  payments: CreditCard,
 } as const
 
 /** Global /account sidebar */
 export const accountNavIcons = {
-  overview: tintIcon(IconShieldBadge, 'text-brand-600'),
-  stores: tintIcon(IconBinder, 'text-sky-600'),
-  decks: tintIcon(IconDeckBox, 'text-violet-600'),
-  payment: tintIcon(IconCoinStack, 'text-amber-700'),
-  orders: tintIcon(IconPackageStack, 'text-sky-600'),
-  settings: tintIcon(IconPackageStack, 'text-fg-muted'),
+  overview: LayoutDashboard,
+  stores: Store,
+  decks: BookOpen,
+  payment: CreditCard,
+  orders: Package,
+  settings: Settings,
 } as const

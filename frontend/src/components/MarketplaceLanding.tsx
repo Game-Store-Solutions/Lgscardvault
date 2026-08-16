@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
-import { ArrowRight, Store, UserPlus } from 'lucide-react'
+import { ArrowRight, LayoutGrid, Store, UserPlus } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
+import { useActiveStores } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 
 /**
@@ -11,6 +12,8 @@ import { useAppShellFlush } from './layout/AppShellLayout'
  */
 export default function MarketplaceLanding() {
   const { user, isSuperAdmin } = useAuth()
+  const { data: stores = [], isSuccess } = useActiveStores()
+  const hasStores = isSuccess && stores.length > 0
   useAppShellFlush(true)
 
   const primaryCta =
@@ -66,17 +69,25 @@ export default function MarketplaceLanding() {
         </p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          {isSuperAdmin ? (
-            <Link to="/platform/admin" className={primaryCta}>
-              <Store aria-hidden className="size-4" />
-              Open a store
+          {hasStores && (
+            <Link to="/stores" className={primaryCta}>
+              <LayoutGrid aria-hidden className="size-4" />
+              View stores
               <ArrowRight aria-hidden className="size-4" />
             </Link>
+          )}
+
+          {isSuperAdmin ? (
+            <Link to="/platform/admin" className={hasStores ? secondaryCta : primaryCta}>
+              <Store aria-hidden className="size-4" />
+              Open a store
+              {!hasStores && <ArrowRight aria-hidden className="size-4" />}
+            </Link>
           ) : (
-            <Link to="/register/owner" className={primaryCta}>
+            <Link to="/register/owner" className={hasStores ? secondaryCta : primaryCta}>
               <Store aria-hidden className="size-4" />
               Start your store
-              <ArrowRight aria-hidden className="size-4" />
+              {!hasStores && <ArrowRight aria-hidden className="size-4" />}
             </Link>
           )}
 

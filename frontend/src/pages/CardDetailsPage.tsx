@@ -45,6 +45,7 @@ import { EditInventoryModal, type InventoryEditPayload } from './store-admin/sea
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 import { setBrowsePath } from '../lib/setBrowse'
 import { artistBrowsePath, inventoryByArtist, resolveCardArtist } from '../lib/artistBrowse'
+import { deckBuilderPath, isDeckBuilderNav } from '../lib/deckBuilder'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -80,16 +81,32 @@ export default function CardDetailsPage() {
     inventoryId?: string
     gameCode?: string
   } | null
+  const deckNav = isDeckBuilderNav(location.state) ? location.state : null
   const cameFromSet = setNavState?.from === 'set' && Boolean(setNavState.setCode)
   const cameFromArtist = setNavState?.from === 'artist' && Boolean(setNavState.artist)
-  const backTo = cameFromCaseCards
-    ? `/s/${slug}/case-cards`
-    : cameFromArtist && setNavState?.artist
-      ? artistBrowsePath(slug, setNavState.artist, setNavState.gameCode ?? 'mtg')
-      : cameFromSet && setNavState?.setCode
-        ? setBrowsePath(slug, setNavState.setCode)
-        : `/s/${slug}`
-  const backLabel = cameFromCaseCards ? CASE_CARDS_LABEL : cameFromArtist ? 'Artist' : cameFromSet ? 'Set' : null
+  const backTo = deckNav
+    ? deckBuilderPath(slug, {
+        commanderId: deckNav.commanderId,
+        strategy: deckNav.strategy,
+        panel: deckNav.panel,
+        view: deckNav.view,
+      })
+    : cameFromCaseCards
+      ? `/s/${slug}/case-cards`
+      : cameFromArtist && setNavState?.artist
+        ? artistBrowsePath(slug, setNavState.artist, setNavState.gameCode ?? 'mtg')
+        : cameFromSet && setNavState?.setCode
+          ? setBrowsePath(slug, setNavState.setCode)
+          : `/s/${slug}`
+  const backLabel = deckNav
+    ? 'Deck builder'
+    : cameFromCaseCards
+      ? CASE_CARDS_LABEL
+      : cameFromArtist
+        ? 'Artist'
+        : cameFromSet
+          ? 'Set'
+          : null
   const { user } = useAuth()
   const canManage = useCanManageStore(slug)
   const queryClient = useQueryClient()
@@ -171,6 +188,7 @@ export default function CardDetailsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: customerKeys.wantList(slug) })
+      await queryClient.invalidateQueries({ queryKey: ['my-want-list'] })
     },
   })
 
@@ -312,8 +330,6 @@ export default function CardDetailsPage() {
               ? 'Riftbound'
               : 'Singles'
 
-  const bleed = '-mx-4 sm:-mx-6 lg:-mx-10'
-  const inset = 'px-4 sm:px-6 lg:px-10'
   const setDisplay = card.setName ?? (card.setCode ? card.setCode.toUpperCase() : '')
   const setPageUrl = card.setCode ? setBrowsePath(slug, card.setCode) : null
   const productTitle = setDisplay ? `${card.name} - ${setDisplay}` : card.name
@@ -344,8 +360,8 @@ export default function CardDetailsPage() {
   }
 
   return (
-    <div className={cx(bleed, 'pb-12')}>
-      <div className={cx(inset, 'flex flex-wrap items-center justify-between gap-3 py-4')}>
+    <div className="pb-12">
+      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
           <BackButton to={backTo} className="shrink-0">
             {backLabel ? `Back to ${backLabel}` : 'Back to store'}
@@ -371,7 +387,7 @@ export default function CardDetailsPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {user && (
-            <Link to={`/s/${slug}/account`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
               <UserCircle aria-hidden className="size-4" />
               <span className="hidden sm:inline">Account</span>
             </Link>
@@ -388,7 +404,7 @@ export default function CardDetailsPage() {
         </div>
       </div>
 
-      <div className={inset}>
+      <div>
         <article className="product-detail-sheet">
         <div className="flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)_minmax(20rem,28rem)] xl:grid-cols-[minmax(17rem,24rem)_minmax(0,1fr)_minmax(22rem,30rem)] lg:items-start lg:gap-0">
           {/* Card art. Left */}

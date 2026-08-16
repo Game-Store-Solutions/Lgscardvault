@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Entity\Order;
+use App\Entity\SellSubmission;
 use App\Entity\Store;
 use App\Entity\User;
 use App\Enum\OrderStatus;
@@ -82,8 +83,20 @@ final class MailPreviewCommand extends Command
         $io->section('Store — order fulfilled [store branding / ready for pickup]');
         $this->mail->sendOrderFulfilled($order, $customer, $brandedStore);
 
+        $sellTrade = (new SellSubmission())
+            ->setStore($brandedStore)
+            ->setUser($customer)
+            ->setPayoutMethod(SellSubmission::PAYOUT_CREDIT)
+            ->setTotalOfferCents(1850);
+
+        $io->section('Store — sell/trade accepted [store branding]');
+        $this->mail->sendSellTradeAccepted($sellTrade, $customer, $brandedStore);
+
+        $io->section('Store — sell/trade declined [store branding]');
+        $this->mail->sendSellTradeDeclined($sellTrade, $customer, $brandedStore);
+
         $io->success(sprintf(
-            'Sent 5 sample emails to %s. Open Mailpit at http://127.0.0.1:8025',
+            'Sent 7 sample emails to %s. Open Mailpit at http://127.0.0.1:8025',
             $to,
         ));
         $io->writeln('Platform mails: LGS logo + navy/gold. Store mail: store colors/name (and store logo when set).');

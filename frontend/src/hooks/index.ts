@@ -1,4 +1,4 @@
-export { useStore } from './useStore'
+export { useStore, useActiveStores, activeStoresKey } from './useStore'
 export { useInventory, inventoryKey, inventoryPageKey, useInventoryPage } from './useInventory'
 export { useStoreSections, useStoreCases, usePullSheet, useStockingSheet, storeSectionsKey, storeCasesKey } from './useStoreSections'
 export { usePendingSellSubmissionCount, useSellSubmissionsList, sellSubmissionsKey, pendingSellSubmissionsCountKey } from './useSellSubmissions'
@@ -20,7 +20,14 @@ export {
   useCustomerCart,
   useCustomerOrders,
   useMyOrders,
+  useMyWantList,
+  useMyFavorites,
+  useMyNotifications,
+  useMySellSubmissions,
   useCustomerNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+  invalidateCustomerNotifications,
 } from './useCustomer'
 export { useCart } from './useCart'
 export { useGuestCart, guestCartKey, guestCartLines, resetGuestCart } from './useGuestCart'
@@ -28,10 +35,12 @@ export { useStoreCart } from './useStoreCart'
 export {
   useCommanderSearch,
   useCommanderRecommendations,
+  useCommanderStrategies,
   useCommanderCombos,
   useCommanderDeck,
   commanderSearchKey,
   commanderRecommendKey,
+  commanderStrategiesKey,
   commanderCombosKey,
   commanderDeckKey,
 } from './useCommanderRecommend'
@@ -39,6 +48,9 @@ export type {
   CommanderSummary,
   CommanderRecommendation,
   CommanderRecommendResponse,
+  CommanderStrategy,
+  DeckRole,
+  DeckCardType,
   SpellbookCombo,
   CommanderCombosResponse,
   AssembledDeckResponse,

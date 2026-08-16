@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Test\MailerAssertionsTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -18,6 +19,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 final class StoreBuylistControllerTest extends WebTestCase
 {
+    use MailerAssertionsTrait;
+
     private EntityManagerInterface $em;
     private CatalogFixtures $fixtures;
     private object $client;
@@ -222,8 +225,19 @@ final class StoreBuylistControllerTest extends WebTestCase
         self::assertSame(3, $accepted['items'][0]['acceptedQuantity']);
         self::assertSame(1200, $accepted['totalOfferCents']);
         self::assertSame(2400, $accepted['totalMarketCents']);
+        self::assertEmailCount(1);
+        $this->assertEmailSubjectContains($this->getMailerMessage(), 'accepted your sell/trade');
+        $this->assertEmailAddressContains($this->getMailerMessage(), 'to', (string) $customer->getEmail());
+
+        $this->authenticate($customer);
+        $acceptedNotes = $this->jsonRequest('GET', '/api/me/notifications');
+        self::assertCount(1, $acceptedNotes['items'] ?? []);
+        self::assertSame('sell_trade_accepted', $acceptedNotes['items'][0]['type']);
+        self::assertSame(sprintf('Sell/trade #%d accepted', $submission['id']), $acceptedNotes['items'][0]['title']);
+        self::assertStringContainsString('accepted your sell/trade', $acceptedNotes['items'][0]['body']);
 
         // Completing the deal stocks the accepted copies with the payout as COGS.
+        $this->authenticate($store->getOwner());
         $completed = $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['status' => 'completed']);
         self::assertSame('completed', $completed['status']);
 
@@ -236,7 +250,20 @@ final class StoreBuylistControllerTest extends WebTestCase
         self::assertSame('LP', $item['condition']);
         self::assertSame(400, (int) $item['acquisition_cost_cents']);
 
+        $this->authenticate($customer);
+        $notes = $this->jsonRequest('GET', '/api/me/notifications');
+        $types = array_column($notes['items'] ?? [], 'type');
+        self::assertContains('sell_trade_accepted', $types);
+        self::assertContains('sell_trade_completed', $types);
+        self::assertNotContains('order_fulfilled', $types);
+        $completedNote = array_values(array_filter($notes['items'] ?? [], static fn (array $note): bool => 'sell_trade_completed' === $note['type']))[0];
+        self::assertSame(sprintf('Sell/trade #%d completed', $submission['id']), $completedNote['title']);
+        self::assertStringContainsString('went through', $completedNote['body']);
+        self::assertStringContainsString('cash', $completedNote['body']);
+        self::assertNull($completedNote['orderId']);
+
         // Terminal: no further transitions.
+        $this->authenticate($store->getOwner());
         $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['status' => 'declined']);
         self::assertSame(409, $this->client->getResponse()->getStatusCode());
     }
@@ -324,5 +351,65 @@ final class StoreBuylistControllerTest extends WebTestCase
             'items' => [['id' => $itemId, 'acceptedQuantity' => 0]],
         ]);
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCompletingCreditPayoutNotifiesSellerAboutStoreCredit(): void
+    {
+        $store = $this->fixtures->store();
+        $card = $this->fixtures->card(977);
+        $card->setPrices(['usd' => '10.00']);
+        $customer = $this->fixtures->user(['ROLE_USER']);
+        $this->em->flush();
+        $base = "/api/stores/{$store->getSlug()}";
+
+        $this->authenticate($customer);
+        $submission = $this->jsonRequest('POST', "$base/sell-submissions", [
+            'payoutMethod' => 'credit',
+            'items' => [['cardId' => (string) $card->getId(), 'quantity' => 1, 'condition' => 'NM']],
+        ]);
+
+        $this->authenticate($store->getOwner());
+        $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['status' => 'accepted']);
+        $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['status' => 'completed']);
+        self::assertResponseIsSuccessful();
+
+        $this->authenticate($customer);
+        $notes = $this->jsonRequest('GET', '/api/me/notifications');
+        $types = array_column($notes['items'] ?? [], 'type');
+        self::assertContains('sell_trade_accepted', $types);
+        self::assertContains('sell_trade_completed', $types);
+        $completedNote = array_values(array_filter($notes['items'] ?? [], static fn (array $note): bool => 'sell_trade_completed' === $note['type']))[0];
+        self::assertStringContainsString('store credit', $completedNote['body']);
+        self::assertNull($completedNote['orderId']);
+    }
+
+    public function testDecliningSubmissionNotifiesAndEmailsSeller(): void
+    {
+        $store = $this->fixtures->store();
+        $card = $this->fixtures->card(978);
+        $card->setPrices(['usd' => '6.00']);
+        $customer = $this->fixtures->user(['ROLE_USER']);
+        $this->em->flush();
+        $base = "/api/stores/{$store->getSlug()}";
+
+        $this->authenticate($customer);
+        $submission = $this->jsonRequest('POST', "$base/sell-submissions", [
+            'payoutMethod' => 'cash',
+            'items' => [['cardId' => (string) $card->getId(), 'quantity' => 1, 'condition' => 'NM']],
+        ]);
+
+        $this->authenticate($store->getOwner());
+        $declined = $this->jsonRequest('PATCH', "$base/sell-submissions/{$submission['id']}", ['status' => 'declined']);
+        self::assertSame('declined', $declined['status']);
+        self::assertEmailCount(1);
+        $this->assertEmailSubjectContains($this->getMailerMessage(), 'Update on your sell/trade');
+        $this->assertEmailHtmlBodyContains($this->getMailerMessage(), 'declined');
+
+        $this->authenticate($customer);
+        $notes = $this->jsonRequest('GET', '/api/me/notifications');
+        self::assertCount(1, $notes['items'] ?? []);
+        self::assertSame('sell_trade_declined', $notes['items'][0]['type']);
+        self::assertSame(sprintf('Sell/trade #%d declined', $submission['id']), $notes['items'][0]['title']);
+        self::assertStringContainsString('declined your sell/trade', $notes['items'][0]['body']);
     }
 }

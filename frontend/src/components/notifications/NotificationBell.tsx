@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router'
 import { Bell } from 'lucide-react'
-import api from '../../api/client'
-import { customerKeys, useCustomerNotifications } from '../../hooks'
+import { useCustomerNotifications, useMarkNotificationRead } from '../../hooks'
 import { NotificationList } from './NotificationList'
 
 export function NotificationBell({ slug }: { slug: string }) {
-  const queryClient = useQueryClient()
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
@@ -15,13 +12,7 @@ export function NotificationBell({ slug }: { slug: string }) {
   const { data: notifications = [] } = useCustomerNotifications(slug, Boolean(slug))
   const unread = notifications.filter((notification) => !notification.readAt)
   const badge = unread.length > 99 ? '99+' : String(unread.length)
-
-  const markRead = useMutation({
-    mutationFn: async (id: number) => {
-      await api.patch(`/stores/${slug}/customer/notifications/${id}/read`)
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.notifications(slug) }),
-  })
+  const markRead = useMarkNotificationRead(slug)
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -62,7 +53,7 @@ export function NotificationBell({ slug }: { slug: string }) {
         <div className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-card border border-border bg-surface p-2 shadow-card">
           <div className="flex items-center justify-between gap-3 px-2 py-2">
             <p className="text-sm font-bold text-fg">Notifications</p>
-            <Link to={`/s/${slug}/account`} onClick={() => setOpen(false)} className="text-xs font-bold text-brand-600 hover:underline">
+            <Link to={`/account?section=notifications&store=${slug}`} onClick={() => setOpen(false)} className="text-xs font-bold text-brand-600 hover:underline">
               Account
             </Link>
           </div>

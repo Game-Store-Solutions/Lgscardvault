@@ -50,6 +50,27 @@ final class StoreCreditController extends AbstractController
         ]);
     }
 
+    /** Staff: every customer with a positive credit balance at this store. */
+    #[Route('/admin/credit', name: 'api_store_admin_credit_balances', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function storeBalances(string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (null === $store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+        $this->denyAccessUnlessGranted('STORE_MANAGE', $store);
+
+        $customers = $this->transactions->balancesForStore($store);
+        $outstandingCents = array_sum(array_column($customers, 'balanceCents'));
+
+        return $this->json([
+            'outstandingCents' => $outstandingCents,
+            'customerCount' => count($customers),
+            'customers' => $customers,
+        ]);
+    }
+
     /** Staff: grant or deduct credit for a customer (positive or negative cents). */
     #[Route('/customers/{userId}/credit', name: 'api_store_customer_credit_adjust', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]

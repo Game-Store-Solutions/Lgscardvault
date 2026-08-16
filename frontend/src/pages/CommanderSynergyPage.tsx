@@ -1,13 +1,17 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
 import {
   Check,
+  CheckCircle2,
   Crown,
+  Fuel,
+  Gem,
   Layers,
   Search,
   ShoppingCart,
   Sparkles,
   Wand2,
+  Zap,
 } from 'lucide-react'
 import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
@@ -18,16 +22,80 @@ import {
   useCommanderDeck,
   useCommanderRecommendations,
   useCommanderSearch,
+  useCommanderStrategies,
   useStore,
   useStoreTheme,
 } from '../hooks'
-import type { CommanderSummary, SpellbookCombo } from '../hooks'
-import { Button, BackButton, buttonVariants, EmptyState, Input } from '../components/ui'
+import type { CommanderRecommendation, CommanderSummary, DeckCardType, DeckRole, SpellbookCombo } from '../hooks'
+import {
+  Badge,
+  Button,
+  BackButton,
+  buttonVariants,
+  EmptyState,
+  LoadingPanel,
+  Skeleton,
+  Tabs,
+  TabPanel,
+} from '../components/ui'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
 import { finishName } from '../lib/finishes'
 import { cx } from '../lib/cx'
+import { useAppShellFlush } from '../components/layout/AppShellLayout'
+import {
+  loadDeckBuilderSession,
+  parseDeckBuilderPanel,
+  parseDeckBuilderView,
+  saveDeckBuilderSession,
+  type DeckBuilderNavState,
+} from '../lib/deckBuilder'
+
+const ROLE_META: Record<DeckRole, { label: string; blurb: string; icon: typeof Zap }> = {
+  enabler: {
+    label: 'Enablers',
+    blurb: 'Pieces that start or assemble the strategy.',
+    icon: Zap,
+  },
+  fuel: {
+    label: 'Fuel',
+    blurb: 'Cards that keep the engine running turn after turn.',
+    icon: Fuel,
+  },
+  payoff: {
+    label: 'Payoffs',
+    blurb: 'Cards that convert the strategy into wins and value.',
+    icon: Gem,
+  },
+  support: {
+    label: 'Support',
+    blurb: 'Ramp, draw, interaction, and lands that round out the list.',
+    icon: Layers,
+  },
+}
+
+const TYPE_ORDER: DeckCardType[] = [
+  'creature',
+  'enchantment',
+  'instant',
+  'sorcery',
+  'artifact',
+  'land',
+  'planeswalker',
+  'other',
+]
+
+const TYPE_LABELS: Record<DeckCardType, string> = {
+  creature: 'Creatures',
+  enchantment: 'Enchantments',
+  instant: 'Instants',
+  sorcery: 'Sorceries',
+  artifact: 'Artifacts',
+  land: 'Lands',
+  planeswalker: 'Planeswalkers',
+  other: 'Other',
+}
 
 function colorPips(identity: string[] | undefined) {
   const colors = identity && identity.length > 0 ? identity : ['C']
@@ -40,28 +108,262 @@ function colorPips(identity: string[] | undefined) {
   )
 }
 
+function RecRow({
+  row,
+  slug,
+  signedIn,
+  inCart,
+  checked,
+  disabledPick,
+  adding,
+  linkState,
+  onToggle,
+  onAdd,
+}: {
+  row: CommanderRecommendation
+  slug: string
+  signedIn: boolean
+  inCart: number
+  checked: boolean
+  disabledPick: boolean
+  adding: boolean
+  linkState?: DeckBuilderNavState
+  onToggle: () => void
+  onAdd: () => void
+}) {
+  const item = row.inventoryItem
+  const match = Math.round(row.score * 100)
+  const roleLabel = ROLE_META[row.role]?.label ?? row.role
+
+  return (
+    <li
+      className={cx(
+        'group grid grid-cols-[auto_auto_minmax(0,1fr)] items-start gap-3 rounded-card border bg-surface p-3 transition-colors duration-200 sm:items-center',
+        checked
+          ? 'border-brand-400/70 bg-brand-50/40 dark:bg-brand-500/10'
+          : 'border-border hover:border-brand-400/40 hover:bg-bg/60',
+      )}
+    >
+      <label className="flex items-center self-center">
+        <input
+          type="checkbox"
+          className="size-4 rounded border-border text-brand-600 focus:ring-brand-500"
+          checked={checked}
+          disabled={disabledPick}
+          onChange={onToggle}
+          aria-label={`Select ${item.card.name}`}
+        />
+      </label>
+      <Link
+        to={`/s/${slug}/cards/${item.id}`}
+        state={linkState}
+        className="w-12 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-14"
+      >
+        <CardImage src={cardImage(item.card)} alt={item.card.name} className="aspect-5/7 w-full" />
+      </Link>
+      <div className="min-w-0 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+        <div className="min-w-0">
+          <Link
+            to={`/s/${slug}/cards/${item.id}`}
+            state={linkState}
+            className="font-display text-sm font-bold text-fg transition-colors hover:text-brand-600 sm:text-[0.95rem]"
+          >
+            {item.card.name}
+          </Link>
+          <p className="mt-0.5 truncate text-xs text-fg-muted">
+            {item.card.typeLine}
+            {' · '}
+            {item.condition} / {finishName(item.card, item.isFoil, item.finish)}
+            {' · '}
+            {item.quantity} in stock
+          </p>
+          {row.reasons.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {row.reasons.slice(0, 3).map((reason) => (
+                <span
+                  key={reason}
+                  className="rounded-full bg-bg px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-fg-muted"
+                >
+                  {reason.replaceAll('_', ' ')}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 sm:mt-0 sm:flex-col sm:items-end sm:justify-center">
+          <div className="text-right">
+            <p className="font-display text-base font-extrabold tracking-tight text-fg">
+              {formatPrice(item.priceCents)}
+            </p>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-muted">
+              {roleLabel} · {match}% match
+            </p>
+          </div>
+          {!signedIn ? (
+            <Link to="/login" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              Sign in
+            </Link>
+          ) : inCart > 0 ? (
+            <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Check aria-hidden className="size-3.5" />
+              In cart
+            </Link>
+          ) : (
+            <Button size="sm" variant="secondary" loading={adding} onClick={onAdd}>
+              <ShoppingCart aria-hidden className="size-3.5" />
+              Add
+            </Button>
+          )}
+        </div>
+      </div>
+    </li>
+  )
+}
+
+function CommanderSearchField({
+  value,
+  onChange,
+  fetching,
+  compact = false,
+  autoFocus = false,
+}: {
+  value: string
+  onChange: (value: string) => void
+  fetching: boolean
+  compact?: boolean
+  autoFocus?: boolean
+}) {
+  return (
+    <div className={cx(compact ? 'w-full max-w-md' : 'w-full max-w-xl')}>
+      {!compact && (
+        <p className="mb-2.5 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-fg-muted">
+          Search commanders
+        </p>
+      )}
+      <div className="relative">
+        <Search
+          aria-hidden
+          className={cx(
+            'pointer-events-none absolute top-1/2 -translate-y-1/2 text-fg-muted',
+            compact ? 'left-3 size-4' : 'left-4 size-5',
+          )}
+        />
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={compact ? 'Change commander…' : 'Atraxa, Krenko, Korvold…'}
+          className={cx(
+            'w-full border border-border bg-surface text-fg shadow-sm placeholder:text-fg-muted',
+            'focus-visible:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
+            compact
+              ? 'h-10 rounded-[var(--radius-input)] pl-10 pr-3 text-sm'
+              : 'h-14 rounded-full pl-12 pr-5 text-base font-medium',
+          )}
+          autoComplete="off"
+          autoFocus={autoFocus}
+          aria-label="Search commanders"
+        />
+      </div>
+      {fetching && value.trim().length >= 2 && (
+        <p className="mt-2 text-xs text-fg-muted">Searching catalog…</p>
+      )}
+    </div>
+  )
+}
+
 export default function CommanderSynergyPage() {
   const { slug = '' } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const signedIn = Boolean(user)
   const { data: store, isLoading: storeLoading } = useStore(slug)
   useStoreTheme(store)
+  useAppShellFlush(true)
 
-  const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<CommanderSummary | null>(null)
+  const [selected, setSelected] = useState<CommanderSummary | null>(() => {
+    const commanderId = searchParams.get('commander')
+    if (!commanderId) return null
+    const stored = loadDeckBuilderSession(slug)
+    if (stored?.commander.id === commanderId) return stored.commander
+    return { id: commanderId, oracleId: '', name: '' }
+  })
+  const [strategyId, setStrategyId] = useState<string | null>(() => searchParams.get('strategy'))
+  const [view, setView] = useState<'roles' | 'types'>(() => parseDeckBuilderView(searchParams.get('view')))
   const [picked, setPicked] = useState<Set<number>>(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkDone, setBulkDone] = useState(false)
-  const [panel, setPanel] = useState<'synergy' | 'combos' | 'deck'>('synergy')
+  const [panel, setPanel] = useState<'synergy' | 'combos' | 'deck'>(() =>
+    parseDeckBuilderPanel(searchParams.get('panel')),
+  )
   const [deckBusy, setDeckBusy] = useState(false)
+  const [query, setQuery] = useState(() => selected?.name ?? '')
 
   const search = useCommanderSearch(slug, query)
-  const recommend = useCommanderRecommendations(slug, selected?.id ?? null)
+  const strategiesQuery = useCommanderStrategies(slug, selected?.id ?? null)
+  const recommend = useCommanderRecommendations(slug, selected?.id ?? null, strategyId)
   const combos = useCommanderCombos(slug, selected?.id ?? null, panel === 'combos' || panel === 'deck')
   const deck = useCommanderDeck(slug, selected?.id ?? null, panel === 'deck')
   const cart = useCart(slug, signedIn)
   const cartLines = cart.query.data ?? []
   const recommendations = recommend.data?.recommendations ?? []
+  const byRole = recommend.data?.byRole
+  const byType = recommend.data?.byType
+
+  useEffect(() => {
+    if (!selected) {
+      setStrategyId(null)
+      return
+    }
+    const list = strategiesQuery.data
+    if (!list || list.length === 0) return
+    setStrategyId((current) => {
+      if (current && list.some((s) => s.id === current)) return current
+      return list[0].id
+    })
+  }, [selected, strategiesQuery.data])
+
+  useEffect(() => {
+    const commander = recommend.data?.commander
+    if (!commander || selected?.id !== commander.id) return
+    if (selected.name === commander.name) return
+    setSelected({
+      id: commander.id,
+      oracleId: commander.oracleId,
+      name: commander.name,
+      typeLine: commander.typeLine,
+      manaCost: commander.manaCost,
+      cmc: commander.cmc,
+      colorIdentity: commander.colorIdentity,
+      imageUrl: commander.imageUrl,
+    })
+    setQuery((current) => current || commander.name)
+  }, [recommend.data?.commander, selected])
+
+  useEffect(() => {
+    const next = new URLSearchParams()
+    if (selected?.id) {
+      next.set('commander', selected.id)
+      if (strategyId) next.set('strategy', strategyId)
+      if (panel !== 'synergy') next.set('panel', panel)
+      if (view !== 'roles') next.set('view', view)
+    }
+    if (next.toString() === searchParams.toString()) return
+    setSearchParams(next, { replace: true })
+  }, [panel, searchParams, selected?.id, setSearchParams, strategyId, view])
+
+  useEffect(() => {
+    if (!slug) return
+    if (!selected?.id || !selected.name) {
+      if (!selected) saveDeckBuilderSession(slug, null)
+      return
+    }
+    saveDeckBuilderSession(slug, {
+      commander: selected,
+      strategyId,
+      panel,
+      view,
+    })
+  }, [panel, selected, slug, strategyId, view])
 
   const cartQtyByInventoryId = new Map<number, number>()
   for (const line of cartLines) {
@@ -76,6 +378,20 @@ export default function CommanderSynergyPage() {
 
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => picked.has(id))
 
+  function resetPicks() {
+    setPicked(new Set())
+    setBulkDone(false)
+  }
+
+  function handleQueryChange(next: string) {
+    setQuery(next)
+    if (selected && next.trim() !== selected.name) {
+      setSelected(null)
+      setStrategyId(null)
+      resetPicks()
+    }
+  }
+
   function togglePick(id: number) {
     setPicked((current) => {
       const next = new Set(current)
@@ -88,9 +404,7 @@ export default function CommanderSynergyPage() {
 
   function toggleSelectAll() {
     setPicked((current) => {
-      if (selectableIds.every((id) => current.has(id))) {
-        return new Set()
-      }
+      if (selectableIds.every((id) => current.has(id))) return new Set()
       return new Set(selectableIds)
     })
     setBulkDone(false)
@@ -140,179 +454,362 @@ export default function CommanderSynergyPage() {
     return <StorePageLoader />
   }
 
+  const searchResults = search.data ?? []
+  const showSearchGrid = !selected && query.trim().length >= 2
+
+  function pickCommander(commander: CommanderSummary) {
+    setSelected(commander)
+    setStrategyId(null)
+    resetPicks()
+    setPanel('synergy')
+    setQuery(commander.name)
+  }
+
+  function clearCommander() {
+    setSelected(null)
+    setStrategyId(null)
+    resetPicks()
+    setQuery('')
+    saveDeckBuilderSession(slug, null)
+  }
+
+  const cardLinkState: DeckBuilderNavState | undefined = selected
+    ? {
+        from: 'deck-builder',
+        commanderId: selected.id,
+        strategy: strategyId,
+        panel,
+        view,
+      }
+    : undefined
+
+  function renderRows(rows: CommanderRecommendation[]) {
+    return (
+      <ul className="space-y-2">
+        {rows.map((row) => {
+          const item = row.inventoryItem
+          const inCart = cartQtyByInventoryId.get(item.id) ?? 0
+          return (
+            <RecRow
+              key={item.id}
+              row={row}
+              slug={slug}
+              signedIn={signedIn}
+              inCart={inCart}
+              checked={picked.has(item.id)}
+              disabledPick={inCart > 0}
+              adding={cart.setItem.isPending}
+              onToggle={() => togglePick(item.id)}
+              onAdd={() => void addOne(item)}
+              linkState={cardLinkState}
+            />
+          )
+        })}
+      </ul>
+    )
+  }
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <BackButton to={`/s/${slug}`}>Back to store</BackButton>
-
-      <header className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-brand-600">
-            <Crown aria-hidden className="size-3.5" />
-            Commander synergies
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-extrabold tracking-tight text-fg">
-            Deck Builder
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-            Search any commander-legal card (kept locally from Scryfall&apos;s weekly
-            <span className="font-mono"> is:commander </span>
-            sync). Rank in-stock synergies, sniff Commander Spellbook combos available
-            here, or assemble a ~100-card list from this store&apos;s shelves.
-          </p>
-        </div>
-      </header>
-
-      <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-fg">Search commanders</span>
-            <div className="relative">
-              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
-              <Input
+    <div className="flex min-h-[calc(100vh-5rem)] flex-col">
+      {selected ? (
+        <header className="sticky top-0 z-20 border-b border-border/60 bg-bg/85 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <BackButton to={`/s/${slug}`}>Back</BackButton>
+              <div className="min-w-0">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-brand-600">
+                  Deck builder
+                </p>
+                <h1 className="truncate font-display text-lg font-extrabold tracking-tight text-fg">
+                  {selected.name}
+                </h1>
+              </div>
+            </div>
+            <CommanderSearchField
+              value={query}
+              onChange={handleQueryChange}
+              fetching={search.isFetching}
+              compact
+            />
+          </div>
+        </header>
+      ) : (
+        <div className="relative mx-auto w-full max-w-5xl px-6 pt-4 sm:px-8 sm:pt-6 lg:px-10">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 -top-8 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_srgb,var(--color-brand-500)_18%,transparent),transparent_62%)]"
+          />
+          <header className="relative">
+            <BackButton to={`/s/${slug}`}>Back to store</BackButton>
+            <p className="mt-8 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-[0.2em] text-brand-600">
+              <Crown aria-hidden className="size-3.5" />
+              Commander
+            </p>
+            <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-fg sm:text-5xl">
+              Deck Builder
+            </h1>
+            <p className="mt-3 max-w-lg text-base leading-7 text-fg-muted">
+              Search a legal commander, pick a strategy, then add this store&apos;s in-stock cards
+              grouped by role or type.
+            </p>
+            <div className="mt-8">
+              <CommanderSearchField
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g. Atraxa, Krenko…"
-                className="pl-9"
-                autoComplete="off"
+                onChange={handleQueryChange}
+                fetching={search.isFetching}
+                autoFocus
               />
             </div>
-          </label>
+          </header>
+        </div>
+      )}
 
-          {search.isFetching && query.trim().length >= 2 && (
-            <p className="text-sm text-fg-muted">Searching catalog…</p>
-          )}
-
-          {search.data && search.data.length > 0 && (
-            <ul className="overflow-hidden rounded-card border border-border bg-surface shadow-sm">
-              {search.data.map((commander) => {
-                const active = selected?.id === commander.id
-                return (
-                  <li key={commander.id} className="border-b border-border last:border-b-0">
+      <section
+        className={cx(
+          'flex flex-1 flex-col',
+          selected
+            ? 'gap-6 px-4 py-6 sm:px-6 lg:px-8 xl:flex-row xl:items-start'
+            : 'mx-auto w-full max-w-5xl px-6 pb-16 pt-10 sm:px-8 lg:px-10',
+        )}
+      >
+        {showSearchGrid ? (
+          <div className="w-full min-w-0">
+            {searchResults.length === 0 && !search.isFetching ? (
+              <EmptyState
+                icon={Search}
+                title="No commanders matched"
+                description="Try a different spelling or a shorter name fragment."
+              />
+            ) : searchResults.length === 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className="flex gap-3 rounded-card border border-border bg-surface p-3">
+                    <Skeleton className="h-20 w-14 shrink-0 rounded-md" />
+                    <div className="flex-1 space-y-2 py-1">
+                      <Skeleton className="h-4 w-4/5" />
+                      <Skeleton className="h-3 w-2/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {searchResults.map((commander) => (
+                  <li key={commander.id}>
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelected(commander)
-                        setPicked(new Set())
-                        setBulkDone(false)
-                        setPanel('synergy')
-                      }}
-                      className={cx(
-                        'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
-                        active ? 'bg-brand-50' : 'hover:bg-bg',
-                      )}
+                      onClick={() => pickCommander(commander)}
+                      className="flex h-full w-full gap-3 rounded-card border border-border bg-surface p-3 text-left shadow-sm transition-colors hover:border-brand-400 hover:bg-brand-50/40"
                     >
-                      <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-bg">
+                      <div className="h-20 w-14 shrink-0 overflow-hidden rounded-md bg-bg">
                         {commander.imageUrl ? (
-                          <img src={commander.imageUrl} alt="" className="h-full w-full object-cover" />
-                        ) : null}
+                          <img
+                            src={commander.imageUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <CardImage src={null} alt={commander.name} className="h-full w-full" showLabel={false} />
+                        )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-fg">{commander.name}</p>
-                        <p className="truncate text-xs text-fg-muted">{commander.typeLine}</p>
-                        <div className="mt-1">{colorPips(commander.colorIdentity)}</div>
+                      <div className="min-w-0 flex-1 self-center">
+                        <p className="font-display text-sm font-extrabold leading-snug text-fg">
+                          {commander.name}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs text-fg-muted">{commander.typeLine}</p>
+                        <div className="mt-2">{colorPips(commander.colorIdentity)}</div>
                       </div>
                     </button>
                   </li>
-                )
-              })}
-            </ul>
-          )}
-
-          {selected && (
-            <div className="rounded-card border border-border bg-surface p-4 shadow-sm">
-              <div className="flex gap-3">
-                <div className="w-24 shrink-0">
-                  <CardImage src={selected.imageUrl} alt={selected.name} />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-display text-lg font-extrabold text-fg">{selected.name}</p>
-                  <p className="text-sm text-fg-muted">{selected.typeLine}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {colorPips(selected.colorIdentity)}
-                    {recommend.data?.identityCode && (
-                      <span className="rounded-full bg-bg px-2 py-0.5 text-xs font-semibold text-fg-muted">
-                        {recommend.data.identityCode}
-                      </span>
-                    )}
-                  </div>
-                  {recommend.data?.commander.themes && recommend.data.commander.themes.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {recommend.data.commander.themes.slice(0, 8).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-brand-50 px-2 py-0.5 text-[0.7rem] font-semibold text-brand-700"
-                        >
-                          {tag.replaceAll('_', ' ')}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          {!selected ? (
-            <EmptyState
-              icon={Sparkles}
-              title="Choose a commander"
-              description="Search the local commanders catalog (every Scryfall-legal commander). We'll score this store's in-stock cards that fit its color identity and themes."
-            />
-          ) : (
-            <>
-              <div className="mb-4 flex flex-wrap gap-2">
-                {(
-                  [
-                    { id: 'synergy' as const, label: 'Synergies', icon: Sparkles },
-                    { id: 'combos' as const, label: 'Combos', icon: Wand2 },
-                    { id: 'deck' as const, label: '100-card deck', icon: Layers },
-                  ] as const
-                ).map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setPanel(tab.id)}
-                    className={cx(
-                      'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
-                      panel === tab.id
-                        ? 'bg-brand-600 text-white'
-                        : 'bg-surface text-fg-muted ring-1 ring-border hover:text-fg',
-                    )}
-                  >
-                    <tab.icon aria-hidden className="size-3.5" />
-                    {tab.label}
-                  </button>
                 ))}
+              </ul>
+            )}
+          </div>
+        ) : !selected ? (
+          <div className="grid gap-5 sm:grid-cols-3">
+            {[
+              { step: '01', title: 'Find a commander', body: 'Search the full legal catalog, not just what is on the shelf.' },
+              { step: '02', title: 'Pick a strategy', body: 'We detect the builds that commander actually supports.' },
+              { step: '03', title: 'Fill from stock', body: 'Add enablers, fuel, and payoffs that this store has in stock.' },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="rounded-card border border-border/80 bg-surface/80 px-6 py-7 dark:glass-card"
+              >
+                <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-600">
+                  {item.step}
+                </p>
+                <p className="mt-3 font-display text-lg font-extrabold leading-snug text-fg">{item.title}</p>
+                <p className="mt-2 text-sm leading-6 text-fg-muted">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:self-start">
+              <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
+                <div className="flex gap-4 p-4">
+                  <div className="w-24 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-28">
+                    <CardImage
+                      src={selected.imageUrl}
+                      alt={selected.name}
+                      className="aspect-5/7 w-full"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-display text-lg font-extrabold leading-snug text-fg">
+                      {selected.name}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-fg-muted">{selected.typeLine}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {colorPips(selected.colorIdentity)}
+                      {recommend.data?.identityCode && (
+                        <Badge tone="neutral">{recommend.data.identityCode}</Badge>
+                      )}
+                    </div>
+                    {recommend.data?.commander.themes && recommend.data.commander.themes.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {recommend.data.commander.themes.slice(0, 4).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-brand-50 px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-brand-700"
+                          >
+                            {tag.replaceAll('_', ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="mt-3 text-sm font-semibold text-brand-600 transition-colors hover:text-brand-500"
+                      onClick={clearCommander}
+                    >
+                      Change commander
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {panel === 'synergy' && (
-                <>
-                  {recommend.isLoading ? (
-                    <p className="text-sm text-fg-muted">Scoring in-stock synergies…</p>
-                  ) : recommendations.length === 0 ? (
-                    <EmptyState
-                      icon={Search}
-                      title="No in-stock synergies yet"
-                      description="This store doesn't currently stock cards that share themes with this commander. Try another commander, or ask the store to sync more Magic inventory."
-                    />
-                  ) : (
-                    <>
-                      <div className="mb-4 flex flex-col gap-3 rounded-card border border-border bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-fg">
-                            {recommendations.length} in-stock recommendation
-                            {recommendations.length === 1 ? '' : 's'}
+              <div>
+                <p className="mb-2 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
+                  Strategy
+                </p>
+                {strategiesQuery.isLoading && (
+                  <div className="space-y-2">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {(strategiesQuery.data ?? []).map((strategy) => {
+                    const active = strategyId === strategy.id
+                    const confidence = Math.round(strategy.confidence * 100)
+                    return (
+                      <button
+                        key={strategy.id}
+                        type="button"
+                        onClick={() => {
+                          setStrategyId(strategy.id)
+                          resetPicks()
+                        }}
+                        className={cx(
+                          'w-full rounded-card border px-3.5 py-3 text-left transition-all duration-200',
+                          active
+                            ? 'border-brand-400 bg-brand-50/70 shadow-sm dark:bg-brand-500/12'
+                            : 'border-border bg-surface hover:border-brand-300/70',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-bold text-fg">{strategy.label}</p>
+                          {active ? (
+                            <CheckCircle2 aria-hidden className="size-4 shrink-0 text-brand-600" />
+                          ) : (
+                            <span className="text-[0.65rem] font-bold tabular-nums text-fg-muted">
+                              {confidence}%
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-fg-muted">{strategy.description}</p>
+                        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-bg">
+                          <div
+                            className={cx(
+                              'h-full rounded-full transition-all duration-500',
+                              active ? 'bg-brand-500' : 'bg-fg-muted/35',
+                            )}
+                            style={{ width: `${confidence}%` }}
+                          />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </aside>
+
+            <div className="min-w-0 flex-1">
+              <Tabs
+                aria-label="Deck builder views"
+                value={panel}
+                onChange={(id) => setPanel(id as typeof panel)}
+                tabs={[
+                  { id: 'synergy', label: 'Synergies', icon: Sparkles },
+                  { id: 'combos', label: 'Combos', icon: Wand2 },
+                  { id: 'deck', label: '100-card deck', icon: Layers },
+                ]}
+              />
+
+              <TabPanel when="synergy" value={panel} className="pt-5">
+                {!strategyId || strategiesQuery.isLoading ? (
+                  <LoadingPanel label="Reading this commander's strategies…" />
+                ) : recommend.isLoading ? (
+                  <LoadingPanel label="Building your in-stock package…" />
+                ) : recommendations.length === 0 ? (
+                  <EmptyState
+                    icon={Search}
+                    title="No in-stock package yet"
+                    description="This store does not currently stock enough cards for that strategy. Try another strategy, or ask the store to sync more Magic inventory."
+                  />
+                ) : (
+                  <>
+                    <div className="sticky top-[4.25rem] z-10 mb-5 rounded-card border border-border/80 bg-surface/90 p-3 shadow-sm backdrop-blur-md">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-display text-base font-extrabold text-fg">
+                            {recommend.data?.strategy.label}
+                            <span className="ml-2 text-sm font-semibold text-fg-muted">
+                              {recommendations.length} in stock
+                            </span>
                           </p>
                           <p className="text-xs text-fg-muted">
-                            From {recommend.data?.totalCandidates ?? recommendations.length} color-legal
+                            {recommend.data?.totalCandidates ?? recommendations.length} color-legal
                             candidates
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <Button type="button" variant="secondary" size="sm" onClick={toggleSelectAll}>
-                            {allSelected ? 'Clear selection' : 'Select all'}
+                          <div className="inline-flex rounded-btn border border-border bg-bg p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setView('roles')}
+                              className={cx(
+                                'rounded-btn px-2.5 py-1 text-xs font-bold transition-colors',
+                                view === 'roles' ? 'bg-brand-500 text-white' : 'text-fg-muted hover:text-fg',
+                              )}
+                            >
+                              By role
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setView('types')}
+                              className={cx(
+                                'rounded-btn px-2.5 py-1 text-xs font-bold transition-colors',
+                                view === 'types' ? 'bg-brand-500 text-white' : 'text-fg-muted hover:text-fg',
+                              )}
+                            >
+                              By type
+                            </button>
+                          </div>
+                          <Button type="button" variant="ghost" size="sm" onClick={toggleSelectAll}>
+                            {allSelected ? 'Clear' : 'Select all'}
                           </Button>
                           {!signedIn ? (
                             <Link to="/login" className={buttonVariants({ size: 'sm' })}>
@@ -327,7 +824,7 @@ export default function CommanderSynergyPage() {
                               onClick={() => void addSelectedEnMasse()}
                             >
                               <ShoppingCart aria-hidden className="size-4" />
-                              Add {picked.size || ''} to cart
+                              Add{picked.size > 0 ? ` ${picked.size}` : ''} to cart
                             </Button>
                           )}
                           {signedIn && (
@@ -335,118 +832,76 @@ export default function CommanderSynergyPage() {
                               to={`/s/${slug}/cart`}
                               className={buttonVariants({ variant: 'secondary', size: 'sm' })}
                             >
-                              View cart
+                              Cart
                             </Link>
                           )}
                         </div>
                       </div>
+                    </div>
 
-                      {bulkDone && (
-                        <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-success-700">
-                          <Check aria-hidden className="size-4" />
-                          Selected cards added to your cart.
-                        </p>
-                      )}
+                    {bulkDone && (
+                      <p className="mb-4 flex items-center gap-1.5 text-sm font-medium text-success-700">
+                        <Check aria-hidden className="size-4" />
+                        Selected cards added to your cart.
+                      </p>
+                    )}
 
-                      <ul className="space-y-3">
-                        {recommendations.map((row) => {
-                          const item = row.inventoryItem
-                          const inCart = cartQtyByInventoryId.get(item.id) ?? 0
-                          const checked = picked.has(item.id)
+                    {view === 'roles' && byRole && (
+                      <div className="space-y-8">
+                        {(['enabler', 'fuel', 'payoff', 'support'] as DeckRole[]).map((role) => {
+                          const rows = byRole[role] ?? []
+                          if (rows.length === 0) return null
+                          const meta = ROLE_META[role]
+                          const Icon = meta.icon
                           return (
-                            <li
-                              key={item.id}
-                              className="flex gap-3 rounded-card border border-border bg-surface p-3 shadow-sm"
-                            >
-                              <label className="flex shrink-0 items-start pt-1">
-                                <input
-                                  type="checkbox"
-                                  className="size-4 rounded border-border text-brand-600 focus:ring-brand-500"
-                                  checked={checked}
-                                  disabled={inCart > 0}
-                                  onChange={() => togglePick(item.id)}
-                                  aria-label={`Select ${item.card.name}`}
-                                />
-                              </label>
-                              <Link to={`/s/${slug}/cards/${item.id}`} className="w-16 shrink-0 sm:w-20">
-                                <CardImage src={cardImage(item.card)} alt={item.card.name} />
-                              </Link>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <Link
-                                      to={`/s/${slug}/cards/${item.id}`}
-                                      className="font-display text-base font-extrabold text-fg hover:text-brand-600"
-                                    >
-                                      {item.card.name}
-                                    </Link>
-                                    <p className="text-xs text-fg-muted">
-                                      {item.card.typeLine}
-                                      {' · '}
-                                      {item.condition} / {finishName(item.card, item.isFoil, item.finish)}
-                                      {' · '}
-                                      {item.quantity} in stock
-                                    </p>
+                            <section key={role}>
+                              <div className="mb-3 flex items-center gap-3">
+                                <span className="grid size-8 place-items-center rounded-full bg-brand-50 text-brand-700">
+                                  <Icon aria-hidden className="size-4" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-baseline gap-2">
+                                    <h2 className="font-display text-lg font-extrabold text-fg">
+                                      {meta.label}
+                                    </h2>
+                                    <span className="text-xs font-semibold text-fg-muted">
+                                      {rows.length}
+                                    </span>
                                   </div>
-                                  <div className="text-right">
-                                    <p className="font-display text-lg font-extrabold text-fg">
-                                      {formatPrice(item.priceCents)}
-                                    </p>
-                                    <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-fg-muted">
-                                      score {(row.score * 100).toFixed(0)}
-                                    </p>
-                                  </div>
-                                </div>
-                                {row.reasons.length > 0 && (
-                                  <div className="mt-2 flex flex-wrap gap-1.5">
-                                    {row.reasons.map((reason) => (
-                                      <span
-                                        key={reason}
-                                        className="rounded-full bg-bg px-2 py-0.5 text-[0.65rem] font-semibold text-fg-muted"
-                                      >
-                                        {reason.replaceAll('_', ' ')}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                <div className="mt-3">
-                                  {!signedIn ? (
-                                    <Link
-                                      to="/login"
-                                      className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                                    >
-                                      Sign in to add
-                                    </Link>
-                                  ) : inCart > 0 ? (
-                                    <Link
-                                      to={`/s/${slug}/cart`}
-                                      className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                                    >
-                                      <Check aria-hidden className="size-4" />
-                                      In cart ({inCart})
-                                    </Link>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      loading={cart.setItem.isPending}
-                                      onClick={() => void addOne(item)}
-                                    >
-                                      <ShoppingCart aria-hidden className="size-4" />
-                                      Add to cart
-                                    </Button>
-                                  )}
+                                  <p className="text-xs text-fg-muted">{meta.blurb}</p>
                                 </div>
                               </div>
-                            </li>
+                              {renderRows(rows)}
+                            </section>
                           )
                         })}
-                      </ul>
-                    </>
-                  )}
-                </>
-              )}
+                      </div>
+                    )}
 
-              {panel === 'combos' && (
+                    {view === 'types' && byType && (
+                      <div className="space-y-8">
+                        {TYPE_ORDER.map((type) => {
+                          const rows = byType[type] ?? []
+                          if (rows.length === 0) return null
+                          return (
+                            <section key={type}>
+                              <h2 className="mb-3 font-display text-lg font-extrabold text-fg">
+                                {TYPE_LABELS[type]}
+                                <span className="ml-2 text-sm font-semibold text-fg-muted">
+                                  {rows.length}
+                                </span>
+                              </h2>
+                              {renderRows(rows)}
+                            </section>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </TabPanel>
+
+              <TabPanel when="combos" value={panel} className="pt-5">
                 <CombosPanel
                   slug={slug}
                   loading={combos.isLoading}
@@ -455,10 +910,11 @@ export default function CommanderSynergyPage() {
                   cartQtyByInventoryId={cartQtyByInventoryId}
                   onAdd={(item) => void addOne(item)}
                   cartPending={cart.setItem.isPending}
+                  linkState={cardLinkState}
                 />
-              )}
+              </TabPanel>
 
-              {panel === 'deck' && (
+              <TabPanel when="deck" value={panel} className="pt-5">
                 <DeckPanel
                   slug={slug}
                   loading={deck.isLoading}
@@ -466,11 +922,12 @@ export default function CommanderSynergyPage() {
                   signedIn={signedIn}
                   busy={deckBusy}
                   onAddAll={() => void addDeckToCart()}
+                  linkState={cardLinkState}
                 />
-              )}
-            </>
-          )}
-        </div>
+              </TabPanel>
+            </div>
+          </>
+        )}
       </section>
     </div>
   )
@@ -484,6 +941,7 @@ function CombosPanel({
   cartQtyByInventoryId,
   onAdd,
   cartPending,
+  linkState,
 }: {
   slug: string
   loading: boolean
@@ -492,27 +950,28 @@ function CombosPanel({
   cartQtyByInventoryId: Map<number, number>
   onAdd: (item: InventoryItem) => void
   cartPending: boolean
+  linkState?: DeckBuilderNavState
 }) {
   if (loading) {
-    return <p className="text-sm text-fg-muted">Checking Commander Spellbook against store stock…</p>
+    return <LoadingPanel label="Checking Commander Spellbook against store stock…" />
   }
   if (combos.length === 0) {
     return (
       <EmptyState
         icon={Wand2}
         title="No combos found yet"
-        description="Commander Spellbook didn’t return combos for this commander, or the store has none of the pieces in stock."
+        description="Commander Spellbook did not return combos for this commander, or the store has none of the pieces in stock."
       />
     )
   }
 
   return (
-    <ul className="space-y-4">
+    <ul className="space-y-3">
       {combos.map((combo) => (
         <li key={combo.id || combo.description} className="rounded-card border border-border bg-surface p-4 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-fg">
+              <p className="text-sm font-bold text-fg">
                 {combo.inStockCount} of {combo.cards.length} pieces in stock
                 {combo.completeInStore ? ' · complete here' : ''}
               </p>
@@ -520,16 +979,12 @@ function CombosPanel({
                 <p className="mt-1 text-xs text-fg-muted">{combo.produces.slice(0, 3).join(' · ')}</p>
               )}
             </div>
-            {combo.completeInStore && (
-              <span className="rounded-full bg-success-100 px-2 py-0.5 text-[0.7rem] font-bold text-success-800">
-                Buyable here
-              </span>
-            )}
+            {combo.completeInStore && <Badge tone="success">Buyable here</Badge>}
           </div>
           {combo.description && (
             <p className="mt-2 text-sm leading-relaxed text-fg-muted">{combo.description}</p>
           )}
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 space-y-1.5">
             {combo.cards.map((piece) => (
               <li
                 key={`${combo.id}-${piece.name}`}
@@ -549,7 +1004,11 @@ function CombosPanel({
                         Add
                       </Button>
                     ) : piece.inventoryItem ? (
-                      <Link to={`/s/${slug}/cards/${piece.inventoryItem.id}`} className="text-xs font-semibold text-brand-600">
+                      <Link
+                        to={`/s/${slug}/cards/${piece.inventoryItem.id}`}
+                        state={linkState}
+                        className="text-xs font-semibold text-brand-600"
+                      >
                         View
                       </Link>
                     ) : null}
@@ -577,6 +1036,7 @@ function DeckPanel({
   signedIn,
   busy,
   onAddAll,
+  linkState,
 }: {
   slug: string
   loading: boolean
@@ -584,9 +1044,10 @@ function DeckPanel({
   signedIn: boolean
   busy: boolean
   onAddAll: () => void
+  linkState?: DeckBuilderNavState
 }) {
   if (loading || !deck) {
-    return <p className="text-sm text-fg-muted">Assembling a deck from store inventory…</p>
+    return <LoadingPanel label="Assembling a deck from store inventory…" />
   }
 
   const slotEntries = Object.entries(deck.slots).filter(([key]) => key !== 'commander')
@@ -595,10 +1056,10 @@ function DeckPanel({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-fg">
+          <p className="font-display text-base font-extrabold text-fg">
             {deck.filledSize} / {deck.targetSize} cards from this store
           </p>
-          <p className="text-xs text-fg-muted">
+          <p className="mt-1 text-xs text-fg-muted">
             Lands {deck.slots.land ?? 0} · Ramp {deck.slots.ramp ?? 0} · Draw {deck.slots.draw ?? 0} ·
             Removal {deck.slots.removal ?? 0} · Combo {deck.slots.combo ?? 0} · Synergy{' '}
             {deck.slots.synergy ?? 0}
@@ -619,16 +1080,16 @@ function DeckPanel({
             </Button>
           )}
           <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            View cart
+            Cart
           </Link>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
         {slotEntries.map(([slot, count]) => (
-          <span key={slot} className="rounded-full bg-bg px-2 py-0.5 text-[0.7rem] font-semibold text-fg-muted">
+          <Badge key={slot} tone="neutral">
             {slot}: {count}
-          </span>
+          </Badge>
         ))}
       </div>
 
@@ -644,12 +1105,17 @@ function DeckPanel({
           const item = row.inventoryItem
           return (
             <li key={`${row.slot}-${item.id}`} className="flex gap-2 rounded-card border border-border bg-surface p-2">
-              <Link to={`/s/${slug}/cards/${item.id}`} className="w-12 shrink-0">
-                <CardImage src={cardImage(item.card)} alt={item.card.name} />
+              <Link
+                to={`/s/${slug}/cards/${item.id}`}
+                state={linkState}
+                className="w-12 shrink-0 overflow-hidden rounded-md"
+              >
+                <CardImage src={cardImage(item.card)} alt={item.card.name} className="aspect-5/7 w-full" />
               </Link>
-              <div className="min-w-0">
+              <div className="min-w-0 self-center">
                 <Link
                   to={`/s/${slug}/cards/${item.id}`}
+                  state={linkState}
                   className="block truncate text-sm font-semibold text-fg hover:text-brand-600"
                 >
                   {item.card.name}

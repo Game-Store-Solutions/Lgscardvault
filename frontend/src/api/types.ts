@@ -500,6 +500,8 @@ export interface CustomerFavorite {
   id: number
   inventoryItem: InventoryItem
   createdAt: string
+  storeSlug?: string | null
+  storeName?: string | null
 }
 
 export interface CartItem {
@@ -528,6 +530,8 @@ export interface CustomerWantListEntry {
   /** Store listing to open on the storefront, when one matches this want. */
   inventoryItemId?: number | null
   createdAt: string
+  storeSlug?: string | null
+  storeName?: string | null
 }
 
 export type CsvImportJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'paused' | 'cancelled'
@@ -745,6 +749,15 @@ export interface PaginatedOrders {
   itemsPerPage: number
 }
 
+/** Shared shape for /me activity lists (want list, favorites, notifications, sell/trade). */
+export interface PaginatedList<T> {
+  items: T[]
+  total: number
+  page: number
+  itemsPerPage: number
+  unread?: number
+}
+
 export type OrderStatus = 'pending' | 'received' | 'fulfilled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
 
 /** A store's effective sell/trade payout rates right now (promo-resolved server-side). */
@@ -820,6 +833,8 @@ export interface SellSubmission {
   customerName?: string | null
   customerEmail?: string | null
   items: SellSubmissionItem[]
+  storeSlug?: string | null
+  storeName?: string | null
 }
 
 export interface StoreCreditTransaction {
@@ -834,7 +849,29 @@ export interface StoreCreditTransaction {
 
 export interface StoreCreditSummary {
   balanceCents: number
-  transactions: StoreCreditTransaction[]
+  transactions: PaginatedList<StoreCreditTransaction> | StoreCreditTransaction[]
+  storeSlug?: string | null
+  storeName?: string | null
+}
+
+export interface StoreCreditBalance {
+  storeSlug: string
+  storeName: string
+  balanceCents: number
+}
+
+export interface StoreCreditCustomer {
+  userId: number
+  email: string
+  displayName: string
+  balanceCents: number
+  lastActivityAt: string
+}
+
+export interface StoreCreditLedger {
+  outstandingCents: number
+  customerCount: number
+  customers: StoreCreditCustomer[]
 }
 
 export interface Deck {
@@ -866,6 +903,8 @@ export interface CustomerNotification {
   orderReference?: string | null
   createdAt: string
   readAt?: string | null
+  storeSlug?: string | null
+  storeName?: string | null
 }
 
 /* ---------- Multi-game catalog (TCGCSV-sourced) ---------- */

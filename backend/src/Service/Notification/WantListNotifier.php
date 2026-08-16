@@ -5,6 +5,7 @@ namespace App\Service\Notification;
 use App\Entity\Card;
 use App\Entity\CustomerNotification;
 use App\Entity\Store;
+use App\Entity\User;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\CustomerWantListEntryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,7 +32,7 @@ final class WantListNotifier
      * NOT flush — it joins the caller's transaction so notification writes
      * ride along with the inventory write itself.
      */
-    public function notifyAvailability(Store $store, Card $card): void
+    public function notifyAvailability(Store $store, Card $card, ?User $exceptUser = null): void
     {
         $cardName = $card->getName();
         if (null === $cardName || '' === $cardName) {
@@ -61,6 +62,9 @@ final class WantListNotifier
         foreach ($entries as $entry) {
             $user = $entry->getCustomer()?->getUser();
             if (null === $user || null === $user->getId()) {
+                continue;
+            }
+            if ($exceptUser instanceof User && $user->getId() === $exceptUser->getId()) {
                 continue;
             }
             // One notification per user even if they want the card at

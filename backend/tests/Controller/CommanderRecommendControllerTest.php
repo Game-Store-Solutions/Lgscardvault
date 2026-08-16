@@ -97,6 +97,39 @@ final class CommanderRecommendControllerTest extends WebTestCase
         self::assertContains('proliferate', $buddy['reasons']);
         self::assertSame(3, $buddy['inventoryItem']['quantity']);
         self::assertArrayHasKey('id', $buddy['inventoryItem'], 'inventory id is required for cart PUT');
+        self::assertArrayHasKey('strategy', $payload);
+        self::assertSame('proliferate', $payload['strategy']['id']);
+        self::assertArrayHasKey('byRole', $payload);
+        self::assertArrayHasKey('byType', $payload);
+        self::assertArrayHasKey('role', $buddy);
+        self::assertArrayHasKey('cardType', $buddy);
+    }
+
+    public function testStrategiesEndpointListsSupportedBuilds(): void
+    {
+        $store = $this->fixtures->store('strategy-picker-store');
+        $commander = $this->fixtures->card(705, [
+            'name' => 'Atraxa Strategy',
+            'type_line' => 'Legendary Creature — Phyrexian Angel Horror',
+            'oracle_text' => 'At the beginning of your end step, proliferate.',
+            'keywords' => ['Flying', 'Proliferate'],
+            'color_identity' => ['W', 'U', 'B', 'G'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $this->em->flush();
+
+        $this->client->request('GET', sprintf(
+            '/api/stores/%s/recommend/commander/%s/strategies',
+            $store->getSlug(),
+            $commander->getId(),
+        ));
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame('Atraxa Strategy', $payload['commander']['name']);
+        $ids = array_column($payload['strategies'], 'id');
+        self::assertContains('proliferate', $ids);
+        self::assertNotEmpty($payload['strategies'][0]['label']);
+        self::assertArrayHasKey('confidence', $payload['strategies'][0]);
     }
 
     public function testCommanderSearchUsesCommandersCatalogNotInventory(): void

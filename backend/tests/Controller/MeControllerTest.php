@@ -2,6 +2,7 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\CustomerNotification;
 use App\Entity\User;
 use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
@@ -171,5 +172,125 @@ final class MeControllerTest extends WebTestCase
         $slugs = array_column($body['items'], 'storeSlug');
         self::assertContains($storeA->getSlug(), $slugs);
         self::assertContains($storeB->getSlug(), $slugs);
+
+        $filtered = $this->jsonRequest('GET', '/api/me/orders?page=1&itemsPerPage=50&store='.$storeA->getSlug());
+        self::assertSame(1, $filtered['total'] ?? null);
+        self::assertSame($storeA->getSlug(), $filtered['items'][0]['storeSlug'] ?? null);
+    }
+
+    public function testMyWantListAggregatesAcrossStoresAndFilters(): void
+    {
+        $storeA = $this->fixtures->store();
+        $storeB = $this->fixtures->store();
+        $card = $this->fixtures->card(960);
+        $customer = $this->fixtures->user(['ROLE_USER']);
+
+        $this->authenticate($customer);
+        $this->jsonRequest('POST', "/api/stores/{$storeA->getSlug()}/customer/want-list", [
+            'cardId' => (string) $card->getId(),
+            'cardName' => $card->getName(),
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        $this->jsonRequest('POST', "/api/stores/{$storeB->getSlug()}/customer/want-list", [
+            'cardName' => 'Sol Ring',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+
+        $all = $this->jsonRequest('GET', '/api/me/want-list');
+        self::assertSame(2, $all['total'] ?? null);
+        self::assertCount(2, $all['items'] ?? []);
+        $slugs = array_column($all['items'], 'storeSlug');
+        self::assertContains($storeA->getSlug(), $slugs);
+        self::assertContains($storeB->getSlug(), $slugs);
+
+        $filtered = $this->jsonRequest('GET', '/api/me/want-list?store='.$storeA->getSlug());
+        self::assertSame(1, $filtered['total'] ?? null);
+        self::assertCount(1, $filtered['items'] ?? []);
+        self::assertSame($storeA->getSlug(), $filtered['items'][0]['storeSlug'] ?? null);
+        self::assertSame($card->getName(), $filtered['items'][0]['cardName'] ?? null);
+    }
+
+    public function testMarkingNotificationsReadClearsUnreadList(): void
+    {
+        $storeA = $this->fixtures->store();
+        $storeB = $this->fixtures->store();
+        $customer = $this->fixtures->user(['ROLE_USER']);
+        $this->em->persist(
+            (new CustomerNotification())
+                ->setUser($customer)
+                ->setStore($storeA)
+                ->setType(CustomerNotification::TYPE_SELL_TRADE_ACCEPTED)
+                ->setTitle('Sell/trade #1 accepted')
+                ->setBody('Accepted'),
+        );
+        $this->em->persist(
+            (new CustomerNotification())
+                ->setUser($customer)
+                ->setStore($storeB)
+                ->setType(CustomerNotification::TYPE_WANT_LIST_MATCH)
+                ->setTitle('Sol Ring is in stock')
+                ->setBody('In stock'),
+        );
+        $this->em->flush();
+
+        $this->authenticate($customer);
+        $unread = $this->jsonRequest('GET', '/api/me/notifications');
+        self::assertSame(2, $unread['unread'] ?? null);
+        self::assertCount(2, $unread['items'] ?? []);
+        self::assertNull($unread['items'][0]['readAt']);
+        self::assertNull($unread['items'][1]['readAt']);
+
+        $this->jsonRequest('PATCH', '/api/me/notifications/read-all?store='.$storeA->getSlug());
+        self::assertResponseIsSuccessful();
+        $filtered = $this->jsonRequest('GET', '/api/me/notifications?store='.$storeA->getSlug());
+        self::assertNotNull($filtered['items'][0]['readAt']);
+        $other = $this->jsonRequest('GET', '/api/me/notifications?store='.$storeB->getSlug());
+        self::assertNull($other['items'][0]['readAt']);
+
+        $this->jsonRequest('PATCH', '/api/me/notifications/read-all');
+        self::assertResponseIsSuccessful();
+        $all = $this->jsonRequest('GET', '/api/me/notifications');
+        self::assertSame(0, $all['unread'] ?? null);
+        self::assertCount(2, $all['items'] ?? []);
+        self::assertNotNull($all['items'][0]['readAt']);
+        self::assertNotNull($all['items'][1]['readAt']);
+    }
+
+    public function testMarkingNotificationsReadCanTargetAType(): void
+    {
+        $store = $this->fixtures->store();
+        $customer = $this->fixtures->user(['ROLE_USER']);
+        $this->em->persist(
+            (new CustomerNotification())
+                ->setUser($customer)
+                ->setStore($store)
+                ->setType(CustomerNotification::TYPE_ORDER_FULFILLED)
+                ->setTitle('Order delivered')
+                ->setBody('Delivered'),
+        );
+        $this->em->persist(
+            (new CustomerNotification())
+                ->setUser($customer)
+                ->setStore($store)
+                ->setType(CustomerNotification::TYPE_WANT_LIST_MATCH)
+                ->setTitle('Sol Ring is in stock')
+                ->setBody('In stock'),
+        );
+        $this->em->flush();
+
+        $this->authenticate($customer);
+        $this->jsonRequest('PATCH', '/api/me/notifications/read-all?type=order_fulfilled');
+        self::assertResponseIsSuccessful();
+
+        $list = $this->jsonRequest('GET', '/api/me/notifications');
+        self::assertSame(1, $list['unread'] ?? null);
+        $byType = [];
+        foreach ($list['items'] as $row) {
+            $byType[$row['type']] = $row['readAt'] ?? null;
+        }
+        self::assertArrayHasKey(CustomerNotification::TYPE_ORDER_FULFILLED, $byType);
+        self::assertArrayHasKey(CustomerNotification::TYPE_WANT_LIST_MATCH, $byType);
+        self::assertNotNull($byType[CustomerNotification::TYPE_ORDER_FULFILLED]);
+        self::assertNull($byType[CustomerNotification::TYPE_WANT_LIST_MATCH]);
     }
 }

@@ -40,6 +40,8 @@ import {
 
   TrendingUp,
 
+  Wallet,
+
   WalletCards,
 
   X,
@@ -173,6 +175,8 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
           { to: `${base}/orders`, label: 'Orders', icon: ReceiptText },
 
           { to: `${base}/sell-trade`, label: 'Sell / Trade', icon: WalletCards },
+
+          { to: `${base}/store-credit`, label: 'Store credit', icon: Wallet },
 
           { to: `${base}/payments`, label: 'Payments', icon: CreditCard },
 

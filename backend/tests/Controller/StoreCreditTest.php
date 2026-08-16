@@ -129,6 +129,30 @@ final class StoreCreditTest extends WebTestCase
         self::assertSame(0, $this->creditBalance($base, $customer));
     }
 
+    public function testAdminListsCustomersWithStoreCredit(): void
+    {
+        $store = $this->fixtures->store('credit-ledger-store');
+        $withCredit = $this->fixtures->user(['ROLE_USER']);
+        $this->em->flush();
+
+        $ledger = static::getContainer()->get(\App\Service\Credit\StoreCreditLedger::class);
+        $ledger->grant($store, $withCredit, 2500, \App\Entity\StoreCreditTransaction::KIND_ADJUSTMENT);
+        $this->em->flush();
+
+        $this->authenticate($store->getOwner());
+        $payload = $this->jsonRequest('GET', '/api/stores/'.$store->getSlug().'/admin/credit');
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame(2500, $payload['outstandingCents']);
+        self::assertSame(1, $payload['customerCount']);
+        self::assertSame($withCredit->getId(), $payload['customers'][0]['userId']);
+        self::assertSame(2500, $payload['customers'][0]['balanceCents']);
+        self::assertSame($withCredit->getEmail(), $payload['customers'][0]['email']);
+
+        $this->authenticate($withCredit);
+        $this->jsonRequest('GET', '/api/stores/'.$store->getSlug().'/admin/credit');
+        self::assertSame(403, $this->client->getResponse()->getStatusCode());
+    }
+
     private function creditBalance(string $base, User $customer): int
     {
         $previous = $this->bearer;

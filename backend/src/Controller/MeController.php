@@ -2,9 +2,19 @@
 
 namespace App\Controller;
 
+use App\Entity\CustomerNotification;
+use App\Entity\Store;
 use App\Entity\User;
+use App\Repository\CustomerFavoriteRepository;
+use App\Repository\CustomerNotificationRepository;
+use App\Repository\CustomerWantListEntryRepository;
 use App\Repository\OrderRepository;
+use App\Repository\SellSubmissionRepository;
+use App\Repository\StoreCreditTransactionRepository;
 use App\Repository\StoreRepository;
+use App\Service\Customer\ActivityListPagination;
+use App\Service\Customer\MarketplaceActivitySerializer;
+use App\Service\Credit\StoreCreditLedger;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CustomerPaymentProfileSync;
@@ -36,6 +46,13 @@ class MeController extends AbstractController
         private readonly CustomerOrderSerializer $customerOrderSerializer,
         private readonly SubscriptionBillingInterface $billing,
         private readonly CustomerPaymentProfileSync $paymentProfileSync,
+        private readonly CustomerWantListEntryRepository $wantListRepository,
+        private readonly CustomerFavoriteRepository $favoriteRepository,
+        private readonly CustomerNotificationRepository $notificationRepository,
+        private readonly SellSubmissionRepository $sellSubmissionRepository,
+        private readonly StoreCreditTransactionRepository $creditTransactions,
+        private readonly StoreCreditLedger $creditLedger,
+        private readonly MarketplaceActivitySerializer $activitySerializer,
     ) {
     }
 
@@ -99,6 +116,10 @@ class MeController extends AbstractController
     {
         $user = $this->requireUser();
         $email = $user->getEmail();
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
         if (null === $email || '' === trim($email)) {
             return $this->json([
                 'items' => [],
@@ -113,8 +134,9 @@ class MeController extends AbstractController
             $email,
             $pagination['offset'],
             $pagination['itemsPerPage'],
+            $store,
         );
-        $total = $this->orderRepository->countByCustomerEmail($email);
+        $total = $this->orderRepository->countByCustomerEmail($email, $store);
 
         return CustomerOrderPagination::toJson(
             $orders,
@@ -123,6 +145,191 @@ class MeController extends AbstractController
             $pagination['itemsPerPage'],
             $this->customerOrderSerializer,
         );
+    }
+
+    /** Want-list rows across every store this shopper has listed a card at. */
+    #[Route('/me/want-list', name: 'api_me_want_list', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function myWantList(Request $request): JsonResponse
+    {
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        $pagination = ActivityListPagination::fromRequest($request);
+        $user = $this->requireUser();
+
+        return $this->json(ActivityListPagination::payload(
+            array_map(
+                $this->activitySerializer->wantListEntry(...),
+                $this->wantListRepository->findForUser($user, $store, $pagination['offset'], $pagination['itemsPerPage']),
+            ),
+            $this->wantListRepository->countForUser($user, $store),
+            $pagination,
+        ));
+    }
+
+    /** Saved listings across every store. */
+    #[Route('/me/favorites', name: 'api_me_favorites', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function myFavorites(Request $request): JsonResponse
+    {
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        $pagination = ActivityListPagination::fromRequest($request);
+        $user = $this->requireUser();
+
+        return $this->json(ActivityListPagination::payload(
+            array_map(
+                $this->activitySerializer->favorite(...),
+                $this->favoriteRepository->findForUser($user, $store, $pagination['offset'], $pagination['itemsPerPage']),
+            ),
+            $this->favoriteRepository->countForUser($user, $store),
+            $pagination,
+        ));
+    }
+
+    /** Notifications from every store, newest first. */
+    #[Route('/me/notifications', name: 'api_me_notifications', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function myNotifications(Request $request): JsonResponse
+    {
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        $pagination = ActivityListPagination::fromRequest($request);
+        $user = $this->requireUser();
+        $payload = ActivityListPagination::payload(
+            array_map(
+                $this->activitySerializer->notification(...),
+                $this->notificationRepository->findForUser($user, $store, $pagination['itemsPerPage'], $pagination['offset']),
+            ),
+            $this->notificationRepository->countForUser($user, $store),
+            $pagination,
+        );
+        $payload['unread'] = $this->notificationRepository->countUnreadForUser($user, $store);
+
+        return $this->json($payload);
+    }
+
+    #[Route('/me/notifications/read-all', name: 'api_me_notifications_read_all', methods: ['PATCH'])]
+    #[IsGranted('ROLE_USER')]
+    public function markMyNotificationsRead(Request $request): JsonResponse
+    {
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        $read = $this->notificationRepository->markAllReadForUser(
+            $this->requireUser(),
+            $store,
+            $this->notificationTypesFromRequest($request),
+        );
+
+        return $this->json(['read' => $read]);
+    }
+
+    #[Route('/me/notifications/{id}/read', name: 'api_me_notification_read', methods: ['PATCH'], requirements: ['id' => '\\d+'])]
+    #[IsGranted('ROLE_USER')]
+    public function markMyNotificationRead(int $id): JsonResponse
+    {
+        $user = $this->requireUser();
+        $notification = $this->notificationRepository->find($id);
+        if (!$notification instanceof CustomerNotification || $notification->getUser()?->getId() !== $user->getId()) {
+            return $this->json(['detail' => 'Notification not found.'], 404);
+        }
+
+        $notification->markRead();
+        $this->entityManager->flush();
+
+        return $this->json($this->activitySerializer->notification($notification));
+    }
+
+    /** Sell/trade submissions across stores. */
+    #[Route('/me/sell-submissions', name: 'api_me_sell_submissions', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function mySellSubmissions(Request $request): JsonResponse
+    {
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        $pagination = ActivityListPagination::fromRequest($request);
+        $user = $this->requireUser();
+
+        return $this->json(ActivityListPagination::payload(
+            array_map(
+                $this->activitySerializer->sellSubmission(...),
+                $this->sellSubmissionRepository->findForUser($user, $store, $pagination['offset'], $pagination['itemsPerPage']),
+            ),
+            $this->sellSubmissionRepository->countForUser($user, $store),
+            $pagination,
+        ));
+    }
+
+    /**
+     * Store-credit balances. With ?store=slug, also returns that store's ledger.
+     *
+     * @return JsonResponse
+     */
+    #[Route('/me/credit', name: 'api_me_credit', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function myCredit(Request $request): JsonResponse
+    {
+        $user = $this->requireUser();
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        if ($store instanceof Store) {
+            $pagination = ActivityListPagination::fromRequest($request);
+
+            return $this->json([
+                'storeSlug' => $store->getSlug(),
+                'storeName' => $store->getName(),
+                'balanceCents' => $this->creditLedger->balance($user, $store),
+                'transactions' => ActivityListPagination::payload(
+                    array_map(
+                        $this->activitySerializer->creditTransaction(...),
+                        $this->creditTransactions->historyFor($user, $store, $pagination['itemsPerPage'], $pagination['offset']),
+                    ),
+                    $this->creditTransactions->countHistoryFor($user, $store),
+                    $pagination,
+                ),
+            ]);
+        }
+
+        $rows = $this->creditTransactions->balancesForUser($user);
+        $ids = array_column($rows, 'storeId');
+        $stores = [] === $ids ? [] : $this->storeRepository->findBy(['id' => $ids]);
+        $byId = [];
+        foreach ($stores as $rowStore) {
+            $byId[$rowStore->getId()] = $rowStore;
+        }
+
+        $balances = [];
+        foreach ($rows as $row) {
+            $rowStore = $byId[$row['storeId']] ?? null;
+            if (!$rowStore instanceof Store) {
+                continue;
+            }
+            $balances[] = [
+                'storeSlug' => $rowStore->getSlug(),
+                'storeName' => $rowStore->getName(),
+                'balanceCents' => $row['balanceCents'],
+            ];
+        }
+
+        return $this->json(['balances' => $balances]);
     }
 
     #[Route('/me/payment-config', name: 'api_me_payment_config', methods: ['GET'])]
@@ -250,6 +457,51 @@ class MeController extends AbstractController
         }
 
         return $user;
+    }
+
+    /**
+     * Optional `?store=slug` filter. Returns a 404 JsonResponse when the slug
+     * is present but unknown; null when the caller wants every store.
+     */
+    private function optionalStore(Request $request): Store|JsonResponse|null
+    {
+        $slug = trim((string) $request->query->get('store', ''));
+        if ('' === $slug) {
+            return null;
+        }
+
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        return $store;
+    }
+
+    /**
+     * Optional `?type=order_fulfilled` (repeatable) so opening Orders can
+     * clear only order alerts without wiping sell/trade or want-list notices.
+     *
+     * @return list<string>|null
+     */
+    private function notificationTypesFromRequest(Request $request): ?array
+    {
+        $raw = $request->query->all()['type'] ?? null;
+        if (is_string($raw)) {
+            $raw = [$raw];
+        }
+        if (!is_array($raw) || [] === $raw) {
+            return null;
+        }
+
+        $types = [];
+        foreach ($raw as $value) {
+            if (is_string($value) && in_array($value, CustomerNotification::TYPES, true)) {
+                $types[] = $value;
+            }
+        }
+
+        return [] === $types ? null : array_values(array_unique($types));
     }
 
     /** @return array<string, mixed> */

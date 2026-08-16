@@ -143,6 +143,7 @@ export default function MassSearchPage() {
     onSuccess: async (_data, result) => {
       setWanted((current) => new Set(current).add(result.name.toLowerCase()))
       await queryClient.invalidateQueries({ queryKey: customerKeys.wantList(slug) })
+      await queryClient.invalidateQueries({ queryKey: ['my-want-list'] })
     },
   })
 

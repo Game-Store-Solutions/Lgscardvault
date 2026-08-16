@@ -18,6 +18,7 @@ use App\Service\Catalog\CatalogCardResolver;
 use App\Service\Catalog\FinishVocabulary;
 use App\Service\Credit\StoreCreditLedger;
 use App\Service\Inventory\StoreInventoryWriter;
+use App\Service\Notification\SellTradeSellerNotifier;
 use App\Service\Pricing\MarketPriceResolver;
 use App\Service\Store\TradeRateResolver;
 use Doctrine\ORM\EntityManagerInterface;
@@ -57,6 +58,7 @@ final class StoreBuylistController extends AbstractController
         private readonly StoreInventoryWriter $inventoryWriter,
         private readonly StoreCreditLedger $creditLedger,
         private readonly MarketPriceResolver $marketPrices,
+        private readonly SellTradeSellerNotifier $sellerNotifier,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -456,14 +458,16 @@ final class StoreBuylistController extends AbstractController
             // settles. Kiosk submissions are owned by the staff account, so the
             // walk-up customer is paid at the counter instead.
             $seller = $submission->getUser();
+            $onlineSeller = SellSubmission::CHANNEL_KIOSK !== $submission->getChannel() && $seller instanceof User
+                ? $seller
+                : null;
             if (SellSubmission::PAYOUT_CREDIT === $submission->getPayoutMethod()
-                && SellSubmission::CHANNEL_KIOSK !== $submission->getChannel()
+                && $onlineSeller instanceof User
                 && $submission->getTotalOfferCents() > 0
-                && $seller instanceof User
             ) {
                 $this->creditLedger->grant(
                     $store,
-                    $seller,
+                    $onlineSeller,
                     $submission->getTotalOfferCents(),
                     StoreCreditTransaction::KIND_SELL_SUBMISSION,
                     sellSubmission: $submission,
@@ -485,6 +489,7 @@ final class StoreBuylistController extends AbstractController
                     $item->getFinish(),
                     flush: false,
                     acquisitionCostCents: $item->getOfferCentsEach(),
+                    exceptWantListUser: $onlineSeller,
                 );
             }
         }
@@ -498,6 +503,14 @@ final class StoreBuylistController extends AbstractController
             $submission->setArchivedAt(new \DateTimeImmutable());
         }
         $this->entityManager->flush();
+
+        if (in_array($status, [
+            SellSubmission::STATUS_ACCEPTED,
+            SellSubmission::STATUS_DECLINED,
+            SellSubmission::STATUS_COMPLETED,
+        ], true)) {
+            $this->sellerNotifier->notify($store, $submission);
+        }
 
         return $this->json($this->serializeSubmission($submission));
     }

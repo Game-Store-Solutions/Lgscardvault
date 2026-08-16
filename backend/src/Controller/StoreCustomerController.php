@@ -501,6 +501,24 @@ final class StoreCustomerController extends AbstractController
         ));
     }
 
+    #[Route('/notifications/read-all', name: 'api_store_customer_notifications_read_all', methods: ['PATCH'])]
+    public function markAllNotificationsRead(string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $read = $this->notificationRepository->markAllReadForUser($user, $store);
+
+        return $this->json(['read' => $read]);
+    }
+
     #[Route('/notifications/{id}/read', name: 'api_store_customer_notification_read', methods: ['PATCH'])]
     public function markNotificationRead(string $slug, int $id): JsonResponse
     {

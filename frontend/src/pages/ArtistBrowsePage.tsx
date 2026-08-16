@@ -80,7 +80,7 @@ export default function ArtistBrowsePage() {
 
   if (!artist) {
     return (
-      <div className="mx-auto max-w-[90rem] px-4 py-8 sm:px-6">
+      <div>
         <BackButton to={`/s/${slug}`}>Back to store</BackButton>
         <EmptyState
           className="mt-8"
@@ -96,7 +96,7 @@ export default function ArtistBrowsePage() {
   const showNoStockModal = !isLoading && inStore.length === 0 && noStockModalOpen
 
   return (
-    <div className="mx-auto max-w-[90rem] px-4 py-8 sm:px-6">
+    <div>
       <BackButton to={backTo}>{backLabel ? `Back to ${backLabel}` : 'Back to store'}</BackButton>
 
       <Modal
