@@ -6,7 +6,7 @@ import { cx } from '../lib/cx'
 import { EASE_PREMIUM } from './motion'
 import { FlipWords } from './FlipWords'
 
-const HOLD_MS = 1600
+const HOLD_MS = 2100
 const CARDS_PER_GAME = 4
 
 const REST_TILT = [-1.6, 1.2, -0.9, 1.8] as const
@@ -211,9 +211,9 @@ export function GameShowcaseReel({
 }) {
   const slides = useMemo(() => groupCards(games, cards), [games, cards])
   const [index, setIndex] = useState(0)
-  const [paused, setPaused] = useState(false)
   const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set())
   const [artTick, setArtTick] = useState(0)
+  const holdUntil = useRef(0)
 
   const markFailed = useCallback((id: string) => {
     setFailedIds((current) => {
@@ -253,12 +253,19 @@ export function GameShowcaseReel({
   }, [slides, markFailed])
 
   useEffect(() => {
-    if (slides.length <= 1 || paused) return
-    const timer = window.setInterval(() => {
-      setIndex((current) => (current + 1) % slides.length)
-    }, HOLD_MS)
-    return () => window.clearInterval(timer)
-  }, [slides.length, paused])
+    if (slides.length <= 1) return
+    holdUntil.current = performance.now() + HOLD_MS
+    let frame = 0
+    const tick = (now: number) => {
+      if (now >= holdUntil.current) {
+        setIndex((current) => (current + 1) % slides.length)
+        holdUntil.current = now + HOLD_MS
+      }
+      frame = window.requestAnimationFrame(tick)
+    }
+    frame = window.requestAnimationFrame(tick)
+    return () => window.cancelAnimationFrame(frame)
+  }, [slides.length])
 
   useEffect(() => {
     if (index >= slides.length && slides.length > 0) setIndex(0)
@@ -272,11 +279,7 @@ export function GameShowcaseReel({
   const visible = pickVisible(active.pool, failedIds, active.game.code)
 
   return (
-    <div
-      className="mt-8"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
+    <div className="mt-8">
       <h2
         className="text-display-sm sm:text-display-md"
         aria-label={`We stock ${tile.short}`}
@@ -302,18 +305,18 @@ export function GameShowcaseReel({
         <AnimatePresence initial={false}>
           <motion.div
             key={active.game.code}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.22, ease: EASE_PREMIUM }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: EASE_PREMIUM }}
             className="absolute inset-0 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
           >
             {visible.map((card, cardIndex) => (
               <motion.figure
                 key={card.id}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0, rotate: REST_TILT[cardIndex] ?? 0 }}
-                transition={{ duration: 0.22, delay: cardIndex * 0.02, ease: EASE_PREMIUM }}
+                transition={{ duration: 0.4, delay: cardIndex * 0.03, ease: EASE_PREMIUM }}
                 className="origin-bottom will-change-transform"
               >
                 <ShowcaseArt card={card} accent={tile.accent} onFailed={markFailed} artTick={artTick} />
@@ -339,7 +342,10 @@ export function GameShowcaseReel({
                 role="tab"
                 aria-selected={selected}
                 aria-label={label}
-                onClick={() => setIndex(slideIndex)}
+                onClick={() => {
+                  setIndex(slideIndex)
+                  holdUntil.current = performance.now() + HOLD_MS
+                }}
                 className={cx(
                   'rounded-full px-3 py-1.5 text-xs font-bold tracking-wide transition-colors',
                   selected
