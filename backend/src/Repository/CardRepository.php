@@ -516,9 +516,15 @@ class CardRepository extends ServiceEntityRepository
 
     /**
      * Resolve curated card names to real printings for one game, keeping the
-     * caller's order. Names are matched as prefixes so a single entry works
-     * across naming conventions ("Charizard" finds "Charizard (Holofoil)").
-     * Only printings with art are returned, newest first per name.
+     * caller's order. Only printings with art are returned.
+     *
+     * Matching is exact-first, then prefix. The prefix pass exists because the
+     * catalog holds two naming conventions — Scryfall's exact names for Magic and
+     * TCGCSV product names elsewhere ("Charizard (Holofoil)", "Ahri - Nine-Tailed
+     * Fox") — but on its own it picks up unrelated cards that merely start with
+     * the same words: "Black Lotus" matched "Black Lotus Lounge", a MagicCon
+     * plane card, and won on recency. Preferring an exact hit keeps the card we
+     * actually asked for.
      *
      * @param list<string> $namePrefixes
      *
@@ -542,7 +548,7 @@ class CardRepository extends ServiceEntityRepository
             ->orderBy('c.releasedAt', 'DESC')
             ->addOrderBy('c.id', 'ASC')
             // Generous cap: one curated name can match many printings, and the
-            // loop below only keeps the first hit for each.
+            // loop below only keeps the best hit for each.
             ->setMaxResults(count($namePrefixes) * 25)
             ->getQuery()
             ->getResult();
@@ -552,18 +558,47 @@ class CardRepository extends ServiceEntityRepository
         $resolved = [];
         foreach ($namePrefixes as $prefix) {
             $needle = mb_strtolower(trim($prefix));
-            foreach ($rows as $card) {
-                if (isset($resolved[(string) $card->getId()])) {
-                    continue;
-                }
-                if (str_starts_with(mb_strtolower($card->getName()), $needle)) {
-                    $resolved[(string) $card->getId()] = $card;
-                    break;
-                }
+
+            $match = $this->firstCardMatching(
+                $rows,
+                $resolved,
+                // Exact name, or the front face of a split/double-faced card
+                // ("Fire // Ice" for a curated "Fire").
+                static fn (string $name): bool => $name === $needle || str_starts_with($name, $needle.' //'),
+            ) ?? $this->firstCardMatching(
+                $rows,
+                $resolved,
+                static fn (string $name): bool => str_starts_with($name, $needle),
+            );
+
+            if (null !== $match) {
+                $resolved[(string) $match->getId()] = $match;
             }
         }
 
         return array_values($resolved);
+    }
+
+    /**
+     * First card whose lowercased name satisfies $matches and isn't already
+     * taken by an earlier curated entry.
+     *
+     * @param list<Card>            $rows
+     * @param array<string, Card>   $taken    keyed by card id
+     * @param callable(string):bool $matches
+     */
+    private function firstCardMatching(array $rows, array $taken, callable $matches): ?Card
+    {
+        foreach ($rows as $card) {
+            if (isset($taken[(string) $card->getId()])) {
+                continue;
+            }
+            if ($matches(mb_strtolower($card->getName()))) {
+                return $card;
+            }
+        }
+
+        return null;
     }
 
     /**
