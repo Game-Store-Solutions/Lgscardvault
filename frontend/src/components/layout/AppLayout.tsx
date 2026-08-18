@@ -38,6 +38,7 @@ export default function AppLayout() {
   const cartCount = cart.reduce((total: number, entry) => total + entry.quantity, 0)
   const cartBadge = cartCount > 99 ? '99+' : String(cartCount)
   const location = useLocation()
+  const hideHeaderLinks = location.pathname === '/stores' || location.pathname.startsWith('/stores/')
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [storeMenuOpen, setStoreMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -150,7 +151,7 @@ export default function AppLayout() {
           <div className="flex items-center gap-3">
           {/* Desktop navigation */}
           <nav className="hidden items-center gap-3 md:flex">
-            {user && (
+            {user && !hideHeaderLinks && (
               <NavLink to="/" className={navLinkClass} end>
                 Stores
               </NavLink>
@@ -336,7 +337,7 @@ export default function AppLayout() {
                 </div>
               )}
 
-              {user && (
+              {user && !hideHeaderLinks && (
                 <NavLink to="/" end onClick={closeMobile} className={mobileLinkClass}>
                   Stores
                 </NavLink>

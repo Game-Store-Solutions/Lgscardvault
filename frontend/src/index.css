@@ -4,6 +4,10 @@
 /* Class-based dark mode: toggled by adding `.dark` on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+html {
+  scroll-behavior: smooth;
+}
+
 /*
  * Typography — Plus Jakarta Sans (variable, self-hosted).
  * One family for UI + headings: smooth curves, strong screen rendering,

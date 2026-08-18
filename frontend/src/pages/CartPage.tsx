@@ -228,11 +228,11 @@ export default function CartPage() {
           : `Cart updated. ${itemCount} item${itemCount === 1 ? '' : 's'}, estimated total ${subtotalLabel}.`}
       </p>
 
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface px-5 py-5 shadow-card dark:glass-card">
         <div className="min-w-0">
           <BackButton to={`/s/${slug}`}>Back to store</BackButton>
-          <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Checkout</h1>
-          <p className="mt-1 text-sm text-fg-muted">{store?.name ?? 'Store'}</p>
+          <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">Checkout</h1>
+          <p className="mt-1 text-sm text-fg-muted">{store?.name ?? 'Store'} cart</p>
         </div>
         {cart.length > 0 && (
           <Button variant="ghost" size="sm" onClick={() => clear.mutate()} loading={clear.isPending} className="text-fg-muted">
@@ -252,7 +252,7 @@ export default function CartPage() {
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="space-y-8">
             {!kioskMode && (
-              <section className="rounded-card border border-border bg-surface p-5 shadow-card">
+              <section className="rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-base font-bold text-fg">Contact</h2>
                   {isGuest && (
@@ -283,7 +283,7 @@ export default function CartPage() {
             )}
 
             {!kioskMode && (
-              <fieldset className="rounded-card border border-border bg-surface p-5 shadow-card">
+              <fieldset className="rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
                 <legend className="px-1 text-base font-bold text-fg">Delivery</legend>
                 {isGuest ? (
                   <p className="mt-4 text-sm text-fg-muted">
@@ -370,7 +370,7 @@ export default function CartPage() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3 shadow-xl lg:bottom-6"
+          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3 shadow-xl dark:glass-card lg:bottom-6"
         >
           <p className="min-w-0 truncate text-sm text-fg">
             Removed <span className="font-bold">{removed.item.card.name}</span>

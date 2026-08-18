@@ -441,7 +441,6 @@ export default function BrandingTab({ slug }: { slug: string }) {
               onChange={(e) => set('hoursText', e.target.value)}
             />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Contact email" type="email" placeholder="hello@yourstore.com" value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
               <Input label="Website" placeholder="https://yourstore.com" value={form.websiteUrl} onChange={(e) => set('websiteUrl', e.target.value)} />
               <Input label="Facebook URL" placeholder="https://facebook.com/yourstore" value={form.facebookUrl} onChange={(e) => set('facebookUrl', e.target.value)} />
               <Input label="Instagram URL" placeholder="https://instagram.com/yourstore" value={form.instagramUrl} onChange={(e) => set('instagramUrl', e.target.value)} />

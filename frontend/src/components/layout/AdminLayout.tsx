@@ -255,9 +255,9 @@ export default function AdminLayout() {
       isActive
 
         // Dark brand-100 ≈ sidebar active fill — pair with text-fg / brand-700, not brand-100.
-        ? 'bg-brand-100 text-brand-700 dark:bg-brand-200 dark:text-fg'
+        ? 'bg-white/[0.08] text-fg dark:bg-white/[0.08] dark:text-fg'
 
-        : 'text-fg-muted hover:bg-bg hover:text-fg',
+        : 'text-fg-muted hover:bg-white/[0.04] hover:text-fg',
 
     ].join(' ')
 
@@ -289,7 +289,7 @@ export default function AdminLayout() {
 
         className={[
 
-          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border/60 bg-surface shadow-[4px_0_24px_-12px_rgb(28_25_23/0.12)]',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/8 bg-[#111113] shadow-[4px_0_32px_-12px_rgba(0,0,0,0.42)]',
 
           'transition-transform lg:translate-x-0',
 
@@ -299,7 +299,7 @@ export default function AdminLayout() {
 
       >
 
-        <div className="flex h-16 items-center justify-between gap-2 border-b border-border/60 px-4">
+        <div className="flex h-16 items-center justify-between gap-2 border-b border-white/8 px-4">
 
           <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
 
@@ -405,7 +405,7 @@ export default function AdminLayout() {
 
 
 
-        <div className="border-t border-border/60 p-3">
+        <div className="border-t border-white/8 p-3">
 
           <BackButton to="/" tone="soft" className="w-full justify-start rounded-btn px-3 shadow-none">
 
@@ -421,7 +421,7 @@ export default function AdminLayout() {
 
       <div className="lg:pl-64">
 
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border/60 bg-surface/90 px-4 backdrop-blur-md">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-white/8 bg-bg/88 px-4 backdrop-blur-xl">
 
           <div className="flex items-center gap-3">
 

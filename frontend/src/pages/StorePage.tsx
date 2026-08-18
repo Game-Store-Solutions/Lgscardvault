@@ -338,7 +338,7 @@ export default function StorePage() {
   }
 
   return (
-    <div className="storefront-atmosphere relative space-y-6 sm:space-y-10">
+    <div className="storefront-atmosphere relative space-y-8 sm:space-y-12">
       <StoreHero
         name={store?.name ?? slug}
         slug={slug}
@@ -387,17 +387,19 @@ export default function StorePage() {
       <TradePromoBanner slug={slug} showSellLink />
 
       {/* Slim stat line */}
-      <p className="text-sm text-fg-muted">
-        <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings ·{' '}
-        <span className="font-bold text-fg">{shelf?.copies ?? 0}</span> cards ·{' '}
-        <span className="font-bold text-fg">{availableSets.length}</span> sets ·{' '}
-        <Link
-          to={`/s/${slug}/events`}
-          className="font-bold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
-        >
-          Event calendar
-        </Link>
-      </p>
+      <div className="rounded-[1.25rem] border border-white/8 bg-[#111113] px-5 py-4 shadow-[0_18px_54px_-30px_rgba(0,0,0,0.72)]">
+        <p className="text-sm text-fg-muted">
+          <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings ·{' '}
+          <span className="font-bold text-fg">{shelf?.copies ?? 0}</span> cards ·{' '}
+          <span className="font-bold text-fg">{availableSets.length}</span> sets ·{' '}
+          <Link
+            to={`/s/${slug}/events`}
+            className="font-bold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
+          >
+            Event calendar
+          </Link>
+        </p>
+      </div>
 
       {/* Quick actions. Themed shortcut tiles over the spotlight */}
       <section className="space-y-5">
@@ -407,7 +409,7 @@ export default function StorePage() {
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'group flex flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface px-2 py-3 text-fg shadow-card ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:border-white/10 dark:bg-white/[0.04]'
+              'group flex flex-col items-center justify-center gap-2 rounded-[1.15rem] border border-white/8 bg-[#111113] px-2 py-3 text-fg transition-[transform,border-color,box-shadow] hover:-translate-y-1 hover:border-white/16 hover:shadow-[0_20px_54px_-30px_rgba(0,0,0,0.74)] sm:gap-3 sm:px-4 sm:py-8'
             const content = (
               <>
                 <span className="grid size-9 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] sm:size-12 dark:text-brand-300">
@@ -505,7 +507,7 @@ export default function StorePage() {
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-20 rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
+          <div className="sticky top-20 rounded-[1.25rem] border border-white/8 bg-[#111113] p-5 shadow-[0_18px_54px_-30px_rgba(0,0,0,0.72)]">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
@@ -522,11 +524,11 @@ export default function StorePage() {
         </aside>
 
         <main className="min-w-0 space-y-5">
-          <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:border-b lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
+          <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-white/8 bg-bg/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:border-b lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
             <div className="lg:hidden">{renderSearchField('store-search-mobile', false)}</div>
             <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center sm:justify-between lg:border-b lg:border-border lg:pb-4">
               <div className="min-w-0">
-              <h2 className="font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">Singles</h2>
+              <h2 className="font-display text-2xl font-bold tracking-[-0.04em] text-fg sm:text-3xl">Singles</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm text-fg-muted">
                   <span className="font-bold text-fg">{resultTotal}</span> {resultTotal === 1 ? 'result' : 'results'}
@@ -537,7 +539,7 @@ export default function StorePage() {
                     key={`${chip.label}-${i}`}
                     type="button"
                     onClick={chip.onClear}
-                    className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:text-brand-600"
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:text-fg"
                   >
                     {chip.label}
                     <X aria-hidden className="size-3" />
@@ -570,13 +572,13 @@ export default function StorePage() {
                 ))}
               </Select>
               {cardDisplayStyle === 'gallery' ? (
-                <div className="flex shrink-0 overflow-hidden rounded-btn border border-border">
+                <div className="flex shrink-0 overflow-hidden rounded-btn border border-white/10 bg-[#111113]">
                   <button
                     type="button"
                     onClick={() => setView('grid')}
                     aria-label="Grid view"
                     aria-pressed={view === 'grid'}
-                    className={cx('grid size-10 place-items-center', view === 'grid' ? 'bg-brand-50 text-brand-700' : 'bg-surface text-fg-muted hover:text-fg')}
+                    className={cx('grid size-10 place-items-center', view === 'grid' ? 'bg-white/[0.08] text-fg' : 'bg-transparent text-fg-muted hover:text-fg')}
                   >
                     <LayoutGrid aria-hidden className="size-4" />
                   </button>
@@ -585,13 +587,13 @@ export default function StorePage() {
                     onClick={() => setView('list')}
                     aria-label="List view"
                     aria-pressed={view === 'list'}
-                    className={cx('grid size-10 place-items-center border-l border-border', view === 'list' ? 'bg-brand-50 text-brand-700' : 'bg-surface text-fg-muted hover:text-fg')}
+                    className={cx('grid size-10 place-items-center border-l border-white/10', view === 'list' ? 'bg-white/[0.08] text-fg' : 'bg-transparent text-fg-muted hover:text-fg')}
                   >
                     <ListIcon aria-hidden className="size-4" />
                   </button>
                 </div>
               ) : (
-                <span className="inline-flex h-10 shrink-0 items-center gap-2 rounded-btn border border-border bg-brand-50 px-3 text-sm font-bold text-brand-700">
+                <span className="inline-flex h-10 shrink-0 items-center gap-2 rounded-btn border border-white/10 bg-[#111113] px-3 text-sm font-bold text-fg">
                   <ShoppingCart aria-hidden className="size-4" />
                   <span className="hidden sm:inline">Marketplace cards</span>
                 </span>

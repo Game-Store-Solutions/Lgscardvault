@@ -22,20 +22,22 @@ export function SpotlightCard({ item, slug, ribbon }: SpotlightCardProps) {
   return (
     <Link to={`/s/${slug}/cards/${item.id}`} className="group relative w-40 flex-shrink-0 snap-start sm:w-52">
       {ribbon && (
-        <span className="absolute right-2 top-2 z-20 rounded-full bg-brand-500 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow">
+        <span className="absolute right-3 top-3 z-20 rounded-full bg-brand-500 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow">
           {ribbon}
         </span>
       )}
-      <InteractiveCard
-        image={cardImage(item.card)}
-        alt={item.card.name}
-        foil={item.isFoil}
-        accent={rarityAccent(item.card.rarity)}
-        maxTilt={12}
-        shadow={false}
-      />
-      <div className="mt-2 px-0.5">
-        <h3 className="truncate font-display text-sm font-bold tracking-tight text-fg group-hover:text-brand-600">
+      <div className="overflow-hidden rounded-[1.1rem] border border-white/8 bg-[#111113] p-2 transition-[transform,border-color] group-hover:-translate-y-1 group-hover:border-white/16">
+        <InteractiveCard
+          image={cardImage(item.card)}
+          alt={item.card.name}
+          foil={item.isFoil}
+          accent={rarityAccent(item.card.rarity)}
+          maxTilt={10}
+          shadow={false}
+        />
+      </div>
+      <div className="mt-3 px-0.5">
+        <h3 className="truncate text-sm font-semibold tracking-[-0.02em] text-fg group-hover:text-white">
           {item.card.name}
         </h3>
         <div className="flex items-center justify-between text-xs">

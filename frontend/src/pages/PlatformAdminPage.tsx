@@ -13,7 +13,6 @@ import {
   ErrorState,
   Input,
   LoadingPanel,
-  PageHeader,
   Select,
   TabPanel,
   Tabs,
@@ -200,10 +199,26 @@ export default function PlatformAdminPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Platform admin"
-        subtitle="Manage tenants, catalog sync, and import audits across the platform."
-      />
+      <section className="overflow-hidden rounded-[1.6rem] border border-white/8 bg-[linear-gradient(180deg,rgba(220,38,38,0.12),rgba(17,17,19,0.98))]">
+        <div className="grid gap-6 px-6 py-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:px-8">
+          <div className="space-y-4">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-fg-muted">Platform admin</p>
+            <div className="space-y-3">
+              <h1 className="font-display text-4xl font-bold tracking-[-0.05em] text-fg sm:text-5xl">
+                Command center for stores, billing, and platform operations.
+              </h1>
+              <p className="max-w-3xl text-sm leading-7 text-fg-muted sm:text-base">
+                Manage tenants, review store applications, audit imports, and keep the marketplace healthy from one place.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <QuickAdminCallout title="Pending review" value={pending.length} text="Store applications waiting on approval." />
+            <QuickAdminCallout title="Live stores" value={activeStores} text="Active storefronts currently visible to shoppers." />
+            <QuickAdminCallout title="Users" value={users.length} text="Accounts across the marketplace." />
+          </div>
+        </div>
+      </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -229,7 +244,7 @@ export default function PlatformAdminPage() {
       </section>
 
       {pending.length > 0 && activeTab !== 'stores' && (
-        <div className="flex flex-col gap-3 rounded-card border border-brand-500/30 bg-brand-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:bg-brand-500/10">
+        <div className="flex flex-col gap-3 rounded-[1.15rem] border border-brand-500/25 bg-brand-500/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-fg">
             <span className="font-bold">{pending.length}</span> store application{pending.length === 1 ? '' : 's'}{' '}
             awaiting review.
@@ -331,6 +346,38 @@ export default function PlatformAdminPage() {
                 </div>
               </CardBody>
             </Card>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            <CommandTile
+              icon={<StoreIcon aria-hidden className="size-5" />}
+              title="Store reviews"
+              text="Approve or reject incoming store applications and control visibility."
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setActiveTab('stores')}>
+                  Open stores
+                </Button>
+              }
+            />
+            <CommandTile
+              icon={<CreditCard aria-hidden className="size-5" />}
+              title="Billing"
+              text="Jump into subscription health, owner billing state, and charge history."
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setActiveTab('billing')}>
+                  Open billing
+                </Button>
+              }
+            />
+            <CommandTile
+              icon={<Plug aria-hidden className="size-5" />}
+              title="Integrations"
+              text="Check provider readiness and verify external platform connections."
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setActiveTab('platform')}>
+                  Open integrations
+                </Button>
+              }
+            />
           </div>
         </TabPanel>
 
@@ -621,6 +668,39 @@ function IntegrationTile({
   )
 }
 
+function QuickAdminCallout({ title, value, text }: { title: string; value: number; text: string }) {
+  return (
+    <div className="rounded-[1.15rem] border border-white/8 bg-white/[0.04] p-4">
+      <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-fg-muted">{title}</p>
+      <p className="mt-2 font-display text-3xl font-bold tracking-[-0.04em] text-fg">{value}</p>
+      <p className="mt-2 text-sm text-fg-muted">{text}</p>
+    </div>
+  )
+}
+
+function CommandTile({
+  icon,
+  title,
+  text,
+  action,
+}: {
+  icon: ReactNode
+  title: string
+  text: string
+  action: ReactNode
+}) {
+  return (
+    <div className="rounded-[1.2rem] border border-white/8 bg-[#111113] p-5 shadow-[0_20px_60px_-34px_rgba(0,0,0,0.82)]">
+      <span className="inline-flex size-11 items-center justify-center rounded-[0.95rem] border border-brand-500/20 bg-brand-500/10 text-brand-300">
+        {icon}
+      </span>
+      <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-fg">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-fg-muted">{text}</p>
+      <div className="mt-5">{action}</div>
+    </div>
+  )
+}
+
 function StatCard({
   icon,
   label,
@@ -631,14 +711,14 @@ function StatCard({
   value: number
 }) {
   return (
-    <Card>
+    <Card className="border-white/8 bg-[#111113] shadow-[0_18px_54px_-30px_rgba(0,0,0,0.76)]">
       <CardBody className="flex items-center gap-4">
-        <span className="flex size-11 items-center justify-center rounded-card bg-brand-50 text-brand-600">
+        <span className="flex size-11 items-center justify-center rounded-[0.95rem] border border-white/8 bg-white/[0.04] text-brand-300">
           {icon}
         </span>
         <div>
           <p className="text-sm text-fg-muted">{label}</p>
-          <p className="font-display text-2xl font-bold text-fg">{value}</p>
+          <p className="font-display text-3xl font-bold tracking-[-0.04em] text-fg">{value}</p>
         </div>
       </CardBody>
     </Card>

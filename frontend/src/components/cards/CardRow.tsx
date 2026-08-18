@@ -26,12 +26,12 @@ export function CardRow({ item, slug }: CardRowProps) {
     <Link
       to={`/s/${slug}/cards/${item.id}`}
       className={cx(
-        'group flex items-center gap-3 rounded-card border border-border bg-surface p-2.5 shadow-card dark:glass-card ui-lift hover:border-brand-500/25 sm:gap-4 sm:p-3',
+        'group flex items-center gap-3 rounded-[1.1rem] border border-white/8 bg-[#111113] p-3 transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-white/16 hover:shadow-[0_20px_52px_-30px_rgba(0,0,0,0.74)] sm:gap-4 sm:p-3.5',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
       )}
     >
-      <div className="relative grid h-20 w-[3.6rem] shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-surface-elevated sm:h-24 sm:w-[4.35rem] dark:bg-[#18181B]">
-        <CardImage src={image} alt={item.card.name} fit="contain" className="size-full" showLabel={false} />
+      <div className="relative grid h-20 w-[3.6rem] shrink-0 place-items-center overflow-hidden rounded-[0.95rem] border border-white/8 bg-[#0d0d10] sm:h-24 sm:w-[4.35rem]">
+        <CardImage src={image} alt={item.card.name} fit="cover" className="size-full" showLabel={false} />
       </div>
 
       <div className="min-w-0 flex-1">
