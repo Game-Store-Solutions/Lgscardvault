@@ -69,7 +69,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     const angle = (time / IDLE_PERIOD_MS) * Math.PI * 2 + phase.current
     px.set(50 + Math.sin(angle) * 34)
     py.set(50 + Math.cos(angle * 0.78) * 22)
-    op.set(0.32 + Math.sin(angle * 1.6) * 0.06)
+    op.set(0.42 + Math.sin(angle * 1.6) * 0.08)
     rx.set(Math.sin(angle * 0.95) * maxTilt * 0.28)
     ry.set(Math.cos(angle) * maxTilt * 0.32)
   })
