@@ -568,7 +568,7 @@ function SearchResultRow({
   const offer = market == null ? null : Math.floor((market * percent) / 100)
 
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface p-3 shadow-card">
+    <li className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-3 shadow-card">
       {cardImage(card) && <img src={cardImage(card)} alt="" className="h-16 w-12 shrink-0 rounded object-cover" />}
       <div className="min-w-0 flex-1">
         <p className="truncate font-bold text-fg">{card.name}</p>
@@ -586,9 +586,14 @@ function SearchResultRow({
           )}
         </p>
       </div>
-      <div className="flex items-end gap-2">
+      <div className="flex shrink-0 flex-nowrap items-end gap-2">
         {finishes.length > 1 && (
-          <Select label="Finish" value={finish} onChange={(e) => setFinish(e.target.value)} className="w-32">
+          <Select
+            label="Finish"
+            value={finish}
+            onChange={(e) => setFinish(e.target.value)}
+            wrapperClassName="w-[7.75rem] shrink-0"
+          >
             {finishes.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.value}
@@ -596,7 +601,12 @@ function SearchResultRow({
             ))}
           </Select>
         )}
-        <Select label="Cond." value={condition} onChange={(e) => setCondition(e.target.value as Condition)} className="w-20">
+        <Select
+          label="Cond."
+          value={condition}
+          onChange={(e) => setCondition(e.target.value as Condition)}
+          wrapperClassName="w-[5.25rem] shrink-0"
+        >
           {CONDITIONS.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -609,9 +619,16 @@ function SearchResultRow({
           min={1}
           value={quantity}
           onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
-          className="w-16"
+          wrapperClassName="w-[4.25rem] shrink-0"
+          className="tabular-nums"
         />
-        <Button size="sm" variant="secondary" disabled={offer == null} onClick={() => onAdd(finish, condition, quantity)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="shrink-0"
+          disabled={offer == null}
+          onClick={() => onAdd(finish, condition, quantity)}
+        >
           Add
         </Button>
       </div>
