@@ -57,8 +57,10 @@ final class CatalogController extends AbstractController
             $showcase[] = [
                 'code' => $game->getCode(),
                 'name' => $game->getName(),
-                // Tiles are a few hundred px wide; `normal` is plenty.
-                'imageUrl' => null !== $card ? $this->preferredImage($card, ['normal', 'large', 'small']) : null,
+                // Ordered candidates, best first. TCGCSV art is stored as CDN
+                // rendition URLs and an individual rendition can 404, so the
+                // client walks this list instead of showing a broken image.
+                'imageUrls' => null !== $card ? $this->imageCandidates($card, ['normal', 'large', 'small']) : [],
             ];
         }
 
@@ -137,16 +139,34 @@ final class CatalogController extends AbstractController
      */
     private function preferredImage(Card $card, array $preference): ?string
     {
+        return $this->imageCandidates($card, $preference)[0] ?? null;
+    }
+
+    /**
+     * Every usable art URL for a card, best variant first and de-duplicated.
+     *
+     * @param list<string> $preference image_uris keys, best first
+     *
+     * @return list<string>
+     */
+    private function imageCandidates(Card $card, array $preference): array
+    {
         $uris = $card->getImageUris() ?? [];
+        $candidates = [];
         foreach ($preference as $key) {
             $candidate = $uris[$key] ?? null;
             if (is_string($candidate) && '' !== $candidate) {
-                return $candidate;
+                $candidates[] = $candidate;
             }
         }
 
         // Multi-faced cards keep art on the faces; getImageUrl() handles those.
-        return $card->getImageUrl();
+        $fallback = $card->getImageUrl();
+        if (null !== $fallback && '' !== $fallback) {
+            $candidates[] = $fallback;
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     #[Route('/games/{code}/sets', name: 'api_catalog_game_sets', methods: ['GET'])]

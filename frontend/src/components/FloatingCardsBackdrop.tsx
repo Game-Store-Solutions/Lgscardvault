@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cx } from '../lib/cx'
 
 export type FloatCard = {
@@ -557,26 +558,43 @@ export function FloatingCardsBackdrop({
   return (
     <div aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>
       {cards.map((card, i) => (
-        <img
+        <FloatCard
           key={`${layout}-${card.src}-${i}`}
-          src={card.src}
-          alt=""
-          className={cx(
-            'absolute rounded-xl object-cover',
-            'opacity-[0.78] saturate-[0.92]',
-            'shadow-[0_16px_44px_-18px_rgba(10,10,11,0.22)] ring-1 ring-white/8 dark:ring-white/10',
-            'dark:shadow-[0_24px_60px_-18px_rgba(0,0,0,0.72)]',
-            'animate-[hero-float_8.5s_ease-in-out_infinite]',
-            card.className,
-          )}
-          style={{ animationDelay: card.delay }}
+          card={card}
           // Only the first ring blocks first paint; the rest stream in.
-          loading={i < 12 ? 'eager' : 'lazy'}
-          decoding="async"
+          eager={i < 12}
         />
       ))}
       {washClassName ? <div className={cx('absolute inset-0', washClassName)} /> : null}
     </div>
+  )
+}
+
+/**
+ * One floating card. Catalog art can 404 (external CDN renditions), and a broken
+ * image in a decorative field is worse than an empty slot — so drop it silently.
+ */
+function FloatCard({ card, eager }: { card: FloatCard; eager: boolean }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+
+  return (
+    <img
+      src={card.src}
+      alt=""
+      onError={() => setFailed(true)}
+      className={cx(
+        'absolute rounded-xl object-cover',
+        'opacity-[0.78] saturate-[0.92]',
+        'shadow-[0_16px_44px_-18px_rgba(10,10,11,0.22)] ring-1 ring-white/8 dark:ring-white/10',
+        'dark:shadow-[0_24px_60px_-18px_rgba(0,0,0,0.72)]',
+        'animate-[hero-float_8.5s_ease-in-out_infinite]',
+        card.className,
+      )}
+      style={{ animationDelay: card.delay }}
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+    />
   )
 }
 

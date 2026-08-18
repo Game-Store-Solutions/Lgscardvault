@@ -7,8 +7,8 @@ import { useAuth } from '../context/AuthContext'
 import { useGameShowcase, useShowcaseCards } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
-import { gameTile } from '../lib/gameTiles'
 import { ContactForm } from './ContactForm'
+import { GameTile } from './GameTile'
 
 const TRUST_POINTS = [
   {
@@ -145,56 +145,12 @@ export default function MarketplaceLanding() {
             </div>
           ) : (
             <Stagger className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5" gap={0.05}>
-              {games.map((game) => {
-                const tile = gameTile(game.code, game.name)
-                return (
-                  <StaggerItem key={game.code} className="h-full">
-                    {/* Presentational only — these show coverage, not navigation. */}
-                    <figure className="group flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card transition-colors hover:border-fg/15 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20">
-                      <span aria-hidden className="h-1 w-full shrink-0" style={{ backgroundColor: tile.accent }} />
-
-                      {/* Art sits in its own frame at card proportions, so nothing
-                          important gets cropped and the label never covers it. */}
-                      <div
-                        className="relative overflow-hidden"
-                        style={{
-                          aspectRatio: '0.72',
-                          background: `radial-gradient(120% 80% at 50% 0%, ${tile.accent}26 0%, transparent 70%)`,
-                        }}
-                      >
-                        {game.imageUrl ? (
-                          <img
-                            src={game.imageUrl}
-                            alt={`${game.name} card`}
-                            loading="lazy"
-                            decoding="async"
-                            className="absolute inset-0 size-full object-cover object-top transition-transform duration-[700ms] ease-out group-hover:scale-[1.04]"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 grid place-items-center">
-                            <span
-                              aria-hidden
-                              className="font-display text-4xl font-black tracking-[-0.06em] opacity-70"
-                              style={{ color: tile.accent }}
-                            >
-                              {tile.short.slice(0, 2).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <figcaption className="flex flex-1 flex-col justify-center border-t border-border px-3 py-3 dark:border-white/10">
-                        <span className="block font-display text-sm font-extrabold leading-tight tracking-[-0.03em] text-fg sm:text-base">
-                          {tile.short}
-                        </span>
-                        <span className="mt-1 line-clamp-2 block text-[0.68rem] font-semibold uppercase leading-tight tracking-[0.12em] text-fg-muted">
-                          {game.name}
-                        </span>
-                      </figcaption>
-                    </figure>
-                  </StaggerItem>
-                )
-              })}
+              {games.map((game) => (
+                // Presentational only — these show coverage, not navigation.
+                <StaggerItem key={game.code} className="h-full">
+                  <GameTile game={game} />
+                </StaggerItem>
+              ))}
             </Stagger>
           )}
         </section>

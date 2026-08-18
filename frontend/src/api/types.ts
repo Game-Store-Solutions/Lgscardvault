@@ -932,11 +932,15 @@ export interface CatalogShowcaseCard {
   imageUrl: string | null
 }
 
-/** A supported game plus one piece of real card art, for marketing tiles. */
+/**
+ * A supported game plus real card art for marketing tiles. `imageUrls` is
+ * ordered best-first; catalog art lives on external CDNs where an individual
+ * rendition can 404, so clients should try the next entry before giving up.
+ */
 export interface CatalogGameShowcase {
   code: string
   name: string
-  imageUrl: string | null
+  imageUrls: string[]
 }
 
 export interface CatalogGameSet {
