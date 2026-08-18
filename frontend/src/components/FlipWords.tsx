@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { cx } from '../lib/cx'
+import { EASE_PREMIUM } from './motion'
 
 /**
- * Flip-words headline: the current word exits with a blur/scale, then the next
- * one spells in letter-by-letter. Inspired by Sera UI's FlipWords, written to
- * sit inside our existing MotionRoot (so `prefers-reduced-motion` is honoured).
+ * Flip-words headline: the current name crossfades in as a single unit, with a
+ * light letter stagger so it still reads as a flip rather than a hard swap.
+ * Transform + opacity only — no blur/scale — so the GPU can keep it smooth.
  *
  * The parent owns the cycle so the game name and the card row stay in lockstep.
  */
@@ -24,25 +25,21 @@ export function FlipWords({
   )
 
   return (
-    <span aria-hidden className="relative inline-grid align-baseline">
+    <span aria-hidden className="relative inline-grid overflow-hidden align-baseline">
       {/* Invisible sizer so the headline doesn't jump as names change length. */}
       <span className={cx('invisible col-start-1 row-start-1 whitespace-nowrap', className)}>{widest}</span>
-      <AnimatePresence mode="wait">
+      <AnimatePresence initial={false}>
         <motion.span
           key={word}
           aria-hidden
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{
-            opacity: 0,
-            y: -36,
-            x: 28,
-            filter: 'blur(8px)',
-            scale: 1.55,
-            transition: { type: 'spring', stiffness: 200, damping: 22 },
-          }}
-          transition={{ type: 'spring', stiffness: 150, damping: 16, mass: 0.8 }}
-          className={cx('col-start-1 row-start-1 inline-block whitespace-nowrap text-left', className)}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.48, ease: EASE_PREMIUM }}
+          className={cx(
+            'col-start-1 row-start-1 inline-block whitespace-nowrap text-left will-change-transform',
+            className,
+          )}
         >
           {parts.map((part, wordIndex) => (
             <span key={`${part}-${wordIndex}`} className="inline-block whitespace-nowrap">
@@ -50,15 +47,14 @@ export function FlipWords({
               {part.split('').map((letter, letterIndex) => (
                 <motion.span
                   key={`${part}-${letterIndex}`}
-                  initial={{ opacity: 0, y: 8, filter: 'blur(8px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{
-                    delay: wordIndex * 0.22 + letterIndex * 0.035,
-                    type: 'spring',
-                    stiffness: 140,
-                    damping: 14,
+                    duration: 0.36,
+                    delay: wordIndex * 0.08 + letterIndex * 0.018,
+                    ease: EASE_PREMIUM,
                   }}
-                  className="inline-block"
+                  className="inline-block will-change-transform"
                 >
                   {letter}
                 </motion.span>

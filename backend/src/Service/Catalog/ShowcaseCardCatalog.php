@@ -23,21 +23,23 @@ final class ShowcaseCardCatalog
 {
     /** @var array<string, list<string>> game code => card name prefixes */
     private const CARDS = [
-        // Iconic Magic: Sol Ring fronts the tile (near-universally recognised and
-        // actually ownable), backed by the Power Nine anchor and format staples.
+        // Iconic Magic for the games reel, then format staples to fill the hero
+        // and stand in if a printing's art 404s.
         'mtg' => [
+            'Birds of Paradise',
+            'Goblin Guide',
+            'Dark Confidant',
+            'Snapcaster Mage',
+            'Serra Angel',
             'Sol Ring',
-            'Black Lotus',
             'Lightning Bolt',
             'Ragavan',
             'Sheoldred',
             'The One Ring',
             'Jace, the Mind Sculptor',
-            'Snapcaster Mage',
             'Tarmogoyf',
             'Force of Will',
             'Liliana of the Veil',
-            'Birds of Paradise',
         ],
         // Charizard leads; Umbreon (the "Moonbreon" alt art) is the modern grail.
         'pokemon' => [

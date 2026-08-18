@@ -108,13 +108,15 @@ final class CatalogController extends AbstractController
             }
         }
 
-        // These render a few percent of viewport wide, so ship the small
-        // variant: the full-size art would be megabytes of hero background.
+        // `imageUrl` stays the compact rendition for the hero scatter. `imageUrls`
+        // is quality-first so the games reel can show large art and fall back if
+        // a CDN size 404s (TCGCSV's in_1000x1000 is missing for some games).
         $payload = array_map(fn (Card $card): array => [
             'id' => $card->getId()->toRfc4122(),
             'name' => $card->getName(),
             'gameCode' => $card->resolvedGameCode(),
             'imageUrl' => $this->preferredImage($card, ['small', 'normal', 'large']),
+            'imageUrls' => $this->imageCandidates($card, ['large', 'normal', 'small']),
         ], array_slice($ordered, 0, $limit));
 
         $response = $this->json($payload);

@@ -167,7 +167,7 @@ export default function MarketplaceLanding() {
         {/* Why the marketplace. */}
         <section className="scroll-mt-24">
           <Reveal className="space-y-2">
-            <p className="text-eyebrow">Why LG’s Card Vault</p>
+            <p className="text-eyebrow">Why LGS Card Vault</p>
             <h2 className="mt-2 text-display-sm sm:text-display-md">
               Built for collectors and the stores they trust.
             </h2>
