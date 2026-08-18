@@ -23,10 +23,11 @@ final class ShowcaseCardCatalog
 {
     /** @var array<string, list<string>> game code => card name prefixes */
     private const CARDS = [
-        // Iconic Magic: the Power Nine anchor plus long-running format staples.
+        // Iconic Magic: Sol Ring fronts the tile (near-universally recognised and
+        // actually ownable), backed by the Power Nine anchor and format staples.
         'mtg' => [
-            'Black Lotus',
             'Sol Ring',
+            'Black Lotus',
             'Lightning Bolt',
             'Ragavan',
             'Sheoldred',
