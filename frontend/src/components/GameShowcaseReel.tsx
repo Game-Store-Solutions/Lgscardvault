@@ -11,6 +11,28 @@ const CARDS_PER_GAME = 4
 
 const REST_TILT = [-1.6, 1.2, -0.9, 1.8] as const
 
+/** Names the reel should lead with when they exist in that game's pool. */
+const REEL_LEADERS: Record<string, string[]> = {
+  mtg: ['Birds of Paradise', 'Goblin Guide', 'Dark Confidant', 'Snapcaster Mage'],
+}
+
+function nameMatches(cardName: string, wanted: string): boolean {
+  const name = cardName.trim().toLowerCase()
+  const needle = wanted.trim().toLowerCase()
+  return name === needle || name.startsWith(`${needle} `) || name.startsWith(`${needle},`) || name.startsWith(`${needle} //`)
+}
+
+function preferLeaders(pool: CatalogShowcaseCard[], leaders?: string[]): CatalogShowcaseCard[] {
+  if (!leaders || leaders.length === 0) return pool
+  const remaining = [...pool]
+  const ordered: CatalogShowcaseCard[] = []
+  for (const leader of leaders) {
+    const index = remaining.findIndex((card) => nameMatches(card.name, leader))
+    if (index >= 0) ordered.push(...remaining.splice(index, 1))
+  }
+  return [...ordered, ...remaining]
+}
+
 function groupCards(
   games: CatalogGameShowcase[],
   cards: CatalogShowcaseCard[],
@@ -53,8 +75,15 @@ function artUrls(card: CatalogShowcaseCard): string[] {
   return expandArtUrls(urls.length > 0 ? urls : card.imageUrl ? [card.imageUrl] : [])
 }
 
-function pickVisible(pool: CatalogShowcaseCard[], failedIds: Set<string>): CatalogShowcaseCard[] {
-  return pool.filter((card) => !failedIds.has(card.id)).slice(0, CARDS_PER_GAME)
+function pickVisible(
+  pool: CatalogShowcaseCard[],
+  failedIds: Set<string>,
+  gameCode: string,
+): CatalogShowcaseCard[] {
+  return preferLeaders(
+    pool.filter((card) => !failedIds.has(card.id)),
+    REEL_LEADERS[gameCode],
+  ).slice(0, CARDS_PER_GAME)
 }
 
 function ShowcaseArt({
@@ -152,7 +181,7 @@ export function GameShowcaseReel({
   const active = slides[Math.min(index, slides.length - 1)]
   const tile = gameTile(active.game.code, active.game.name)
   const names = slides.map((slide) => gameTile(slide.game.code, slide.game.name).short)
-  const visible = pickVisible(active.pool, failedIds)
+  const visible = pickVisible(active.pool, failedIds, active.game.code)
 
   return (
     <div
@@ -162,12 +191,11 @@ export function GameShowcaseReel({
     >
       <h2
         className="text-display-sm sm:text-display-md"
-        aria-label={`We stock ${tile.short}.`}
+        aria-label={`We stock ${tile.short}`}
         aria-live="polite"
         aria-atomic="true"
       >
-        We stock{' '}
-        <FlipWords word={tile.short} reserve={names} className="text-brand-600 dark:text-brand-400" />.
+        We stock <FlipWords word={tile.short} color={tile.accent} />
       </h2>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
         Singles and sealed product across the games collectors actually play, all searchable by set, rarity,
@@ -215,6 +243,7 @@ export function GameShowcaseReel({
           {slides.map((slide, slideIndex) => {
             const label = names[slideIndex]
             const selected = slideIndex === index
+            const accent = gameTile(slide.game.code, slide.game.name).accent
             return (
               <button
                 key={slide.game.code}
@@ -226,9 +255,10 @@ export function GameShowcaseReel({
                 className={cx(
                   'rounded-full px-3 py-1.5 text-xs font-bold tracking-wide transition-colors',
                   selected
-                    ? 'bg-brand-500 text-white'
+                    ? 'text-white'
                     : 'bg-surface text-fg-muted ring-1 ring-border hover:text-fg dark:bg-white/[0.04] dark:ring-white/10',
                 )}
+                style={selected ? { backgroundColor: accent } : undefined}
               >
                 {label}
               </button>

@@ -8,26 +8,29 @@ import { EASE_PREMIUM } from './motion'
  * Transform + opacity only — no blur/scale — so the GPU can keep it smooth.
  *
  * The parent owns the cycle so the game name and the card row stay in lockstep.
+ * Width hugs the current word so a shorter name does not leave a hole after it.
  */
 export function FlipWords({
   word,
-  reserve,
+  color,
   className,
 }: {
   word: string
-  /** Names used to reserve width so the headline doesn't jump as they cycle. */
-  reserve?: string[]
+  /** Per-game accent; animates with the name. */
+  color?: string
   className?: string
 }) {
   const parts = word.trim().split(/\s+/).filter(Boolean)
-  const widest = (reserve && reserve.length > 0 ? reserve : [word]).reduce((best, candidate) =>
-    candidate.length > best.length ? candidate : best,
-  )
 
   return (
-    <span aria-hidden className="relative inline-grid overflow-hidden align-baseline">
-      {/* Invisible sizer so the headline doesn't jump as names change length. */}
-      <span className={cx('invisible col-start-1 row-start-1 whitespace-nowrap', className)}>{widest}</span>
+    <motion.span
+      aria-hidden
+      className="relative inline-grid overflow-hidden align-baseline"
+      initial={false}
+      animate={{ color: color ?? 'currentColor' }}
+      transition={{ duration: 0.48, ease: EASE_PREMIUM }}
+    >
+      <span className={cx('invisible col-start-1 row-start-1 whitespace-nowrap', className)}>{word}</span>
       <AnimatePresence initial={false}>
         <motion.span
           key={word}
@@ -63,7 +66,7 @@ export function FlipWords({
           ))}
         </motion.span>
       </AnimatePresence>
-    </span>
+    </motion.span>
   )
 }
 
