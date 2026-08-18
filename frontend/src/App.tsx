@@ -41,7 +41,23 @@ import PatchNotesTab from './pages/store-admin/PatchNotesTab'
 import SellTradePage from './pages/SellTradePage'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      /*
+       * Without a stale time every query refetched on each mount, and since the
+       * admin tabs are separate routes, switching tabs threw away perfectly good
+       * data and showed a loading panel while it came back. Half a minute is
+       * short enough that operational screens stay current (mutations still
+       * invalidate explicitly, and stale data refetches in the background) while
+       * making tab-to-tab navigation instant.
+       */
+      staleTime: 30_000,
+      // Three retries tripled the wait before a failure surfaced.
+      retry: 1,
+    },
+  },
+})
 
 export default function App() {
   return (

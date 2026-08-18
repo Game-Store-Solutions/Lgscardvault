@@ -135,8 +135,10 @@ export function useOrdersPage(
     queryKey: [...ordersKey(slug), page, itemsPerPage, queueKey],
     enabled: Boolean(slug),
     retry: false,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    // Short but non-zero: revisiting the tab renders the cached page instantly
+    // and refreshes behind it, instead of blanking to a loading panel. Status
+    // changes invalidate this key directly, so actions still show immediately.
+    staleTime: 15_000,
     // Keep previous page only within the same tab — never show Processing rows on Delivered.
     placeholderData: (previousData, previousQuery) => {
       const prevKey = previousQuery?.queryKey
@@ -164,8 +166,9 @@ export function useStoreOrderQueueCounts(slug: string, enabled = true) {
     queryKey: openStoreOrdersCountKey(slug),
     enabled: Boolean(slug) && enabled,
     retry: false,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    // The 30s poll keeps the badges live; this stops every tab switch from
+    // firing an extra count request on top of it.
+    staleTime: 15_000,
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data } = await api.get<StoreOrderQueueCounts>(`/stores/${slug}/orders-open-count`)

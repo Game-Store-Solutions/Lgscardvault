@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
 import type { InventoryItem, Order, OrderChannel, OrderStatus } from '../../api/types'
-import { inventoryKey, openStoreOrdersCountKey, ordersKey, resolveOrdersListTotal, useDebouncedValue, useInventory, useOrders, useStoreOrderQueueCounts } from '../../hooks'
+import { inventoryKey, openStoreOrdersCountKey, ordersKey, resolveOrdersListTotal, useDebouncedValue, useInventoryPage, useOrders, useStoreOrderQueueCounts } from '../../hooks'
 import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal } from '../../components/ui'
 import { OrderLineList } from '../../components/orders/OrderLineList'
 import { OrderWorkflow } from '../../components/orders/OrderWorkflow'
@@ -152,12 +152,15 @@ export default function OrdersTab({ slug }: { slug: string }) {
   useEffect(() => setPage(1), [tab, channelFilter, debouncedSearch])
 
   const selectTab = (next: OrderListTab) => {
-    setTab(next)
-    void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
-    void refetchQueueCounts()
+    // Only force a network round-trip when the same tab is clicked again (an
+    // explicit "reload this list"). Switching tabs used to invalidate every
+    // cached orders query for the store, refetching each previously visited
+    // tab and page in parallel just to show one of them.
     if (next === tab) {
-      void refetchOrders()
+      refreshOrdersAndCounts()
+      return
     }
+    setTab(next)
   }
 
   const refreshOrdersAndCounts = () => {
@@ -790,20 +793,23 @@ interface KioskLine {
 
 function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const { data: inventory = [], isLoading } = useInventory(slug)
   const [query, setQuery] = useState('')
   const debounced = useDebouncedValue(query, 200)
   const [lines, setLines] = useState<KioskLine[]>([])
   const [kioskUserId, setKioskUserId] = useState('')
   const [created, setCreated] = useState<Order | null>(null)
 
-  const results = useMemo(() => {
-    const q = debounced.trim().toLowerCase()
-    if (!q) return []
-    return inventory
-      .filter((item) => item.quantity > 0 && item.card.name.toLowerCase().includes(q))
-      .slice(0, 12)
-  }, [inventory, debounced])
+  // Search server-side. Filtering in the browser meant downloading the store's
+  // entire inventory (paged 500 rows at a time) before the first keystroke could
+  // match anything.
+  const term = debounced.trim()
+  const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
+    q: term,
+    inStockOnly: true,
+    itemsPerPage: 12,
+    enabled: term !== '',
+  })
+  const results = term === '' ? [] : (searchPage?.items ?? [])
 
   const totalCents = lines.reduce((sum, line) => sum + line.item.priceCents * line.quantity, 0)
 
