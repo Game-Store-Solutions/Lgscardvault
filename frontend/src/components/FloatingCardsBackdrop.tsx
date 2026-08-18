@@ -444,16 +444,28 @@ type FloatingCardsBackdropProps = {
   layout?: 'scatter' | 'right'
   className?: string
   washClassName?: string
+  /**
+   * Catalog art to fill the composition with (see `useShowcaseCards`). The
+   * hand-tuned positions below are reused and only the images swap, so real
+   * inventory can rotate through without redesigning the layout. Falls back to
+   * the bundled art when empty.
+   */
+  images?: string[]
 }
 
 export function FloatingCardsBackdrop({
   layout = 'scatter',
   className,
   washClassName,
+  images,
 }: FloatingCardsBackdropProps) {
   // Dense field for the landing scatter; the side layouts stay lighter so they
   // don't fight the copy sitting next to them.
-  const cards = layout === 'right' ? RIGHT_FOCUS_CARDS.slice(0, 14) : FLOAT_CARDS
+  const layoutCards = layout === 'right' ? RIGHT_FOCUS_CARDS.slice(0, 14) : FLOAT_CARDS
+  const cards =
+    images && images.length > 0
+      ? layoutCards.map((card, index) => ({ ...card, src: images[index % images.length], alt: '' }))
+      : layoutCards
 
   return (
     <div aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>

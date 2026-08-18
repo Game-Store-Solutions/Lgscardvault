@@ -523,16 +523,31 @@ class CardRepository extends ServiceEntityRepository
      */
     public function findShowcaseForGame(Game $game): ?Card
     {
-        /** @var Card|null $card */
-        $card = $this->scopedToGame($game)
+        return $this->findShowcaseCandidatesForGame($game, 1)[0] ?? null;
+    }
+
+    /**
+     * Newest cards for a game that carry image data — the pool the landing
+     * page's rotating background draws from.
+     *
+     * @return list<Card>
+     */
+    public function findShowcaseCandidatesForGame(Game $game, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        /** @var list<Card> $cards */
+        $cards = $this->scopedToGame($game)
             ->andWhere('c.imageUris IS NOT NULL')
             ->orderBy('c.releasedAt', 'DESC')
             ->addOrderBy('c.id', 'ASC')
-            ->setMaxResults(1)
+            ->setMaxResults($limit)
             ->getQuery()
-            ->getOneOrNullResult();
+            ->getResult();
 
-        return $card;
+        return $cards;
     }
 
     /** Base query for one game, including legacy NULL-game rows for Magic. */

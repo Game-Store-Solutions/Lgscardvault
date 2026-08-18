@@ -924,6 +924,14 @@ export interface CatalogGame {
   active: boolean
 }
 
+/** Catalog card art for the marketing background. Rotates daily server-side. */
+export interface CatalogShowcaseCard {
+  id: string
+  name: string
+  gameCode: string
+  imageUrl: string | null
+}
+
 /** A supported game plus one piece of real card art, for marketing tiles. */
 export interface CatalogGameShowcase {
   code: string

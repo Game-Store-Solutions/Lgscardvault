@@ -59,6 +59,7 @@ export type {
 export {
   useCatalogGames,
   useGameShowcase,
+  useShowcaseCards,
   useStoreGames,
   useStoreGameStats,
   useStoreGameShelf,
@@ -72,6 +73,7 @@ export {
   useScryfallSyncRuns,
   catalogGamesKey,
   catalogGamesShowcaseKey,
+  catalogShowcaseCardsKey,
   gameSetsKey,
   sealedInventoryKey,
   sealedPublicKey,

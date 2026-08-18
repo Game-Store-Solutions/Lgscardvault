@@ -4,7 +4,7 @@ import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-re
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
-import { useGameShowcase } from '../hooks'
+import { useGameShowcase, useShowcaseCards } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { gameTile } from '../lib/gameTiles'
@@ -31,6 +31,11 @@ const TRUST_POINTS = [
 export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
   const { data: games = [], isLoading: gamesLoading } = useGameShowcase()
+  // Real catalog art behind the hero, rotated daily by the API.
+  const { data: showcaseCards = [] } = useShowcaseCards(40)
+  const backdropImages = showcaseCards
+    .map((card) => card.imageUrl)
+    .filter((url): url is string => Boolean(url))
   useAppShellFlush(true)
 
   const primaryCta =
@@ -57,6 +62,7 @@ export default function MarketplaceLanding() {
         />
         <FloatingCardsBackdrop
           layout="scatter"
+          images={backdropImages}
           washClassName="bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(243,244,246,0.92),rgba(243,244,246,0.55)_58%,transparent_76%)] dark:bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(9,9,11,0.94),rgba(9,9,11,0.6)_58%,transparent_78%)]"
         />
 

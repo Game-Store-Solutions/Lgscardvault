@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Card;
 use App\Repository\CardRepository;
 use App\Repository\GameRepository;
 use App\Repository\GameSetRepository;
@@ -23,6 +24,9 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/catalog')]
 final class CatalogController extends AbstractController
 {
+    /** Candidates pulled per game before the daily shuffle picks winners. */
+    private const SHOWCASE_POOL_PER_GAME = 30;
+
     public function __construct(
         private readonly GameRepository $games,
         private readonly GameSetRepository $gameSets,
@@ -49,14 +53,84 @@ final class CatalogController extends AbstractController
     {
         $showcase = [];
         foreach ($this->games->findActive() as $game) {
+            $card = $this->cards->findShowcaseForGame($game);
             $showcase[] = [
                 'code' => $game->getCode(),
                 'name' => $game->getName(),
-                'imageUrl' => $this->cards->findShowcaseForGame($game)?->getImageUrl(),
+                // Tiles are a few hundred px wide; `normal` is plenty.
+                'imageUrl' => null !== $card ? $this->preferredImage($card, ['normal', 'large', 'small']) : null,
             ];
         }
 
         return $this->json($showcase);
+    }
+
+    /**
+     * Card art for the marketing background, rotating once per day.
+     *
+     * The order is seeded by the current date rather than randomised per
+     * request: the hero art stays put while someone browses (and stays
+     * cacheable) but looks different tomorrow. The pool is spread across every
+     * active game so one large catalog can't crowd the others out.
+     */
+    #[Route('/showcase-cards', name: 'api_catalog_showcase_cards', methods: ['GET'])]
+    public function showcaseCards(Request $request): JsonResponse
+    {
+        $limit = max(1, min(60, $request->query->getInt('limit', 24)));
+
+        $pool = [];
+        foreach ($this->games->findActive() as $game) {
+            foreach ($this->cards->findShowcaseCandidatesForGame($game, self::SHOWCASE_POOL_PER_GAME) as $card) {
+                if (null !== $card->getImageUrl()) {
+                    $pool[] = $card;
+                }
+            }
+        }
+
+        // Deterministic daily shuffle: hashing (day + card id) gives a stable
+        // order for the whole day without touching global RNG state.
+        $seed = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        usort($pool, static fn ($a, $b): int => strcmp(
+            md5($seed.$a->getId()->toRfc4122()),
+            md5($seed.$b->getId()->toRfc4122()),
+        ));
+
+        // These render a few percent of viewport wide, so ship the small
+        // variant: the full-size art would be megabytes of hero background.
+        $payload = array_map(fn ($card): array => [
+            'id' => $card->getId()->toRfc4122(),
+            'name' => $card->getName(),
+            'gameCode' => $card->resolvedGameCode(),
+            'imageUrl' => $this->preferredImage($card, ['small', 'normal', 'large']),
+        ], array_slice($pool, 0, $limit));
+
+        $response = $this->json($payload);
+        // Safe to cache: the payload only changes when the date does.
+        $response->setPublic();
+        $response->setMaxAge(3600);
+
+        return $response;
+    }
+
+    /**
+     * Pick the smallest usable art variant for the job. Card::getImageUrl()
+     * always prefers `large`, which is right for a product page and wasteful for
+     * a thumbnail or a background tile.
+     *
+     * @param list<string> $preference image_uris keys, best first
+     */
+    private function preferredImage(Card $card, array $preference): ?string
+    {
+        $uris = $card->getImageUris() ?? [];
+        foreach ($preference as $key) {
+            $candidate = $uris[$key] ?? null;
+            if (is_string($candidate) && '' !== $candidate) {
+                return $candidate;
+            }
+        }
+
+        // Multi-faced cards keep art on the faces; getImageUrl() handles those.
+        return $card->getImageUrl();
     }
 
     #[Route('/games/{code}/sets', name: 'api_catalog_game_sets', methods: ['GET'])]

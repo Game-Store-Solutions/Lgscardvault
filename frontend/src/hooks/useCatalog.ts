@@ -5,6 +5,7 @@ import type {
   CatalogGame,
   CatalogGameSet,
   CatalogGameShowcase,
+  CatalogShowcaseCard,
   CatalogSyncRun,
   CatalogArtistBrowseResult,
   SealedInventoryLine,
@@ -20,6 +21,7 @@ import type {
 
 export const catalogGamesKey = ['catalog', 'games'] as const
 export const catalogGamesShowcaseKey = ['catalog', 'games', 'showcase'] as const
+export const catalogShowcaseCardsKey = ['catalog', 'showcase-cards'] as const
 export const gameSetsKey = (gameCode: string) => ['catalog', 'sets', gameCode] as const
 export const sealedSearchKey = (params: SealedSearchParams) =>
   ['catalog', 'sealed', params.game ?? '', params.setId ?? 0, params.q ?? '', params.page ?? 1] as const
@@ -53,6 +55,23 @@ export function useGameShowcase() {
     queryFn: async () => {
       const { data } = await api.get<CatalogGameShowcase[]>('/catalog/games/showcase')
       return data
+    },
+  })
+}
+
+/**
+ * Card art for the marketing background. The server rotates the selection once
+ * a day, so this can cache hard — a refresh should not reshuffle the hero.
+ */
+export function useShowcaseCards(limit = 24) {
+  return useQuery({
+    queryKey: [...catalogShowcaseCardsKey, limit],
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<CatalogShowcaseCard[]>('/catalog/showcase-cards', {
+        params: { limit },
+      })
+      return data.filter((card) => Boolean(card.imageUrl))
     },
   })
 }
