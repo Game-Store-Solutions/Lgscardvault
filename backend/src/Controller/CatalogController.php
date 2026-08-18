@@ -120,9 +120,10 @@ final class CatalogController extends AbstractController
         ], array_slice($ordered, 0, $limit));
 
         $response = $this->json($payload);
-        // Safe to cache: the selection only changes when the catalog does.
+        // Short cache so reel curation (which cards, which order) shows up
+        // quickly after a deploy instead of sitting behind a one-hour CDN hit.
         $response->setPublic();
-        $response->setMaxAge(3600);
+        $response->setMaxAge(120);
 
         return $response;
     }

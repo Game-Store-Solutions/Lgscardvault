@@ -66,11 +66,11 @@ export function useGameShowcase() {
  */
 export function useShowcaseCards(perGame = 12) {
   return useQuery({
-    queryKey: [...catalogShowcaseCardsKey, perGame],
-    staleTime: 60 * 60 * 1000,
+    queryKey: [...catalogShowcaseCardsKey, perGame, 'reel-v3'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await api.get<CatalogShowcaseCard[]>('/catalog/showcase-cards', {
-        params: { perGame },
+        params: { perGame, v: 3 },
       })
       return data.filter((card) => Boolean(card.imageUrl) || (card.imageUrls?.length ?? 0) > 0)
     },
