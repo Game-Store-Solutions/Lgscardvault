@@ -464,12 +464,12 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.82) 0%,
-      hsla(0, 0%, 100%, 0.38) 22%,
+      hsla(0, 0%, 100%, 0.46) 0%,
+      hsla(0, 0%, 100%, 0.16) 22%,
       hsla(0, 0%, 100%, 0) 58%
     );
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.78);
+    opacity: calc(var(--op, 0) * 0.5);
   }
   .tilt-holo,
   .foil-shimmer {
@@ -478,7 +478,7 @@ body {
       linear-gradient(
         115deg,
         transparent 36%,
-        rgba(255, 255, 255, calc(0.08 + var(--op, 0) * 0.42)) 48%,
+        rgba(255, 255, 255, calc(0.03 + var(--op, 0) * 0.2)) 48%,
         transparent 62%
       ),
       repeating-linear-gradient(
@@ -506,13 +506,13 @@ body {
       foil-idle-orbit 8s ease-in-out infinite;
   }
   .tilt-sparkle {
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 0.55px, transparent 0.85px);
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 0.55px, transparent 0.85px);
     background-size: 12px 15px;
     background-position: calc(var(--mx, 50%) * 0.4) calc(var(--my, 50%) * 0.4);
     mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 58%);
     -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 58%);
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.62);
+    opacity: calc(var(--op, 0) * 0.38);
   }
   /*
    * Flip / DFC faces cannot use the pointer hook (drag is the flip). CSS
@@ -521,7 +521,7 @@ body {
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.4;
+    --op: 0.3;
     animation: foil-idle-orbit 8s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -582,17 +582,17 @@ body {
   100% {
     --mx: 22%;
     --my: 40%;
-    --op: 0.36;
+    --op: 0.26;
   }
   33% {
     --mx: 74%;
     --my: 28%;
-    --op: 0.48;
+    --op: 0.34;
   }
   66% {
     --mx: 40%;
     --my: 72%;
-    --op: 0.4;
+    --op: 0.3;
   }
 }
 
