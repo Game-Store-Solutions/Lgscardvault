@@ -45,8 +45,8 @@ export interface SealedSearchParams {
 }
 
 /**
- * Supported games with a representative card image pulled from the catalog.
- * Public endpoint — the landing page uses it for the "games we support" tiles.
+ * Supported games, each with its signature card's art from the catalog. Public
+ * endpoint — the landing page uses it for the "games we support" tiles.
  */
 export function useGameShowcase() {
   return useQuery({
@@ -60,8 +60,9 @@ export function useGameShowcase() {
 }
 
 /**
- * Card art for the marketing background. The server rotates the selection once
- * a day, so this can cache hard — a refresh should not reshuffle the hero.
+ * Card art for the marketing background: each game's signature cards, resolved
+ * from our catalog. The selection is stable, so this caches hard — the hero looks
+ * the same on every visit rather than reshuffling.
  */
 export function useShowcaseCards(perGame = 12) {
   return useQuery({

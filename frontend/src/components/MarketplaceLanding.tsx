@@ -31,8 +31,8 @@ const TRUST_POINTS = [
 export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
   const { data: games = [], isLoading: gamesLoading } = useGameShowcase()
-  // Real catalog art behind the hero, rotated daily by the API. 12 per game
-  // fills the 60 layout slots when all five games are stocked.
+  // Each game's signature cards behind the hero, resolved from our catalog.
+  // 12 per game fills the 60 layout slots when all five games are stocked.
   const { data: showcaseCards = [] } = useShowcaseCards(12)
   const backdropImages = showcaseCards
     .map((card) => card.imageUrl)

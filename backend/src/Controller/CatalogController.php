@@ -3,11 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\Card;
+use App\Entity\Game;
 use App\Repository\CardRepository;
 use App\Repository\GameRepository;
 use App\Repository\GameSetRepository;
 use App\Repository\SealedProductRepository;
 use App\Service\Catalog\GameCatalogSerializer;
+use App\Service\Catalog\ShowcaseCardCatalog;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use App\Entity\CsvImportJob;
 use App\Service\CsvImport\ImportTemplateBuilder;
@@ -32,6 +34,7 @@ final class CatalogController extends AbstractController
         private readonly GameSetRepository $gameSets,
         private readonly SealedProductRepository $sealedProducts,
         private readonly CardRepository $cards,
+        private readonly ShowcaseCardCatalog $showcaseCatalog,
         private readonly GameCatalogSerializer $serializer,
         private readonly ImportTemplateBuilder $templateBuilder,
     ) {
@@ -44,16 +47,18 @@ final class CatalogController extends AbstractController
     }
 
     /**
-     * Active games plus one piece of real card art each, for the landing page's
-     * "games we support" tiles. Games whose catalog has not been synced yet come
-     * back with a null imageUrl so the client can fall back to a text tile.
+     * Active games plus real card art each, for the landing page's "games we
+     * support" tiles. Art is the game's signature card (see
+     * ShowcaseCardCatalog), falling back to the newest synced printing. Games
+     * with no art at all come back with an empty list so the client can render a
+     * text tile instead.
      */
     #[Route('/games/showcase', name: 'api_catalog_games_showcase', methods: ['GET'])]
     public function gamesShowcase(): JsonResponse
     {
         $showcase = [];
         foreach ($this->games->findActive() as $game) {
-            $card = $this->cards->findShowcaseForGame($game);
+            $card = $this->showcaseCardsForGame($game, 1)[0] ?? null;
             $showcase[] = [
                 'code' => $game->getCode(),
                 'name' => $game->getName(),
@@ -70,39 +75,27 @@ final class CatalogController extends AbstractController
     }
 
     /**
-     * Card art for the marketing background, rotating once per day.
+     * Card art for the marketing background — the signature cards of every game
+     * we service, resolved from our own catalog (see ShowcaseCardCatalog).
      *
-     * The order is seeded by the current date rather than randomised per
-     * request: the hero art stays put while someone browses (and stays
-     * cacheable) but looks different tomorrow. `perGame` controls how many cards
-     * each active game contributes, so the field stays balanced across games.
+     * The selection is stable rather than randomised: the same recognizable
+     * cards every visit, which keeps the page cacheable and means the hero never
+     * changes under a returning visitor. `perGame` controls how many cards each
+     * game contributes so the field stays balanced.
      */
     #[Route('/showcase-cards', name: 'api_catalog_showcase_cards', methods: ['GET'])]
     public function showcaseCards(Request $request): JsonResponse
     {
         $perGame = max(1, min(20, $request->query->getInt('perGame', 8)));
         $limit = max(1, min(80, $request->query->getInt('limit', 60)));
-        $seed = (new \DateTimeImmutable('today'))->format('Y-m-d');
 
-        // Pick per game first so every game is represented, then round-robin the
-        // lists together — a flat shuffle lets the biggest catalog dominate and
-        // clusters the same game in neighbouring positions.
+        // Pick per game first, then round-robin the lists together so games
+        // interleave across the field instead of clustering.
         $byGame = [];
         foreach ($this->games->findActive() as $game) {
-            $candidates = array_values(array_filter(
-                $this->cards->findShowcaseCandidatesForGame($game, self::SHOWCASE_POOL_PER_GAME),
-                static fn (Card $card): bool => null !== $card->getImageUrl(),
-            ));
-
-            // Deterministic daily shuffle: hashing (day + card id) gives a stable
-            // order for the whole day without touching global RNG state.
-            usort($candidates, static fn (Card $a, Card $b): int => strcmp(
-                md5($seed.$a->getId()->toRfc4122()),
-                md5($seed.$b->getId()->toRfc4122()),
-            ));
-
-            if ([] !== $candidates) {
-                $byGame[] = array_slice($candidates, 0, $perGame);
+            $cards = $this->showcaseCardsForGame($game, $perGame);
+            if ([] !== $cards) {
+                $byGame[] = $cards;
             }
         }
 
@@ -125,11 +118,43 @@ final class CatalogController extends AbstractController
         ], array_slice($ordered, 0, $limit));
 
         $response = $this->json($payload);
-        // Safe to cache: the payload only changes when the date does.
+        // Safe to cache: the selection only changes when the catalog does.
         $response->setPublic();
         $response->setMaxAge(3600);
 
         return $response;
+    }
+
+    /**
+     * The showcase cards for one game: curated signature cards first, topped up
+     * with the newest synced art so a thin catalog still fills the layout.
+     *
+     * @return list<Card>
+     */
+    private function showcaseCardsForGame(Game $game, int $limit): array
+    {
+        $curated = $this->cards->findShowcaseByNamesForGame(
+            $game,
+            $this->showcaseCatalog->forGame((string) $game->getCode()),
+        );
+
+        if (count($curated) >= $limit) {
+            return array_slice($curated, 0, $limit);
+        }
+
+        $chosen = [];
+        foreach ($curated as $card) {
+            $chosen[(string) $card->getId()] = $card;
+        }
+
+        foreach ($this->cards->findShowcaseCandidatesForGame($game, self::SHOWCASE_POOL_PER_GAME) as $card) {
+            if (count($chosen) >= $limit) {
+                break;
+            }
+            $chosen[(string) $card->getId()] ??= $card;
+        }
+
+        return array_slice(array_values($chosen), 0, $limit);
     }
 
     /**

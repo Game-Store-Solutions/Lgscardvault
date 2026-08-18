@@ -535,7 +535,7 @@ type FloatingCardsBackdropProps = {
   /**
    * Catalog art to fill the composition with (see `useShowcaseCards`). The
    * hand-tuned positions below are reused and only the images swap, so real
-   * inventory can rotate through without redesigning the layout. Falls back to
+   * catalog art can fill the field without redesigning the layout. Falls back to
    * the bundled art when empty.
    */
   images?: string[]
