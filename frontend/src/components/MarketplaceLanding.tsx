@@ -8,8 +8,7 @@ import { useCatalogGames } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { gameTile } from '../lib/gameTiles'
-
-const PLATFORM_ADMIN_EMAILS = ['primary-admin@test.local', 'secondary-admin@test.local']
+import { contactEmails } from '../lib/runtimeEnv'
 
 const TRUST_POINTS = [
   {
@@ -41,7 +40,11 @@ export default function MarketplaceLanding() {
   const secondaryCta =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn border border-border bg-surface px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-bg sm:w-auto dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]'
 
-  const contactHref = `mailto:${PLATFORM_ADMIN_EMAILS.join(',')}?subject=${encodeURIComponent("Interested in LG's Card Vault")}&body=${encodeURIComponent("Hi,\n\nI'm interested in learning more about LG's Card Vault.\n\nName:\nStore / Team:\nWhat I'm looking for:\n\nThanks.")}`
+  // Only render a mailto when real inboxes are configured (VITE_CONTACT_EMAILS).
+  const contactHref =
+    contactEmails.length > 0
+      ? `mailto:${contactEmails.join(',')}?subject=${encodeURIComponent("Interested in LG's Card Vault")}&body=${encodeURIComponent("Hi,\n\nI'm interested in learning more about LG's Card Vault.\n\nName:\nStore / Team:\nWhat I'm looking for:\n\nThanks.")}`
+      : null
 
   return (
     <div className="bg-bg">
@@ -148,29 +151,59 @@ export default function MarketplaceLanding() {
                 return (
                   <StaggerItem key={game.id ?? game.code} className="h-full">
                     {/* Presentational only — these show coverage, not navigation. */}
-                    <figure className="relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-card border border-border shadow-card dark:border-white/10">
-                      <img
-                        src={tile.art}
-                        alt=""
-                        aria-hidden
-                        loading="lazy"
-                        decoding="async"
-                        className="absolute inset-0 size-full object-cover"
-                      />
-                      <div
-                        aria-hidden
-                        className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10"
-                      />
+                    <figure className="relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-card border border-border bg-surface shadow-card dark:border-white/10 dark:bg-white/[0.03]">
+                      {tile.art ? (
+                        <>
+                          <img
+                            src={tile.art}
+                            alt=""
+                            aria-hidden
+                            loading="lazy"
+                            decoding="async"
+                            className="absolute inset-0 size-full object-cover"
+                          />
+                          <div
+                            aria-hidden
+                            className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10"
+                          />
+                        </>
+                      ) : (
+                        // No verified art for this game yet — lean on the accent.
+                        <div
+                          aria-hidden
+                          className="absolute inset-0"
+                          style={{
+                            background: `radial-gradient(115% 85% at 20% 0%, ${tile.accent}59 0%, transparent 68%), linear-gradient(180deg, ${tile.accent}1f 0%, rgba(0,0,0,0.55) 100%)`,
+                          }}
+                        />
+                      )}
                       <span
                         aria-hidden
                         className="absolute inset-x-0 top-0 h-1"
                         style={{ backgroundColor: tile.accent }}
                       />
-                      <figcaption className="relative p-3.5">
-                        <p className="font-display text-base font-extrabold leading-tight tracking-[-0.03em] text-white sm:text-lg">
-                          {tile.short}
-                        </p>
-                        <span className="mt-1 block text-eyebrow !text-white/60">{game.name}</span>
+                      <figcaption
+                        className={
+                          tile.art
+                            ? 'relative p-3.5'
+                            : 'relative flex flex-1 flex-col justify-between p-3.5'
+                        }
+                      >
+                        {!tile.art && (
+                          <span
+                            aria-hidden
+                            className="font-display text-3xl font-black leading-none tracking-[-0.06em] sm:text-4xl"
+                            style={{ color: tile.accent }}
+                          >
+                            {tile.short.slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="block">
+                          <span className="block font-display text-base font-extrabold leading-tight tracking-[-0.03em] text-white sm:text-lg">
+                            {tile.short}
+                          </span>
+                          <span className="mt-1 block text-eyebrow !text-white/60">{game.name}</span>
+                        </span>
                       </figcaption>
                     </figure>
                   </StaggerItem>
@@ -219,10 +252,17 @@ export default function MarketplaceLanding() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
-              <a href={contactHref} className={primaryCta}>
-                <Mail aria-hidden className="size-4" />
-                Email the team
-              </a>
+              {contactHref ? (
+                <a href={contactHref} className={primaryCta}>
+                  <Mail aria-hidden className="size-4" />
+                  Email the team
+                </a>
+              ) : (
+                <Link to="/register/owner" className={primaryCta}>
+                  <Store aria-hidden className="size-4" />
+                  Start your store
+                </Link>
+              )}
             </div>
           </div>
         </Reveal>

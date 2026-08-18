@@ -6,6 +6,11 @@ Everything the backend expects for a successful deploy. Copy
 The frontend production image uses same-origin `/api` (no `VITE_*` required).
 Do **not** set `VITE_ENABLE_TEST_CHECKOUT=true` in production.
 
+Optional frontend build arg: `VITE_CONTACT_EMAILS` — comma-separated inboxes the
+landing page's "Contact us" button writes to (e.g.
+`VITE_CONTACT_EMAILS=owner@example.com,support@example.com`). Unset, that section
+links to store signup instead of opening a mail draft.
+
 JWT **key files** (`config/jwt/*.pem`) are not env vars — generate once on the
 server (`lexik:jwt:generate-keypair`); see [`LAUNCH.md`](LAUNCH.md).
 
