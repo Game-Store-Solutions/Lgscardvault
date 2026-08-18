@@ -4,6 +4,7 @@ import type {
   StoreGame,
   CatalogGame,
   CatalogGameSet,
+  CatalogGameShowcase,
   CatalogSyncRun,
   CatalogArtistBrowseResult,
   SealedInventoryLine,
@@ -18,6 +19,7 @@ import type {
    catalog, per-store sealed inventory, and platform sync-run history. */
 
 export const catalogGamesKey = ['catalog', 'games'] as const
+export const catalogGamesShowcaseKey = ['catalog', 'games', 'showcase'] as const
 export const gameSetsKey = (gameCode: string) => ['catalog', 'sets', gameCode] as const
 export const sealedSearchKey = (params: SealedSearchParams) =>
   ['catalog', 'sealed', params.game ?? '', params.setId ?? 0, params.q ?? '', params.page ?? 1] as const
@@ -38,6 +40,21 @@ export interface SealedSearchParams {
   q?: string
   page?: number
   perPage?: number
+}
+
+/**
+ * Supported games with a representative card image pulled from the catalog.
+ * Public endpoint — the landing page uses it for the "games we support" tiles.
+ */
+export function useGameShowcase() {
+  return useQuery({
+    queryKey: catalogGamesShowcaseKey,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<CatalogGameShowcase[]>('/catalog/games/showcase')
+      return data
+    },
+  })
 }
 
 export function useCatalogGames() {

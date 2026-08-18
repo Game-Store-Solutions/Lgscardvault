@@ -58,6 +58,7 @@ export type {
 } from './useCommanderRecommend'
 export {
   useCatalogGames,
+  useGameShowcase,
   useStoreGames,
   useStoreGameStats,
   useStoreGameShelf,
@@ -70,6 +71,7 @@ export {
   useCatalogSyncRuns,
   useScryfallSyncRuns,
   catalogGamesKey,
+  catalogGamesShowcaseKey,
   gameSetsKey,
   sealedInventoryKey,
   sealedPublicKey,

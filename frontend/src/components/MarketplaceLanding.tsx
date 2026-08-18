@@ -1,14 +1,14 @@
 import { Link } from 'react-router'
 import { motion } from 'framer-motion'
-import { ArrowRight, Mail, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-react'
+import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
-import { useCatalogGames } from '../hooks'
+import { useGameShowcase } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { gameTile } from '../lib/gameTiles'
-import { contactEmails } from '../lib/runtimeEnv'
+import { ContactForm } from './ContactForm'
 
 const TRUST_POINTS = [
   {
@@ -30,17 +30,13 @@ const TRUST_POINTS = [
 
 export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
-  const { data: games = [], isLoading: gamesLoading } = useCatalogGames()
+  const { data: games = [], isLoading: gamesLoading } = useGameShowcase()
   useAppShellFlush(true)
-
-  const activeGames = games.filter((game) => game.active !== false)
 
   const primaryCta =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn bg-brand-500 px-6 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-600 sm:w-auto'
   const secondaryCta =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn border border-border bg-surface px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-bg sm:w-auto dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]'
-
-  const contactHref = `mailto:${contactEmails.join(',')}?subject=${encodeURIComponent("Interested in LG's Card Vault")}&body=${encodeURIComponent("Hi,\n\nI'm interested in learning more about LG's Card Vault.\n\nName:\nStore / Team:\nWhat I'm looking for:\n\nThanks.")}`
 
   return (
     <div className="bg-bg">
@@ -142,29 +138,23 @@ export default function MarketplaceLanding() {
             </div>
           ) : (
             <Stagger className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5" gap={0.05}>
-              {activeGames.map((game) => {
+              {games.map((game) => {
                 const tile = gameTile(game.code, game.name)
                 return (
-                  <StaggerItem key={game.id ?? game.code} className="h-full">
+                  <StaggerItem key={game.code} className="h-full">
                     {/* Presentational only — these show coverage, not navigation. */}
                     <figure className="relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-card border border-border bg-surface shadow-card dark:border-white/10 dark:bg-white/[0.03]">
-                      {tile.art ? (
-                        <>
-                          <img
-                            src={tile.art}
-                            alt=""
-                            aria-hidden
-                            loading="lazy"
-                            decoding="async"
-                            className="absolute inset-0 size-full object-cover"
-                          />
-                          <div
-                            aria-hidden
-                            className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10"
-                          />
-                        </>
+                      {game.imageUrl ? (
+                        <img
+                          src={game.imageUrl}
+                          alt=""
+                          aria-hidden
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 size-full object-cover"
+                        />
                       ) : (
-                        // No verified art for this game yet — lean on the accent.
+                        // Catalog not synced for this game yet — lean on the accent.
                         <div
                           aria-hidden
                           className="absolute inset-0"
@@ -173,33 +163,21 @@ export default function MarketplaceLanding() {
                           }}
                         />
                       )}
+                      {/* Solid base under the caption so names stay readable over busy art. */}
+                      <div
+                        aria-hidden
+                        className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black via-black/85 to-transparent"
+                      />
                       <span
                         aria-hidden
                         className="absolute inset-x-0 top-0 h-1"
                         style={{ backgroundColor: tile.accent }}
                       />
-                      <figcaption
-                        className={
-                          tile.art
-                            ? 'relative p-3.5'
-                            : 'relative flex flex-1 flex-col justify-between p-3.5'
-                        }
-                      >
-                        {!tile.art && (
-                          <span
-                            aria-hidden
-                            className="font-display text-3xl font-black leading-none tracking-[-0.06em] sm:text-4xl"
-                            style={{ color: tile.accent }}
-                          >
-                            {tile.short.slice(0, 2).toUpperCase()}
-                          </span>
-                        )}
-                        <span className="block">
-                          <span className="block font-display text-base font-extrabold leading-tight tracking-[-0.03em] text-white sm:text-lg">
-                            {tile.short}
-                          </span>
-                          <span className="mt-1 block text-eyebrow !text-white/60">{game.name}</span>
+                      <figcaption className="relative p-3.5">
+                        <span className="block font-display text-base font-extrabold leading-tight tracking-[-0.03em] text-white sm:text-lg">
+                          {tile.short}
                         </span>
+                        <span className="mt-1 block text-eyebrow !text-white/65">{game.name}</span>
                       </figcaption>
                     </figure>
                   </StaggerItem>
@@ -237,22 +215,17 @@ export default function MarketplaceLanding() {
           id="contact"
           className="scroll-mt-24 overflow-hidden rounded-card border border-border bg-surface shadow-card dark:border-white/10 dark:bg-white/[0.03]"
         >
-          <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center">
+          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div>
               <p className="text-eyebrow">Contact us</p>
               <h2 className="mt-2.5 text-display-sm sm:text-display-md">
-                Questions about a plan or opening a store?
+                Questions about opening a store?
               </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
-                Send us a note and we’ll follow up about pricing, onboarding, and getting your inventory live.
+              <p className="mt-3 max-w-xl text-sm leading-7 text-fg-muted">
+                Send us a note and we’ll follow up about onboarding, pricing, and getting your inventory live.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
-              <a href={contactHref} className={primaryCta}>
-                <Mail aria-hidden className="size-4" />
-                Email the team
-              </a>
-            </div>
+            <ContactForm />
           </div>
         </Reveal>
       </div>

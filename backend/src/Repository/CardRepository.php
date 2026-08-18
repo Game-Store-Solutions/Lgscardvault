@@ -514,6 +514,27 @@ class CardRepository extends ServiceEntityRepository
         return $words[0];
     }
 
+    /**
+     * A representative card for a game, used as marketing art (landing page
+     * game tiles). Only rows that actually carry Scryfall/TCGCSV image data are
+     * considered, and the newest release wins so a tile shows current product
+     * rather than whatever happened to be inserted first. Deterministic by id so
+     * the tile does not flicker between requests.
+     */
+    public function findShowcaseForGame(Game $game): ?Card
+    {
+        /** @var Card|null $card */
+        $card = $this->scopedToGame($game)
+            ->andWhere('c.imageUris IS NOT NULL')
+            ->orderBy('c.releasedAt', 'DESC')
+            ->addOrderBy('c.id', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $card;
+    }
+
     /** Base query for one game, including legacy NULL-game rows for Magic. */
     private function scopedToGame(Game $game): QueryBuilder
     {

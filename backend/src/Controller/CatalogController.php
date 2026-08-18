@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Repository\CardRepository;
 use App\Repository\GameRepository;
 use App\Repository\GameSetRepository;
 use App\Repository\SealedProductRepository;
@@ -26,6 +27,7 @@ final class CatalogController extends AbstractController
         private readonly GameRepository $games,
         private readonly GameSetRepository $gameSets,
         private readonly SealedProductRepository $sealedProducts,
+        private readonly CardRepository $cards,
         private readonly GameCatalogSerializer $serializer,
         private readonly ImportTemplateBuilder $templateBuilder,
     ) {
@@ -35,6 +37,26 @@ final class CatalogController extends AbstractController
     public function games(): JsonResponse
     {
         return $this->json(array_map($this->serializer->game(...), $this->games->findActive()));
+    }
+
+    /**
+     * Active games plus one piece of real card art each, for the landing page's
+     * "games we support" tiles. Games whose catalog has not been synced yet come
+     * back with a null imageUrl so the client can fall back to a text tile.
+     */
+    #[Route('/games/showcase', name: 'api_catalog_games_showcase', methods: ['GET'])]
+    public function gamesShowcase(): JsonResponse
+    {
+        $showcase = [];
+        foreach ($this->games->findActive() as $game) {
+            $showcase[] = [
+                'code' => $game->getCode(),
+                'name' => $game->getName(),
+                'imageUrl' => $this->cards->findShowcaseForGame($game)?->getImageUrl(),
+            ];
+        }
+
+        return $this->json($showcase);
     }
 
     #[Route('/games/{code}/sets', name: 'api_catalog_game_sets', methods: ['GET'])]

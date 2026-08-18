@@ -50,3 +50,11 @@ framework:
             policy: 'sliding_window'
             limit: 5
             interval: '15 minutes'
+
+        # Public landing-page contact form. Keyed by IP: enough for someone to
+        # correct a typo and resend, low enough that the form cannot be scripted
+        # to flood the owners' inboxes.
+        contact_form:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '30 minutes'

@@ -924,6 +924,13 @@ export interface CatalogGame {
   active: boolean
 }
 
+/** A supported game plus one piece of real card art, for marketing tiles. */
+export interface CatalogGameShowcase {
+  code: string
+  name: string
+  imageUrl: string | null
+}
+
 export interface CatalogGameSet {
   id: number
   gameCode: string | null
