@@ -99,8 +99,8 @@ export default function MarketplaceLanding() {
             transition={{ duration: 0.6, ease: EASE_PREMIUM, delay: 0.22 }}
             className="mt-4 max-w-2xl text-[0.95rem] leading-relaxed text-fg-muted sm:mt-5 sm:text-lg"
           >
-            Discover, collect, and trade the cards you care about through trusted local game stores and a
-            collector-first marketplace.
+            Discover, play, and trade the cards you care about through trusted local game stores and a
+            player-first marketplace.
           </motion.p>
 
           <motion.div
@@ -156,7 +156,7 @@ export default function MarketplaceLanding() {
             <>
               <h2 className="mt-2 text-display-sm sm:text-display-md">Every game our stores stock.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
-                Singles and sealed product across the games collectors actually play, all searchable by set, rarity,
+                Singles and sealed product across the games players actually play, all searchable by set, rarity,
                 condition, and finish.
               </p>
               <Stagger className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5" gap={0.05}>
@@ -175,7 +175,7 @@ export default function MarketplaceLanding() {
           <Reveal className="space-y-2">
             <p className="text-eyebrow">Why LGS Card Vault</p>
             <h2 className="mt-2 text-display-sm sm:text-display-md">
-              Built for collectors and the stores they trust.
+              Built for players and the stores they trust.
             </h2>
           </Reveal>
           <Stagger className="mt-6 grid gap-4 md:grid-cols-3" gap={0.06}>

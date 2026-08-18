@@ -297,7 +297,7 @@ export function GameShowcaseReel({
         We stock <FlipWords word={tile.short} color={tile.accent} />
       </h2>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
-        Singles and sealed product across the games collectors actually play, all searchable by set, rarity,
+        Singles and sealed product across the games players actually play, all searchable by set, rarity,
         condition, and finish.
       </p>
 
