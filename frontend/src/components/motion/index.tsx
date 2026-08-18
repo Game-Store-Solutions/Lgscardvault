@@ -26,8 +26,13 @@ export function MotionRoot({ children }: { children: ReactNode }) {
 }
 
 /**
- * Route-level transition. Keyed on the pathname so navigating swaps content
- * with a short cross-fade rather than a hard cut.
+ * Route-level transition: keyed on the pathname so each navigation remounts and
+ * fades its content in.
+ *
+ * Deliberately no `AnimatePresence`/`exit` here. Wrapping an `<Outlet />` in
+ * `mode="wait"` holds the previous keyed wrapper on screen while the router has
+ * already swapped the route underneath it, which left pages blank until a manual
+ * refresh. An entrance-only animation cannot get stuck waiting on an exit.
  */
 export function PageTransition({
   routeKey,
@@ -39,18 +44,15 @@ export function PageTransition({
   className?: string
 }) {
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={routeKey}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
-        transition={{ duration: 0.26, ease: EASE_PREMIUM }}
-        className={className}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <motion.div
+      key={routeKey}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.26, ease: EASE_PREMIUM }}
+      className={className}
+    >
+      {children}
+    </motion.div>
   )
 }
 
