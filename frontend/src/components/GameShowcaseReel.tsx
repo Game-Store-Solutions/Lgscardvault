@@ -6,7 +6,7 @@ import { cx } from '../lib/cx'
 import { EASE_PREMIUM } from './motion'
 import { FlipWords } from './FlipWords'
 
-const HOLD_MS = 3200
+const HOLD_MS = 1600
 const CARDS_PER_GAME = 4
 
 const REST_TILT = [-1.6, 1.2, -0.9, 1.8] as const
@@ -14,6 +14,11 @@ const REST_TILT = [-1.6, 1.2, -0.9, 1.8] as const
 /** Names the reel should lead with when they exist in that game's pool. */
 const REEL_LEADERS: Record<string, string[]> = {
   mtg: ['Birds of Paradise', 'Goblin Guide', 'Dark Confidant', 'Snapcaster Mage'],
+}
+
+/** Never show these in the games reel, even as art-failure backups. */
+const REEL_BLOCKED: Record<string, string[]> = {
+  mtg: ['Sol Ring', 'Black Lotus'],
 }
 
 function nameMatches(cardName: string, wanted: string): boolean {
@@ -31,6 +36,10 @@ function preferLeaders(pool: CatalogShowcaseCard[], leaders?: string[]): Catalog
     if (index >= 0) ordered.push(...remaining.splice(index, 1))
   }
   return [...ordered, ...remaining]
+}
+
+function isBlocked(card: CatalogShowcaseCard, gameCode: string): boolean {
+  return (REEL_BLOCKED[gameCode] ?? []).some((name) => nameMatches(card.name, name))
 }
 
 function groupCards(
@@ -129,10 +138,8 @@ function pickVisible(
   failedIds: Set<string>,
   gameCode: string,
 ): CatalogShowcaseCard[] {
-  return preferLeaders(
-    pool.filter((card) => !failedIds.has(card.id)),
-    REEL_LEADERS[gameCode],
-  ).slice(0, CARDS_PER_GAME)
+  const available = pool.filter((card) => !failedIds.has(card.id) && !isBlocked(card, gameCode))
+  return preferLeaders(available, REEL_LEADERS[gameCode]).slice(0, CARDS_PER_GAME)
 }
 
 function ShowcaseArt({
@@ -295,18 +302,18 @@ export function GameShowcaseReel({
         <AnimatePresence initial={false}>
           <motion.div
             key={active.game.code}
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.5, ease: EASE_PREMIUM }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: EASE_PREMIUM }}
             className="absolute inset-0 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
           >
             {visible.map((card, cardIndex) => (
               <motion.figure
                 key={card.id}
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0, rotate: REST_TILT[cardIndex] ?? 0 }}
-                transition={{ duration: 0.5, delay: cardIndex * 0.04, ease: EASE_PREMIUM }}
+                transition={{ duration: 0.22, delay: cardIndex * 0.02, ease: EASE_PREMIUM }}
                 className="origin-bottom will-change-transform"
               >
                 <ShowcaseArt card={card} accent={tile.accent} onFailed={markFailed} artTick={artTick} />

@@ -31,7 +31,6 @@ final class ShowcaseCardCatalog
             'Dark Confidant',
             'Snapcaster Mage',
             'Serra Angel',
-            'Sol Ring',
             'Lightning Bolt',
             'Ragavan',
             'Sheoldred',
