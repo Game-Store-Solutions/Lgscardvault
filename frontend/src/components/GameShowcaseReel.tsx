@@ -284,8 +284,8 @@ export function GameShowcaseReel({
         aria-hidden
         className="pointer-events-none absolute -inset-x-6 -top-10 -bottom-8 -z-10 sm:-inset-x-16 sm:-top-14 sm:-bottom-12"
       >
-        <span className="absolute left-1/2 top-[18%] h-48 w-[min(32rem,85%)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(198,160,53,0.55),transparent_68%)] blur-2xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.38),transparent_72%)] dark:blur-3xl" />
-        <span className="absolute left-1/2 top-[62%] h-[24rem] w-[min(58rem,125%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(10,22,39,0.16),transparent_68%)] blur-2xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.26),transparent_70%)] dark:blur-3xl" />
+        <span className="absolute left-1/2 top-[18%] h-48 w-[min(32rem,85%)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(198,160,53,0.55),transparent_68%)] blur-2xl dark:bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.55),transparent_68%)]" />
+        <span className="absolute left-1/2 top-[62%] h-[24rem] w-[min(58rem,125%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(10,22,39,0.16),transparent_68%)] blur-2xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.42),transparent_68%)]" />
       </div>
 
       <h2
