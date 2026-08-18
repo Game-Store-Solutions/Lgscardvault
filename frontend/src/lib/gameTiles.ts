@@ -14,7 +14,7 @@ export type GameTileStyle = {
 }
 
 const TILES: Record<string, GameTileStyle> = {
-  mtg: { accent: '#c6a035', short: 'Magic' },
+  mtg: { accent: '#2563eb', short: 'Magic' },
   pokemon: { accent: '#ef4444', short: 'Pokémon' },
   onepiece: { accent: '#f59e0b', short: 'One Piece' },
   fab: { accent: '#10b981', short: 'Flesh & Blood' },

@@ -75,6 +75,55 @@ function artUrls(card: CatalogShowcaseCard): string[] {
   return expandArtUrls(urls.length > 0 ? urls : card.imageUrl ? [card.imageUrl] : [])
 }
 
+/** Working art URL per card, filled by the page-load warmer so the reel
+ *  does not wait until the section is scrolled into view. */
+const warmedArt = new Map<string, string>()
+
+function loadUrl(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.decoding = 'async'
+    img.onload = () => resolve(true)
+    img.onerror = () => resolve(false)
+    img.src = url
+  })
+}
+
+async function warmCard(card: CatalogShowcaseCard): Promise<string | null> {
+  const cached = warmedArt.get(card.id)
+  if (cached) return cached
+  for (const url of artUrls(card)) {
+    if (await loadUrl(url)) {
+      warmedArt.set(card.id, url)
+      return url
+    }
+  }
+  return null
+}
+
+/** Kick off reel art downloads as soon as the catalog payload arrives, so the
+ *  images are in cache before the games section is scrolled into view. */
+export function warmupShowcaseCards(cards: CatalogShowcaseCard[]) {
+  const byCode = new Map<string, CatalogShowcaseCard[]>()
+  for (const card of cards) {
+    const list = byCode.get(card.gameCode) ?? []
+    list.push(card)
+    byCode.set(card.gameCode, list)
+  }
+  for (const [code, pool] of byCode) {
+    for (const card of pickVisible(pool, new Set(), code)) {
+      void warmCard(card)
+    }
+  }
+}
+
+function urlsForCard(card: CatalogShowcaseCard): string[] {
+  const expanded = artUrls(card)
+  const warmed = warmedArt.get(card.id)
+  if (!warmed) return expanded
+  return [warmed, ...expanded.filter((url) => url !== warmed)]
+}
+
 function pickVisible(
   pool: CatalogShowcaseCard[],
   failedIds: Set<string>,
@@ -90,12 +139,14 @@ function ShowcaseArt({
   card,
   accent,
   onFailed,
+  artTick,
 }: {
   card: CatalogShowcaseCard
   accent: string
   onFailed: (id: string) => void
+  artTick: number
 }) {
-  const urls = useMemo(() => artUrls(card), [card])
+  const urls = useMemo(() => urlsForCard(card), [card, artTick])
   const [attempt, setAttempt] = useState(0)
   const src = urls[attempt]
   const reported = useRef(false)
@@ -103,7 +154,7 @@ function ShowcaseArt({
   useEffect(() => {
     setAttempt(0)
     reported.current = false
-  }, [card.id])
+  }, [card.id, artTick])
 
   useEffect(() => {
     if (src || reported.current) return
@@ -129,7 +180,8 @@ function ShowcaseArt({
           alt={card.name}
           onError={() => setAttempt((current) => current + 1)}
           className="absolute inset-0 size-full object-cover object-top"
-          loading="lazy"
+          loading="eager"
+          fetchPriority="high"
           decoding="async"
         />
       ) : null}
@@ -154,6 +206,7 @@ export function GameShowcaseReel({
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set())
+  const [artTick, setArtTick] = useState(0)
 
   const markFailed = useCallback((id: string) => {
     setFailedIds((current) => {
@@ -163,6 +216,34 @@ export function GameShowcaseReel({
       return next
     })
   }, [])
+
+  useEffect(() => {
+    if (slides.length === 0) return
+    let cancelled = false
+    const emptyFailed = new Set<string>()
+    const first = pickVisible(slides[0].pool, emptyFailed, slides[0].game.code)
+    const rest = slides.slice(1).flatMap((slide) => pickVisible(slide.pool, emptyFailed, slide.game.code))
+
+    const bump = () => {
+      if (!cancelled) setArtTick((current) => current + 1)
+    }
+
+    const failIfMissing = (card: CatalogShowcaseCard, src: string | null) => {
+      if (!src && !cancelled) markFailed(card.id)
+    }
+
+    void (async () => {
+      await Promise.all(first.map((card) => warmCard(card).then((src) => failIfMissing(card, src))))
+      bump()
+      if (cancelled || rest.length === 0) return
+      await Promise.all(rest.map((card) => warmCard(card).then((src) => failIfMissing(card, src))))
+      bump()
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [slides, markFailed])
 
   useEffect(() => {
     if (slides.length <= 1 || paused) return
@@ -228,7 +309,7 @@ export function GameShowcaseReel({
                 transition={{ duration: 0.5, delay: cardIndex * 0.04, ease: EASE_PREMIUM }}
                 className="origin-bottom will-change-transform"
               >
-                <ShowcaseArt card={card} accent={tile.accent} onFailed={markFailed} />
+                <ShowcaseArt card={card} accent={tile.accent} onFailed={markFailed} artTick={artTick} />
                 <figcaption className="mt-2 truncate px-0.5 text-center text-[0.7rem] font-semibold text-fg-muted">
                   {card.name}
                 </figcaption>

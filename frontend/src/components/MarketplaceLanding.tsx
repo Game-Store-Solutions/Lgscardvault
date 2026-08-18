@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
@@ -8,7 +9,7 @@ import { useGameShowcase, useShowcaseCards } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { ContactForm } from './ContactForm'
-import { GameShowcaseReel } from './GameShowcaseReel'
+import { GameShowcaseReel, warmupShowcaseCards } from './GameShowcaseReel'
 import { GameTile } from './GameTile'
 
 const TRUST_POINTS = [
@@ -39,6 +40,11 @@ export default function MarketplaceLanding() {
     .map((card) => card.imageUrl)
     .filter((url): url is string => Boolean(url))
   useAppShellFlush(true)
+
+  useEffect(() => {
+    if (showcaseCards.length === 0) return
+    warmupShowcaseCards(showcaseCards)
+  }, [showcaseCards])
 
   const primaryCta =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn bg-brand-500 px-6 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-600 sm:w-auto'
