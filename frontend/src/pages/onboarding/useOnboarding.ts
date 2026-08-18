@@ -48,9 +48,8 @@ export function useOnboarding() {
     }))
   }, [user])
 
-  // Only fetch plans once the owner is authenticated — the /plans endpoint
-  // requires auth, and firing it on the (pre-login) account step would 401 and
-  // bounce the user to /login via the axios interceptor.
+  // Deferred to the plan step: nothing before it needs the list, so the wizard
+  // avoids a request the user may never reach. (/plans itself is public.)
   const plansQuery = useQuery({
     queryKey: ['plans'],
     queryFn: async () => {
