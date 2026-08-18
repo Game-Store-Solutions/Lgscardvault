@@ -27,8 +27,8 @@ export interface GameSelectorProps {
  * both read the same way.
  *
  * Responsive by construction rather than by breakpoint guesswork: pills on
- * a wide screen (fast, everything visible at once) collapse to a native
- * select on small screens, where a row of five-plus pills would either wrap
+ * a wide screen (fast, everything visible at once) collapse to a compact
+ * custom select on small screens, where a row of five-plus pills would either wrap
  * into a wall or scroll sideways. Both render the same options and emit the
  * same value.
  */
@@ -45,7 +45,7 @@ export function GameSelector({
 
   return (
     <div className={cx('w-full', className)}>
-      {/* Mobile: a native picker. Reliable, no horizontal scrolling. */}
+      {/* Mobile: a compact picker. Reliable, no horizontal scrolling. */}
       <label className="block sm:hidden">
         <span className="sr-only">{label}</span>
         <Select value={value} onChange={(event) => onChange(event.target.value)} wrapperClassName="w-full" className="w-full">

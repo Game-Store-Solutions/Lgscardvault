@@ -7,8 +7,11 @@ export type { ButtonProps } from './Button'
 export { Card, CardHeader, CardBody, CardFooter } from './Card'
 export type { CardProps, CardHeaderProps, CardBodyProps, CardFooterProps } from './Card'
 
-export { Input, Textarea, Select } from './Input'
-export type { InputProps, TextareaProps, SelectProps } from './Input'
+export { Input, Textarea } from './Input'
+export type { InputProps, TextareaProps } from './Input'
+
+export { Select } from './Select'
+export type { SelectProps } from './Select'
 
 export { Field } from './Field'
 export type { FieldProps } from './Field'
@@ -42,5 +45,7 @@ export type { PaginationProps } from './Pagination'
 
 export { Avatar } from './Avatar'
 export type { AvatarProps } from './Avatar'
+
+export { dropdownPanelClass, dropdownItemClass } from './dropdown'
 
 export * from './icons'

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { Bell } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useCustomerNotifications, useMarkNotificationRead } from '../../hooks'
 import { NotificationList } from './NotificationList'
+import { dropdownPanelClass } from '../ui'
+import { EASE_PREMIUM } from '../motion'
 
 export function NotificationBell({ slug }: { slug: string }) {
   const location = useLocation()
@@ -50,7 +53,12 @@ export function NotificationBell({ slug }: { slug: string }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-card border border-border bg-surface p-2 shadow-card">
+        <motion.div
+          initial={{ opacity: 0, y: 6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+          className={`${dropdownPanelClass} absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] p-2`}
+        >
           <div className="flex items-center justify-between gap-3 px-2 py-2">
             <p className="text-sm font-bold text-fg">Notifications</p>
             <Link to={`/account?section=notifications&store=${slug}`} onClick={() => setOpen(false)} className="text-xs font-bold text-brand-600 hover:underline">
@@ -63,7 +71,7 @@ export function NotificationBell({ slug }: { slug: string }) {
             onMarkRead={(id) => markRead.mutate(id)}
             compact
           />
-        </div>
+        </motion.div>
       )}
     </div>
   )

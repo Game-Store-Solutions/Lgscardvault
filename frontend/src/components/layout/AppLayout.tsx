@@ -4,12 +4,13 @@ import { useAuth } from '../../context/AuthContext'
 import { useCustomerCart, useGuestCart, useKioskMode, useTheme } from '../../hooks'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
-import { Avatar, Button, buttonVariants } from '../ui'
+import { Avatar, Button, buttonVariants, dropdownItemClass, dropdownPanelClass } from '../ui'
 import { BrandLogo } from '../BrandLogo'
 import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { manageableStores } from '../../lib/manageableStores'
 import { AppShellLayoutProvider, useAppShellLayout } from './AppShellLayout'
-import { PageTransition } from '../motion'
+import { PageTransition, EASE_PREMIUM } from '../motion'
+import { motion } from 'framer-motion'
 import { cx } from '../../lib/cx'
 import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShieldCheck, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
 
@@ -211,18 +212,25 @@ export default function AppLayout() {
                   <ChevronDown aria-hidden className="size-4" />
                 </Button>
                 {storeMenuOpen && (
-                  <div className="absolute right-0 z-20 mt-2 min-w-56 rounded-card border border-border bg-surface p-2 shadow-card">
+                  <motion.div
+                    role="menu"
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                    className={cx(dropdownPanelClass, 'absolute right-0 z-20 mt-2 min-w-56 p-1.5')}
+                  >
                     {ownedStores.map((store) => (
                       <Link
                         key={store.id}
+                        role="menuitem"
                         to={`/s/${store.slug}/admin`}
                         onClick={() => setStoreMenuOpen(false)}
-                        className="block rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
+                        className={dropdownItemClass({})}
                       >
                         {store.name}
                       </Link>
                     ))}
-                  </div>
+                  </motion.div>
                 )}
               </div>
             )}
@@ -242,15 +250,22 @@ export default function AppLayout() {
                   <ChevronDown aria-hidden className="size-4 text-fg-muted" />
                 </button>
                 {userMenuOpen && (
-                  <div className="absolute right-0 z-20 mt-2 w-56 rounded-card border border-border bg-surface p-2 shadow-card">
-                    <div className="border-b border-border px-3 pb-2 pt-1">
+                  <motion.div
+                    role="menu"
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                    className={cx(dropdownPanelClass, 'absolute right-0 z-20 mt-2 w-56 p-1.5')}
+                  >
+                    <div className="border-b border-border px-2.5 pb-2 pt-1.5 dark:border-white/10">
                       <p className="truncate text-sm font-bold text-fg">{user.displayName}</p>
                       <p className="truncate text-xs text-fg-muted">{user.email}</p>
                     </div>
                     <Link
+                      role="menuitem"
                       to={storeSlug ? `/account?store=${storeSlug}` : '/account'}
                       onClick={() => setUserMenuOpen(false)}
-                      className="mt-1 flex items-center gap-2 rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
+                      className={cx(dropdownItemClass({}), 'mt-1')}
                     >
                       <UserCircle aria-hidden className="size-4 text-fg-muted" />
                       My account
@@ -259,11 +274,12 @@ export default function AppLayout() {
                     {isStoreOwner && (
                       <button
                         type="button"
+                        role="menuitem"
                         onClick={() => {
                           setUserMenuOpen(false)
                           enterKioskMode()
                         }}
-                        className="flex w-full items-center gap-2 rounded-btn px-3 py-2 text-left text-sm text-fg hover:bg-bg"
+                        className={dropdownItemClass({})}
                       >
                         <Monitor aria-hidden className="size-4 text-fg-muted" />
                         Enter kiosk mode
@@ -271,16 +287,17 @@ export default function AppLayout() {
                     )}
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         setUserMenuOpen(false)
                         logout()
                       }}
-                      className="flex w-full items-center gap-2 rounded-btn px-3 py-2 text-left text-sm text-danger-700 hover:bg-bg"
+                      className={cx(dropdownItemClass({}), 'text-danger-700 hover:text-danger-700')}
                     >
                       <LogOut aria-hidden className="size-4" />
                       Logout
                     </button>
-                  </div>
+                  </motion.div>
                 )}
               </div>
             ) : (
@@ -302,22 +319,30 @@ export default function AppLayout() {
                     <ChevronDown aria-hidden className="size-4" />
                   </Button>
                   {accountMenuOpen && (
-                    <div className="absolute right-0 z-20 mt-2 w-48 rounded-card border border-border bg-surface p-2 shadow-card">
+                    <motion.div
+                      role="menu"
+                      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                      className={cx(dropdownPanelClass, 'absolute right-0 z-20 mt-2 w-48 p-1.5')}
+                    >
                       <Link
+                        role="menuitem"
                         to="/register/customer"
                         onClick={() => setAccountMenuOpen(false)}
-                        className="block rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
+                        className={dropdownItemClass({})}
                       >
                         Shopper
                       </Link>
                       <Link
+                        role="menuitem"
                         to="/register/owner"
                         onClick={() => setAccountMenuOpen(false)}
-                        className="block rounded-btn px-3 py-2 text-sm text-fg hover:bg-bg"
+                        className={dropdownItemClass({})}
                       >
                         Owner
                       </Link>
-                    </div>
+                    </motion.div>
                   )}
                 </div>
               </>

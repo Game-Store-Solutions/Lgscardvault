@@ -23,7 +23,7 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
 import type { InventoryItem, Order, OrderChannel, OrderStatus } from '../../api/types'
 import { inventoryKey, openStoreOrdersCountKey, ordersKey, resolveOrdersListTotal, useDebouncedValue, useInventoryPage, useOrders, useStoreOrderQueueCounts } from '../../hooks'
-import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal } from '../../components/ui'
+import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal, Select } from '../../components/ui'
 import { OrderLineList } from '../../components/orders/OrderLineList'
 import { OrderWorkflow } from '../../components/orders/OrderWorkflow'
 import { cx } from '../../lib/cx'
@@ -326,16 +326,17 @@ export default function OrdersTab({ slug }: { slug: string }) {
                 className="h-10 w-full rounded-[var(--radius-input)] border border-border bg-bg pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               />
             </div>
-            <select
+            <Select
               aria-label="Filter by channel"
               value={channelFilter}
               onChange={(e) => setChannelFilter(e.target.value as OrderChannel | 'all')}
-              className="h-10 rounded-[var(--radius-input)] border border-border bg-surface px-3 text-sm font-medium text-fg"
+              wrapperClassName="w-[9.5rem] shrink-0"
+              className="h-10"
             >
               <option value="all">All channels</option>
               <option value="online">Online</option>
               <option value="kiosk">Kiosk</option>
-            </select>
+            </Select>
             <button
               type="button"
               aria-label="Filter options"
