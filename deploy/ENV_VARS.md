@@ -6,6 +6,13 @@ Everything the backend expects for a successful deploy. Copy
 The frontend production image uses same-origin `/api` (no `VITE_*` required).
 Do **not** set `VITE_ENABLE_TEST_CHECKOUT=true` in production.
 
+Optional backend var: `APP_CONTACT_RECIPIENTS` — comma-separated inboxes that
+receive landing-page contact-form submissions (`POST /api/contact`). Unset, it
+defaults to the platform owners (`tedy@` / `robert@gamestoresolutions.com`). Set
+it to route enquiries elsewhere, e.g.
+`APP_CONTACT_RECIPIENTS=support@gamestoresolutions.com`. Delivery uses
+`MAILER_DSN`, so the form needs a working mailer in production.
+
 JWT **key files** (`config/jwt/*.pem`) are not env vars — generate once on the
 server (`lexik:jwt:generate-keypair`); see [`LAUNCH.md`](LAUNCH.md).
 

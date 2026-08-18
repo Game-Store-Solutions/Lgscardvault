@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cx } from '../lib/cx'
 
 export type FloatCard = {
@@ -302,6 +303,93 @@ export const FLOAT_CARDS: FloatCard[] = [
     className: 'right-[2%] top-[62%] hidden w-[9.5%] max-w-[5.5rem] -rotate-8 2xl:block',
     delay: '3.4s',
   },
+
+  // —— Extra depth. Slots for a fuller catalog field (≈12 cards per game);
+  //    kept on lg+ so phones stay light and the copy keeps breathing room. ——
+  {
+    src: '/brand/cards/mtg-atraxa.jpg',
+    alt: '',
+    className: 'left-[28%] top-[8%] hidden w-[9%] max-w-[5.25rem] -rotate-7 lg:block',
+    delay: '3.45s',
+  },
+  {
+    src: '/brand/cards/pkm-mewtwo.jpg',
+    alt: '',
+    className: 'right-[28%] top-[9%] hidden w-[9%] max-w-[5.25rem] rotate-6 lg:block',
+    delay: '3.5s',
+  },
+  {
+    src: '/brand/cards/op-nami.jpg',
+    alt: '',
+    className: 'left-[28%] bottom-[8%] hidden w-[9%] max-w-[5.25rem] rotate-8 lg:block',
+    delay: '3.55s',
+  },
+  {
+    src: '/brand/cards/rb-lux.jpg',
+    alt: '',
+    className: 'right-[28%] bottom-[9%] hidden w-[9%] max-w-[5.25rem] -rotate-6 lg:block',
+    delay: '3.6s',
+  },
+  {
+    src: '/brand/cards/fab-lexi.jpg',
+    alt: '',
+    className: 'left-[14%] top-[70%] hidden w-[9%] max-w-[5.25rem] rotate-5 lg:block',
+    delay: '3.65s',
+  },
+  {
+    src: '/brand/cards/mtg-oko.jpg',
+    alt: '',
+    className: 'right-[14%] top-[70%] hidden w-[9%] max-w-[5.25rem] -rotate-9 lg:block',
+    delay: '3.7s',
+  },
+  {
+    src: '/brand/cards/pkm-lugia.jpg',
+    alt: '',
+    className: 'left-[4%] top-[46%] hidden w-[8.5%] max-w-[5rem] rotate-11 xl:block',
+    delay: '3.75s',
+  },
+  {
+    src: '/brand/cards/op-sanji.jpg',
+    alt: '',
+    className: 'right-[4%] top-[46%] hidden w-[8.5%] max-w-[5rem] -rotate-11 xl:block',
+    delay: '3.8s',
+  },
+  {
+    src: '/brand/cards/rb-vi.jpg',
+    alt: '',
+    className: 'left-[56%] top-[10%] hidden w-[8.5%] max-w-[5rem] rotate-4 xl:block',
+    delay: '3.85s',
+  },
+  {
+    src: '/brand/cards/fab-chane.jpg',
+    alt: '',
+    className: 'right-[56%] top-[11%] hidden w-[8.5%] max-w-[5rem] -rotate-5 xl:block',
+    delay: '3.9s',
+  },
+  {
+    src: '/brand/cards/mtg-force.jpg',
+    alt: '',
+    className: 'left-[56%] bottom-[10%] hidden w-[8.5%] max-w-[5rem] -rotate-8 xl:block',
+    delay: '3.95s',
+  },
+  {
+    src: '/brand/cards/pkm-gengar.jpg',
+    alt: '',
+    className: 'right-[56%] bottom-[11%] hidden w-[8.5%] max-w-[5rem] rotate-9 xl:block',
+    delay: '4s',
+  },
+  {
+    src: '/brand/cards/op-law.jpg',
+    alt: '',
+    className: 'left-[20%] top-[30%] hidden w-[8%] max-w-[4.75rem] rotate-7 2xl:block',
+    delay: '4.05s',
+  },
+  {
+    src: '/brand/cards/rb-annie.jpg',
+    alt: '',
+    className: 'right-[20%] top-[31%] hidden w-[8%] max-w-[4.75rem] -rotate-7 2xl:block',
+    delay: '4.1s',
+  },
 ]
 
 /** Right-anchored layout for marketplace / auth panels — denser side stack. */
@@ -444,36 +532,69 @@ type FloatingCardsBackdropProps = {
   layout?: 'scatter' | 'right'
   className?: string
   washClassName?: string
+  /**
+   * Catalog art to fill the composition with (see `useShowcaseCards`). The
+   * hand-tuned positions below are reused and only the images swap, so real
+   * catalog art can fill the field without redesigning the layout. Falls back to
+   * the bundled art when empty.
+   */
+  images?: string[]
 }
 
 export function FloatingCardsBackdrop({
   layout = 'scatter',
   className,
   washClassName,
+  images,
 }: FloatingCardsBackdropProps) {
-  const cards = layout === 'right' ? RIGHT_FOCUS_CARDS : FLOAT_CARDS
+  // Dense field for the landing scatter; the side layouts stay lighter so they
+  // don't fight the copy sitting next to them.
+  const layoutCards = layout === 'right' ? RIGHT_FOCUS_CARDS.slice(0, 14) : FLOAT_CARDS
+  const cards =
+    images && images.length > 0
+      ? layoutCards.map((card, index) => ({ ...card, src: images[index % images.length], alt: '' }))
+      : layoutCards
 
   return (
     <div aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>
       {cards.map((card, i) => (
-        <img
+        <FloatCard
           key={`${layout}-${card.src}-${i}`}
-          src={card.src}
-          alt=""
-          className={cx(
-            'absolute rounded-xl object-cover',
-            'shadow-[0_20px_50px_-18px_rgba(10,10,11,0.28)] ring-1 ring-[#c6a035]/45 dark:ring-[#dc2626]/35',
-            'dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.75)] dark:ring-[#e0c15a]/35',
-            'animate-[hero-float_7s_ease-in-out_infinite]',
-            card.className,
-          )}
-          style={{ animationDelay: card.delay }}
-          loading="eager"
-          decoding="async"
+          card={card}
+          // Only the first ring blocks first paint; the rest stream in.
+          eager={i < 12}
         />
       ))}
       {washClassName ? <div className={cx('absolute inset-0', washClassName)} /> : null}
     </div>
+  )
+}
+
+/**
+ * One floating card. Catalog art can 404 (external CDN renditions), and a broken
+ * image in a decorative field is worse than an empty slot — so drop it silently.
+ */
+function FloatCard({ card, eager }: { card: FloatCard; eager: boolean }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+
+  return (
+    <img
+      src={card.src}
+      alt=""
+      onError={() => setFailed(true)}
+      className={cx(
+        'absolute rounded-xl object-cover',
+        'opacity-[0.78] saturate-[0.92]',
+        'shadow-[0_16px_44px_-18px_rgba(10,10,11,0.22)] ring-1 ring-white/8 dark:ring-white/10',
+        'dark:shadow-[0_24px_60px_-18px_rgba(0,0,0,0.72)]',
+        'animate-[hero-float_8.5s_ease-in-out_infinite]',
+        card.className,
+      )}
+      style={{ animationDelay: card.delay }}
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+    />
   )
 }
 

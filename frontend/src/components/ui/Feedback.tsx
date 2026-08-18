@@ -1,9 +1,18 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { ComponentType, ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import { tv, type VariantProps } from 'tailwind-variants'
 import { Loader2, TriangleAlert, Inbox } from 'lucide-react'
+import { EASE_PREMIUM } from '../motion'
 import { cx } from '../../lib/cx'
 import { Button } from './Button'
+
+/** Shared entrance so loading, empty, and error panels read consistently. */
+const panelEntrance = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.34, ease: EASE_PREMIUM },
+}
 
 export const spinnerVariants = tv({
   base: 'animate-spin text-brand-500',
@@ -38,16 +47,17 @@ export interface LoadingPanelProps {
 
 export function LoadingPanel({ label = 'Loading…', className }: LoadingPanelProps) {
   return (
-    <div
+    <motion.div
+      {...panelEntrance}
       className={cx(
-        'flex flex-col items-center justify-center gap-3 py-16 px-6',
+        'flex flex-col items-center justify-center gap-3 py-14 px-6 sm:py-16',
         'rounded-card border border-border bg-surface dark:glass-card',
         className,
       )}
     >
       <Spinner size="lg" />
       <p className="text-sm text-fg-muted">{label}</p>
-    </div>
+    </motion.div>
   )
 }
 
@@ -67,21 +77,27 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <div
+    <motion.div
+      {...panelEntrance}
       className={cx(
-        'flex flex-col items-center justify-center gap-3 py-16 px-6 text-center',
+        'flex flex-col items-center justify-center gap-3 py-14 px-6 text-center sm:py-16',
         className,
       )}
     >
-      <span className="flex size-12 items-center justify-center rounded-full bg-bg text-fg-muted">
+      <motion.span
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.34, ease: EASE_PREMIUM, delay: 0.05 }}
+        className="flex size-12 items-center justify-center rounded-full bg-bg text-fg-muted"
+      >
         <Icon aria-hidden className="size-6" />
-      </span>
-      <div className="space-y-1">
-        <h3 className="text-base font-bold text-fg">{title}</h3>
-        {description != null && <p className="text-sm text-fg-muted">{description}</p>}
+      </motion.span>
+      <div className="max-w-md space-y-1.5">
+        <h3 className="text-display-xs">{title}</h3>
+        {description != null && <p className="text-sm leading-relaxed text-fg-muted">{description}</p>}
       </div>
       {action != null && <div className="mt-2">{action}</div>}
-    </div>
+    </motion.div>
   )
 }
 
@@ -99,25 +115,26 @@ export function ErrorState({
   className,
 }: ErrorStateProps) {
   return (
-    <div
+    <motion.div
       role="alert"
+      {...panelEntrance}
       className={cx(
-        'flex flex-col items-center justify-center gap-3 py-16 px-6 text-center',
+        'flex flex-col items-center justify-center gap-3 py-14 px-6 text-center sm:py-16',
         className,
       )}
     >
       <span className="flex size-12 items-center justify-center rounded-full bg-danger-50 text-danger-700">
         <TriangleAlert aria-hidden className="size-6" />
       </span>
-      <div className="space-y-1">
-        <h3 className="text-base font-bold text-fg">{title}</h3>
-        {description != null && <p className="text-sm text-fg-muted">{description}</p>}
+      <div className="max-w-md space-y-1.5">
+        <h3 className="text-display-xs">{title}</h3>
+        {description != null && <p className="text-sm leading-relaxed text-fg-muted">{description}</p>}
       </div>
       {onRetry && (
         <Button variant="secondary" size="sm" onClick={onRetry} className="mt-2">
           Try again
         </Button>
       )}
-    </div>
+    </motion.div>
   )
 }

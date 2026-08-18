@@ -514,6 +514,82 @@ class CardRepository extends ServiceEntityRepository
         return $words[0];
     }
 
+    /**
+     * Resolve curated card names to real printings for one game, keeping the
+     * caller's order. Names are matched as prefixes so a single entry works
+     * across naming conventions ("Charizard" finds "Charizard (Holofoil)").
+     * Only printings with art are returned, newest first per name.
+     *
+     * @param list<string> $namePrefixes
+     *
+     * @return list<Card>
+     */
+    public function findShowcaseByNamesForGame(Game $game, array $namePrefixes): array
+    {
+        if ([] === $namePrefixes) {
+            return [];
+        }
+
+        $qb = $this->scopedToGame($game)->andWhere('c.imageUris IS NOT NULL');
+        $matcher = $qb->expr()->orX();
+        foreach (array_values($namePrefixes) as $index => $prefix) {
+            $matcher->add(sprintf('LOWER(c.name) LIKE :showcaseName%d', $index));
+            $qb->setParameter(sprintf('showcaseName%d', $index), mb_strtolower(trim($prefix)).'%');
+        }
+
+        /** @var list<Card> $rows */
+        $rows = $qb->andWhere($matcher)
+            ->orderBy('c.releasedAt', 'DESC')
+            ->addOrderBy('c.id', 'ASC')
+            // Generous cap: one curated name can match many printings, and the
+            // loop below only keeps the first hit for each.
+            ->setMaxResults(count($namePrefixes) * 25)
+            ->getQuery()
+            ->getResult();
+
+        // Walk the curated order so the page shows what we asked for, not
+        // whatever the database happened to sort first.
+        $resolved = [];
+        foreach ($namePrefixes as $prefix) {
+            $needle = mb_strtolower(trim($prefix));
+            foreach ($rows as $card) {
+                if (isset($resolved[(string) $card->getId()])) {
+                    continue;
+                }
+                if (str_starts_with(mb_strtolower($card->getName()), $needle)) {
+                    $resolved[(string) $card->getId()] = $card;
+                    break;
+                }
+            }
+        }
+
+        return array_values($resolved);
+    }
+
+    /**
+     * Newest cards for a game that carry image data — used to top up the
+     * showcase when curated names aren't in the catalog.
+     *
+     * @return list<Card>
+     */
+    public function findShowcaseCandidatesForGame(Game $game, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        /** @var list<Card> $cards */
+        $cards = $this->scopedToGame($game)
+            ->andWhere('c.imageUris IS NOT NULL')
+            ->orderBy('c.releasedAt', 'DESC')
+            ->addOrderBy('c.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return $cards;
+    }
+
     /** Base query for one game, including legacy NULL-game rows for Magic. */
     private function scopedToGame(Game $game): QueryBuilder
     {

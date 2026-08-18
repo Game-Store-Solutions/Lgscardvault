@@ -4,6 +4,8 @@ import type {
   StoreGame,
   CatalogGame,
   CatalogGameSet,
+  CatalogGameShowcase,
+  CatalogShowcaseCard,
   CatalogSyncRun,
   CatalogArtistBrowseResult,
   SealedInventoryLine,
@@ -18,6 +20,8 @@ import type {
    catalog, per-store sealed inventory, and platform sync-run history. */
 
 export const catalogGamesKey = ['catalog', 'games'] as const
+export const catalogGamesShowcaseKey = ['catalog', 'games', 'showcase'] as const
+export const catalogShowcaseCardsKey = ['catalog', 'showcase-cards'] as const
 export const gameSetsKey = (gameCode: string) => ['catalog', 'sets', gameCode] as const
 export const sealedSearchKey = (params: SealedSearchParams) =>
   ['catalog', 'sealed', params.game ?? '', params.setId ?? 0, params.q ?? '', params.page ?? 1] as const
@@ -38,6 +42,39 @@ export interface SealedSearchParams {
   q?: string
   page?: number
   perPage?: number
+}
+
+/**
+ * Supported games, each with its signature card's art from the catalog. Public
+ * endpoint — the landing page uses it for the "games we support" tiles.
+ */
+export function useGameShowcase() {
+  return useQuery({
+    queryKey: catalogGamesShowcaseKey,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<CatalogGameShowcase[]>('/catalog/games/showcase')
+      return data
+    },
+  })
+}
+
+/**
+ * Card art for the marketing background: each game's signature cards, resolved
+ * from our catalog. The selection is stable, so this caches hard — the hero looks
+ * the same on every visit rather than reshuffling.
+ */
+export function useShowcaseCards(perGame = 12) {
+  return useQuery({
+    queryKey: [...catalogShowcaseCardsKey, perGame],
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<CatalogShowcaseCard[]>('/catalog/showcase-cards', {
+        params: { perGame },
+      })
+      return data.filter((card) => Boolean(card.imageUrl))
+    },
+  })
 }
 
 export function useCatalogGames() {

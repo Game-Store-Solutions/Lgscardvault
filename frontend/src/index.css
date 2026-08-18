@@ -1,13 +1,18 @@
 @import "tailwindcss";
+@import "@fontsource-variable/geist/wght.css";
 @import "@fontsource-variable/plus-jakarta-sans/wght.css";
 
 /* Class-based dark mode: toggled by adding `.dark` on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+html {
+  scroll-behavior: smooth;
+}
+
 /*
- * Typography — Plus Jakarta Sans (variable, self-hosted).
- * One family for UI + headings: smooth curves, strong screen rendering,
- * weight 400–800 without swapping faces.
+ * Typography — Geist (variable, self-hosted) leads, Plus Jakarta Sans as the
+ * fallback face. One family across UI and headings keeps the hierarchy coming
+ * from size, weight, and tracking rather than a font swap.
  */
 @property --rx {
   syntax: "<angle>";
@@ -88,8 +93,41 @@
   --shadow-card: 0 1px 2px rgb(10 10 11 / 0.04), 0 8px 24px rgb(10 10 11 / 0.06);
 
   /* Fonts */
-  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-  --font-display: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
+  --font-display: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, sans-serif;
+
+  /*
+   * Editorial display scale. Headline sizes get progressively tighter tracking —
+   * large type needs negative letter-spacing to avoid looking loose, while small
+   * type needs none. Use `text-display-*` for page and section headlines.
+   */
+  --text-display-xs: 1.375rem;
+  --text-display-xs--line-height: 1.2;
+  --text-display-xs--letter-spacing: -0.022em;
+  --text-display-xs--font-weight: 800;
+
+  --text-display-sm: 1.8125rem;
+  --text-display-sm--line-height: 1.12;
+  --text-display-sm--letter-spacing: -0.032em;
+  --text-display-sm--font-weight: 800;
+
+  --text-display-md: 2.375rem;
+  --text-display-md--line-height: 1.05;
+  --text-display-md--letter-spacing: -0.038em;
+  --text-display-md--font-weight: 850;
+
+  --text-display-lg: 3.125rem;
+  --text-display-lg--line-height: 1;
+  --text-display-lg--letter-spacing: -0.046em;
+  --text-display-lg--font-weight: 900;
+
+  --text-display-xl: 4rem;
+  --text-display-xl--line-height: 0.94;
+  --text-display-xl--letter-spacing: -0.055em;
+  --text-display-xl--font-weight: 900;
+
+  /* Small uppercase labels ("eyebrows") used above section headlines. */
+  --tracking-eyebrow: 0.18em;
 }
 
 /*
@@ -150,10 +188,16 @@
 }
 
 body {
-  @apply min-h-screen bg-bg text-fg font-sans text-[0.9375rem] leading-relaxed antialiased;
+  @apply min-h-screen bg-bg text-fg font-sans text-[0.9375rem] antialiased;
+  line-height: 1.6;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Let the variable font pick its own optical size; never fake a weight. */
+  font-optical-sizing: auto;
+  font-synthesis: none;
+  /* Proportional-width lining figures read better in prose than tabular. */
+  font-variant-numeric: proportional-nums;
 }
 
 .dark body {
@@ -340,11 +384,30 @@ body {
 }
 
 @layer base {
+  /*
+   * Headings share one voice: display face, real weight, and tracking that
+   * tightens as the type grows. Individual sizes still come from utilities.
+   */
   h1,
   h2,
-  h3 {
-    @apply font-display tracking-tight;
-    letter-spacing: -0.02em;
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display font-extrabold text-fg;
+    letter-spacing: -0.028em;
+    /* Avoid a lone short word on the last line of a headline. */
+    text-wrap: balance;
+  }
+
+  h1 {
+    @apply font-black;
+    letter-spacing: -0.04em;
+  }
+
+  /* Body copy: even rag, no orphan-heavy line breaks. */
+  p {
+    text-wrap: pretty;
   }
 
   label,
@@ -354,6 +417,24 @@ body {
   textarea {
     font-family: inherit;
   }
+
+  /* Controls are UI, not prose — keep them tight and unambiguous. */
+  button,
+  label {
+    letter-spacing: -0.005em;
+  }
+
+  /* Money and counts should never shift width as they update. */
+  th,
+  td,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@utility text-eyebrow {
+  @apply text-[0.7rem] font-extrabold uppercase text-fg-muted;
+  letter-spacing: var(--tracking-eyebrow);
 }
 
 @layer components {

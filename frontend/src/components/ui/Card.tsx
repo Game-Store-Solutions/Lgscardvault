@@ -1,16 +1,35 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { ComponentProps, HTMLAttributes, ReactNode } from 'react'
+import { motion } from 'framer-motion'
+import { EASE_PREMIUM } from '../motion'
 import { cx } from '../../lib/cx'
 
-export type CardProps = HTMLAttributes<HTMLDivElement>
+export type CardProps = HTMLAttributes<HTMLDivElement> & {
+  /** Opt out of the scroll-in entrance (e.g. inside an already-animated list). */
+  animateIn?: boolean
+}
 
-export function Card({ className, ...props }: CardProps) {
+/**
+ * Card — the app's primary panel. It fades and rises the first time it scrolls
+ * into view so long admin/report pages feel composed rather than dumped.
+ */
+export function Card({ className, animateIn = true, ...props }: CardProps) {
+  const entrance = animateIn
+    ? {
+        initial: { opacity: 0, y: 12 },
+        whileInView: { opacity: 1, y: 0 },
+        viewport: { once: true, margin: '-50px' },
+        transition: { duration: 0.4, ease: EASE_PREMIUM },
+      }
+    : {}
+
   return (
-    <div
+    <motion.div
       className={cx(
         'rounded-card bg-surface shadow-card ring-1 ring-black/[0.04] dark:ring-white/10',
         className,
       )}
-      {...props}
+      {...entrance}
+      {...(props as ComponentProps<typeof motion.div>)}
     />
   )
 }
@@ -32,16 +51,16 @@ export function CardHeader({
   const hasSlots = title != null || subtitle != null || actions != null
   return (
     <div
-      className={cx('flex items-start justify-between gap-4 border-b border-border/80 px-5 py-4', className)}
+      className={cx('flex flex-wrap items-start justify-between gap-4 border-b border-border/80 px-5 py-4', className)}
       {...props}
     >
       {hasSlots ? (
         <>
           <div className="min-w-0">
-            {title != null && <h3 className="font-display text-lg font-bold text-fg truncate">{title}</h3>}
-            {subtitle != null && <p className="text-sm text-fg-muted mt-0.5">{subtitle}</p>}
+            {title != null && <h3 className="truncate text-display-xs">{title}</h3>}
+            {subtitle != null && <p className="mt-1 text-sm leading-relaxed text-fg-muted">{subtitle}</p>}
           </div>
-          {actions != null && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          {actions != null && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
         </>
       ) : (
         children
@@ -61,7 +80,7 @@ export type CardFooterProps = HTMLAttributes<HTMLDivElement>
 export function CardFooter({ className, ...props }: CardFooterProps) {
   return (
     <div
-      className={cx('flex items-center justify-end gap-2 border-t border-border/80 px-5 py-4', className)}
+      className={cx('flex flex-wrap items-center justify-end gap-2 border-t border-border/80 px-5 py-4', className)}
       {...props}
     />
   )
