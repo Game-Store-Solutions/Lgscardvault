@@ -1,9 +1,11 @@
 import { Link } from 'react-router'
 import { ImageOff } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { CardImage } from './CardImage'
+import { FoilOverlays } from './FoilOverlays'
 import { useTilt } from '../../hooks'
 import { rarityAccent, rarityLabel } from '../../lib/mtg'
 import { finishName } from '../../lib/finishes'
@@ -15,7 +17,7 @@ export interface CardTileProps {
 
 /**
  * CardTile — image-forward storefront result card (grid view). The art fills
- * the top with a subtle pointer-driven holographic tilt (glare always, rainbow
+ * the top with a springy pointer-driven holographic tilt (glare always, rainbow
  * holo for foils); rarity + foil accents add game flavor; the footer keeps the
  * name, printing and market price scannable.
  */
@@ -23,7 +25,7 @@ export function CardTile({ item, slug }: CardTileProps) {
   const image = cardImage(item.card)
   const accent = rarityAccent(item.card.rarity)
   const price = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
-  const { ref, onPointerMove, onPointerLeave } = useTilt(9)
+  const { ref, onPointerMove, onPointerLeave, tiltStyle } = useTilt(9)
 
   return (
     <Link
@@ -35,7 +37,10 @@ export function CardTile({ item, slug }: CardTileProps) {
     >
       {/* Card art with holographic tilt */}
       <div ref={ref} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} className="perspective-[900px]">
-        <div className={cx('tilt-card relative aspect-5/7 overflow-hidden bg-surface-elevated dark:bg-[#18181B]', item.isFoil && 'foil-card')}>
+        <motion.div
+          className={cx('tilt-card relative aspect-5/7 overflow-hidden bg-surface-elevated dark:bg-[#18181B]', item.isFoil && 'foil-card')}
+          style={tiltStyle}
+        >
           {image ? (
             <CardImage src={image} alt={item.card.name} fit="contain" className="size-full" />
           ) : (
@@ -45,8 +50,7 @@ export function CardTile({ item, slug }: CardTileProps) {
           )}
 
           {/* Holographic overlays (the sheen itself signals a foil. No pill needed) */}
-          {image && <span aria-hidden className="tilt-glare pointer-events-none absolute inset-0" />}
-          {image && item.isFoil && <span aria-hidden className="tilt-holo pointer-events-none absolute inset-0" />}
+          {image && <FoilOverlays foil={item.isFoil} />}
 
           {/* Rarity dot */}
           {item.card.rarity && (
@@ -61,7 +65,7 @@ export function CardTile({ item, slug }: CardTileProps) {
           <span className="absolute bottom-2 right-2 z-10 rounded-full bg-black/70 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-sm">
             {price}
           </span>
-        </div>
+        </motion.div>
       </div>
 
       {/* Footer */}
