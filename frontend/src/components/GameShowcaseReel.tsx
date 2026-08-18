@@ -282,31 +282,10 @@ export function GameShowcaseReel({
     <div className="relative isolate mt-8">
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-x-6 -top-10 -bottom-8 -z-10 overflow-visible sm:-inset-x-16 sm:-top-14 sm:-bottom-12"
+        className="pointer-events-none absolute -inset-x-6 -top-10 -bottom-8 -z-10 sm:-inset-x-16 sm:-top-14 sm:-bottom-12"
       >
-        <AnimatePresence initial={false}>
-          <motion.div
-            key={active.game.code}
-            className="absolute inset-0"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.7, ease: EASE_PREMIUM }}
-          >
-            <span
-              className="absolute left-1/2 top-[18%] h-40 w-[min(28rem,80%)] -translate-x-1/2 rounded-full blur-3xl"
-              style={{
-                background: `radial-gradient(ellipse at center, ${tile.accent}55 0%, transparent 72%)`,
-              }}
-            />
-            <span
-              className="absolute left-1/2 top-[62%] h-[22rem] w-[min(56rem,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
-              style={{
-                background: `radial-gradient(ellipse at center, ${tile.accent}4D 0%, transparent 70%)`,
-              }}
-            />
-          </motion.div>
-        </AnimatePresence>
+        <span className="absolute left-1/2 top-[18%] h-40 w-[min(28rem,80%)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(198,160,53,0.30),transparent_72%)] blur-3xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.38),transparent_72%)]" />
+        <span className="absolute left-1/2 top-[62%] h-[22rem] w-[min(56rem,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(10,22,39,0.12),transparent_70%)] blur-3xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.26),transparent_70%)]" />
       </div>
 
       <h2
