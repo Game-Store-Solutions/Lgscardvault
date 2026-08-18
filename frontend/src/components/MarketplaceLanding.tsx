@@ -8,6 +8,7 @@ import { useGameShowcase, useShowcaseCards } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { ContactForm } from './ContactForm'
+import { GameShowcaseReel } from './GameShowcaseReel'
 import { GameTile } from './GameTile'
 
 const TRUST_POINTS = [
@@ -33,7 +34,7 @@ export default function MarketplaceLanding() {
   const { data: games = [], isLoading: gamesLoading } = useGameShowcase()
   // Each game's signature cards behind the hero, resolved from our catalog.
   // 12 per game fills the 60 layout slots when all five games are stocked.
-  const { data: showcaseCards = [] } = useShowcaseCards(12)
+  const { data: showcaseCards = [], isPending: cardsPending } = useShowcaseCards(12)
   const backdropImages = showcaseCards
     .map((card) => card.imageUrl)
     .filter((url): url is string => Boolean(url))
@@ -46,7 +47,7 @@ export default function MarketplaceLanding() {
 
   return (
     <div className="bg-bg">
-      <section className="relative isolate min-h-[calc(100dvh-3.75rem)]">
+      <section className="relative isolate min-h-[calc(100dvh-3.75rem)] overflow-hidden">
         <div
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(198,160,53,0.12),transparent_55%),linear-gradient(180deg,#fafafa_0%,#f3f4f6_46%,transparent_100%)] dark:bg-[radial-gradient(ellipse_78%_55%_at_50%_-6%,rgba(220,38,38,0.18),transparent_56%),linear-gradient(180deg,#09090b_0%,#121214_48%,transparent_100%)]"
@@ -64,11 +65,11 @@ export default function MarketplaceLanding() {
         <FloatingCardsBackdrop
           layout="scatter"
           images={backdropImages}
-          className="[mask-image:linear-gradient(to_bottom,black_0%,black_62%,transparent_96%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_62%,transparent_96%)]"
+          className="[mask-image:linear-gradient(to_bottom,black_0%,black_70%,transparent_92%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_70%,transparent_92%)]"
           washClassName="bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(243,244,246,0.92),rgba(243,244,246,0.55)_58%,transparent_76%)] dark:bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(9,9,11,0.94),rgba(9,9,11,0.6)_58%,transparent_78%)]"
         />
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-3.75rem)] max-w-4xl flex-col items-center justify-center px-5 pb-28 pt-10 text-center sm:px-10 sm:pb-32">
+        <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-3.75rem)] max-w-4xl flex-col items-center justify-center px-5 pb-16 pt-10 text-center sm:px-10">
           <motion.div
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -120,45 +121,46 @@ export default function MarketplaceLanding() {
           </motion.div>
         </div>
 
-        {/* Soft horizon — the hero field dissolves into the page instead of ending on a hard line. */}
+        {/* Fade the field out before the next section so cards never bleed through. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] h-36 bg-gradient-to-b from-transparent via-bg/75 to-bg sm:h-48"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] h-28 bg-gradient-to-b from-transparent to-bg sm:h-36"
         />
       </section>
 
-      <div className="relative z-10 mx-auto -mt-16 flex max-w-7xl flex-col gap-16 px-4 pb-20 pt-2 sm:-mt-24 sm:gap-20 sm:px-6 sm:pt-4 lg:px-8">
+      <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-16 bg-bg px-4 pb-20 pt-12 sm:gap-20 sm:px-6 sm:pt-16 lg:px-8">
         {/* Supported games — driven by the platform's own catalog. */}
         <section id="games" className="scroll-mt-24">
-          <Reveal className="space-y-2">
+          <Reveal>
             <p className="text-eyebrow">Games we support</p>
-            <h2 className="mt-2 text-display-sm sm:text-display-md">
-              Every game our stores stock.
-            </h2>
-            <p className="max-w-2xl text-sm leading-7 text-fg-muted">
-              Singles and sealed product across the games collectors actually play, all searchable by set, rarity,
-              condition, and finish.
-            </p>
           </Reveal>
 
-          {gamesLoading ? (
-            <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              {Array.from({ length: 5 }).map((_, index) => (
+          {gamesLoading || cardsPending ? (
+            <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
                   className="aspect-[3/4] rounded-card border border-border skeleton-shimmer dark:border-white/10"
                 />
               ))}
             </div>
+          ) : showcaseCards.length > 0 ? (
+            <GameShowcaseReel games={games} cards={showcaseCards} />
           ) : (
-            <Stagger className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5" gap={0.05}>
-              {games.map((game) => (
-                // Presentational only — these show coverage, not navigation.
-                <StaggerItem key={game.code} className="h-full">
-                  <GameTile game={game} />
-                </StaggerItem>
-              ))}
-            </Stagger>
+            <>
+              <h2 className="mt-2 text-display-sm sm:text-display-md">Every game our stores stock.</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
+                Singles and sealed product across the games collectors actually play, all searchable by set, rarity,
+                condition, and finish.
+              </p>
+              <Stagger className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5" gap={0.05}>
+                {games.map((game) => (
+                  <StaggerItem key={game.code} className="h-full">
+                    <GameTile game={game} />
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            </>
           )}
         </section>
 
