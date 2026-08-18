@@ -57,10 +57,12 @@ final class CatalogController extends AbstractController
             $showcase[] = [
                 'code' => $game->getCode(),
                 'name' => $game->getName(),
-                // Ordered candidates, best first. TCGCSV art is stored as CDN
-                // rendition URLs and an individual rendition can 404, so the
-                // client walks this list instead of showing a broken image.
-                'imageUrls' => null !== $card ? $this->imageCandidates($card, ['normal', 'large', 'small']) : [],
+                // Ordered candidates, best first. `small` leads deliberately:
+                // tiles render ~250px wide, and TCGCSV's larger renditions are
+                // derived URLs that the CDN does not always serve (Flesh and
+                // Blood has no in_1000x1000). The client walks the list, so a
+                // missing rendition costs nothing.
+                'imageUrls' => null !== $card ? $this->imageCandidates($card, ['small', 'normal', 'large']) : [],
             ];
         }
 

@@ -14,7 +14,8 @@ import { gameTile } from '../lib/gameTiles'
 export function GameTile({ game }: { game: CatalogGameShowcase }) {
   const [attempt, setAttempt] = useState(0)
   const tile = gameTile(game.code, game.name)
-  const src = game.imageUrls[attempt]
+  // Tolerate an older API response that has not been restarted yet.
+  const src = (game.imageUrls ?? [])[attempt]
 
   return (
     <figure className="group flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card transition-colors hover:border-fg/15 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20">
