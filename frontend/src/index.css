@@ -447,10 +447,10 @@ body {
   /*
    * Holographic foil.
    *
-   * Pointer light (--mx/--my/--op) is spring-smoothed by useTilt. Idle foils
-   * still breathe via --foil-idle so a grid of foils reads as foil without a
-   * looping white flash. Hovering fades the idle drift out so the rainbow
-   * locks to the pointer instead of fighting it.
+   * Pointer light (--mx/--my/--op) is spring-smoothed by useTilt. Foils idle
+   * with a slow 3D orbit while the pointer is away; hover locks the sheen to
+   * the hand. Static thumbs (foil-shimmer) and flip faces (foil-idle-orbit)
+   * use CSS so they still breathe without the hook.
    *
    * --foil-holo-opacity: rest-state rainbow strength.
    */
@@ -500,6 +500,11 @@ body {
     opacity: calc(var(--foil-holo-opacity, 0.28) + var(--op, 0) * 0.38);
     animation: foil-idle-shift 7.5s ease-in-out infinite;
   }
+  .foil-shimmer {
+    animation:
+      foil-idle-shift 7.5s ease-in-out infinite,
+      foil-idle-orbit 8s ease-in-out infinite;
+  }
   .tilt-sparkle {
     background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 0.55px, transparent 0.85px);
     background-size: 12px 15px;
@@ -509,10 +514,24 @@ body {
     mix-blend-mode: overlay;
     opacity: calc(var(--op, 0) * 0.62);
   }
+  /*
+   * Flip / DFC faces cannot use the pointer hook (drag is the flip). CSS
+   * orbits --mx/--my/--op so foil still catches light in the display case.
+   */
+  .foil-idle-orbit {
+    --mx: 50%;
+    --my: 50%;
+    --op: 0.4;
+    animation: foil-idle-orbit 8s ease-in-out infinite;
+  }
+  .foil-idle-orbit:hover {
+    animation-play-state: paused;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     .tilt-holo,
-    .foil-shimmer {
+    .foil-shimmer,
+    .foil-idle-orbit {
       animation: none;
     }
   }
@@ -555,6 +574,25 @@ body {
   }
   50% {
     --foil-idle: 22%;
+  }
+}
+
+@keyframes foil-idle-orbit {
+  0%,
+  100% {
+    --mx: 22%;
+    --my: 40%;
+    --op: 0.36;
+  }
+  33% {
+    --mx: 74%;
+    --my: 28%;
+    --op: 0.48;
+  }
+  66% {
+    --mx: 40%;
+    --my: 72%;
+    --op: 0.4;
   }
 }
 

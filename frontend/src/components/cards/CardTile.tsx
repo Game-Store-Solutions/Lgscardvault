@@ -17,15 +17,15 @@ export interface CardTileProps {
 
 /**
  * CardTile — image-forward storefront result card (grid view). The art fills
- * the top with a springy pointer-driven holographic tilt (glare always, rainbow
- * holo for foils); rarity + foil accents add game flavor; the footer keeps the
- * name, printing and market price scannable.
+ * the top with a springy pointer-driven holographic tilt. Foils keep a slow
+ * idle orbit (glare, rainbow holo, sparkle). Rarity accents add game flavor;
+ * the footer keeps the name, printing and market price scannable.
  */
 export function CardTile({ item, slug }: CardTileProps) {
   const image = cardImage(item.card)
   const accent = rarityAccent(item.card.rarity)
   const price = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
-  const { ref, onPointerMove, onPointerLeave, tiltStyle } = useTilt(9)
+  const { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle } = useTilt(9, { idle: item.isFoil })
 
   return (
     <Link
@@ -36,7 +36,13 @@ export function CardTile({ item, slug }: CardTileProps) {
       )}
     >
       {/* Card art with holographic tilt */}
-      <div ref={ref} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} className="perspective-[900px]">
+      <div
+        ref={ref}
+        onPointerEnter={onPointerEnter}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
+        className="perspective-[900px]"
+      >
         <motion.div
           className={cx('tilt-card relative aspect-5/7 overflow-hidden bg-surface-elevated dark:bg-[#18181B]', item.isFoil && 'foil-card')}
           style={tiltStyle}

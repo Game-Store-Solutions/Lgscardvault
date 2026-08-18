@@ -3,7 +3,7 @@
  *
  * Glare is always present (non-foils still catch a specular highlight). Rainbow
  * holo + sparkle only render for foil printings. Pointer-driven CSS variables
- * (`--mx/--my/--op`) come from `useTilt`; idle foils still breathe via CSS.
+ * (`--mx/--my/--op`) come from `useTilt`, including the slow idle orbit.
  */
 export function FoilOverlays({ foil = false, glare = true }: { foil?: boolean; glare?: boolean }) {
   return (
