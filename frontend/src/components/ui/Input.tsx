@@ -1,6 +1,7 @@
 import { forwardRef, useId, useState } from 'react'
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import { twMerge } from 'tailwind-merge'
 import { cx } from '../../lib/cx'
 
 const fieldStack = 'flex min-w-0 flex-col gap-1.5'
@@ -61,7 +62,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const isPassword = type === 'password'
   const resolvedType = isPassword && revealed ? 'text' : type
   return (
-    <div className={cx(fieldStack, 'w-full', wrapperClassName)}>
+    <div className={twMerge(cx(fieldStack, 'w-full'), wrapperClassName)}>
       {label != null && (
         <Label id={inputId} required={required}>
           {label}
