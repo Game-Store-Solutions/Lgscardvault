@@ -3,6 +3,8 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import {
   type MotionStyle,
   type MotionValue,
+  useAnimationFrame,
+  useInView,
   useMotionTemplate,
   useMotionValue,
   useReducedMotion,
@@ -15,23 +17,37 @@ const TILT_SPRING = { stiffness: 320, damping: 22, mass: 0.45 }
 /** Softer light follow so the sheen trails the pointer like a physical surface. */
 const LIGHT_SPRING = { stiffness: 170, damping: 24, mass: 0.5 }
 
+/** Slow display-case orbit. Long enough to feel like catching light, not fidgeting. */
+const IDLE_PERIOD_MS = 8000
+
 export type TiltStyle = MotionStyle & {
   '--mx': MotionValue<string>
   '--my': MotionValue<string>
   '--op': MotionValue<number>
 }
 
+export interface UseTiltOptions {
+  /**
+   * When true, the card slowly rocks and the sheen orbits while the pointer
+   * is away. Pointer takeovers instantly; idle resumes on leave.
+   */
+  idle?: boolean
+}
+
 /**
- * Pointer-driven holographic tilt, now spring-smoothed through Framer Motion.
+ * Pointer-driven holographic tilt, spring-smoothed through Framer Motion.
  *
  * Attach `ref` + the pointer handlers to a perspective wrapper, and spread
  * `tiltStyle` onto the card (`motion.div`). Rotation is a spring; `--mx/--my/--op`
  * drive `.tilt-glare` / `.tilt-holo` / `.tilt-sparkle`. Reduced-motion skips
- * rotation and keeps the light tracking.
+ * rotation and idle, and keeps pointer light tracking.
  */
-export function useTilt(maxTilt = 12) {
+export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ref = useRef<HTMLDivElement>(null)
+  const hovering = useRef(false)
+  const phase = useRef(Math.random() * Math.PI * 2)
   const reduceMotion = useReducedMotion()
+  const inView = useInView(ref, { amount: 0.15, margin: '80px', once: false })
 
   const rx = useMotionValue(0)
   const ry = useMotionValue(0)
@@ -48,8 +64,23 @@ export function useTilt(maxTilt = 12) {
   const mx = useMotionTemplate`${spx}%`
   const my = useMotionTemplate`${spy}%`
 
+  useAnimationFrame((time) => {
+    if (!idle || hovering.current || reduceMotion || !inView) return
+    const angle = (time / IDLE_PERIOD_MS) * Math.PI * 2 + phase.current
+    px.set(50 + Math.sin(angle) * 34)
+    py.set(50 + Math.cos(angle * 0.78) * 22)
+    op.set(0.32 + Math.sin(angle * 1.6) * 0.06)
+    rx.set(Math.sin(angle * 0.95) * maxTilt * 0.28)
+    ry.set(Math.cos(angle) * maxTilt * 0.32)
+  })
+
+  const onPointerEnter = useCallback(() => {
+    hovering.current = true
+  }, [])
+
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
+      hovering.current = true
       const el = ref.current
       if (!el) return
       const rect = el.getBoundingClientRect()
@@ -70,12 +101,14 @@ export function useTilt(maxTilt = 12) {
   )
 
   const onPointerLeave = useCallback(() => {
+    hovering.current = false
+    if (idle && !reduceMotion) return
     rx.set(0)
     ry.set(0)
     px.set(50)
     py.set(50)
     op.set(0)
-  }, [op, px, py, rx, ry])
+  }, [idle, op, px, py, reduceMotion, rx, ry])
 
   const tiltStyle: TiltStyle = {
     rotateX: reduceMotion ? 0 : srx,
@@ -85,7 +118,7 @@ export function useTilt(maxTilt = 12) {
     '--op': sop,
   }
 
-  return { ref, onPointerMove, onPointerLeave, tiltStyle }
+  return { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle }
 }
 
 export default useTilt

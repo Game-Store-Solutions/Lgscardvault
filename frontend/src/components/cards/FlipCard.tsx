@@ -52,7 +52,11 @@ function Face({
 }) {
   return (
     <div
-      className={cx('tilt-card absolute inset-0 overflow-hidden rounded-[4.5%/3.5%]', !borderless && 'rounded-2xl border-2', foil && 'foil-card')}
+      className={cx(
+        'tilt-card absolute inset-0 overflow-hidden rounded-[4.5%/3.5%]',
+        !borderless && 'rounded-2xl border-2',
+        foil && 'foil-card foil-idle-orbit',
+      )}
       style={{
         ...(borderless ? {} : { borderColor: accent }),
         backfaceVisibility: 'hidden',
@@ -66,7 +70,7 @@ function Face({
           <ImageOff aria-hidden className="size-8" />
         </div>
       )}
-      {image && <FoilOverlays foil={foil} glare={false} />}
+      {image && <FoilOverlays foil={foil} />}
     </div>
   )
 }
