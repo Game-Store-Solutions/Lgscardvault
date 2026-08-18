@@ -4,7 +4,8 @@ import { Loader2, MapPin, Search } from 'lucide-react'
 import api from '../../api/client'
 import type { GeocodeSuggestion } from '../../api/types'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
-import { Field } from '../../components/ui'
+import { Field, dropdownItemClass, dropdownPanelClass } from '../../components/ui'
+import { cx } from '../../lib/cx'
 
 /**
  * Address search-as-you-type. Queries the server-side geocode proxy (Mapbox,
@@ -82,14 +83,14 @@ export function AddressAutocomplete({
       {open && suggestions.length > 0 && (
         <ul
           role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-card border border-border bg-surface py-1 shadow-card"
+          className={cx(dropdownPanelClass, 'absolute z-20 mt-1.5 max-h-64 w-full overflow-y-auto py-1')}
         >
           {suggestions.map((s, i) => (
             <li key={`${s.label}-${i}`}>
               <button
                 type="button"
                 onClick={() => choose(s)}
-                className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm text-fg hover:bg-bg"
+                className={dropdownItemClass({})}
               >
                 <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-brand-600" />
                 <span>{s.label}</span>

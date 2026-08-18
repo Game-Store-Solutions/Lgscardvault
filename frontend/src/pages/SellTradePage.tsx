@@ -739,21 +739,20 @@ function SummaryPanel({
                     }}
                     className="w-14 rounded-btn border border-border bg-surface px-2 py-1 text-fg"
                   />
-                  <label className="sr-only" htmlFor={`cond-${line.key}`}>
-                    Condition of {line.card.name}
-                  </label>
-                  <select
+                  <Select
                     id={`cond-${line.key}`}
+                    aria-label={`Condition of ${line.card.name}`}
                     value={line.condition}
                     onChange={(e) => onUpdateLine(line.key, { condition: e.target.value as Condition })}
-                    className="rounded-btn border border-border bg-surface px-1 py-1 text-xs text-fg"
+                    wrapperClassName="w-[4.75rem] shrink-0"
+                    className="h-8 px-2 text-xs"
                   >
                     {CONDITIONS.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   {!line.entry && (
                     <button
                       type="button"

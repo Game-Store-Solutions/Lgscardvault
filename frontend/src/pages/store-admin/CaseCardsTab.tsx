@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
-import { storeCasesKey, useInventory, usePullSheet, useStockingSheet, useStoreCases } from '../../hooks'
+import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
-import type { InventoryItem, PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
+import type { PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
 import {
   Badge,
   Button,
@@ -831,7 +831,6 @@ function InventoryPicker({
   onClose: () => void
   onChanged: () => void
 }) {
-  const { data: inventory = [], isLoading } = useInventory(slug)
   const [query, setQuery] = useState('')
   const debounced = useDebouncedValue(query, 200)
 
@@ -840,13 +839,13 @@ function InventoryPicker({
     [section.cards],
   )
 
-  const results = useMemo(() => {
-    const q = debounced.trim().toLowerCase()
-    const list: InventoryItem[] = q
-      ? inventory.filter((item) => item.card.name.toLowerCase().includes(q))
-      : inventory
-    return list.slice(0, 60)
-  }, [inventory, debounced])
+  // Search server-side rather than filtering a full inventory download in the
+  // browser; with no term this is just the first page of the store's listings.
+  const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
+    q: debounced.trim(),
+    itemsPerPage: 60,
+  })
+  const results = searchPage?.items ?? []
 
   const addMutation = useMutation({
     mutationFn: async (inventoryItemId: number) => {

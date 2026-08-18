@@ -2,6 +2,7 @@ import { Sparkles } from 'lucide-react'
 import { cx } from '../../lib/cx'
 import { FOIL_GRADIENT } from '../../lib/mtg'
 import { isFoilFinish, type FinishOption } from '../../lib/finishes'
+import { Select } from '../ui'
 
 export interface FinishPickerProps {
   value: string
@@ -23,19 +24,19 @@ export function FinishPicker({ value, options, onChange, disabled }: FinishPicke
   // control also gives mobile a proper picker.
   if (options.length > 3) {
     return (
-      <select
+      <Select
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         aria-label="Finish"
-        className="h-11 w-full rounded-btn border border-border bg-surface px-3 text-sm font-bold text-fg disabled:opacity-50"
+        className="h-11 font-bold"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.value}
           </option>
         ))}
-      </select>
+      </Select>
     )
   }
 

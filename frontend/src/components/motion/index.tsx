@@ -27,7 +27,8 @@ export function MotionRoot({ children }: { children: ReactNode }) {
 
 /**
  * Route-level transition: keyed on the pathname so each navigation remounts and
- * fades its content in.
+ * fades its content in. Opacity-only so the canvas (header, background) stays
+ * put and pages blend instead of lifting into place.
  *
  * Deliberately no `AnimatePresence`/`exit` here. Wrapping an `<Outlet />` in
  * `mode="wait"` holds the previous keyed wrapper on screen while the router has
@@ -46,9 +47,9 @@ export function PageTransition({
   return (
     <motion.div
       key={routeKey}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.26, ease: EASE_PREMIUM }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.34, ease: EASE_PREMIUM }}
       className={className}
     >
       {children}

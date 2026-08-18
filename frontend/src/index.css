@@ -578,9 +578,25 @@ body {
 button,
 a,
 input,
-select,
 textarea {
   @apply transition;
+}
+
+/*
+ * Last-resort native <select> chrome. Custom Select covers the app, but any
+ * leftover system picker still gets a chevron and loses the OS blue highlight.
+ */
+select:not([multiple]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='m4 6 4 4 4-4'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem;
+  padding-right: 2.25rem;
+}
+
+.dark select:not([multiple]) {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a3a3a3' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='m4 6 4 4 4-4'/></svg>");
 }
 
 /* Square Web Payments card iframe — match host dark mode. */

@@ -1,10 +1,5 @@
 import { forwardRef, useId, useState } from 'react'
-import type {
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
-} from 'react'
+import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { cx } from '../../lib/cx'
 
@@ -131,43 +126,6 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         className={cx(controlBase, controlBorder(!!error), 'px-3 py-2 text-sm', className)}
         {...props}
       />
-      <Caption id={descId} error={error} hint={hint} />
-    </div>
-  )
-})
-
-export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  label?: ReactNode
-  error?: ReactNode
-  hint?: ReactNode
-  wrapperClassName?: string
-}
-
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { label, error, hint, className, wrapperClassName, id, required, children, ...props },
-  ref,
-) {
-  const generatedId = useId()
-  const inputId = id ?? generatedId
-  const descId = error || hint ? `${inputId}-desc` : undefined
-  return (
-    <div className={cx(fieldStack, wrapperClassName)}>
-      {label != null && (
-        <Label id={inputId} required={required}>
-          {label}
-        </Label>
-      )}
-      <select
-        ref={ref}
-        id={inputId}
-        required={required}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={descId}
-        className={cx(controlBase, controlBorder(!!error), 'h-10 px-3 text-sm', className)}
-        {...props}
-      >
-        {children}
-      </select>
       <Caption id={descId} error={error} hint={hint} />
     </div>
   )
