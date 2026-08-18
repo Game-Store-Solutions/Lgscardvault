@@ -136,7 +136,7 @@ export default function MarketplaceLanding() {
 
       <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-16 bg-bg px-4 pb-20 pt-12 sm:gap-20 sm:px-6 sm:pt-16 lg:px-8">
         {/* Supported games — driven by the platform's own catalog. */}
-        <section id="games" className="scroll-mt-24">
+        <section id="games" className="relative scroll-mt-24 overflow-visible">
           <Reveal>
             <p className="text-eyebrow">Games we support</p>
           </Reveal>

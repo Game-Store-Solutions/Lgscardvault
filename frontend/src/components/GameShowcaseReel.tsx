@@ -279,7 +279,36 @@ export function GameShowcaseReel({
   const visible = pickVisible(active.pool, failedIds, active.game.code)
 
   return (
-    <div className="mt-8">
+    <div className="relative isolate mt-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-x-6 -top-10 -bottom-8 -z-10 overflow-visible sm:-inset-x-16 sm:-top-14 sm:-bottom-12"
+      >
+        <AnimatePresence initial={false}>
+          <motion.div
+            key={active.game.code}
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7, ease: EASE_PREMIUM }}
+          >
+            <span
+              className="absolute left-1/2 top-[18%] h-40 w-[min(28rem,80%)] -translate-x-1/2 rounded-full blur-3xl"
+              style={{
+                background: `radial-gradient(ellipse at center, ${tile.accent}55 0%, transparent 72%)`,
+              }}
+            />
+            <span
+              className="absolute left-1/2 top-[62%] h-[22rem] w-[min(56rem,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+              style={{
+                background: `radial-gradient(ellipse at center, ${tile.accent}4D 0%, transparent 70%)`,
+              }}
+            />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
       <h2
         className="text-display-sm sm:text-display-md"
         aria-label={`We stock ${tile.short}`}
