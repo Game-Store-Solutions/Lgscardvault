@@ -23,10 +23,11 @@ import {
   useCustomerFavorites,
   useCustomerWantList,
   useInventory,
+  useInventoryPage,
   useStore,
   useStoreTheme,
 } from '../hooks'
-import { Badge, BackButton, Button, buttonVariants, ErrorState, Modal, TabPanel, Tabs } from '../components/ui'
+import { Badge, BackButton, Button, buttonVariants, ErrorState, TabPanel, Tabs } from '../components/ui'
 import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { rarityAccent, rarityLabel } from '../lib/mtg'
@@ -44,7 +45,7 @@ import {
 import { EditInventoryModal, type InventoryEditPayload } from './store-admin/search'
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 import { setBrowsePath } from '../lib/setBrowse'
-import { artistBrowsePath, inventoryByArtist, resolveCardArtist } from '../lib/artistBrowse'
+import { artistBrowsePath, resolveCardArtist } from '../lib/artistBrowse'
 import { deckBuilderPath, isDeckBuilderNav } from '../lib/deckBuilder'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
@@ -114,7 +115,6 @@ export default function CardDetailsPage() {
   // Which face of a multi-faced card is currently shown (0 = front).
   const [faceIndex, setFaceIndex] = useState(0)
   const [infoTab, setInfoTab] = useState<'details' | 'legality'>('details')
-  const [artistEmptyModalOpen, setArtistEmptyModalOpen] = useState(false)
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -132,8 +132,25 @@ export default function CardDetailsPage() {
     },
   })
 
-  // Shared cache key with StorePage — usually warm — powers the recommendations rail.
-  const { data: inventory = [], isLoading: inventoryLoading } = useInventory(slug, { inStockOnly: true })
+  // The full-catalog walk pages the entire store 500 rows at a time, so only
+  // staff opening the edit modal pay for it. Shoppers get the two targeted
+  // queries below instead of waiting on tens of sequential requests.
+  const { data: inventory = [] } = useInventory(slug, { inStockOnly: true, enabled: manageListing })
+
+  // Related rail: one page of stock rather than the whole store.
+  const relatedQuery = useInventoryPage(slug, {
+    inStockOnly: true,
+    itemsPerPage: 12,
+    enabled: Boolean(slug),
+  })
+
+  // Other listings of this same printing, resolved by a server-side name search.
+  const printingQuery = useInventoryPage(slug, {
+    q: item?.card.name ?? '',
+    inStockOnly: true,
+    itemsPerPage: 50,
+    enabled: Boolean(slug && item?.card.name),
+  })
 
   const { data: favorites = [] } = useCustomerFavorites(slug, Boolean(user))
   const { data: wantList = [] } = useCustomerWantList(slug, Boolean(user))
@@ -280,7 +297,9 @@ export default function CardDetailsPage() {
   const inCart = Boolean(cartEntry)
   const outOfStock = item.quantity < 1
 
-  const related = inventory.filter((i) => i.id !== item.id && i.quantity > 0).slice(0, 10)
+  const related = (relatedQuery.data?.items ?? [])
+    .filter((row) => row.id !== item.id && row.quantity > 0)
+    .slice(0, 10)
 
   const powerToughness = card.power || card.toughness ? `${card.power ?? '—'} / ${card.toughness ?? '—'}` : ''
   const specs = (
@@ -306,7 +325,7 @@ export default function CardDetailsPage() {
       ? item.priceCents - marketCents
       : null
 
-  const samePrintListings = inventory.filter(
+  const samePrintListings = (printingQuery.data?.items ?? []).filter(
     (row) =>
       row.card.id === card.id ||
       (row.card.name === card.name &&
@@ -336,16 +355,11 @@ export default function CardDetailsPage() {
   const colPad = 'px-4 py-5 sm:px-8 sm:py-8 lg:px-10'
   const displayArtist = resolveCardArtist(card, faceIndex)
 
+  // Navigate straight through: the artist page loads that store's inventory
+  // itself and shows its own "nothing in stock" state, so gating the click on a
+  // full inventory download here just made the link feel broken while loading.
   const openArtistBrowse = () => {
     if (!displayArtist || !item) {
-      return
-    }
-    const inStore = inventoryByArtist(inventory, displayArtist, [item])
-    if (inStore.length === 0 && !inventoryLoading) {
-      setArtistEmptyModalOpen(true)
-      return
-    }
-    if (inStore.length === 0 && inventoryLoading) {
       return
     }
     navigate(artistBrowsePath(slug, displayArtist, card.gameCode ?? 'mtg'), {
@@ -354,7 +368,7 @@ export default function CardDetailsPage() {
         inventoryId: item.id,
         artist: displayArtist,
         gameCode: card.gameCode ?? 'mtg',
-        seedItems: inStore.length > 0 ? inStore : [item],
+        seedItems: [item],
       },
     })
   }
@@ -801,22 +815,6 @@ export default function CardDetailsPage() {
         )}
       </article>
       </div>
-
-      <Modal
-        open={artistEmptyModalOpen}
-        onClose={() => setArtistEmptyModalOpen(false)}
-        title="No cards in this store"
-        footer={
-          <Button variant="primary" onClick={() => setArtistEmptyModalOpen(false)}>
-            OK
-          </Button>
-        }
-      >
-        <p className="text-sm leading-relaxed text-fg">
-          <span className="font-bold">{store?.name ?? 'This store'}</span> doesn’t have any in-stock cards
-          illustrated by <span className="font-bold">{displayArtist ?? 'this artist'}</span> right now.
-        </p>
-      </Modal>
 
       <EditInventoryModal
         slug={slug}

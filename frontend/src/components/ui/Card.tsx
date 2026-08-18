@@ -9,15 +9,20 @@ export type CardProps = HTMLAttributes<HTMLDivElement> & {
 }
 
 /**
- * Card — the app's primary panel. It fades and rises the first time it scrolls
- * into view so long admin/report pages feel composed rather than dumped.
+ * Card — the app's primary panel, fading up as it mounts so pages feel composed
+ * rather than dumped.
+ *
+ * Deliberately mount-driven rather than scroll-driven: `whileInView` starts at
+ * opacity 0 and depends on an intersection callback, so anything that mounts
+ * hidden (mid route transition, inside a collapsed panel) could stay invisible
+ * until the user scrolled or reloaded. Cards carry the app's actual content, so
+ * they must never depend on that.
  */
 export function Card({ className, animateIn = true, ...props }: CardProps) {
   const entrance = animateIn
     ? {
         initial: { opacity: 0, y: 12 },
-        whileInView: { opacity: 1, y: 0 },
-        viewport: { once: true, margin: '-50px' },
+        animate: { opacity: 1, y: 0 },
         transition: { duration: 0.4, ease: EASE_PREMIUM },
       }
     : {}
