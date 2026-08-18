@@ -13,18 +13,25 @@ export interface StoreCardProps {
   className?: string
 }
 
+/** Initials fallback so a store with no logo still gets a deliberate mark. */
+function monogram(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '?'
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return (words[0][0] + words[1][0]).toUpperCase()
+}
+
 /**
  * StoreCard — the marketplace directory card.
  *
- * The store's own artwork (hero image, else logo, else an accent wash) fills a
- * cinematic banner so each storefront is recognisable at a glance, then the body
- * keeps the details a shopper actually decides on: name, blurb, location, and
- * how long they've been on the platform.
+ * Most stores have no logo or hero art, so the design leads with a monogram and
+ * a restrained accent rather than a large empty media banner. Identity, blurb,
+ * trust metadata, and a single CTA stack in a fixed rhythm so a row of cards
+ * lines up regardless of how much copy each store has filled in.
  */
 export function StoreCard({ store, index = 0, className }: StoreCardProps) {
   const accent = storeAccent(index, store.primaryColor)
   const logo = store.logoUrl?.trim()
-  const banner = store.heroImageUrl?.trim() || logo
   const blurb = store.tagline?.trim() || store.heroSubheading?.trim()
   const since = memberSince(store.createdAt)
   const verified = store.isActive !== false
@@ -32,7 +39,7 @@ export function StoreCard({ store, index = 0, className }: StoreCardProps) {
 
   return (
     <motion.div
-      whileHover={{ y: -5 }}
+      whileHover={{ y: -4 }}
       whileTap={{ scale: 0.995 }}
       transition={{ duration: 0.24, ease: EASE_PREMIUM }}
       className={cx('h-full', className)}
@@ -46,65 +53,54 @@ export function StoreCard({ store, index = 0, className }: StoreCardProps) {
           'dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20',
         )}
       >
-        {/* Banner — store art when available, otherwise a branded accent wash. */}
-        <div className="relative h-28 overflow-hidden sm:h-32">
-          <div
-            aria-hidden
-            className="absolute inset-0"
-            style={{ background: `linear-gradient(135deg, ${accent} 0%, ${accent}22 62%, transparent 100%)` }}
-          />
-          {banner && (
-            <img
-              src={banner}
-              alt=""
-              aria-hidden
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 size-full object-cover opacity-55 transition-transform duration-[600ms] ease-out group-hover:scale-[1.05]"
-            />
-          )}
-          <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-surface via-surface/45 to-transparent dark:from-[#0d0d10] dark:via-[#0d0d10]/45" />
+        {/* Hairline accent — store identity without a heavy media block. */}
+        <span aria-hidden className="h-1 w-full shrink-0" style={{ backgroundColor: accent }} />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 opacity-[0.10] transition-opacity duration-500 group-hover:opacity-[0.16]"
+          style={{ background: `radial-gradient(120% 100% at 15% 0%, ${accent} 0%, transparent 70%)` }}
+        />
 
-          {store.featured && (
-            <span className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
-              Featured
+        <div className="relative flex flex-1 flex-col p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <span
+              className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-bg font-display text-sm font-black tracking-wide dark:border-white/10 dark:bg-white/[0.04]"
+              style={{ color: accent }}
+            >
+              {logo ? (
+                <img src={logo} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
+              ) : (
+                monogram(store.name)
+              )}
             </span>
-          )}
-        </div>
 
-        {/* Logo chip straddles the banner edge so the identity leads the card. */}
-        <div className="-mt-8 px-4 sm:px-5">
-          <span
-            className="grid size-14 place-items-center overflow-hidden rounded-2xl border border-border bg-surface shadow-md dark:border-white/12 dark:bg-[#15151a]"
-            style={{ boxShadow: `0 12px 30px -16px ${accent}` }}
-          >
-            {logo ? (
-              <img src={logo} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
-            ) : (
-              <StoreIcon aria-hidden className="size-6" style={{ color: accent }} />
-            )}
-          </span>
-        </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-1.5">
+                <h3 className="min-w-0 font-display text-lg font-bold leading-snug tracking-tight text-fg">
+                  <span className="line-clamp-1">{store.name}</span>
+                </h3>
+                {verified && (
+                  <BadgeCheck aria-label="Verified store" className="mt-1 size-4 shrink-0 text-success-700" />
+                )}
+              </div>
+              <p className="truncate text-xs text-fg-muted">/{store.slug}</p>
+            </div>
 
-        <div className="flex flex-1 flex-col px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-          <div className="flex items-start gap-1.5">
-            <h3 className="min-w-0 flex-1 font-display text-lg font-bold leading-snug tracking-tight text-fg">
-              <span className="line-clamp-1">{store.name}</span>
-            </h3>
-            {verified && (
-              <BadgeCheck
-                aria-label="Verified store"
-                className="mt-0.5 size-4 shrink-0 text-success-700"
-              />
+            {store.featured && (
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-[0.14em]"
+                style={{ backgroundColor: `${accent}1f`, color: accent }}
+              >
+                Featured
+              </span>
             )}
           </div>
-          <p className="mt-0.5 truncate text-xs text-fg-muted">/{store.slug}</p>
 
-          <p className="mt-3 line-clamp-2 flex-1 text-sm leading-6 text-fg-muted">
+          <p className="mt-3.5 line-clamp-2 min-h-[2.5rem] text-sm leading-6 text-fg-muted">
             {blurb || 'Trading card singles and sealed product from a trusted local game store.'}
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
             {location && (
               <span className="inline-flex min-w-0 items-center gap-1">
                 <MapPin aria-hidden className="size-3.5 shrink-0" />
@@ -117,16 +113,19 @@ export function StoreCard({ store, index = 0, className }: StoreCardProps) {
                 Since {since}
               </span>
             )}
+            {!location && !since && (
+              <span className="inline-flex items-center gap-1">
+                <StoreIcon aria-hidden className="size-3.5" />
+                Independent store
+              </span>
+            )}
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4 dark:border-white/10">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted">
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3.5 dark:border-white/10">
+            <span className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-fg-muted">
               Shop inventory
             </span>
-            <span
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-fg transition-colors"
-              style={{ color: accent }}
-            >
+            <span className="inline-flex items-center gap-1.5 text-sm font-bold" style={{ color: accent }}>
               Visit
               <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
             </span>
@@ -146,13 +145,15 @@ export function StoreCardSkeleton({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="h-28 w-full skeleton-shimmer sm:h-32" />
-      <div className="-mt-8 px-4 sm:px-5">
-        <div className="size-14 rounded-2xl skeleton-shimmer" />
-      </div>
-      <div className="px-4 pb-5 pt-3 sm:px-5">
-        <div className="h-4 w-2/3 rounded skeleton-shimmer" />
-        <div className="mt-2 h-3 w-1/3 rounded skeleton-shimmer" />
+      <div className="h-1 w-full bg-border/80" />
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <div className="size-12 rounded-xl skeleton-shimmer" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-2/3 rounded skeleton-shimmer" />
+            <div className="h-3 w-1/3 rounded skeleton-shimmer" />
+          </div>
+        </div>
         <div className="mt-4 space-y-2">
           <div className="h-3 w-full rounded skeleton-shimmer" />
           <div className="h-3 w-4/5 rounded skeleton-shimmer" />

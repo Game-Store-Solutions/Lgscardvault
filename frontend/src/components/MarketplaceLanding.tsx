@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { motion } from 'framer-motion'
-import { ArrowRight, Mail, Store } from 'lucide-react'
+import { ArrowRight, BadgeCheck, CalendarDays, Mail, MapPin, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
@@ -8,14 +8,35 @@ import { useActiveStores } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { StoreCard, StoreCardSkeleton } from './store'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
+import { memberSince, storeAccent } from '../lib/storeAccent'
 
 const PLATFORM_ADMIN_EMAILS = ['primary-admin@test.local', 'secondary-admin@test.local']
+
+const TRUST_POINTS = [
+  {
+    icon: ShieldCheck,
+    title: 'Verified storefronts',
+    text: 'Every store is reviewed and approved before it can list inventory.',
+  },
+  {
+    icon: PackageSearch,
+    title: 'Real store inventory',
+    text: 'Browse singles and sealed product that stores actually have on the shelf.',
+  },
+  {
+    icon: Wallet,
+    title: 'Buy, sell, and trade',
+    text: 'Check out online or in store, and send your collection in for cash or credit.',
+  },
+]
 
 export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
   const { data: stores = [], isLoading } = useActiveStores()
-  const hasStores = stores.length > 0
   const featuredStore = stores.find((store) => store.featured) ?? stores[0]
+  // The featured store already gets a full panel, so keep it out of the grid
+  // below instead of showing the same storefront twice.
+  const otherStores = stores.filter((store) => store.id !== featuredStore?.id)
   useAppShellFlush(true)
 
   const primaryCta =
@@ -24,6 +45,10 @@ export default function MarketplaceLanding() {
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn border border-border bg-surface px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-bg sm:w-auto dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]'
 
   const reachOutHref = `mailto:${PLATFORM_ADMIN_EMAILS.join(',')}?subject=${encodeURIComponent("Interested in LG's Card Vault")}&body=${encodeURIComponent("Hi,\n\nI'm interested in learning more about LG's Card Vault.\n\nName:\nStore / Team:\nWhat I'm looking for:\n\nThanks.")}`
+
+  const featuredAccent = storeAccent(0, featuredStore?.primaryColor)
+  const featuredLocation = [featuredStore?.city, featuredStore?.region].filter(Boolean).join(', ')
+  const featuredSince = memberSince(featuredStore?.createdAt)
 
   return (
     <div className="bg-bg">
@@ -44,8 +69,7 @@ export default function MarketplaceLanding() {
         />
         <FloatingCardsBackdrop
           layout="scatter"
-          className="opacity-90"
-          washClassName="bg-[radial-gradient(ellipse_52%_38%_at_50%_48%,rgba(243,244,246,0.86),transparent_72%)] dark:bg-[radial-gradient(ellipse_48%_34%_at_50%_48%,rgba(9,9,11,0.9),transparent_72%)]"
+          washClassName="bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(243,244,246,0.92),rgba(243,244,246,0.55)_58%,transparent_76%)] dark:bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(9,9,11,0.94),rgba(9,9,11,0.6)_58%,transparent_78%)]"
         />
 
         <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-3.75rem)] max-w-4xl flex-col items-center justify-center px-5 pb-16 pt-10 text-center sm:px-10">
@@ -80,16 +104,11 @@ export default function MarketplaceLanding() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: EASE_PREMIUM, delay: 0.32 }}
-            className="mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:mt-9 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-center"
+            className="mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:mt-10 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-center"
           >
-            {hasStores && (
-              <a href="#featured-store" className={primaryCta}>
-                Featured store
-                <ArrowRight aria-hidden className="size-4" />
-              </a>
-            )}
-            <Link to="/stores" className={secondaryCta}>
+            <Link to="/stores" className={primaryCta}>
               Explore stores
+              <ArrowRight aria-hidden className="size-4" />
             </Link>
             {isSuperAdmin ? (
               <Link to="/platform/admin" className={secondaryCta}>
@@ -106,93 +125,184 @@ export default function MarketplaceLanding() {
         </div>
       </section>
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-14 px-4 pb-20 sm:gap-16 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-16 px-4 pb-20 pt-14 sm:gap-20 sm:px-6 sm:pt-16 lg:px-8">
+        {/* Featured store — one panel, no duplicate card beside it. */}
         {featuredStore && (
-          <section id="featured-store" className="scroll-mt-24 space-y-5">
+          <section id="featured-store" className="scroll-mt-24">
             <Reveal className="space-y-2">
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Featured store</p>
               <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
                 Start with the storefront we’re spotlighting.
               </h2>
             </Reveal>
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-              <Reveal
-                delay={0.05}
-                className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6 dark:border-white/10 dark:glass-card"
-              >
-                <p className="text-xs uppercase tracking-[0.2em] text-fg-muted">Now featuring</p>
-                <h3 className="mt-3 font-display text-xl font-bold text-fg sm:text-2xl">{featuredStore.name}</h3>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
-                  {featuredStore.heroSubheading?.trim() ||
-                    featuredStore.tagline?.trim() ||
-                    'Browse singles, compare inventory, and shop with confidence.'}
-                </p>
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Link to={`/s/${featuredStore.slug}`} className={primaryCta}>
-                    Visit store
-                    <ArrowRight aria-hidden className="size-4" />
-                  </Link>
-                  <Link to="/stores" className={secondaryCta}>
-                    Browse all stores
-                  </Link>
+
+            <Reveal
+              delay={0.06}
+              className="mt-6 overflow-hidden rounded-card border border-border bg-surface shadow-card dark:border-white/10 dark:bg-white/[0.03]"
+            >
+              <span aria-hidden className="block h-1 w-full" style={{ backgroundColor: featuredAccent }} />
+              <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-center">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-bg font-display text-sm font-black dark:border-white/10 dark:bg-white/[0.04]"
+                      style={{ color: featuredAccent }}
+                    >
+                      {featuredStore.logoUrl?.trim() ? (
+                        <img src={featuredStore.logoUrl} alt="" className="size-full object-cover" />
+                      ) : (
+                        featuredStore.name.trim().slice(0, 2).toUpperCase()
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="truncate font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">
+                        {featuredStore.name}
+                      </h3>
+                      <p className="truncate text-sm text-fg-muted">/{featuredStore.slug}</p>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-muted">
+                    {featuredStore.heroSubheading?.trim() ||
+                      featuredStore.tagline?.trim() ||
+                      'Browse singles, compare inventory, and shop with confidence.'}
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-fg-muted">
+                    <span className="inline-flex items-center gap-1.5 font-medium text-success-700">
+                      <BadgeCheck aria-hidden className="size-4" />
+                      Verified store
+                    </span>
+                    {featuredLocation && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin aria-hidden className="size-3.5" />
+                        {featuredLocation}
+                      </span>
+                    )}
+                    {featuredSince && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarDays aria-hidden className="size-3.5" />
+                        Since {featuredSince}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <Link to={`/s/${featuredStore.slug}`} className={primaryCta}>
+                      Visit store
+                      <ArrowRight aria-hidden className="size-4" />
+                    </Link>
+                    <Link to="/stores" className={secondaryCta}>
+                      Browse all stores
+                    </Link>
+                  </div>
                 </div>
-              </Reveal>
-              <Reveal delay={0.12}>
-                <StoreCard store={featuredStore} />
-              </Reveal>
-            </div>
+
+                {/* Direct entry points instead of repeating the store card. */}
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
+                  {[
+                    { label: 'Singles', to: `/s/${featuredStore.slug}` },
+                    { label: 'Sealed product', to: `/s/${featuredStore.slug}/sealed` },
+                    { label: 'Events', to: `/s/${featuredStore.slug}/events` },
+                    { label: 'Sell or trade', to: `/s/${featuredStore.slug}/sell` },
+                  ].map((shortcut) => (
+                    <Link
+                      key={shortcut.label}
+                      to={shortcut.to}
+                      className="group flex items-center justify-between gap-3 rounded-btn border border-border bg-bg px-4 py-3 text-sm font-bold text-fg transition-colors hover:border-fg/15 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20"
+                    >
+                      {shortcut.label}
+                      <ArrowRight
+                        aria-hidden
+                        className="size-4 text-fg-muted transition-transform duration-300 group-hover:translate-x-1"
+                      />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
           </section>
         )}
 
-        <section id="marketplace" className="scroll-mt-24 space-y-5">
+        {/* Why the marketplace — substance rather than a repeated store list. */}
+        <section className="scroll-mt-24">
           <Reveal className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Marketplace</p>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Why LG’s Card Vault</p>
             <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
-              Trusted local game stores.
+              Built for collectors and the stores they trust.
             </h2>
           </Reveal>
-
-          {isLoading ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <StoreCardSkeleton key={index} />
-              ))}
-            </div>
-          ) : (
-            <Stagger className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {stores.slice(0, 6).map((store, index) => (
-                <StaggerItem key={store.id} className="h-full">
-                  <StoreCard store={store} index={index} />
-                </StaggerItem>
-              ))}
-            </Stagger>
-          )}
-
-          {stores.length > 6 && (
-            <div className="flex justify-center">
-              <Link to="/stores" className={secondaryCta}>
-                Browse all stores
-              </Link>
-            </div>
-          )}
+          <Stagger className="mt-6 grid gap-4 md:grid-cols-3" gap={0.06}>
+            {TRUST_POINTS.map(({ icon: Icon, title, text }) => (
+              <StaggerItem key={title} className="h-full">
+                <div className="h-full rounded-card border border-border bg-surface p-5 shadow-card dark:border-white/10 dark:bg-white/[0.03]">
+                  <span className="inline-flex size-11 items-center justify-center rounded-btn border border-brand-500/20 bg-brand-500/10 text-brand-600 dark:text-brand-300">
+                    <Icon aria-hidden className="size-5" />
+                  </span>
+                  <h3 className="mt-4 font-display text-lg font-bold tracking-tight text-fg">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-fg-muted">{text}</p>
+                </div>
+              </StaggerItem>
+            ))}
+          </Stagger>
         </section>
+
+        {/* Remaining storefronts. Hidden when the featured store is the only one. */}
+        {(isLoading || otherStores.length > 0) && (
+          <section id="marketplace" className="scroll-mt-24">
+            <Reveal className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Marketplace</p>
+              <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
+                More local game stores.
+              </h2>
+            </Reveal>
+
+            {isLoading ? (
+              <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <StoreCardSkeleton key={index} />
+                ))}
+              </div>
+            ) : (
+              <Stagger className="mt-6 grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {otherStores.slice(0, 6).map((store, index) => (
+                  <StaggerItem key={store.id} className="h-full">
+                    <StoreCard store={store} index={index + 1} />
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            )}
+
+            {otherStores.length > 6 && (
+              <div className="mt-8 flex justify-center">
+                <Link to="/stores" className={secondaryCta}>
+                  Browse all stores
+                </Link>
+              </div>
+            )}
+          </section>
+        )}
 
         <Reveal
           id="reach-out"
-          className="scroll-mt-24 rounded-card border border-border bg-surface p-6 shadow-card sm:p-8 dark:border-white/10 dark:glass-card"
+          className="scroll-mt-24 overflow-hidden rounded-card border border-border bg-surface shadow-card dark:border-white/10 dark:bg-white/[0.03]"
         >
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Reach out</p>
-          <h2 className="mt-3 max-w-2xl font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
-            Interested in opening a store or learning more?
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
-            Send us a quick note and we’ll follow up about the platform, onboarding, and what you want to build.
-          </p>
-          <div className="mt-6">
-            <a href={reachOutHref} className={primaryCta}>
-              <Mail aria-hidden className="size-4" />
-              Email the platform team
-            </a>
+          <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Reach out</p>
+              <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">
+                Interested in opening a store or learning more?
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
+                Send us a note and we’ll follow up about the platform, onboarding, and what you want to build.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+              <a href={reachOutHref} className={primaryCta}>
+                <Mail aria-hidden className="size-4" />
+                Email the team
+              </a>
+            </div>
           </div>
         </Reveal>
       </div>

@@ -451,7 +451,9 @@ export function FloatingCardsBackdrop({
   className,
   washClassName,
 }: FloatingCardsBackdropProps) {
-  const cards = (layout === 'right' ? RIGHT_FOCUS_CARDS : FLOAT_CARDS).slice(0, layout === 'right' ? 10 : 16)
+  // Dense field for the landing scatter; the side layouts stay lighter so they
+  // don't fight the copy sitting next to them.
+  const cards = layout === 'right' ? RIGHT_FOCUS_CARDS.slice(0, 14) : FLOAT_CARDS
 
   return (
     <div aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>
@@ -469,7 +471,8 @@ export function FloatingCardsBackdrop({
             card.className,
           )}
           style={{ animationDelay: card.delay }}
-          loading="eager"
+          // Only the first ring blocks first paint; the rest stream in.
+          loading={i < 12 ? 'eager' : 'lazy'}
           decoding="async"
         />
       ))}
