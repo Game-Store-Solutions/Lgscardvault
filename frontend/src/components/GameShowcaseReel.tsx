@@ -284,8 +284,8 @@ export function GameShowcaseReel({
         aria-hidden
         className="pointer-events-none absolute -inset-x-6 -top-10 -bottom-8 -z-10 sm:-inset-x-16 sm:-top-14 sm:-bottom-12"
       >
-        <span className="absolute left-1/2 top-[18%] h-40 w-[min(28rem,80%)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(198,160,53,0.30),transparent_72%)] blur-3xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.38),transparent_72%)]" />
-        <span className="absolute left-1/2 top-[62%] h-[22rem] w-[min(56rem,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(10,22,39,0.12),transparent_70%)] blur-3xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.26),transparent_70%)]" />
+        <span className="absolute left-1/2 top-[18%] h-48 w-[min(32rem,85%)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(198,160,53,0.55),transparent_68%)] blur-2xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.38),transparent_72%)] dark:blur-3xl" />
+        <span className="absolute left-1/2 top-[62%] h-[24rem] w-[min(58rem,125%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(10,22,39,0.16),transparent_68%)] blur-2xl dark:bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.26),transparent_70%)] dark:blur-3xl" />
       </div>
 
       <h2
@@ -296,7 +296,7 @@ export function GameShowcaseReel({
       >
         We stock <FlipWords word={tile.short} color={tile.accent} />
       </h2>
-      <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
+      <p className="mt-3 max-w-2xl text-[0.95rem] font-medium leading-7 text-fg/75 dark:text-fg-muted">
         Singles and sealed product across the games players actually play, all searchable by set, rarity,
         condition, and finish.
       </p>
@@ -328,7 +328,7 @@ export function GameShowcaseReel({
                 className="origin-bottom will-change-transform"
               >
                 <ShowcaseArt card={card} accent={tile.accent} onFailed={markFailed} artTick={artTick} />
-                <figcaption className="mt-2 truncate px-0.5 text-center text-[0.7rem] font-semibold text-fg-muted">
+                <figcaption className="mt-2 truncate px-0.5 text-center text-xs font-semibold text-fg/70 dark:text-fg-muted">
                   {card.name}
                 </figcaption>
               </motion.figure>
