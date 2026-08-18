@@ -44,6 +44,12 @@ html {
   initial-value: 0;
 }
 
+@property --foil-idle {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
 @theme {
   /*
    * Brand — dual-tone.
@@ -439,78 +445,69 @@ body {
 
 @layer components {
   /*
-   * Foil intensity knobs:
-   * - Increase --foil-shimmer-opacity-max for a brighter flash.
-   * - Decrease --foil-shimmer-duration for a faster shimmer.
+   * Holographic foil.
+   *
+   * Pointer light (--mx/--my/--op) is spring-smoothed by useTilt. Idle foils
+   * still breathe via --foil-idle so a grid of foils reads as foil without a
+   * looping white flash. Hovering fades the idle drift out so the rainbow
+   * locks to the pointer instead of fighting it.
+   *
+   * --foil-holo-opacity: rest-state rainbow strength.
    */
   .foil-card {
-    --foil-holo-opacity: 0.30;
-    --foil-shimmer-opacity-min: 0.24;
-    --foil-shimmer-opacity-mid: 0.38;
-    --foil-shimmer-opacity-max: 0.66;
-    --foil-shimmer-duration: 3s;
+    --foil-holo-opacity: 0.28;
   }
   .tilt-card {
-    transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    isolation: isolate;
     transform-style: preserve-3d;
-    /* Smooth, springy glide toward the pointer and back to rest. */
-    transition: transform 0.45s cubic-bezier(0.32, 0.61, 0.36, 1);
-    will-change: transform;
   }
   .tilt-glare {
     background: radial-gradient(
-      circle at var(--mx, 50%) var(--my, 50%),
-      rgba(255, 255, 255, 0.5),
-      rgba(255, 255, 255, 0) 45%
+      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+      hsla(0, 0%, 100%, 0.82) 0%,
+      hsla(0, 0%, 100%, 0.38) 22%,
+      hsla(0, 0%, 100%, 0) 58%
     );
-    mix-blend-mode: soft-light;
-    opacity: var(--op, 0);
-    /* Fade opacity slowly; let the highlight glide (not snap) with the pointer. */
-    transition: opacity 0.5s ease, background-position 0.2s ease-out;
+    mix-blend-mode: overlay;
+    opacity: calc(var(--op, 0) * 0.78);
   }
-  .tilt-holo {
-    background-image: repeating-linear-gradient(
-      110deg,
-      rgba(255, 0, 132, 0.55) 0%,
-      rgba(0, 153, 255, 0.55) 12%,
-      rgba(0, 255, 170, 0.55) 24%,
-      rgba(255, 215, 0, 0.55) 36%,
-      rgba(170, 0, 255, 0.55) 48%,
-      rgba(255, 0, 132, 0.55) 60%
-    );
-    background-size: 300% 300%;
-    background-position: var(--mx, 50%) var(--my, 50%);
-    mix-blend-mode: color-dodge;
-    filter: saturate(1.4) contrast(1.1);
-    opacity: max(var(--foil-holo-opacity, 0.26), calc(var(--op, 0) * 0.72));
-    /* Ease both the fade and the sheen sweep so foil shimmers instead of jumping. */
-    transition: opacity 0.5s ease;
-    animation: foil-sweep 4.8s linear infinite;
-  }
+  .tilt-holo,
   .foil-shimmer {
+    --foil-idle: 0%;
     background-image:
       linear-gradient(
         115deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0) 34%,
-        rgba(255, 255, 255, 0.55) 47%,
-        rgba(255, 255, 255, 0.08) 56%,
-        transparent 72%
+        transparent 36%,
+        rgba(255, 255, 255, calc(0.08 + var(--op, 0) * 0.42)) 48%,
+        transparent 62%
       ),
       repeating-linear-gradient(
-        110deg,
-        rgba(255, 0, 132, 0.35) 0%,
-        rgba(0, 153, 255, 0.35) 12%,
-        rgba(0, 255, 170, 0.35) 24%,
-        rgba(255, 215, 0, 0.35) 36%,
-        rgba(170, 0, 255, 0.35) 48%,
-        rgba(255, 0, 132, 0.35) 60%
+        125deg,
+        hsl(330 95% 62%) 0%,
+        hsl(200 95% 58%) 10%,
+        hsl(160 90% 52%) 18%,
+        hsl(48 95% 58%) 28%,
+        hsl(280 85% 62%) 38%,
+        hsl(330 95% 62%) 48%
       );
-    background-size: 220% 220%, 280% 280%;
-    background-position: -140% 50%, 0% 50%;
+    background-size: 220% 220%, 380% 380%;
+    background-position:
+      calc(var(--mx, 50%) * 1.15) var(--my, 50%),
+      calc(var(--mx, 50%) + (var(--foil-idle) * (1 - var(--op, 0))))
+        calc(var(--my, 50%) - (var(--foil-idle) * 0.4 * (1 - var(--op, 0))));
     mix-blend-mode: color-dodge;
-    filter: saturate(1.65) contrast(1.16) brightness(1.08);
-    animation: foil-flash var(--foil-shimmer-duration, 3.6s) ease-in-out infinite;
+    filter: brightness(0.72) contrast(1.32) saturate(0.82);
+    opacity: calc(var(--foil-holo-opacity, 0.28) + var(--op, 0) * 0.38);
+    animation: foil-idle-shift 7.5s ease-in-out infinite;
+  }
+  .tilt-sparkle {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 0.55px, transparent 0.85px);
+    background-size: 12px 15px;
+    background-position: calc(var(--mx, 50%) * 0.4) calc(var(--my, 50%) * 0.4);
+    mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 58%);
+    -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 58%);
+    mix-blend-mode: overlay;
+    opacity: calc(var(--op, 0) * 0.62);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -551,21 +548,13 @@ body {
   }
 }
 
-@keyframes foil-flash {
-  0% {
-    background-position: -140% 50%, 0% 50%;
-    opacity: var(--foil-shimmer-opacity-min, 0.36);
-  }
-  48% {
-    opacity: var(--foil-shimmer-opacity-mid, 0.5);
-  }
-  68% {
-    background-position: 160% 50%, 100% 50%;
-    opacity: var(--foil-shimmer-opacity-max, 0.78);
-  }
+@keyframes foil-idle-shift {
+  0%,
   100% {
-    background-position: 160% 50%, 0% 50%;
-    opacity: var(--foil-shimmer-opacity-min, 0.36);
+    --foil-idle: -16%;
+  }
+  50% {
+    --foil-idle: 22%;
   }
 }
 

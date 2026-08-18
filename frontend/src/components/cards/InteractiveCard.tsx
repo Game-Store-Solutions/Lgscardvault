@@ -1,6 +1,8 @@
 import { ImageOff } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { cx } from '../../lib/cx'
 import { useTilt } from '../../hooks'
+import { FoilOverlays } from './FoilOverlays'
 
 export interface InteractiveCardProps {
   image?: string
@@ -20,23 +22,26 @@ export interface InteractiveCardProps {
 
 /**
  * InteractiveCard — a pointer-driven holographic tilt for a card image
- * (inspired by simeydotme/pokemon-cards-css). Moving the pointer tilts the card
- * in 3D, drifts a glare highlight, and — for foil cards — sweeps a rainbow
- * holo sheen. Falls back to a static image under reduced-motion.
+ * (inspired by simeydotme/pokemon-cards-css). Moving the pointer springs the
+ * card in 3D, drifts a glare highlight, and — for foil cards — locks a rainbow
+ * holo + sparkle to the light. Falls back to a static image under reduced-motion.
  */
 export function InteractiveCard({ image, alt, foil = false, accent = '#c6a035', maxTilt = 14, shadow = true, borderless = false, className }: InteractiveCardProps) {
-  const { ref, onPointerMove, onPointerLeave } = useTilt(maxTilt)
+  const { ref, onPointerMove, onPointerLeave, tiltStyle } = useTilt(maxTilt)
 
   return (
     <div ref={ref} className={cx('[perspective:1000px]', className)} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave}>
-      <div
+      <motion.div
         className={cx(
           'tilt-card relative overflow-hidden rounded-[4.5%/3.5%]',
           !borderless && 'rounded-2xl border-2',
           foil && 'foil-card',
           shadow && 'shadow-card',
         )}
-        style={borderless ? undefined : { borderColor: accent }}
+        style={{
+          ...tiltStyle,
+          ...(borderless ? {} : { borderColor: accent }),
+        }}
       >
         {image ? (
           <img src={image} alt={alt} loading="lazy" decoding="async" className="block w-full select-none" draggable={false} />
@@ -45,9 +50,8 @@ export function InteractiveCard({ image, alt, foil = false, accent = '#c6a035', 
             <ImageOff aria-hidden className="size-8" />
           </div>
         )}
-        {image && <div aria-hidden className="tilt-glare pointer-events-none absolute inset-0" />}
-        {image && foil && <div aria-hidden className="tilt-holo pointer-events-none absolute inset-0" />}
-      </div>
+        {image && <FoilOverlays foil={foil} />}
+      </motion.div>
     </div>
   )
 }

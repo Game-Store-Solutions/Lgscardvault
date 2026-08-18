@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ImageOff } from 'lucide-react'
 import { cx } from '../../lib/cx'
+import { FoilOverlays } from './FoilOverlays'
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -51,7 +52,7 @@ function Face({
 }) {
   return (
     <div
-      className={cx('absolute inset-0 overflow-hidden rounded-[4.5%/3.5%]', !borderless && 'rounded-2xl border-2')}
+      className={cx('tilt-card absolute inset-0 overflow-hidden rounded-[4.5%/3.5%]', !borderless && 'rounded-2xl border-2', foil && 'foil-card')}
       style={{
         ...(borderless ? {} : { borderColor: accent }),
         backfaceVisibility: 'hidden',
@@ -65,7 +66,7 @@ function Face({
           <ImageOff aria-hidden className="size-8" />
         </div>
       )}
-      {image && foil && <div aria-hidden className="tilt-holo pointer-events-none absolute inset-0" />}
+      {image && <FoilOverlays foil={foil} glare={false} />}
     </div>
   )
 }
