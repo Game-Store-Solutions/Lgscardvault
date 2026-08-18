@@ -30,6 +30,7 @@ import {
   storeActivityIcons,
 } from '../components/profile'
 import { CardBody, CardHeader, EmptyState, LoadingPanel, Pagination } from '../components/ui'
+import { EASE_PREMIUM, motion } from '../components/motion'
 import { formatDate } from '../lib/format'
 
 interface MyStore {
@@ -453,13 +454,16 @@ export default function AccountPage() {
 
 function OverviewTile({ title, text, onClick }: { title: string; text: string; onClick: () => void }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ duration: 0.2, ease: EASE_PREMIUM }}
       className="rounded-2xl border border-border bg-surface px-4 py-4 text-left shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40 dark:hover:bg-brand-950/20"
     >
       <p className="font-bold text-fg">{title}</p>
       <p className="mt-1 text-sm leading-relaxed text-fg-muted">{text}</p>
-    </button>
+    </motion.button>
   )
 }

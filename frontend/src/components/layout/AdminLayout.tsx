@@ -291,7 +291,7 @@ export default function AdminLayout() {
 
         className={[
 
-          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/8 bg-[#111113] shadow-[4px_0_32px_-12px_rgba(0,0,0,0.42)]',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-surface shadow-[4px_0_32px_-12px_rgba(0,0,0,0.18)] dark:border-white/10 dark:bg-[#111113]',
 
           'transition-transform lg:translate-x-0',
 
@@ -301,7 +301,7 @@ export default function AdminLayout() {
 
       >
 
-        <div className="flex h-16 items-center justify-between gap-2 border-b border-white/8 px-4">
+        <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-4 dark:border-white/10">
 
           <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
 
@@ -407,7 +407,7 @@ export default function AdminLayout() {
 
 
 
-        <div className="border-t border-white/8 p-3">
+        <div className="border-t border-border p-3 dark:border-white/10">
 
           <BackButton to="/" tone="soft" className="w-full justify-start rounded-btn px-3 shadow-none">
 
@@ -423,7 +423,7 @@ export default function AdminLayout() {
 
       <div className="lg:pl-64">
 
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-white/8 bg-bg/88 px-4 backdrop-blur-xl">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border bg-bg/88 px-4 backdrop-blur-xl dark:border-white/10">
 
           <div className="flex items-center gap-3">
 

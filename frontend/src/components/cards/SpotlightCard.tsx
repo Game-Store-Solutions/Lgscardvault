@@ -1,7 +1,9 @@
 import { Link } from 'react-router'
+import { motion } from 'framer-motion'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { rarityAccent } from '../../lib/mtg'
+import { EASE_PREMIUM } from '../motion'
 import { InteractiveCard } from './InteractiveCard'
 
 export interface SpotlightCardProps {
@@ -26,7 +28,11 @@ export function SpotlightCard({ item, slug, ribbon }: SpotlightCardProps) {
           {ribbon}
         </span>
       )}
-      <div className="overflow-hidden rounded-[1.1rem] border border-white/8 bg-[#111113] p-2 transition-[transform,border-color] group-hover:-translate-y-1 group-hover:border-white/16">
+      <motion.div
+        whileHover={{ y: -6 }}
+        transition={{ duration: 0.24, ease: EASE_PREMIUM }}
+        className="overflow-hidden rounded-card border border-border bg-surface p-2 shadow-card transition-colors group-hover:border-fg/15 dark:border-white/10 dark:bg-white/[0.03] dark:group-hover:border-white/20"
+      >
         <InteractiveCard
           image={cardImage(item.card)}
           alt={item.card.name}
@@ -35,9 +41,9 @@ export function SpotlightCard({ item, slug, ribbon }: SpotlightCardProps) {
           maxTilt={10}
           shadow={false}
         />
-      </div>
+      </motion.div>
       <div className="mt-3 px-0.5">
-        <h3 className="truncate text-sm font-semibold tracking-[-0.02em] text-fg group-hover:text-white">
+        <h3 className="truncate font-display text-sm font-bold tracking-tight text-fg transition-colors group-hover:text-brand-600 dark:group-hover:text-white">
           {item.card.name}
         </h3>
         <div className="flex items-center justify-between text-xs">

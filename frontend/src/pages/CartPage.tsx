@@ -18,6 +18,7 @@ import { inventoryKey, ordersKey, useCanManageStore, useDebouncedValue, useInven
 import { customerKeys } from '../hooks/useCustomer'
 import { guestCartKey, guestCartLines, resetGuestCart } from '../hooks/useGuestCart'
 import { BackButton, Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
+import { AnimatePresence, EASE_PREMIUM, motion } from '../components/motion'
 import { CheckoutPanel } from '../components/payments/CheckoutPanel'
 import { CardImage, SpotlightCard } from '../components/cards'
 import { cx } from '../lib/cx'
@@ -228,7 +229,7 @@ export default function CartPage() {
           : `Cart updated. ${itemCount} item${itemCount === 1 ? '' : 's'}, estimated total ${subtotalLabel}.`}
       </p>
 
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface px-5 py-5 shadow-card dark:glass-card">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-4 shadow-card sm:px-5 sm:py-5 dark:glass-card">
         <div className="min-w-0">
           <BackButton to={`/s/${slug}`}>Back to store</BackButton>
           <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">Checkout</h1>
@@ -366,10 +367,15 @@ export default function CartPage() {
         </div>
       )}
 
+      <AnimatePresence>
       {removed && (
-        <div
+        <motion.div
           role="status"
           aria-live="polite"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 12 }}
+          transition={{ duration: 0.24, ease: EASE_PREMIUM }}
           className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3 shadow-xl dark:glass-card lg:bottom-6"
         >
           <p className="min-w-0 truncate text-sm text-fg">
@@ -383,8 +389,9 @@ export default function CartPage() {
             <RotateCcw aria-hidden className="size-3.5" />
             Undo
           </button>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 px-4 py-3 shadow-[0_-8px_30px_-12px_rgb(0_0_0/0.25)] backdrop-blur lg:hidden">

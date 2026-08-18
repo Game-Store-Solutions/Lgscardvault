@@ -4,6 +4,7 @@ import { Package } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useStore, useStoreCart, useStoreSealedPublic, useStoreTheme } from '../hooks'
 import { BackButton, EmptyState, Input, Pagination, Select } from '../components/ui'
+import { Stagger, StaggerItem } from '../components/motion'
 import { SealedProductCard } from '../components/store/SealedProductCard'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 
@@ -133,22 +134,26 @@ export default function SealedBrowsePage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          <Stagger
+            className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+            gap={0.03}
+          >
             {visible.map((line) => (
-              <SealedProductCard
-                key={line.id}
-                line={line}
-                cartQty={cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0}
-                pending={setSealedItem.isPending}
-                onAdd={() =>
-                  setSealedItem.mutate({
-                    item: line,
-                    quantity: (cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0) + 1,
-                  })
-                }
-              />
+              <StaggerItem key={line.id} className="h-full">
+                <SealedProductCard
+                  line={line}
+                  cartQty={cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0}
+                  pending={setSealedItem.isPending}
+                  onAdd={() =>
+                    setSealedItem.mutate({
+                      item: line,
+                      quantity: (cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0) + 1,
+                    })
+                  }
+                />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
           <Pagination
             page={currentPage}
             pageCount={pageCount}

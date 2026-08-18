@@ -27,6 +27,7 @@ import {
   useStoreTheme,
 } from '../hooks'
 import { Badge, BackButton, Button, buttonVariants, ErrorState, Modal, TabPanel, Tabs } from '../components/ui'
+import { Reveal, Stagger, StaggerItem } from '../components/motion'
 import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { rarityAccent, rarityLabel } from '../lib/mtg'
@@ -404,7 +405,7 @@ export default function CardDetailsPage() {
         </div>
       </div>
 
-      <div>
+      <Reveal immediate y={12}>
         <article className="product-detail-sheet">
         <div className="flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)_minmax(20rem,28rem)] xl:grid-cols-[minmax(17rem,24rem)_minmax(0,1fr)_minmax(22rem,30rem)] lg:items-start lg:gap-0">
           {/* Card art. Left */}
@@ -792,15 +793,20 @@ export default function CardDetailsPage() {
                 View all
               </Link>
             </div>
-            <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <Stagger
+              className="scrollbar-none flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              gap={0.04}
+            >
               {related.map((rel) => (
-                <SpotlightCard key={rel.id} item={rel} slug={slug} />
+                <StaggerItem key={rel.id} className="shrink-0">
+                  <SpotlightCard item={rel} slug={slug} />
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           </section>
         )}
       </article>
-      </div>
+      </Reveal>
 
       <Modal
         open={artistEmptyModalOpen}

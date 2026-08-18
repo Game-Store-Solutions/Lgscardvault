@@ -1,5 +1,7 @@
 import { Link } from 'react-router'
+import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
+import { EASE_PREMIUM } from '../motion'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { cx } from '../../lib/cx'
@@ -23,14 +25,16 @@ export function CardRow({ item, slug }: CardRowProps) {
   const price = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
 
   return (
+    <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2, ease: EASE_PREMIUM }}>
     <Link
       to={`/s/${slug}/cards/${item.id}`}
       className={cx(
-        'group flex items-center gap-3 rounded-[1.1rem] border border-white/8 bg-[#111113] p-3 transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-white/16 hover:shadow-[0_20px_52px_-30px_rgba(0,0,0,0.74)] sm:gap-4 sm:p-3.5',
+        'group flex items-center gap-3 rounded-card border border-border bg-surface p-3 shadow-card transition-[border-color,box-shadow] hover:border-fg/15 hover:shadow-lg sm:gap-4 sm:p-3.5',
+        'dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
       )}
     >
-      <div className="relative grid h-20 w-[3.6rem] shrink-0 place-items-center overflow-hidden rounded-[0.95rem] border border-white/8 bg-[#0d0d10] sm:h-24 sm:w-[4.35rem]">
+      <div className="relative grid h-20 w-[3.6rem] shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-bg sm:h-24 sm:w-[4.35rem] dark:border-white/10 dark:bg-[#0d0d10]">
         <CardImage src={image} alt={item.card.name} fit="cover" className="size-full" showLabel={false} />
       </div>
 
@@ -68,6 +72,7 @@ export function CardRow({ item, slug }: CardRowProps) {
         <p className="text-xs text-fg-muted">{item.quantity} available</p>
       </div>
     </Link>
+    </motion.div>
   )
 }
 

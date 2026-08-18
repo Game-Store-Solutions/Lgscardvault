@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { ArrowRight, Search, Store } from 'lucide-react'
 import type { Store as StoreType } from '../api/types'
 import { BackButton, EmptyState, ErrorState, PageHeader, Select } from '../components/ui'
+import { Stagger, StaggerItem } from '../components/motion'
 import { StoreHero, StoreCard, StoreCardSkeleton } from '../components/store'
 import { BrandLogo } from '../components/BrandLogo'
 import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
@@ -188,11 +189,13 @@ export default function StoreDirectoryPage() {
             description={`Nothing found for “${debouncedQuery.trim()}”. Try a different name.`}
           />
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <Stagger className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {results.map((store, i) => (
-              <StoreCard key={store.id} store={store} index={i} />
+              <StaggerItem key={store.id} className="h-full">
+                <StoreCard store={store} index={i} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         )}
       </section>
       </div>

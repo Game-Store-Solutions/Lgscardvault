@@ -5,6 +5,7 @@ import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import { useInventory, useStore, useStoreTheme } from '../hooks'
 import { BackButton, Button, EmptyState, Input, Modal } from '../components/ui'
+import { Stagger, StaggerItem } from '../components/motion'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { inventoryByArtist } from '../lib/artistBrowse'
@@ -169,11 +170,16 @@ export default function ArtistBrowsePage() {
           description="Try a different filter."
         />
       ) : (
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        <Stagger
+          className="mt-6 grid grid-cols-2 gap-2.5 sm:mt-8 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+          gap={0.03}
+        >
           {grouped.map((entry) => (
-            <ArtistCardTile key={entry.representative.card.id} slug={slug} artist={artist} entry={entry} />
+            <StaggerItem key={entry.representative.card.id} className="h-full">
+              <ArtistCardTile slug={slug} artist={artist} entry={entry} />
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       )}
     </div>
   )

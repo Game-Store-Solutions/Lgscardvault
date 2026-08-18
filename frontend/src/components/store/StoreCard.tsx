@@ -75,7 +75,7 @@ export function StoreCard({ store, index = 0, className }: StoreCardProps) {
         {/* Logo chip straddles the banner edge so the identity leads the card. */}
         <div className="-mt-8 px-4 sm:px-5">
           <span
-            className="grid size-14 place-items-center overflow-hidden rounded-2xl border border-white/12 bg-surface shadow-md dark:bg-[#15151a]"
+            className="grid size-14 place-items-center overflow-hidden rounded-2xl border border-border bg-surface shadow-md dark:border-white/12 dark:bg-[#15151a]"
             style={{ boxShadow: `0 12px 30px -16px ${accent}` }}
           >
             {logo ? (

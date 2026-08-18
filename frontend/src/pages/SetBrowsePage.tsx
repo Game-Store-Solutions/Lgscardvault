@@ -5,6 +5,7 @@ import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import { useInventory, useStore, useStoreTheme } from '../hooks'
 import { BackButton, Badge, EmptyState, Input, Select } from '../components/ui'
+import { Stagger, StaggerItem } from '../components/motion'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { finishName } from '../lib/finishes'
@@ -211,11 +212,16 @@ export default function SetBrowsePage() {
               description="Try a different search term or clear the filter."
             />
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+            <Stagger
+              className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+              gap={0.03}
+            >
               {grouped.map((entry) => (
-                <SetCardTile key={entry.representative.card.id} slug={slug} entry={entry} />
+                <StaggerItem key={entry.representative.card.id} className="h-full">
+                  <SetCardTile slug={slug} entry={entry} />
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           )}
         </>
       )}

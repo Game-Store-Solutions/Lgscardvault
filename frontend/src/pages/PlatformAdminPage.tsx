@@ -197,7 +197,7 @@ export default function PlatformAdminPage() {
     <div className="space-y-8">
       <Reveal
         immediate
-        className="overflow-hidden rounded-[1.6rem] border border-white/8 bg-[linear-gradient(180deg,rgba(220,38,38,0.12),rgba(17,17,19,0.98))]"
+        className="overflow-hidden rounded-card border border-border bg-[linear-gradient(180deg,rgba(198,160,53,0.14),rgba(255,255,255,0.9))] shadow-card dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(220,38,38,0.14),rgba(17,17,19,0.98))]"
       >
         <div className="grid gap-6 px-5 py-7 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:px-8">
           <div className="space-y-4">
@@ -696,7 +696,7 @@ function IntegrationTile({
 
 function QuickAdminCallout({ title, value, text }: { title: string; value: number; text: string }) {
   return (
-    <div className="rounded-[1.15rem] border border-white/8 bg-white/[0.04] p-4">
+    <div className="h-full rounded-card border border-border bg-surface/80 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04]">
       <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-fg-muted">{title}</p>
       <p className="mt-2 font-display text-3xl font-bold tracking-[-0.04em] text-fg">{value}</p>
       <p className="mt-2 text-sm text-fg-muted">{text}</p>
@@ -716,8 +716,8 @@ function CommandTile({
   action: ReactNode
 }) {
   return (
-    <div className="rounded-[1.2rem] border border-white/8 bg-[#111113] p-5 shadow-[0_20px_60px_-34px_rgba(0,0,0,0.82)]">
-      <span className="inline-flex size-11 items-center justify-center rounded-[0.95rem] border border-brand-500/20 bg-brand-500/10 text-brand-300">
+    <div className="h-full rounded-card border border-border bg-surface p-5 shadow-card dark:border-white/10 dark:bg-white/[0.03]">
+      <span className="inline-flex size-11 items-center justify-center rounded-btn border border-brand-500/20 bg-brand-500/10 text-brand-600 dark:text-brand-300">
         {icon}
       </span>
       <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-fg">{title}</h3>
@@ -737,9 +737,9 @@ function StatCard({
   value: number
 }) {
   return (
-    <Card animateIn={false} className="h-full border-white/8 bg-[#111113] shadow-[0_18px_54px_-30px_rgba(0,0,0,0.76)]">
+    <Card animateIn={false} className="h-full">
       <CardBody className="flex items-center gap-4">
-        <span className="flex size-11 items-center justify-center rounded-[0.95rem] border border-white/8 bg-white/[0.04] text-brand-300">
+        <span className="flex size-11 items-center justify-center rounded-btn border border-border bg-bg text-brand-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-brand-300">
           {icon}
         </span>
         <div>

@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext'
 import { useCanManageStore, useDebouncedValue, useInventoryPage, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
 import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, Skeleton } from '../components/ui'
+import { Stagger, StaggerItem } from '../components/motion'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
 import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
 import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
@@ -387,7 +388,7 @@ export default function StorePage() {
       <TradePromoBanner slug={slug} showSellLink />
 
       {/* Slim stat line */}
-      <div className="rounded-[1.25rem] border border-white/8 bg-[#111113] px-5 py-4 shadow-[0_18px_54px_-30px_rgba(0,0,0,0.72)]">
+      <div className="rounded-card border border-border bg-surface px-4 py-3.5 shadow-card sm:px-5 sm:py-4 dark:border-white/10 dark:bg-white/[0.03]">
         <p className="text-sm text-fg-muted">
           <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings ·{' '}
           <span className="font-bold text-fg">{shelf?.copies ?? 0}</span> cards ·{' '}
@@ -409,7 +410,7 @@ export default function StorePage() {
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'group flex flex-col items-center justify-center gap-2 rounded-[1.15rem] border border-white/8 bg-[#111113] px-2 py-3 text-fg transition-[transform,border-color,box-shadow] hover:-translate-y-1 hover:border-white/16 hover:shadow-[0_20px_54px_-30px_rgba(0,0,0,0.74)] sm:gap-3 sm:px-4 sm:py-8'
+              'group flex flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface px-2 py-3 text-fg shadow-card transition-[transform,border-color,box-shadow] hover:-translate-y-1 hover:border-fg/15 hover:shadow-lg sm:gap-3 sm:px-4 sm:py-8 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20'
             const content = (
               <>
                 <span className="grid size-9 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] sm:size-12 dark:text-brand-300">
@@ -507,7 +508,7 @@ export default function StorePage() {
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-20 rounded-[1.25rem] border border-white/8 bg-[#111113] p-5 shadow-[0_18px_54px_-30px_rgba(0,0,0,0.72)]">
+          <div className="sticky top-20 rounded-card border border-border bg-surface p-5 shadow-card dark:border-white/10 dark:bg-white/[0.03]">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
@@ -524,7 +525,7 @@ export default function StorePage() {
         </aside>
 
         <main className="min-w-0 space-y-5">
-          <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-white/8 bg-bg/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:border-b lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
+          <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:border-b lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none dark:border-white/10">
             <div className="lg:hidden">{renderSearchField('store-search-mobile', false)}</div>
             <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center sm:justify-between lg:border-b lg:border-border lg:pb-4">
               <div className="min-w-0">
@@ -572,7 +573,7 @@ export default function StorePage() {
                 ))}
               </Select>
               {cardDisplayStyle === 'gallery' ? (
-                <div className="flex shrink-0 overflow-hidden rounded-btn border border-white/10 bg-[#111113]">
+                <div className="flex shrink-0 overflow-hidden rounded-btn border border-border bg-surface dark:border-white/10 dark:bg-white/[0.03]">
                   <button
                     type="button"
                     onClick={() => setView('grid')}
@@ -593,7 +594,7 @@ export default function StorePage() {
                   </button>
                 </div>
               ) : (
-                <span className="inline-flex h-10 shrink-0 items-center gap-2 rounded-btn border border-white/10 bg-[#111113] px-3 text-sm font-bold text-fg">
+                <span className="inline-flex h-10 shrink-0 items-center gap-2 rounded-btn border border-border bg-surface px-3 text-sm font-bold text-fg dark:border-white/10 dark:bg-white/[0.03]">
                   <ShoppingCart aria-hidden className="size-4" />
                   <span className="hidden sm:inline">Marketplace cards</span>
                 </span>
@@ -621,30 +622,38 @@ export default function StorePage() {
             <div className={cx('space-y-6', listingsRefreshing && 'opacity-70')}>
               <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={setPage} totalItems={resultTotal} />
               {cardDisplayStyle === 'marketplace' ? (
-                <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
+                <Stagger className="grid gap-4 sm:gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]" gap={0.04}>
                   {visibleResults.map((item) => (
-                    <MarketplaceCard
-                      key={item.id}
-                      item={item}
-                      slug={slug}
-                      inCartQuantity={cartByItemId.get(item.id)}
-                      adding={cartSetItem.isPending && cartSetItem.variables?.item.id === item.id}
-                      onAddToCart={() => cartSetItem.mutate({ item, quantity: 1 })}
-                    />
+                    <StaggerItem key={item.id}>
+                      <MarketplaceCard
+                        item={item}
+                        slug={slug}
+                        inCartQuantity={cartByItemId.get(item.id)}
+                        adding={cartSetItem.isPending && cartSetItem.variables?.item.id === item.id}
+                        onAddToCart={() => cartSetItem.mutate({ item, quantity: 1 })}
+                      />
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
               ) : view === 'grid' ? (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                <Stagger
+                  className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                  gap={0.03}
+                >
                   {visibleResults.map((item) => (
-                    <CardTile key={item.id} item={item} slug={slug} />
+                    <StaggerItem key={item.id} className="h-full">
+                      <CardTile item={item} slug={slug} />
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
               ) : (
-                <div className="space-y-3">
+                <Stagger className="space-y-3" gap={0.03}>
                   {visibleResults.map((item) => (
-                    <CardRow key={item.id} item={item} slug={slug} />
+                    <StaggerItem key={item.id}>
+                      <CardRow item={item} slug={slug} />
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
               )}
               <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={setPage} totalItems={resultTotal} />
             </div>
