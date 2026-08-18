@@ -147,47 +147,32 @@ export default function MarketplaceLanding() {
                 const tile = gameTile(game.code, game.name)
                 return (
                   <StaggerItem key={game.id ?? game.code} className="h-full">
-                    <motion.div
-                      whileHover={{ y: -5 }}
-                      transition={{ duration: 0.24, ease: EASE_PREMIUM }}
-                      className="h-full"
-                    >
-                      <Link
-                        to="/stores"
-                        aria-label={`Shop ${game.name}`}
-                        className="group relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-card border border-border shadow-card transition-[border-color,box-shadow] hover:border-fg/15 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg dark:border-white/10 dark:hover:border-white/20"
-                      >
-                        <img
-                          src={tile.art}
-                          alt=""
-                          aria-hidden
-                          loading="lazy"
-                          decoding="async"
-                          className="absolute inset-0 size-full object-cover transition-transform duration-[700ms] ease-out group-hover:scale-[1.06]"
-                        />
-                        <div
-                          aria-hidden
-                          className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10"
-                        />
-                        <span
-                          aria-hidden
-                          className="absolute inset-x-0 top-0 h-1"
-                          style={{ backgroundColor: tile.accent }}
-                        />
-                        <div className="relative p-3.5">
-                          <p className="font-display text-base font-bold leading-tight tracking-[-0.02em] text-white sm:text-lg">
-                            {tile.short}
-                          </p>
-                          <span className="mt-1.5 inline-flex items-center gap-1 text-eyebrow !text-white/70">
-                            Shop
-                            <ArrowRight
-                              aria-hidden
-                              className="size-3.5 transition-transform duration-300 group-hover:translate-x-1"
-                            />
-                          </span>
-                        </div>
-                      </Link>
-                    </motion.div>
+                    {/* Presentational only — these show coverage, not navigation. */}
+                    <figure className="relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-card border border-border shadow-card dark:border-white/10">
+                      <img
+                        src={tile.art}
+                        alt=""
+                        aria-hidden
+                        loading="lazy"
+                        decoding="async"
+                        className="absolute inset-0 size-full object-cover"
+                      />
+                      <div
+                        aria-hidden
+                        className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10"
+                      />
+                      <span
+                        aria-hidden
+                        className="absolute inset-x-0 top-0 h-1"
+                        style={{ backgroundColor: tile.accent }}
+                      />
+                      <figcaption className="relative p-3.5">
+                        <p className="font-display text-base font-extrabold leading-tight tracking-[-0.03em] text-white sm:text-lg">
+                          {tile.short}
+                        </p>
+                        <span className="mt-1 block text-eyebrow !text-white/60">{game.name}</span>
+                      </figcaption>
+                    </figure>
                   </StaggerItem>
                 )
               })}
