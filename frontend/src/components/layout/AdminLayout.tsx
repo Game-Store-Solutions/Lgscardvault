@@ -58,6 +58,8 @@ import { Avatar, BackButton, Button, buttonVariants } from '../ui'
 
 import { ProfileNavBadge } from '../profile'
 
+import { PageTransition } from '../motion'
+
 import { CASE_CARDS_LABEL } from '../../pages/utils/actionsUtil'
 
 
@@ -501,7 +503,11 @@ export default function AdminLayout() {
 
         >
 
-          <Outlet />
+          <PageTransition routeKey={location.pathname}>
+
+            <Outlet />
+
+          </PageTransition>
 
         </main>
 

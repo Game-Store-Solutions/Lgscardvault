@@ -16,13 +16,9 @@ import {
   Select,
   TabPanel,
   Tabs,
-  Table,
-  THead,
-  TBody,
-  TR,
-  TH,
-  TD,
 } from '../components/ui'
+import { Reveal, Stagger, StaggerItem } from '../components/motion'
+import { storeAccent } from '../lib/storeAccent'
 import {
   Ban,
   CheckCircle2,
@@ -199,12 +195,15 @@ export default function PlatformAdminPage() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-[1.6rem] border border-white/8 bg-[linear-gradient(180deg,rgba(220,38,38,0.12),rgba(17,17,19,0.98))]">
-        <div className="grid gap-6 px-6 py-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:px-8">
+      <Reveal
+        immediate
+        className="overflow-hidden rounded-[1.6rem] border border-white/8 bg-[linear-gradient(180deg,rgba(220,38,38,0.12),rgba(17,17,19,0.98))]"
+      >
+        <div className="grid gap-6 px-5 py-7 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:px-8">
           <div className="space-y-4">
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-fg-muted">Platform admin</p>
             <div className="space-y-3">
-              <h1 className="font-display text-4xl font-bold tracking-[-0.05em] text-fg sm:text-5xl">
+              <h1 className="font-display text-3xl font-bold tracking-[-0.05em] text-fg sm:text-4xl lg:text-5xl">
                 Command center for stores, billing, and platform operations.
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-fg-muted sm:text-base">
@@ -212,36 +211,34 @@ export default function PlatformAdminPage() {
               </p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            <QuickAdminCallout title="Pending review" value={pending.length} text="Store applications waiting on approval." />
-            <QuickAdminCallout title="Live stores" value={activeStores} text="Active storefronts currently visible to shoppers." />
-            <QuickAdminCallout title="Users" value={users.length} text="Accounts across the marketplace." />
-          </div>
+          <Stagger className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1" gap={0.05}>
+            <StaggerItem>
+              <QuickAdminCallout title="Pending review" value={pending.length} text="Store applications waiting on approval." />
+            </StaggerItem>
+            <StaggerItem>
+              <QuickAdminCallout title="Live stores" value={activeStores} text="Active storefronts currently visible to shoppers." />
+            </StaggerItem>
+            <StaggerItem>
+              <QuickAdminCallout title="Users" value={users.length} text="Accounts across the marketplace." />
+            </StaggerItem>
+          </Stagger>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={<StoreIcon aria-hidden className="size-5" />}
-          label="Total stores"
-          value={stores.length}
-        />
-        <StatCard
-          icon={<CheckCircle2 aria-hidden className="size-5" />}
-          label="Active stores"
-          value={activeStores}
-        />
-        <StatCard
-          icon={<Clock aria-hidden className="size-5" />}
-          label="Pending review"
-          value={pending.length}
-        />
-        <StatCard
-          icon={<UsersIcon aria-hidden className="size-5" />}
-          label="Users"
-          value={users.length}
-        />
-      </section>
+      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" gap={0.05}>
+        <StaggerItem>
+          <StatCard icon={<StoreIcon aria-hidden className="size-5" />} label="Total stores" value={stores.length} />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard icon={<CheckCircle2 aria-hidden className="size-5" />} label="Active stores" value={activeStores} />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard icon={<Clock aria-hidden className="size-5" />} label="Pending review" value={pending.length} />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard icon={<UsersIcon aria-hidden className="size-5" />} label="Users" value={users.length} />
+        </StaggerItem>
+      </Stagger>
 
       {pending.length > 0 && activeTab !== 'stores' && (
         <div className="flex flex-col gap-3 rounded-[1.15rem] border border-brand-500/25 bg-brand-500/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -454,114 +451,143 @@ export default function PlatformAdminPage() {
                 />
               </CardBody>
             ) : (
-              <Table>
-                <THead>
-                  <TR>
-                    <TH>Store</TH>
-                    <TH>Slug</TH>
-                    <TH>Status</TH>
-                    <TH>Featured</TH>
-                    <TH className="text-right">Actions</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {stores.map((store) => (
-                    <TR
-                      key={store.id}
-                      onClick={() => navigate(`/s/${store.slug}/admin`)}
-                      title={`Open ${store.name}'s admin`}
-                      className="cursor-pointer"
-                    >
-                      <TD className="font-medium">{store.name}</TD>
-                      <TD className="text-fg-muted">/{store.slug}</TD>
-                      <TD>
-                        {store.status === 'pending' ? (
-                          <Badge tone="brand">Pending</Badge>
-                        ) : store.status === 'rejected' ? (
-                          <Badge tone="danger">Rejected</Badge>
-                        ) : store.isActive === false ? (
-                          <Badge tone="neutral">Inactive</Badge>
-                        ) : (
-                          <Badge tone="success">Active</Badge>
-                        )}
-                      </TD>
-                      <TD onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant={store.featured ? 'primary' : 'secondary'}
-                          size="sm"
-                          loading={setFeatured.isPending && setFeatured.variables?.id === store.id}
-                          onClick={() => setFeatured.mutate({ id: store.id, featured: !store.featured })}
-                          aria-pressed={Boolean(store.featured)}
-                        >
-                          <Star aria-hidden className={`size-4 ${store.featured ? 'fill-current' : ''}`} />
-                          {store.featured ? 'Featured' : 'Feature'}
-                        </Button>
-                      </TD>
-                      <TD className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          <Link
-                            to={`/s/${store.slug}/admin`}
-                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                          >
-                            Manage
-                          </Link>
-                          <Link
-                            to={`/platform/admin/stores/${store.slug}/imports`}
-                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                          >
-                            Imports
-                          </Link>
-                          {store.status !== 'pending' && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              loading={
-                                setStoreActive.isPending && setStoreActive.variables?.id === store.id
-                              }
-                              onClick={() =>
-                                setStoreActive.mutate({
-                                  id: store.id,
-                                  enable: store.isActive === false || store.status === 'rejected',
-                                })
-                              }
-                            >
-                              {store.isActive === false || store.status === 'rejected' ? (
-                                <>
-                                  <Power aria-hidden className="size-4" />
-                                  Enable
-                                </>
-                              ) : (
-                                <>
-                                  <Ban aria-hidden className="size-4" />
-                                  Disable
-                                </>
+              <CardBody>
+                <Stagger className="grid gap-4 xl:grid-cols-2">
+                  {stores.map((store) => {
+                    const inactive = store.isActive === false || store.status === 'rejected'
+                    const accent = storeAccent(store.id, store.primaryColor)
+                    const actionError =
+                      (setStoreActive.isError && setStoreActive.variables?.id === store.id) ||
+                      (deleteStore.isError && deleteStore.variables?.id === store.id)
+                        ? extractErrorMessage(
+                            (setStoreActive.error ?? deleteStore.error) as Error,
+                            'Store action failed.',
+                          )
+                        : null
+
+                    return (
+                      <StaggerItem key={store.id}>
+                        <div className="group relative flex h-full flex-col overflow-hidden rounded-card border border-border bg-bg/60 transition-colors hover:border-fg/15 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20">
+                          <span aria-hidden className="h-1 w-full" style={{ backgroundColor: accent }} />
+
+                          <div className="flex flex-1 flex-col gap-4 p-4 sm:p-5">
+                            <div className="flex items-start gap-3">
+                              <span
+                                className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-surface dark:border-white/10 dark:bg-[#15151a]"
+                                style={{ boxShadow: `0 10px 26px -18px ${accent}` }}
+                              >
+                                {store.logoUrl?.trim() ? (
+                                  <img src={store.logoUrl} alt="" className="size-full object-cover" loading="lazy" />
+                                ) : (
+                                  <StoreIcon aria-hidden className="size-5" style={{ color: accent }} />
+                                )}
+                              </span>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="min-w-0 truncate font-display text-lg font-bold tracking-tight text-fg">
+                                    {store.name}
+                                  </h3>
+                                  {store.status === 'pending' ? (
+                                    <Badge tone="brand">Pending</Badge>
+                                  ) : store.status === 'rejected' ? (
+                                    <Badge tone="danger">Rejected</Badge>
+                                  ) : store.isActive === false ? (
+                                    <Badge tone="neutral">Inactive</Badge>
+                                  ) : (
+                                    <Badge tone="success">Active</Badge>
+                                  )}
+                                  {store.featured && (
+                                    <Badge tone="warning">
+                                      <Star aria-hidden className="size-3 fill-current" />
+                                      Featured
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="mt-0.5 truncate text-sm text-fg-muted">/{store.slug}</p>
+                              </div>
+                            </div>
+
+                            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                              <div className="min-w-0">
+                                <dt className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
+                                  Owner
+                                </dt>
+                                <dd className="mt-0.5 truncate text-fg">
+                                  {store.owner?.displayName ?? 'Unassigned'}
+                                </dd>
+                              </div>
+                              <div className="min-w-0">
+                                <dt className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
+                                  Plan
+                                </dt>
+                                <dd className="mt-0.5 truncate text-fg">{store.planKey ?? '—'}</dd>
+                              </div>
+                            </dl>
+
+                            <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-4 dark:border-white/10">
+                              <Button
+                                variant={store.featured ? 'primary' : 'secondary'}
+                                size="sm"
+                                loading={setFeatured.isPending && setFeatured.variables?.id === store.id}
+                                onClick={() => setFeatured.mutate({ id: store.id, featured: !store.featured })}
+                                aria-pressed={Boolean(store.featured)}
+                              >
+                                <Star aria-hidden className={`size-4 ${store.featured ? 'fill-current' : ''}`} />
+                                {store.featured ? 'Featured' : 'Feature'}
+                              </Button>
+                              <Link
+                                to={`/s/${store.slug}/admin`}
+                                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                              >
+                                Manage
+                              </Link>
+                              <Link
+                                to={`/platform/admin/stores/${store.slug}/imports`}
+                                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                              >
+                                Imports
+                              </Link>
+                              {store.status !== 'pending' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  loading={setStoreActive.isPending && setStoreActive.variables?.id === store.id}
+                                  onClick={() => setStoreActive.mutate({ id: store.id, enable: inactive })}
+                                >
+                                  {inactive ? (
+                                    <>
+                                      <Power aria-hidden className="size-4" />
+                                      Enable
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Ban aria-hidden className="size-4" />
+                                      Disable
+                                    </>
+                                  )}
+                                </Button>
                               )}
-                            </Button>
-                          )}
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            loading={deleteStore.isPending && deleteStore.variables?.id === store.id}
-                            onClick={() => confirmDeleteStore(store)}
-                          >
-                            <Trash2 aria-hidden className="size-4" />
-                            Delete
-                          </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-danger-700 hover:bg-danger-50"
+                                loading={deleteStore.isPending && deleteStore.variables?.id === store.id}
+                                onClick={() => confirmDeleteStore(store)}
+                              >
+                                <Trash2 aria-hidden className="size-4" />
+                                Delete
+                              </Button>
+                            </div>
+
+                            {actionError && <p className="text-xs text-danger-700">{actionError}</p>}
+                          </div>
                         </div>
-                        {(setStoreActive.isError && setStoreActive.variables?.id === store.id) ||
-                        (deleteStore.isError && deleteStore.variables?.id === store.id) ? (
-                          <p className="mt-1 text-xs text-danger-700">
-                            {extractErrorMessage(
-                              (setStoreActive.error ?? deleteStore.error) as Error,
-                              'Store action failed.',
-                            )}
-                          </p>
-                        ) : null}
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
+                      </StaggerItem>
+                    )
+                  })}
+                </Stagger>
+              </CardBody>
             )}
           </Card>
         </TabPanel>
@@ -711,7 +737,7 @@ function StatCard({
   value: number
 }) {
   return (
-    <Card className="border-white/8 bg-[#111113] shadow-[0_18px_54px_-30px_rgba(0,0,0,0.76)]">
+    <Card animateIn={false} className="h-full border-white/8 bg-[#111113] shadow-[0_18px_54px_-30px_rgba(0,0,0,0.76)]">
       <CardBody className="flex items-center gap-4">
         <span className="flex size-11 items-center justify-center rounded-[0.95rem] border border-white/8 bg-white/[0.04] text-brand-300">
           {icon}

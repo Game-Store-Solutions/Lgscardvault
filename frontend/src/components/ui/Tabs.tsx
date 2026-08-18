@@ -1,4 +1,7 @@
 import type { ComponentType, ReactNode } from 'react'
+import { useId } from 'react'
+import { motion } from 'framer-motion'
+import { EASE_PREMIUM } from '../motion'
 import { cx } from '../../lib/cx'
 
 export interface TabItem {
@@ -19,15 +22,19 @@ export interface TabsProps {
 
 /**
  * Tabs — controlled, accessible tablist. Render <TabPanel when=... value=...>
- * blocks as children to show panel content.
+ * blocks as children to show panel content. The active underline slides between
+ * tabs via a shared layout animation instead of snapping.
  */
 export function Tabs({ tabs, value, onChange, children, className, ...rest }: TabsProps) {
+  // Scoped so multiple Tabs on one page don't share (and fight over) the indicator.
+  const indicatorId = useId()
+
   return (
     <div className={className}>
       <div
         role="tablist"
         aria-label={rest['aria-label'] ?? 'Tabs'}
-        className="flex flex-wrap items-center gap-1 border-b border-border/70"
+        className="-mx-1 flex items-center gap-1 overflow-x-auto border-b border-border/70 px-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {
           const selected = tab.id === value
@@ -43,15 +50,20 @@ export function Tabs({ tabs, value, onChange, children, className, ...rest }: Ta
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(tab.id)}
               className={cx(
-                'inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold -mb-px',
+                'relative inline-flex shrink-0 items-center gap-2 px-3.5 py-2.5 text-sm font-bold -mb-px sm:px-4',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:ring-inset',
-                selected
-                  ? 'border-accent-500 text-fg'
-                  : 'border-transparent text-fg-muted hover:text-fg',
+                selected ? 'text-fg' : 'text-fg-muted hover:text-fg',
               )}
             >
               {Icon && <Icon aria-hidden className="size-4" />}
               {tab.label}
+              {selected && (
+                <motion.span
+                  layoutId={`tab-indicator-${indicatorId}`}
+                  className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent-500"
+                  transition={{ duration: 0.28, ease: EASE_PREMIUM }}
+                />
+              )}
             </button>
           )
         })}
@@ -73,13 +85,16 @@ export interface TabPanelProps {
 export function TabPanel({ when, value, children, className }: TabPanelProps) {
   if (when !== value) return null
   return (
-    <div
+    <motion.div
       role="tabpanel"
       id={`tabpanel-${when}`}
       aria-labelledby={`tab-${when}`}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE_PREMIUM }}
       className={className}
     >
       {children}
-    </div>
+    </motion.div>
   )
 }

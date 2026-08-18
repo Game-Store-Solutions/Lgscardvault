@@ -1,25 +1,27 @@
 import { Link } from 'react-router'
+import { motion } from 'framer-motion'
 import { ArrowRight, Mail, Store } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
 import { useActiveStores } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
-import { StoreCard } from './store'
+import { StoreCard, StoreCardSkeleton } from './store'
+import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 
 const PLATFORM_ADMIN_EMAILS = ['primary-admin@test.local', 'secondary-admin@test.local']
 
 export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
-  const { data: stores = [], isSuccess } = useActiveStores()
-  const hasStores = isSuccess && stores.length > 0
+  const { data: stores = [], isLoading } = useActiveStores()
+  const hasStores = stores.length > 0
   const featuredStore = stores.find((store) => store.featured) ?? stores[0]
   useAppShellFlush(true)
 
   const primaryCta =
-    'inline-flex h-12 items-center justify-center gap-2 rounded-btn bg-brand-500 px-6 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-600'
+    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn bg-brand-500 px-6 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-600 sm:w-auto'
   const secondaryCta =
-    'inline-flex h-12 items-center justify-center gap-2 rounded-btn border border-white/10 bg-white/[0.04] px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-white/[0.08]'
+    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn border border-border bg-surface px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-bg sm:w-auto dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]'
 
   const reachOutHref = `mailto:${PLATFORM_ADMIN_EMAILS.join(',')}?subject=${encodeURIComponent("Interested in LG's Card Vault")}&body=${encodeURIComponent("Hi,\n\nI'm interested in learning more about LG's Card Vault.\n\nName:\nStore / Team:\nWhat I'm looking for:\n\nThanks.")}`
 
@@ -43,20 +45,43 @@ export default function MarketplaceLanding() {
         <FloatingCardsBackdrop
           layout="scatter"
           className="opacity-90"
-          washClassName="bg-[radial-gradient(ellipse_44%_32%_at_50%_48%,rgba(9,9,11,0.08),transparent_70%)] dark:bg-[radial-gradient(ellipse_44%_32%_at_50%_48%,rgba(9,9,11,0.88),transparent_72%)]"
+          washClassName="bg-[radial-gradient(ellipse_52%_38%_at_50%_48%,rgba(243,244,246,0.86),transparent_72%)] dark:bg-[radial-gradient(ellipse_48%_34%_at_50%_48%,rgba(9,9,11,0.9),transparent_72%)]"
         />
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-3.75rem)] max-w-4xl flex-col items-center justify-center px-6 pb-16 pt-10 text-center sm:px-10">
-          <BrandLogo size="hero" variant="auto" to={null} className="drop-shadow-[0_14px_44px_rgba(0,0,0,0.32)]" />
+        <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-3.75rem)] max-w-4xl flex-col items-center justify-center px-5 pb-16 pt-10 text-center sm:px-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, ease: EASE_PREMIUM }}
+          >
+            <BrandLogo size="hero" variant="auto" to={null} className="drop-shadow-[0_14px_44px_rgba(0,0,0,0.32)]" />
+          </motion.div>
 
-          <h1 className="mt-10 max-w-3xl font-display text-4xl font-bold uppercase tracking-[-0.08em] text-fg sm:text-6xl sm:leading-[0.96]">
+          <motion.h1
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE_PREMIUM, delay: 0.12 }}
+            className="mt-8 max-w-3xl font-display text-[2.15rem] font-bold uppercase leading-[1.02] tracking-[-0.06em] text-fg sm:mt-10 sm:text-6xl sm:leading-[0.96]"
+          >
             Build your vault.
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            Discover, collect, and trade the cards you care about through trusted local game stores and a collector-first marketplace.
-          </p>
+          </motion.h1>
 
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE_PREMIUM, delay: 0.22 }}
+            className="mt-4 max-w-2xl text-[0.95rem] leading-relaxed text-fg-muted sm:mt-5 sm:text-lg"
+          >
+            Discover, collect, and trade the cards you care about through trusted local game stores and a
+            collector-first marketplace.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE_PREMIUM, delay: 0.32 }}
+            className="mt-8 flex w-full max-w-sm flex-col items-stretch gap-3 sm:mt-9 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-center"
+          >
             {hasStores && (
               <a href="#featured-store" className={primaryCta}>
                 Featured store
@@ -77,25 +102,32 @@ export default function MarketplaceLanding() {
                 Open a store
               </Link>
             )}
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-12 px-4 pb-20 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-14 px-4 pb-20 sm:gap-16 sm:px-6 lg:px-8">
         {featuredStore && (
           <section id="featured-store" className="scroll-mt-24 space-y-5">
-            <div className="space-y-2">
+            <Reveal className="space-y-2">
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Featured store</p>
-              <h2 className="font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">Start with the storefront we’re spotlighting.</h2>
-            </div>
+              <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
+                Start with the storefront we’re spotlighting.
+              </h2>
+            </Reveal>
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-              <div className="rounded-card border border-border bg-surface p-6 shadow-card dark:glass-card">
-                <p className="text-sm uppercase tracking-[0.2em] text-fg-muted">Now featuring</p>
-                <h3 className="mt-3 text-2xl font-bold text-fg">{featuredStore.name}</h3>
+              <Reveal
+                delay={0.05}
+                className="rounded-card border border-border bg-surface p-5 shadow-card sm:p-6 dark:border-white/10 dark:glass-card"
+              >
+                <p className="text-xs uppercase tracking-[0.2em] text-fg-muted">Now featuring</p>
+                <h3 className="mt-3 font-display text-xl font-bold text-fg sm:text-2xl">{featuredStore.name}</h3>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
-                  {featuredStore.heroSubheading?.trim() || featuredStore.tagline?.trim() || 'Browse singles, compare inventory, and shop with confidence.'}
+                  {featuredStore.heroSubheading?.trim() ||
+                    featuredStore.tagline?.trim() ||
+                    'Browse singles, compare inventory, and shop with confidence.'}
                 </p>
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Link to={`/s/${featuredStore.slug}`} className={primaryCta}>
                     Visit store
                     <ArrowRight aria-hidden className="size-4" />
@@ -104,22 +136,38 @@ export default function MarketplaceLanding() {
                     Browse all stores
                   </Link>
                 </div>
-              </div>
-              <StoreCard store={featuredStore} />
+              </Reveal>
+              <Reveal delay={0.12}>
+                <StoreCard store={featuredStore} />
+              </Reveal>
             </div>
           </section>
         )}
 
-        <section className="space-y-5">
-          <div className="space-y-2">
+        <section id="marketplace" className="scroll-mt-24 space-y-5">
+          <Reveal className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Marketplace</p>
-            <h2 className="font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">Trusted local game stores.</h2>
-          </div>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {stores.slice(0, 6).map((store, index) => (
-              <StoreCard key={store.id} store={store} index={index} />
-            ))}
-          </div>
+            <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
+              Trusted local game stores.
+            </h2>
+          </Reveal>
+
+          {isLoading ? (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <StoreCardSkeleton key={index} />
+              ))}
+            </div>
+          ) : (
+            <Stagger className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {stores.slice(0, 6).map((store, index) => (
+                <StaggerItem key={store.id} className="h-full">
+                  <StoreCard store={store} index={index} />
+                </StaggerItem>
+              ))}
+            </Stagger>
+          )}
+
           {stores.length > 6 && (
             <div className="flex justify-center">
               <Link to="/stores" className={secondaryCta}>
@@ -129,9 +177,12 @@ export default function MarketplaceLanding() {
           )}
         </section>
 
-        <section className="rounded-card border border-border bg-surface p-8 shadow-card dark:glass-card">
+        <Reveal
+          id="reach-out"
+          className="scroll-mt-24 rounded-card border border-border bg-surface p-6 shadow-card sm:p-8 dark:border-white/10 dark:glass-card"
+        >
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Reach out</p>
-          <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">
+          <h2 className="mt-3 max-w-2xl font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
             Interested in opening a store or learning more?
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
@@ -143,7 +194,7 @@ export default function MarketplaceLanding() {
               Email the platform team
             </a>
           </div>
-        </section>
+        </Reveal>
       </div>
     </div>
   )
