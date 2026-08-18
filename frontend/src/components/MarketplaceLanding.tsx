@@ -1,13 +1,12 @@
 import { Link } from 'react-router'
 import { motion } from 'framer-motion'
-import { ArrowRight, Check, Mail, PackageSearch, ShieldCheck, Sparkles, Store, Wallet } from 'lucide-react'
+import { ArrowRight, Mail, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
-import { useCatalogGames, usePlans } from '../hooks'
+import { useCatalogGames } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
-import { formatPrice } from '../api/client'
 import { gameTile } from '../lib/gameTiles'
 
 const PLATFORM_ADMIN_EMAILS = ['primary-admin@test.local', 'secondary-admin@test.local']
@@ -33,7 +32,6 @@ const TRUST_POINTS = [
 export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
   const { data: games = [], isLoading: gamesLoading } = useCatalogGames()
-  const { data: plans = [], isLoading: plansLoading } = usePlans()
   useAppShellFlush(true)
 
   const activeGames = games.filter((game) => game.active !== false)
@@ -218,83 +216,6 @@ export default function MarketplaceLanding() {
               </StaggerItem>
             ))}
           </Stagger>
-        </section>
-
-        {/* Pricing — real plans from the platform plan catalog. */}
-        <section id="pricing" className="scroll-mt-24">
-          <Reveal className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Pricing</p>
-            <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
-              Plans for every size of store.
-            </h2>
-            <p className="max-w-2xl text-sm leading-7 text-fg-muted">
-              Start free and upgrade when your storefront outgrows it. Shopping the marketplace is always free for
-              collectors.
-            </p>
-          </Reveal>
-
-          {plansLoading ? (
-            <div className="mt-6 grid gap-5 md:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="h-72 rounded-card border border-border skeleton-shimmer dark:border-white/10" />
-              ))}
-            </div>
-          ) : plans.length === 0 ? (
-            <div className="mt-6 rounded-card border border-border bg-surface p-6 text-sm text-fg-muted shadow-card dark:border-white/10 dark:bg-white/[0.03]">
-              Plan pricing is unavailable right now.{' '}
-              <a href={contactHref} className="font-bold text-brand-600 hover:underline">
-                Contact us
-              </a>{' '}
-              and we’ll walk you through the options.
-            </div>
-          ) : (
-            <Stagger className="mt-6 grid items-stretch gap-5 md:grid-cols-3" gap={0.06}>
-              {plans.map((plan) => (
-                <StaggerItem key={plan.key} className="h-full">
-                  <div
-                    className={
-                      plan.popular
-                        ? 'relative flex h-full flex-col rounded-card border-2 border-brand-500 bg-surface p-5 shadow-lg sm:p-6 dark:bg-white/[0.04]'
-                        : 'relative flex h-full flex-col rounded-card border border-border bg-surface p-5 shadow-card sm:p-6 dark:border-white/10 dark:bg-white/[0.03]'
-                    }
-                  >
-                    {plan.popular && (
-                      <span className="absolute -top-3 left-5 inline-flex items-center gap-1 rounded-full bg-brand-500 px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.14em] text-white">
-                        <Sparkles aria-hidden className="size-3" />
-                        Most popular
-                      </span>
-                    )}
-
-                    <h3 className="font-display text-lg font-bold tracking-tight text-fg">{plan.name}</h3>
-                    <p className="mt-1 min-h-[2.5rem] text-sm leading-6 text-fg-muted">{plan.tagline}</p>
-
-                    <p className="mt-4 flex items-baseline gap-1.5">
-                      <span className="font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">
-                        {plan.priceCents === 0 ? 'Free' : formatPrice(plan.priceCents)}
-                      </span>
-                      {plan.priceCents > 0 && <span className="text-sm text-fg-muted">/ month</span>}
-                    </p>
-
-                    <ul className="mt-5 flex-1 space-y-2.5">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-2 text-sm leading-6 text-fg">
-                          <Check aria-hidden className="mt-1 size-4 shrink-0 text-success-700" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Link
-                      to="/register/owner"
-                      className={`mt-6 ${plan.popular ? primaryCta : secondaryCta} w-full sm:w-full`}
-                    >
-                      {plan.priceCents === 0 ? 'Start for free' : `Choose ${plan.name}`}
-                    </Link>
-                  </div>
-                </StaggerItem>
-              ))}
-            </Stagger>
-          )}
         </section>
 
         {/* Contact us. */}

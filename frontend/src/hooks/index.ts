@@ -79,4 +79,3 @@ export {
   storeGamesKey,
   storeGameStatsKey,
 } from './useCatalog'
-export { usePlans, plansKey } from './usePlans'

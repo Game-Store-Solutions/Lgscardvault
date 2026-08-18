@@ -49,9 +49,6 @@ security:
         - { path: ^/api/stores/.+/guest/checkout, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/stores/.+/guest/checkout/pay-in-store, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/catalog, roles: PUBLIC_ACCESS, methods: [GET] }
-        # The plan list is public marketing copy (names, prices, features) shown
-        # on the landing page's pricing section before anyone signs up.
-        - { path: ^/api/plans, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/admin, roles: ROLE_SUPER_ADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

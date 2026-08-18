@@ -16,7 +16,6 @@ import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShieldCheck, ShoppingC
 /** Sections rendered by the guest landing page, in page order. */
 const LANDING_SECTIONS = [
   { id: 'games', label: 'Games' },
-  { id: 'pricing', label: 'Pricing' },
   { id: 'contact', label: 'Contact' },
 ] as const
 
