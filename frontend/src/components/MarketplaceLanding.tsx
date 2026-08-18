@@ -72,7 +72,7 @@ export default function MarketplaceLanding() {
           layout="scatter"
           images={backdropImages}
           className="[mask-image:linear-gradient(to_bottom,black_0%,black_70%,transparent_92%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_70%,transparent_92%)]"
-          washClassName="bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(243,244,246,0.92),rgba(243,244,246,0.55)_58%,transparent_76%)] dark:bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(9,9,11,0.94),rgba(9,9,11,0.6)_58%,transparent_78%)]"
+          washClassName="bg-[radial-gradient(ellipse_58%_44%_at_50%_46%,rgba(243,244,246,0.97),rgba(243,244,246,0.82)_50%,transparent_78%)] dark:bg-[radial-gradient(ellipse_40%_30%_at_50%_46%,rgba(9,9,11,0.94),rgba(9,9,11,0.6)_58%,transparent_78%)]"
         />
 
         <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-3.75rem)] max-w-4xl flex-col items-center justify-center px-5 pb-16 pt-10 text-center sm:px-10">
@@ -97,7 +97,7 @@ export default function MarketplaceLanding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: EASE_PREMIUM, delay: 0.22 }}
-            className="mt-4 max-w-2xl text-[0.95rem] leading-relaxed text-fg-muted sm:mt-5 sm:text-lg"
+            className="mt-4 max-w-2xl text-base font-medium leading-relaxed text-fg/85 sm:mt-5 sm:text-lg [text-shadow:0_1px_18px_rgb(243_244_246/0.9)] dark:[text-shadow:none]"
           >
             Discover, play, and trade the cards you care about through trusted local game stores and a
             player-first marketplace.
@@ -155,7 +155,7 @@ export default function MarketplaceLanding() {
           ) : (
             <>
               <h2 className="mt-2 text-display-sm sm:text-display-md">Every game our stores stock.</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
+              <p className="mt-3 max-w-2xl text-[0.95rem] font-medium leading-7 text-fg/75 dark:text-fg-muted">
                 Singles and sealed product across the games players actually play, all searchable by set, rarity,
                 condition, and finish.
               </p>
@@ -186,7 +186,7 @@ export default function MarketplaceLanding() {
                     <Icon aria-hidden className="size-5" />
                   </span>
                   <h3 className="mt-4 font-display text-lg font-bold tracking-tight text-fg">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-fg-muted">{text}</p>
+                  <p className="mt-2 text-sm font-medium leading-6 text-fg/75 dark:text-fg-muted">{text}</p>
                 </div>
               </StaggerItem>
             ))}
@@ -204,7 +204,7 @@ export default function MarketplaceLanding() {
               <h2 className="mt-2.5 text-display-sm sm:text-display-md">
                 Questions about opening a store?
               </h2>
-              <p className="mt-3 max-w-xl text-sm leading-7 text-fg-muted">
+              <p className="mt-3 max-w-xl text-[0.95rem] font-medium leading-7 text-fg/75 dark:text-fg-muted">
                 Send us a note and we’ll follow up about onboarding, pricing, and getting your inventory live.
               </p>
             </div>
