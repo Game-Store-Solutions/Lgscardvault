@@ -70,39 +70,55 @@ final class CatalogController extends AbstractController
      *
      * The order is seeded by the current date rather than randomised per
      * request: the hero art stays put while someone browses (and stays
-     * cacheable) but looks different tomorrow. The pool is spread across every
-     * active game so one large catalog can't crowd the others out.
+     * cacheable) but looks different tomorrow. `perGame` controls how many cards
+     * each active game contributes, so the field stays balanced across games.
      */
     #[Route('/showcase-cards', name: 'api_catalog_showcase_cards', methods: ['GET'])]
     public function showcaseCards(Request $request): JsonResponse
     {
-        $limit = max(1, min(60, $request->query->getInt('limit', 24)));
+        $perGame = max(1, min(20, $request->query->getInt('perGame', 8)));
+        $limit = max(1, min(80, $request->query->getInt('limit', 60)));
+        $seed = (new \DateTimeImmutable('today'))->format('Y-m-d');
 
-        $pool = [];
+        // Pick per game first so every game is represented, then round-robin the
+        // lists together — a flat shuffle lets the biggest catalog dominate and
+        // clusters the same game in neighbouring positions.
+        $byGame = [];
         foreach ($this->games->findActive() as $game) {
-            foreach ($this->cards->findShowcaseCandidatesForGame($game, self::SHOWCASE_POOL_PER_GAME) as $card) {
-                if (null !== $card->getImageUrl()) {
-                    $pool[] = $card;
+            $candidates = array_values(array_filter(
+                $this->cards->findShowcaseCandidatesForGame($game, self::SHOWCASE_POOL_PER_GAME),
+                static fn (Card $card): bool => null !== $card->getImageUrl(),
+            ));
+
+            // Deterministic daily shuffle: hashing (day + card id) gives a stable
+            // order for the whole day without touching global RNG state.
+            usort($candidates, static fn (Card $a, Card $b): int => strcmp(
+                md5($seed.$a->getId()->toRfc4122()),
+                md5($seed.$b->getId()->toRfc4122()),
+            ));
+
+            if ([] !== $candidates) {
+                $byGame[] = array_slice($candidates, 0, $perGame);
+            }
+        }
+
+        $ordered = [];
+        for ($slot = 0; $slot < $perGame; ++$slot) {
+            foreach ($byGame as $cards) {
+                if (isset($cards[$slot])) {
+                    $ordered[] = $cards[$slot];
                 }
             }
         }
 
-        // Deterministic daily shuffle: hashing (day + card id) gives a stable
-        // order for the whole day without touching global RNG state.
-        $seed = (new \DateTimeImmutable('today'))->format('Y-m-d');
-        usort($pool, static fn ($a, $b): int => strcmp(
-            md5($seed.$a->getId()->toRfc4122()),
-            md5($seed.$b->getId()->toRfc4122()),
-        ));
-
         // These render a few percent of viewport wide, so ship the small
         // variant: the full-size art would be megabytes of hero background.
-        $payload = array_map(fn ($card): array => [
+        $payload = array_map(fn (Card $card): array => [
             'id' => $card->getId()->toRfc4122(),
             'name' => $card->getName(),
             'gameCode' => $card->resolvedGameCode(),
             'imageUrl' => $this->preferredImage($card, ['small', 'normal', 'large']),
-        ], array_slice($pool, 0, $limit));
+        ], array_slice($ordered, 0, $limit));
 
         $response = $this->json($payload);
         // Safe to cache: the payload only changes when the date does.

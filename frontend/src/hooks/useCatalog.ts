@@ -63,13 +63,13 @@ export function useGameShowcase() {
  * Card art for the marketing background. The server rotates the selection once
  * a day, so this can cache hard — a refresh should not reshuffle the hero.
  */
-export function useShowcaseCards(limit = 24) {
+export function useShowcaseCards(perGame = 12) {
   return useQuery({
-    queryKey: [...catalogShowcaseCardsKey, limit],
+    queryKey: [...catalogShowcaseCardsKey, perGame],
     staleTime: 60 * 60 * 1000,
     queryFn: async () => {
       const { data } = await api.get<CatalogShowcaseCard[]>('/catalog/showcase-cards', {
-        params: { limit },
+        params: { perGame },
       })
       return data.filter((card) => Boolean(card.imageUrl))
     },

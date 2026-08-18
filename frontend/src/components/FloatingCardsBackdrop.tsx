@@ -302,6 +302,93 @@ export const FLOAT_CARDS: FloatCard[] = [
     className: 'right-[2%] top-[62%] hidden w-[9.5%] max-w-[5.5rem] -rotate-8 2xl:block',
     delay: '3.4s',
   },
+
+  // —— Extra depth. Slots for a fuller catalog field (≈12 cards per game);
+  //    kept on lg+ so phones stay light and the copy keeps breathing room. ——
+  {
+    src: '/brand/cards/mtg-atraxa.jpg',
+    alt: '',
+    className: 'left-[28%] top-[8%] hidden w-[9%] max-w-[5.25rem] -rotate-7 lg:block',
+    delay: '3.45s',
+  },
+  {
+    src: '/brand/cards/pkm-mewtwo.jpg',
+    alt: '',
+    className: 'right-[28%] top-[9%] hidden w-[9%] max-w-[5.25rem] rotate-6 lg:block',
+    delay: '3.5s',
+  },
+  {
+    src: '/brand/cards/op-nami.jpg',
+    alt: '',
+    className: 'left-[28%] bottom-[8%] hidden w-[9%] max-w-[5.25rem] rotate-8 lg:block',
+    delay: '3.55s',
+  },
+  {
+    src: '/brand/cards/rb-lux.jpg',
+    alt: '',
+    className: 'right-[28%] bottom-[9%] hidden w-[9%] max-w-[5.25rem] -rotate-6 lg:block',
+    delay: '3.6s',
+  },
+  {
+    src: '/brand/cards/fab-lexi.jpg',
+    alt: '',
+    className: 'left-[14%] top-[70%] hidden w-[9%] max-w-[5.25rem] rotate-5 lg:block',
+    delay: '3.65s',
+  },
+  {
+    src: '/brand/cards/mtg-oko.jpg',
+    alt: '',
+    className: 'right-[14%] top-[70%] hidden w-[9%] max-w-[5.25rem] -rotate-9 lg:block',
+    delay: '3.7s',
+  },
+  {
+    src: '/brand/cards/pkm-lugia.jpg',
+    alt: '',
+    className: 'left-[4%] top-[46%] hidden w-[8.5%] max-w-[5rem] rotate-11 xl:block',
+    delay: '3.75s',
+  },
+  {
+    src: '/brand/cards/op-sanji.jpg',
+    alt: '',
+    className: 'right-[4%] top-[46%] hidden w-[8.5%] max-w-[5rem] -rotate-11 xl:block',
+    delay: '3.8s',
+  },
+  {
+    src: '/brand/cards/rb-vi.jpg',
+    alt: '',
+    className: 'left-[56%] top-[10%] hidden w-[8.5%] max-w-[5rem] rotate-4 xl:block',
+    delay: '3.85s',
+  },
+  {
+    src: '/brand/cards/fab-chane.jpg',
+    alt: '',
+    className: 'right-[56%] top-[11%] hidden w-[8.5%] max-w-[5rem] -rotate-5 xl:block',
+    delay: '3.9s',
+  },
+  {
+    src: '/brand/cards/mtg-force.jpg',
+    alt: '',
+    className: 'left-[56%] bottom-[10%] hidden w-[8.5%] max-w-[5rem] -rotate-8 xl:block',
+    delay: '3.95s',
+  },
+  {
+    src: '/brand/cards/pkm-gengar.jpg',
+    alt: '',
+    className: 'right-[56%] bottom-[11%] hidden w-[8.5%] max-w-[5rem] rotate-9 xl:block',
+    delay: '4s',
+  },
+  {
+    src: '/brand/cards/op-law.jpg',
+    alt: '',
+    className: 'left-[20%] top-[30%] hidden w-[8%] max-w-[4.75rem] rotate-7 2xl:block',
+    delay: '4.05s',
+  },
+  {
+    src: '/brand/cards/rb-annie.jpg',
+    alt: '',
+    className: 'right-[20%] top-[31%] hidden w-[8%] max-w-[4.75rem] -rotate-7 2xl:block',
+    delay: '4.1s',
+  },
 ]
 
 /** Right-anchored layout for marketplace / auth panels — denser side stack. */
