@@ -57,8 +57,8 @@ export function CardHeader({
       {hasSlots ? (
         <>
           <div className="min-w-0">
-            {title != null && <h3 className="font-display text-lg font-bold text-fg truncate">{title}</h3>}
-            {subtitle != null && <p className="text-sm text-fg-muted mt-0.5">{subtitle}</p>}
+            {title != null && <h3 className="truncate text-display-xs">{title}</h3>}
+            {subtitle != null && <p className="mt-1 text-sm leading-relaxed text-fg-muted">{subtitle}</p>}
           </div>
           {actions != null && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
         </>

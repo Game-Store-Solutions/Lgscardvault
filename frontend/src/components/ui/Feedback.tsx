@@ -92,9 +92,9 @@ export function EmptyState({
       >
         <Icon aria-hidden className="size-6" />
       </motion.span>
-      <div className="space-y-1">
-        <h3 className="text-base font-bold text-fg">{title}</h3>
-        {description != null && <p className="text-sm text-fg-muted">{description}</p>}
+      <div className="max-w-md space-y-1.5">
+        <h3 className="text-display-xs">{title}</h3>
+        {description != null && <p className="text-sm leading-relaxed text-fg-muted">{description}</p>}
       </div>
       {action != null && <div className="mt-2">{action}</div>}
     </motion.div>
@@ -126,9 +126,9 @@ export function ErrorState({
       <span className="flex size-12 items-center justify-center rounded-full bg-danger-50 text-danger-700">
         <TriangleAlert aria-hidden className="size-6" />
       </span>
-      <div className="space-y-1">
-        <h3 className="text-base font-bold text-fg">{title}</h3>
-        {description != null && <p className="text-sm text-fg-muted">{description}</p>}
+      <div className="max-w-md space-y-1.5">
+        <h3 className="text-display-xs">{title}</h3>
+        {description != null && <p className="text-sm leading-relaxed text-fg-muted">{description}</p>}
       </div>
       {onRetry && (
         <Button variant="secondary" size="sm" onClick={onRetry} className="mt-2">

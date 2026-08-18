@@ -33,10 +33,7 @@ export function TH({ className, ...props }: ThHTMLAttributes<HTMLTableCellElemen
   return (
     <th
       scope="col"
-      className={cx(
-        'px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-fg-muted',
-        className,
-      )}
+      className={cx('px-4 py-2.5 text-left text-eyebrow', className)}
       {...props}
     />
   )

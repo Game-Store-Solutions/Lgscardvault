@@ -4,7 +4,7 @@ import { tv, type VariantProps } from 'tailwind-variants'
 import { cx } from '../../lib/cx'
 
 export const badgeVariants = tv({
-  base: 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold',
+  base: 'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold tracking-[0.01em]',
   variants: {
     tone: {
       brand: 'bg-brand-50 text-brand-700',

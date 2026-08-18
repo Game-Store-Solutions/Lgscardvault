@@ -78,7 +78,7 @@ export default function MarketplaceLanding() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: EASE_PREMIUM, delay: 0.12 }}
-            className="mt-8 max-w-3xl font-display text-[2.15rem] font-bold uppercase leading-[1.02] tracking-[-0.06em] text-fg sm:mt-10 sm:text-6xl sm:leading-[0.96]"
+            className="mt-8 max-w-3xl text-display-lg uppercase sm:mt-10 sm:text-display-xl"
           >
             Build your vault.
           </motion.h1>
@@ -122,8 +122,8 @@ export default function MarketplaceLanding() {
         {/* Supported games — driven by the platform's own catalog. */}
         <section id="games" className="scroll-mt-24">
           <Reveal className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Games we support</p>
-            <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
+            <p className="text-eyebrow">Games we support</p>
+            <h2 className="mt-2 text-display-sm sm:text-display-md">
               Every game our stores stock.
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-fg-muted">
@@ -175,10 +175,10 @@ export default function MarketplaceLanding() {
                           style={{ backgroundColor: tile.accent }}
                         />
                         <div className="relative p-3.5">
-                          <p className="font-display text-sm font-bold leading-tight text-white sm:text-base">
+                          <p className="font-display text-base font-bold leading-tight tracking-[-0.02em] text-white sm:text-lg">
                             {tile.short}
                           </p>
-                          <span className="mt-1.5 inline-flex items-center gap-1 text-[0.7rem] font-bold uppercase tracking-[0.14em] text-white/70">
+                          <span className="mt-1.5 inline-flex items-center gap-1 text-eyebrow !text-white/70">
                             Shop
                             <ArrowRight
                               aria-hidden
@@ -198,8 +198,8 @@ export default function MarketplaceLanding() {
         {/* Why the marketplace. */}
         <section className="scroll-mt-24">
           <Reveal className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Why LG’s Card Vault</p>
-            <h2 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-4xl">
+            <p className="text-eyebrow">Why LG’s Card Vault</p>
+            <h2 className="mt-2 text-display-sm sm:text-display-md">
               Built for collectors and the stores they trust.
             </h2>
           </Reveal>
@@ -225,8 +225,8 @@ export default function MarketplaceLanding() {
         >
           <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-fg-muted">Contact us</p>
-              <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">
+              <p className="text-eyebrow">Contact us</p>
+              <h2 className="mt-2.5 text-display-sm sm:text-display-md">
                 Questions about a plan or opening a store?
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
