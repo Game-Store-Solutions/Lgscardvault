@@ -451,7 +451,9 @@ export function FloatingCardsBackdrop({
   className,
   washClassName,
 }: FloatingCardsBackdropProps) {
-  const cards = layout === 'right' ? RIGHT_FOCUS_CARDS : FLOAT_CARDS
+  // Dense field for the landing scatter; the side layouts stay lighter so they
+  // don't fight the copy sitting next to them.
+  const cards = layout === 'right' ? RIGHT_FOCUS_CARDS.slice(0, 14) : FLOAT_CARDS
 
   return (
     <div aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>
@@ -462,13 +464,15 @@ export function FloatingCardsBackdrop({
           alt=""
           className={cx(
             'absolute rounded-xl object-cover',
-            'shadow-[0_20px_50px_-18px_rgba(10,10,11,0.28)] ring-1 ring-[#c6a035]/45 dark:ring-[#dc2626]/35',
-            'dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.75)] dark:ring-[#e0c15a]/35',
-            'animate-[hero-float_7s_ease-in-out_infinite]',
+            'opacity-[0.78] saturate-[0.92]',
+            'shadow-[0_16px_44px_-18px_rgba(10,10,11,0.22)] ring-1 ring-white/8 dark:ring-white/10',
+            'dark:shadow-[0_24px_60px_-18px_rgba(0,0,0,0.72)]',
+            'animate-[hero-float_8.5s_ease-in-out_infinite]',
             card.className,
           )}
           style={{ animationDelay: card.delay }}
-          loading="eager"
+          // Only the first ring blocks first paint; the rest stream in.
+          loading={i < 12 ? 'eager' : 'lazy'}
           decoding="async"
         />
       ))}

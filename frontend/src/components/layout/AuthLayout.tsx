@@ -1,6 +1,7 @@
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
 import { Moon, Sun } from 'lucide-react'
 import { BackButton } from '../ui'
+import { PageTransition } from '../motion'
 import { useTheme } from '../../hooks'
 
 /**
@@ -10,6 +11,7 @@ import { useTheme } from '../../hooks'
  */
 export default function AuthLayout() {
   const { theme, toggleTheme } = useTheme()
+  const location = useLocation()
 
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -26,7 +28,9 @@ export default function AuthLayout() {
           {theme === 'dark' ? <Sun aria-hidden className="size-4" /> : <Moon aria-hidden className="size-4" />}
         </button>
       </div>
-      <Outlet />
+      <PageTransition routeKey={location.pathname}>
+        <Outlet />
+      </PageTransition>
     </div>
   )
 }

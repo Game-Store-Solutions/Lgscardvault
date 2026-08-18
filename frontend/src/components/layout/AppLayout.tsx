@@ -9,8 +9,16 @@ import { BrandLogo } from '../BrandLogo'
 import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { manageableStores } from '../../lib/manageableStores'
 import { AppShellLayoutProvider, useAppShellLayout } from './AppShellLayout'
+import { PageTransition } from '../motion'
 import { cx } from '../../lib/cx'
 import { ChevronDown, LogIn, LogOut, Menu, Monitor, Moon, ShieldCheck, ShoppingCart, Store, Sun, UserCircle, UserPlus, X } from 'lucide-react'
+
+/** Sections rendered by the guest landing page, in page order. */
+const LANDING_SECTIONS = [
+  { id: 'featured-store', label: 'Featured' },
+  { id: 'marketplace', label: 'Stores' },
+  { id: 'reach-out', label: 'Contact' },
+] as const
 
 export default function AppLayout() {
   const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
@@ -38,6 +46,9 @@ export default function AppLayout() {
   const cartCount = cart.reduce((total: number, entry) => total + entry.quantity, 0)
   const cartBadge = cartCount > 99 ? '99+' : String(cartCount)
   const location = useLocation()
+  // Section links only make sense on the guest landing page, where those
+  // sections actually exist. Everywhere else the header stays logo + actions.
+  const onLandingPage = location.pathname === '/' && !user
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [storeMenuOpen, setStoreMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -75,6 +86,17 @@ export default function AppLayout() {
 
   const mobileLinkClass = 'block rounded-btn px-3 py-2.5 text-base font-medium text-fg hover:bg-bg'
   const closeMobile = () => setMobileOpen(false)
+
+  /** Landing-only in-page navigation. Smooth-scrolls to the real sections. */
+  const landingLinks = LANDING_SECTIONS.map(({ id, label }) => (
+    <a
+      key={id}
+      href={`#${id}`}
+      className="rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg"
+    >
+      {label}
+    </a>
+  ))
 
   const themeToggle = (
     <button
@@ -150,6 +172,8 @@ export default function AppLayout() {
           <div className="flex items-center gap-3">
           {/* Desktop navigation */}
           <nav className="hidden items-center gap-3 md:flex">
+            {onLandingPage && <div className="flex items-center gap-1">{landingLinks}</div>}
+
             {user && (
               <NavLink to="/" className={navLinkClass} end>
                 Stores
@@ -336,6 +360,13 @@ export default function AppLayout() {
                 </div>
               )}
 
+              {onLandingPage &&
+                LANDING_SECTIONS.map(({ id, label }) => (
+                  <a key={id} href={`#${id}`} onClick={closeMobile} className={mobileLinkClass}>
+                    {label}
+                  </a>
+                ))}
+
               {user && (
                 <NavLink to="/" end onClick={closeMobile} className={mobileLinkClass}>
                   Stores
@@ -415,10 +446,13 @@ export default function AppLayout() {
 function AppMain({ contentShell }: { contentShell: string }) {
   const layout = useAppShellLayout()
   const flush = layout?.flushMain ?? false
+  const location = useLocation()
 
   return (
     <main className={cx(flush ? FLUSH_APP_SHELL : contentShell, 'flex-1', flush ? 'py-0' : 'py-5 sm:py-8')}>
-      <Outlet />
+      <PageTransition routeKey={location.pathname}>
+        <Outlet />
+      </PageTransition>
     </main>
   )
 }
