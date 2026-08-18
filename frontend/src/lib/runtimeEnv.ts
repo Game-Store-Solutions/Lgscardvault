@@ -5,12 +5,18 @@ export const isDevBuild = import.meta.env.DEV
 export const showDevCheckoutTools =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_CHECKOUT === 'true'
 
+/** Where "contact us" goes by default — the platform owners. */
+const DEFAULT_CONTACT_EMAILS = ['tedy@gamestoresolutions.com', 'robert@gamestoresolutions.com']
+
 /**
- * Inboxes the landing page's "contact us" section writes to, set as a
- * comma-separated list in VITE_CONTACT_EMAILS. Left empty the section points at
- * store signup instead — better than a mailto to an address nobody reads.
+ * Inboxes the landing page's "contact us" section writes to. Override per
+ * environment with a comma-separated VITE_CONTACT_EMAILS.
  */
-export const contactEmails: string[] = (import.meta.env.VITE_CONTACT_EMAILS ?? '')
-  .split(',')
-  .map((email: string) => email.trim())
-  .filter((email: string) => email.includes('@'))
+export const contactEmails: string[] = (() => {
+  const configured = (import.meta.env.VITE_CONTACT_EMAILS ?? '')
+    .split(',')
+    .map((email: string) => email.trim())
+    .filter((email: string) => email.includes('@'))
+
+  return configured.length > 0 ? configured : DEFAULT_CONTACT_EMAILS
+})()

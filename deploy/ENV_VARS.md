@@ -7,9 +7,9 @@ The frontend production image uses same-origin `/api` (no `VITE_*` required).
 Do **not** set `VITE_ENABLE_TEST_CHECKOUT=true` in production.
 
 Optional frontend build arg: `VITE_CONTACT_EMAILS` — comma-separated inboxes the
-landing page's "Contact us" button writes to (e.g.
-`VITE_CONTACT_EMAILS=owner@example.com,support@example.com`). Unset, that section
-links to store signup instead of opening a mail draft.
+landing page's "Contact us" button writes to. Unset, it defaults to the platform
+owners (`tedy@` / `robert@gamestoresolutions.com`); set it to route enquiries
+elsewhere, e.g. `VITE_CONTACT_EMAILS=support@gamestoresolutions.com`.
 
 JWT **key files** (`config/jwt/*.pem`) are not env vars — generate once on the
 server (`lexik:jwt:generate-keypair`); see [`LAUNCH.md`](LAUNCH.md).

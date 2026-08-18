@@ -40,11 +40,7 @@ export default function MarketplaceLanding() {
   const secondaryCta =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn border border-border bg-surface px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-bg sm:w-auto dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]'
 
-  // Only render a mailto when real inboxes are configured (VITE_CONTACT_EMAILS).
-  const contactHref =
-    contactEmails.length > 0
-      ? `mailto:${contactEmails.join(',')}?subject=${encodeURIComponent("Interested in LG's Card Vault")}&body=${encodeURIComponent("Hi,\n\nI'm interested in learning more about LG's Card Vault.\n\nName:\nStore / Team:\nWhat I'm looking for:\n\nThanks.")}`
-      : null
+  const contactHref = `mailto:${contactEmails.join(',')}?subject=${encodeURIComponent("Interested in LG's Card Vault")}&body=${encodeURIComponent("Hi,\n\nI'm interested in learning more about LG's Card Vault.\n\nName:\nStore / Team:\nWhat I'm looking for:\n\nThanks.")}`
 
   return (
     <div className="bg-bg">
@@ -252,17 +248,10 @@ export default function MarketplaceLanding() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
-              {contactHref ? (
-                <a href={contactHref} className={primaryCta}>
-                  <Mail aria-hidden className="size-4" />
-                  Email the team
-                </a>
-              ) : (
-                <Link to="/register/owner" className={primaryCta}>
-                  <Store aria-hidden className="size-4" />
-                  Start your store
-                </Link>
-              )}
+              <a href={contactHref} className={primaryCta}>
+                <Mail aria-hidden className="size-4" />
+                Email the team
+              </a>
             </div>
           </div>
         </Reveal>
