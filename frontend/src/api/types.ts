@@ -930,6 +930,8 @@ export interface CatalogShowcaseCard {
   name: string
   gameCode: string
   imageUrl: string | null
+  /** Quality-first art URLs (large → small). Walk this list; a CDN size can 404. */
+  imageUrls?: string[]
 }
 
 /**

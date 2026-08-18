@@ -6,7 +6,7 @@ import { cx } from '../lib/cx'
 import { EASE_PREMIUM } from './motion'
 import { FlipWords } from './FlipWords'
 
-const HOLD_MS = 4200
+const HOLD_MS = 2800
 const CARDS_PER_GAME = 4
 
 const REST_TILT = [-2.4, 1.8, -1.4, 2.6] as const
@@ -27,8 +27,35 @@ function groupCards(
     .filter((entry) => entry.cards.length > 0)
 }
 
-function ShowcaseArt({ src, alt, accent }: { src: string; alt: string; accent: string }) {
-  const [failed, setFailed] = useState(false)
+function expandArtUrls(urls: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  const add = (url: string) => {
+    if (!url || seen.has(url)) return
+    seen.add(url)
+    out.push(url)
+  }
+
+  for (const url of urls) {
+    add(url.replace(/cards\.scryfall\.io\/(?:small|normal)\//, 'cards.scryfall.io/large/'))
+    add(url.replace(/_400w\.jpg$/i, '_in_1000x1000.jpg'))
+    add(url.replace(/cards\.scryfall\.io\/small\//, 'cards.scryfall.io/normal/'))
+    add(url)
+    add(url.replace(/_in_1000x1000\.jpg$/i, '_400w.jpg'))
+    add(url.replace(/cards\.scryfall\.io\/(?:large|normal)\//, 'cards.scryfall.io/small/'))
+  }
+
+  return out
+}
+
+function artUrls(card: CatalogShowcaseCard): string[] {
+  const urls = card.imageUrls?.filter(Boolean) ?? []
+  return expandArtUrls(urls.length > 0 ? urls : card.imageUrl ? [card.imageUrl] : [])
+}
+
+function ShowcaseArt({ urls, alt, accent }: { urls: string[]; alt: string; accent: string }) {
+  const [attempt, setAttempt] = useState(0)
+  const src = urls[attempt]
 
   return (
     <div
@@ -41,11 +68,12 @@ function ShowcaseArt({ src, alt, accent }: { src: string; alt: string; accent: s
         className="absolute inset-0"
         style={{ background: `radial-gradient(120% 80% at 50% 0%, ${accent}26 0%, transparent 70%)` }}
       />
-      {src && !failed ? (
+      {src ? (
         <img
+          key={src}
           src={src}
           alt={alt}
-          onError={() => setFailed(true)}
+          onError={() => setAttempt((current) => current + 1)}
           className="absolute inset-0 size-full object-cover object-top"
           loading="lazy"
           decoding="async"
@@ -126,14 +154,10 @@ export function GameShowcaseReel({
                 initial={{ opacity: 0, y: 28, rotate: cardIndex % 2 === 0 ? -8 : 8, scale: 0.94 }}
                 animate={{ opacity: 1, y: 0, rotate: REST_TILT[cardIndex] ?? 0, scale: 1 }}
                 exit={{ opacity: 0, y: -18, filter: 'blur(6px)', scale: 0.96 }}
-                transition={{ duration: 0.48, delay: cardIndex * 0.07, ease: EASE_PREMIUM }}
+                transition={{ duration: 0.36, delay: cardIndex * 0.05, ease: EASE_PREMIUM }}
                 className="origin-bottom"
               >
-                <ShowcaseArt
-                  src={card.imageUrl ?? ''}
-                  alt={card.name}
-                  accent={tile.accent}
-                />
+                <ShowcaseArt urls={artUrls(card)} alt={card.name} accent={tile.accent} />
                 <figcaption className="mt-2 truncate px-0.5 text-center text-[0.7rem] font-semibold text-fg-muted">
                   {card.name}
                 </figcaption>

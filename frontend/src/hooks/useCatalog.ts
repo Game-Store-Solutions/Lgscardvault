@@ -72,7 +72,7 @@ export function useShowcaseCards(perGame = 12) {
       const { data } = await api.get<CatalogShowcaseCard[]>('/catalog/showcase-cards', {
         params: { perGame },
       })
-      return data.filter((card) => Boolean(card.imageUrl))
+      return data.filter((card) => Boolean(card.imageUrl) || (card.imageUrls?.length ?? 0) > 0)
     },
   })
 }
