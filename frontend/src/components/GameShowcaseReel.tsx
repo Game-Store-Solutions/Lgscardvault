@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { CatalogGameShowcase, CatalogShowcaseCard } from '../api/types'
 import { gameTile } from '../lib/gameTiles'
@@ -6,25 +6,25 @@ import { cx } from '../lib/cx'
 import { EASE_PREMIUM } from './motion'
 import { FlipWords } from './FlipWords'
 
-const HOLD_MS = 2800
+const HOLD_MS = 3200
 const CARDS_PER_GAME = 4
 
-const REST_TILT = [-2.4, 1.8, -1.4, 2.6] as const
+const REST_TILT = [-1.6, 1.2, -0.9, 1.8] as const
 
 function groupCards(
   games: CatalogGameShowcase[],
   cards: CatalogShowcaseCard[],
-): { game: CatalogGameShowcase; cards: CatalogShowcaseCard[] }[] {
+): { game: CatalogGameShowcase; pool: CatalogShowcaseCard[] }[] {
   const byCode = new Map<string, CatalogShowcaseCard[]>()
   for (const card of cards) {
     const list = byCode.get(card.gameCode) ?? []
-    if (list.length < CARDS_PER_GAME) list.push(card)
+    list.push(card)
     byCode.set(card.gameCode, list)
   }
 
   return games
-    .map((game) => ({ game, cards: byCode.get(game.code) ?? [] }))
-    .filter((entry) => entry.cards.length > 0)
+    .map((game) => ({ game, pool: byCode.get(game.code) ?? [] }))
+    .filter((entry) => entry.pool.length > 0)
 }
 
 function expandArtUrls(urls: string[]): string[] {
@@ -53,9 +53,34 @@ function artUrls(card: CatalogShowcaseCard): string[] {
   return expandArtUrls(urls.length > 0 ? urls : card.imageUrl ? [card.imageUrl] : [])
 }
 
-function ShowcaseArt({ urls, alt, accent }: { urls: string[]; alt: string; accent: string }) {
+function pickVisible(pool: CatalogShowcaseCard[], failedIds: Set<string>): CatalogShowcaseCard[] {
+  return pool.filter((card) => !failedIds.has(card.id)).slice(0, CARDS_PER_GAME)
+}
+
+function ShowcaseArt({
+  card,
+  accent,
+  onFailed,
+}: {
+  card: CatalogShowcaseCard
+  accent: string
+  onFailed: (id: string) => void
+}) {
+  const urls = useMemo(() => artUrls(card), [card])
   const [attempt, setAttempt] = useState(0)
   const src = urls[attempt]
+  const reported = useRef(false)
+
+  useEffect(() => {
+    setAttempt(0)
+    reported.current = false
+  }, [card.id])
+
+  useEffect(() => {
+    if (src || reported.current) return
+    reported.current = true
+    onFailed(card.id)
+  }, [src, card.id, onFailed])
 
   return (
     <div
@@ -72,19 +97,13 @@ function ShowcaseArt({ urls, alt, accent }: { urls: string[]; alt: string; accen
         <img
           key={src}
           src={src}
-          alt={alt}
+          alt={card.name}
           onError={() => setAttempt((current) => current + 1)}
           className="absolute inset-0 size-full object-cover object-top"
           loading="lazy"
           decoding="async"
         />
-      ) : (
-        <div className="absolute inset-0 grid place-items-center">
-          <span aria-hidden className="font-display text-4xl font-black tracking-[-0.06em] opacity-70" style={{ color: accent }}>
-            {alt.slice(0, 2).toUpperCase()}
-          </span>
-        </div>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -92,6 +111,8 @@ function ShowcaseArt({ urls, alt, accent }: { urls: string[]; alt: string; accen
 /**
  * Landing "games we support" reel: the game name flips, then four signature
  * cards from that game slide into a row. Catalog art only — no hardcoded URLs.
+ * If a printing's art 404s, the next card from that game's catalogue pool
+ * takes its place rather than a monogram placeholder.
  */
 export function GameShowcaseReel({
   games,
@@ -103,6 +124,16 @@ export function GameShowcaseReel({
   const slides = useMemo(() => groupCards(games, cards), [games, cards])
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set())
+
+  const markFailed = useCallback((id: string) => {
+    setFailedIds((current) => {
+      if (current.has(id)) return current
+      const next = new Set(current)
+      next.add(id)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     if (slides.length <= 1 || paused) return
@@ -121,6 +152,7 @@ export function GameShowcaseReel({
   const active = slides[Math.min(index, slides.length - 1)]
   const tile = gameTile(active.game.code, active.game.name)
   const names = slides.map((slide) => gameTile(slide.game.code, slide.game.name).short)
+  const visible = pickVisible(active.pool, failedIds)
 
   return (
     <div
@@ -128,36 +160,47 @@ export function GameShowcaseReel({
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <h2 className="text-display-sm sm:text-display-md">
+      <h2
+        className="text-display-sm sm:text-display-md"
+        aria-label={`We stock ${tile.short}.`}
+        aria-live="polite"
+        aria-atomic="true"
+      >
         We stock{' '}
-        <span className="sr-only">{tile.short}.</span>
-          <FlipWords word={tile.short} reserve={names} className="text-brand-600 dark:text-brand-400" />
-        <span aria-hidden>.</span>
+        <FlipWords word={tile.short} reserve={names} className="text-brand-600 dark:text-brand-400" />.
       </h2>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-muted">
         Singles and sealed product across the games collectors actually play, all searchable by set, rarity,
         condition, and finish.
       </p>
 
-      <div className="relative mt-8 min-h-[14rem] sm:min-h-[18rem]">
-        <AnimatePresence mode="wait">
+      <div className="relative mt-8">
+        <div className="invisible grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5" aria-hidden>
+          {Array.from({ length: Math.max(visible.length, 1) }, (_, slot) => (
+            <figure key={slot}>
+              <div className="rounded-[1.1rem]" style={{ aspectRatio: '0.72' }} />
+              <figcaption className="mt-2 text-[0.7rem]">&nbsp;</figcaption>
+            </figure>
+          ))}
+        </div>
+        <AnimatePresence initial={false}>
           <motion.div
             key={active.game.code}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.2 } }}
-            className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.5, ease: EASE_PREMIUM }}
+            className="absolute inset-0 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
           >
-            {active.cards.slice(0, CARDS_PER_GAME).map((card, cardIndex) => (
+            {visible.map((card, cardIndex) => (
               <motion.figure
                 key={card.id}
-                initial={{ opacity: 0, y: 28, rotate: cardIndex % 2 === 0 ? -8 : 8, scale: 0.94 }}
-                animate={{ opacity: 1, y: 0, rotate: REST_TILT[cardIndex] ?? 0, scale: 1 }}
-                exit={{ opacity: 0, y: -18, filter: 'blur(6px)', scale: 0.96 }}
-                transition={{ duration: 0.36, delay: cardIndex * 0.05, ease: EASE_PREMIUM }}
-                className="origin-bottom"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0, rotate: REST_TILT[cardIndex] ?? 0 }}
+                transition={{ duration: 0.5, delay: cardIndex * 0.04, ease: EASE_PREMIUM }}
+                className="origin-bottom will-change-transform"
               >
-                <ShowcaseArt urls={artUrls(card)} alt={card.name} accent={tile.accent} />
+                <ShowcaseArt card={card} accent={tile.accent} onFailed={markFailed} />
                 <figcaption className="mt-2 truncate px-0.5 text-center text-[0.7rem] font-semibold text-fg-muted">
                   {card.name}
                 </figcaption>
