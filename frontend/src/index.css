@@ -472,21 +472,21 @@ body {
   .foil-shimmer {
     background: linear-gradient(
       125deg,
-      #ff006e,
-      #ff7a00,
-      #00d9c8,
-      #6b4dff,
-      #ff006e,
-      #ff7a00,
-      #00d9c8,
-      #6b4dff,
-      #ff006e,
-      #ff7a00,
-      #00d9c8
+      #d4006a,
+      #db5a00,
+      #00b8a8,
+      #4a2fd9,
+      #d4006a,
+      #db5a00,
+      #00b8a8,
+      #4a2fd9,
+      #d4006a,
+      #db5a00,
+      #00b8a8
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    filter: brightness(0.7) contrast(1.32) saturate(0.92);
+    filter: brightness(0.64) contrast(1.34) saturate(0.92);
     opacity: calc(var(--foil-holo-opacity, 0.18) + var(--op, 0) * 0.5);
     transition: opacity 0.3s ease;
     animation: holo-gradient 5s ease infinite;
@@ -494,16 +494,16 @@ body {
     mask-image: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
       #000 0%,
-      #000 24%,
-      rgb(0 0 0 / 0.4) 50%,
-      transparent 74%
+      #000 27%,
+      rgb(0 0 0 / 0.4) 52%,
+      transparent 78%
     );
     -webkit-mask-image: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
       #000 0%,
-      #000 24%,
-      rgb(0 0 0 / 0.4) 50%,
-      transparent 74%
+      #000 27%,
+      rgb(0 0 0 / 0.4) 52%,
+      transparent 78%
     );
   }
   .tilt-grid {
