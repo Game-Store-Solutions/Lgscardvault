@@ -483,7 +483,7 @@ body {
    * Sparkle glitter is intentionally absent — it reads as noise on a grid.
    */
   .foil-card {
-    --foil-holo-opacity: 0.2;
+    --foil-holo-opacity: 0.34;
   }
   .tilt-card {
     isolation: isolate;
@@ -498,7 +498,7 @@ body {
       transparent 100%
     );
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.38);
+    opacity: calc(var(--op, 0) * 0.48);
   }
   .tilt-holo,
   .foil-shimmer {
@@ -518,10 +518,10 @@ body {
     background-image:
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        hsla(188, 70%, 74%, 0.55) 0%,
-        hsla(268, 55%, 68%, 0.2) 18%,
-        hsla(42, 60%, 64%, 0.08) 32%,
-        transparent 52%
+        hsla(188, 75%, 76%, 0.72) 0%,
+        hsla(268, 62%, 70%, 0.32) 20%,
+        hsla(42, 65%, 66%, 0.14) 36%,
+        transparent 56%
       ),
       repeating-linear-gradient(
         calc(118deg + (var(--foil-seed, 0.4) - 0.4) * 36deg + var(--foil-flow)),
@@ -551,48 +551,48 @@ body {
       calc(50% + (var(--my, 50%) - 50%) * 1.45 - var(--foil-idle) * 0.7)
         calc(50% + (var(--mx, 50%) - 50%) * 1.05 + var(--foil-idle) * 0.25);
     mix-blend-mode: color-dodge;
-    filter: brightness(0.72) contrast(2.35) saturate(0.55);
-    opacity: calc(var(--foil-holo-opacity, 0.2) + var(--op, 0) * 0.28);
+    filter: brightness(0.82) contrast(2.15) saturate(0.72);
+    opacity: calc(var(--foil-holo-opacity, 0.34) + var(--op, 0) * 0.36);
     mask-image: radial-gradient(
       farthest-corner ellipse at var(--mx, 50%) var(--my, 50%),
       #000 0%,
-      #000 28%,
-      rgb(0 0 0 / 0.45) 55%,
-      transparent 78%
+      #000 40%,
+      rgb(0 0 0 / 0.72) 66%,
+      transparent 92%
     );
     -webkit-mask-image: radial-gradient(
       farthest-corner ellipse at var(--mx, 50%) var(--my, 50%),
       #000 0%,
-      #000 28%,
-      rgb(0 0 0 / 0.45) 55%,
-      transparent 78%
+      #000 40%,
+      rgb(0 0 0 / 0.72) 66%,
+      transparent 92%
     );
     animation:
-      foil-holo-flow 17s ease-in-out infinite,
-      foil-holo-warp 23s ease-in-out infinite,
-      foil-holo-scale 13s ease-in-out infinite;
+      foil-holo-flow 11s ease-in-out infinite,
+      foil-holo-warp 15s ease-in-out infinite,
+      foil-holo-scale 9s ease-in-out infinite;
     animation-delay:
-      calc(var(--foil-seed, 0.4) * -17s),
-      calc(var(--foil-seed, 0.4) * -23s),
-      calc(var(--foil-seed, 0.4) * -13s);
+      calc(var(--foil-seed, 0.4) * -11s),
+      calc(var(--foil-seed, 0.4) * -15s),
+      calc(var(--foil-seed, 0.4) * -9s);
   }
   .foil-shimmer {
     animation:
-      foil-holo-flow 17s ease-in-out infinite,
-      foil-holo-warp 23s ease-in-out infinite,
-      foil-holo-scale 13s ease-in-out infinite,
-      foil-idle-orbit 18s ease-in-out infinite;
+      foil-holo-flow 11s ease-in-out infinite,
+      foil-holo-warp 15s ease-in-out infinite,
+      foil-holo-scale 9s ease-in-out infinite,
+      foil-idle-orbit 14s ease-in-out infinite;
     animation-delay:
-      calc(var(--foil-seed, 0.4) * -17s),
-      calc(var(--foil-seed, 0.4) * -23s),
-      calc(var(--foil-seed, 0.4) * -13s),
-      calc(var(--foil-seed, 0.4) * -9s);
+      calc(var(--foil-seed, 0.4) * -11s),
+      calc(var(--foil-seed, 0.4) * -15s),
+      calc(var(--foil-seed, 0.4) * -9s),
+      calc(var(--foil-seed, 0.4) * -7s);
   }
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.24;
-    animation: foil-idle-orbit 18s ease-in-out infinite;
+    --op: 0.5;
+    animation: foil-idle-orbit 14s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
     animation-play-state: paused;
@@ -639,69 +639,69 @@ body {
 
 @keyframes foil-holo-flow {
   0% {
-    --foil-flow: -14deg;
+    --foil-flow: -22deg;
   }
   28% {
-    --foil-flow: 7deg;
+    --foil-flow: 12deg;
   }
   61% {
-    --foil-flow: 18deg;
+    --foil-flow: 28deg;
   }
   100% {
-    --foil-flow: -14deg;
+    --foil-flow: -22deg;
   }
 }
 
 @keyframes foil-holo-warp {
   0% {
-    --foil-amp: 1.85;
-    --foil-idle: -10%;
+    --foil-amp: 2.15;
+    --foil-idle: -18%;
   }
   40% {
-    --foil-amp: 2.55;
-    --foil-idle: 5%;
+    --foil-amp: 3.05;
+    --foil-idle: 8%;
   }
   72% {
-    --foil-amp: 2.1;
-    --foil-idle: 12%;
+    --foil-amp: 2.55;
+    --foil-idle: 20%;
   }
   100% {
-    --foil-amp: 1.85;
-    --foil-idle: -10%;
+    --foil-amp: 2.15;
+    --foil-idle: -18%;
   }
 }
 
 @keyframes foil-holo-scale {
   0% {
-    --foil-scale: 0.94;
-    --foil-def: 5.3%;
+    --foil-scale: 0.9;
+    --foil-def: 4.8%;
   }
   45% {
-    --foil-scale: 1.12;
-    --foil-def: 6.7%;
+    --foil-scale: 1.22;
+    --foil-def: 7.4%;
   }
   100% {
-    --foil-scale: 0.94;
-    --foil-def: 5.3%;
+    --foil-scale: 0.9;
+    --foil-def: 4.8%;
   }
 }
 
 @keyframes foil-idle-orbit {
   0%,
   100% {
-    --mx: 38%;
-    --my: 46%;
-    --op: 0.22;
+    --mx: 34%;
+    --my: 42%;
+    --op: 0.46;
   }
   33% {
-    --mx: 62%;
-    --my: 40%;
-    --op: 0.28;
+    --mx: 66%;
+    --my: 36%;
+    --op: 0.56;
   }
   66% {
-    --mx: 46%;
-    --my: 60%;
-    --op: 0.24;
+    --mx: 44%;
+    --my: 64%;
+    --op: 0.5;
   }
 }
 
