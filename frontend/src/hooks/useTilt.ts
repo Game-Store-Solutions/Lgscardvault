@@ -25,6 +25,7 @@ export type TiltStyle = MotionStyle & {
   '--mx': MotionValue<string>
   '--my': MotionValue<string>
   '--op': MotionValue<number>
+  '--foil-seed': number
 }
 
 export interface UseTiltOptions {
@@ -40,13 +41,14 @@ export interface UseTiltOptions {
  *
  * Attach `ref` + the pointer handlers to a perspective wrapper, and spread
  * `tiltStyle` onto the card (`motion.div`). Rotation is a spring; `--mx/--my/--op`
- * drive `.tilt-glare` / `.tilt-holo` / `.tilt-sparkle`. Reduced-motion skips
- * rotation and idle, and keeps pointer light tracking.
+ * drive `.tilt-glare` / `.tilt-holo`. Reduced-motion skips rotation and idle,
+ * and keeps pointer light tracking. `--foil-seed` varies the Holo warp per card.
  */
 export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ref = useRef<HTMLDivElement>(null)
   const hovering = useRef(false)
   const phase = useRef(Math.random() * Math.PI * 2)
+  const seed = useRef(0.18 + Math.random() * 0.64)
   const reduceMotion = useReducedMotion()
   const inView = useInView(ref, { amount: 0.15, margin: '80px', once: false })
 
@@ -54,7 +56,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ry = useMotionValue(0)
   const px = useMotionValue(50)
   const py = useMotionValue(50)
-  const op = useMotionValue(idle ? 0.34 : 0)
+  const op = useMotionValue(idle ? 0.2 : 0)
 
   const srx = useSpring(rx, TILT_SPRING)
   const sry = useSpring(ry, TILT_SPRING)
@@ -69,11 +71,11 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     if (!idle || hovering.current || reduceMotion || !inView) return
     const a = (time / IDLE_A_MS) * Math.PI * 2 + phase.current
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
-    px.set(50 + Math.sin(a) * 16 + Math.sin(b * 1.15) * 6)
-    py.set(50 + Math.cos(a * 0.62) * 11 + Math.sin(b) * 5)
-    op.set(0.34 + Math.sin(a * 0.9) * 0.06)
-    rx.set(Math.sin(a * 0.55) * maxTilt * 0.08)
-    ry.set(Math.cos(a * 0.48) * maxTilt * 0.1)
+    px.set(50 + Math.sin(a) * 12 + Math.sin(b * 1.15) * 5)
+    py.set(50 + Math.cos(a * 0.62) * 8 + Math.sin(b) * 4)
+    op.set(0.2 + Math.sin(a * 0.9) * 0.04)
+    rx.set(Math.sin(a * 0.55) * maxTilt * 0.06)
+    ry.set(Math.cos(a * 0.48) * maxTilt * 0.08)
   })
 
   const onPointerEnter = useCallback(() => {
@@ -118,6 +120,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     '--mx': mx,
     '--my': my,
     '--op': sop,
+    '--foil-seed': seed.current,
   }
 
   return { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle }
