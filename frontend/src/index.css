@@ -451,8 +451,8 @@ body {
    * hotspot and keep idle quiet. Pointer/hover opens it up toward 0.55.
    */
   .foil-card {
-    --foil-color-intensity: 1.35;
-    --foil-holo-opacity: 0.243;
+    --foil-color-intensity: 1.82;
+    --foil-holo-opacity: 0.36;
   }
   .tilt-card {
     isolation: isolate;
@@ -461,34 +461,34 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.42) 8%,
-      hsla(0, 0%, 100%, 0.1) 28%,
+      hsla(0, 0%, 100%, 0.28) 8%,
+      hsla(0, 0%, 100%, 0.06) 28%,
       transparent 58%
     );
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.5);
+    opacity: calc(var(--op, 0) * 0.36);
     transition: opacity 0.3s ease;
   }
   .tilt-holo,
   .foil-shimmer {
     background: linear-gradient(
       125deg,
-      #e60074,
-      #e85c00,
-      #00c4b4,
-      #5030e6,
-      #e60074,
-      #e85c00,
-      #00c4b4,
-      #5030e6,
-      #e60074,
-      #e85c00,
-      #00c4b4
+      #ff0078,
+      #ff6800,
+      #00e0cc,
+      #6040ff,
+      #ff0078,
+      #ff6800,
+      #00e0cc,
+      #6040ff,
+      #ff0078,
+      #ff6800,
+      #00e0cc
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    filter: brightness(0.58) contrast(1.4) saturate(0.92);
-    opacity: calc(var(--foil-holo-opacity, 0.243) + var(--op, 0) * 0.675);
+    filter: brightness(0.46) contrast(1.52) saturate(0.98);
+    opacity: calc(var(--foil-holo-opacity, 0.36) + var(--op, 0) * 0.95);
     transition: opacity 0.3s ease;
     animation: holo-gradient 5s ease infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -5s);
@@ -513,15 +513,15 @@ body {
         0deg,
         transparent,
         transparent 2px,
-        rgb(255 255 255 / 0.025) 2px,
-        rgb(255 255 255 / 0.025) 4px
+        rgb(255 255 255 / 0.018) 2px,
+        rgb(255 255 255 / 0.018) 4px
       ),
       repeating-linear-gradient(
         90deg,
         transparent,
         transparent 2px,
-        rgb(255 255 255 / 0.025) 2px,
-        rgb(255 255 255 / 0.025) 4px
+        rgb(255 255 255 / 0.018) 2px,
+        rgb(255 255 255 / 0.018) 4px
       );
     opacity: calc(var(--op, 0) * 0.42);
     transition: opacity 0.3s ease;
