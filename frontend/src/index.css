@@ -451,7 +451,8 @@ body {
    * hotspot and keep idle quiet. Pointer/hover opens it up toward 0.55.
    */
   .foil-card {
-    --foil-holo-opacity: 0.18;
+    --foil-color-intensity: 1.35;
+    --foil-holo-opacity: 0.243;
   }
   .tilt-card {
     isolation: isolate;
@@ -472,22 +473,22 @@ body {
   .foil-shimmer {
     background: linear-gradient(
       125deg,
-      #d4006a,
-      #db5a00,
-      #00b8a8,
-      #4a2fd9,
-      #d4006a,
-      #db5a00,
-      #00b8a8,
-      #4a2fd9,
-      #d4006a,
-      #db5a00,
-      #00b8a8
+      #e60074,
+      #e85c00,
+      #00c4b4,
+      #5030e6,
+      #e60074,
+      #e85c00,
+      #00c4b4,
+      #5030e6,
+      #e60074,
+      #e85c00,
+      #00c4b4
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    filter: brightness(0.64) contrast(1.34) saturate(0.92);
-    opacity: calc(var(--foil-holo-opacity, 0.18) + var(--op, 0) * 0.5);
+    filter: brightness(0.58) contrast(1.4) saturate(0.92);
+    opacity: calc(var(--foil-holo-opacity, 0.243) + var(--op, 0) * 0.675);
     transition: opacity 0.3s ease;
     animation: holo-gradient 5s ease infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -5s);
