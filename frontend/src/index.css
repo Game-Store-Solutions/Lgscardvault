@@ -534,9 +534,9 @@ body {
   }
   .tilt-sparkle {
     background-image:
-      radial-gradient(circle, hsla(190, 100%, 78%, 0.95) 0 0.55px, transparent 0.85px),
-      radial-gradient(circle, hsla(318, 100%, 76%, 0.8) 0 0.45px, transparent 0.75px),
-      radial-gradient(circle, hsla(48, 100%, 70%, 0.75) 0 0.4px, transparent 0.7px);
+      radial-gradient(circle, hsla(190, 80%, 70%, 0.7) 0 0.5px, transparent 0.8px),
+      radial-gradient(circle, hsla(318, 75%, 68%, 0.55) 0 0.4px, transparent 0.7px),
+      radial-gradient(circle, hsla(46, 80%, 62%, 0.5) 0 0.35px, transparent 0.65px);
     background-size: 13px 16px, 18px 11px, 9px 14px;
     background-position:
       calc(var(--mx, 50%) * 0.45) calc(var(--my, 50%) * 0.4),
