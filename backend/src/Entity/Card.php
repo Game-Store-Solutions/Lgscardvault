@@ -13,6 +13,7 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Table(name: 'cards')]
 #[ORM\Index(name: 'IDX_CARD_NAME', fields: ['name'])]
 #[ORM\Index(name: 'IDX_CARD_ORACLE_ID', fields: ['oracleId'])]
+#[ORM\Index(name: 'IDX_CARD_EDHREC_RANK', fields: ['edhrecRank'])]
 #[ApiResource(
     operations: [
         new Get(normalizationContext: ['groups' => ['card:read']]),
@@ -61,6 +62,16 @@ class Card
     #[ORM\Column(length: 20, nullable: true)]
     #[Groups(['card:read', 'inventory:read'])]
     private ?string $rarity = null;
+
+    /**
+     * EDHREC popularity rank (lower = more played). Sourced from Scryfall's
+     * `edhrec_rank` payload field, promoted to a first-class indexed column so
+     * the deck builder can order/filter candidates by real-world playability
+     * without parsing the raw scryfall_data JSON on every request.
+     */
+    #[ORM\Column(name: 'edhrec_rank', type: 'integer', nullable: true)]
+    #[Groups(['card:read', 'inventory:read'])]
+    private ?int $edhrecRank = null;
 
     #[ORM\Column(length: 64, nullable: true)]
     #[Groups(['card:read', 'inventory:read'])]
@@ -258,6 +269,18 @@ class Card
     public function setRarity(?string $rarity): static
     {
         $this->rarity = $rarity;
+
+        return $this;
+    }
+
+    public function getEdhrecRank(): ?int
+    {
+        return $this->edhrecRank;
+    }
+
+    public function setEdhrecRank(?int $edhrecRank): static
+    {
+        $this->edhrecRank = $edhrecRank;
 
         return $this;
     }
