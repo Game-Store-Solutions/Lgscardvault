@@ -461,13 +461,13 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.42) 5%,
-      hsla(0, 0%, 100%, 0.14) 16%,
-      hsla(0, 0%, 100%, 0.04) 32%,
-      transparent 50%
+      hsla(0, 0%, 100%, 0.58) 3%,
+      hsla(0, 0%, 100%, 0.22) 12%,
+      hsla(0, 0%, 100%, 0.06) 24%,
+      transparent 42%
     );
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.48);
+    opacity: calc(var(--op, 0) * 0.62);
     transition: opacity 0.3s ease;
   }
   .tilt-holo,
@@ -488,7 +488,7 @@ body {
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    filter: brightness(0.48) contrast(1.54) saturate(0.98);
+    filter: brightness(0.49) contrast(1.58) saturate(0.98);
     opacity: calc(var(--foil-holo-opacity, 0.36) + var(--op, 0) * 0.95);
     transition: opacity 0.3s ease;
     animation: holo-gradient 5s ease infinite;
@@ -514,17 +514,17 @@ body {
         0deg,
         transparent,
         transparent 2px,
-        rgb(255 255 255 / 0.028) 2px,
-        rgb(255 255 255 / 0.028) 4px
+        rgb(255 255 255 / 0.04) 2px,
+        rgb(255 255 255 / 0.04) 4px
       ),
       repeating-linear-gradient(
         90deg,
         transparent,
         transparent 2px,
-        rgb(255 255 255 / 0.028) 2px,
-        rgb(255 255 255 / 0.028) 4px
+        rgb(255 255 255 / 0.04) 2px,
+        rgb(255 255 255 / 0.04) 4px
       );
-    opacity: calc(var(--op, 0) * 0.5);
+    opacity: calc(var(--op, 0) * 0.62);
     transition: opacity 0.3s ease;
     pointer-events: none;
     mask-image: radial-gradient(
