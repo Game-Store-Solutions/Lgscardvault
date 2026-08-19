@@ -56,6 +56,30 @@ html {
   initial-value: 0.4;
 }
 
+@property --foil-flow {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+
+@property --foil-amp {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 2.2;
+}
+
+@property --foil-scale {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --foil-def {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 6%;
+}
+
 @theme {
   /*
    * Brand — dual-tone.
@@ -459,10 +483,7 @@ body {
    * Sparkle glitter is intentionally absent — it reads as noise on a grid.
    */
   .foil-card {
-    --foil-holo-opacity: 0.18;
-    --foil-warp: 2.2;
-    --foil-space: 6%;
-    --foil-angle: calc(118deg + (var(--foil-seed, 0.4) - 0.4) * 36deg);
+    --foil-holo-opacity: 0.2;
   }
   .tilt-card {
     isolation: isolate;
@@ -482,10 +503,17 @@ body {
   .tilt-holo,
   .foil-shimmer {
     --foil-idle: 0%;
+    --foil-amp: 2.2;
+    --foil-def: 6%;
+    --foil-flow: 0deg;
+    --foil-scale: 1;
     /*
      * 1) Iridescence — bloom at the light (Holo "fringe")
      * 2) Spectral field at ~400% scale (Holo "definition" / light-split)
      * 3) Crossed field at a different scale (Holo "warp" / flow)
+     *
+     * Idle is the shader flowing — speed, scale, amplitude, definition, warp —
+     * not a spotlight orbit. Seed offsets the loop so a grid does not sync.
      */
     background-image:
       radial-gradient(
@@ -496,32 +524,35 @@ body {
         transparent 52%
       ),
       repeating-linear-gradient(
-        var(--foil-angle, 118deg),
+        calc(118deg + (var(--foil-seed, 0.4) - 0.4) * 36deg + var(--foil-flow)),
         hsl(176, 85%, 72%) 0,
-        hsl(228, 80%, 74%) var(--foil-space),
-        hsl(283, 75%, 73%) calc(var(--foil-space) * 2),
-        hsl(2, 80%, 72%) calc(var(--foil-space) * 3),
-        hsl(53, 82%, 70%) calc(var(--foil-space) * 4),
-        hsl(176, 85%, 72%) calc(var(--foil-space) * 5)
+        hsl(228, 80%, 74%) var(--foil-def),
+        hsl(283, 75%, 73%) calc(var(--foil-def) * 2),
+        hsl(2, 80%, 72%) calc(var(--foil-def) * 3),
+        hsl(53, 82%, 70%) calc(var(--foil-def) * 4),
+        hsl(176, 85%, 72%) calc(var(--foil-def) * 5)
       ),
       repeating-linear-gradient(
-        calc(var(--foil-angle, 118deg) + 68deg),
+        calc(186deg + (var(--foil-seed, 0.4) - 0.4) * 36deg + var(--foil-flow)),
         hsl(200, 70%, 70%) 0,
-        hsl(268, 65%, 72%) calc(var(--foil-space) * 1.4),
-        hsl(320, 60%, 70%) calc(var(--foil-space) * 2.8),
-        hsl(48, 70%, 68%) calc(var(--foil-space) * 4.2),
-        hsl(200, 70%, 70%) calc(var(--foil-space) * 5.6)
+        hsl(268, 65%, 72%) calc(var(--foil-def) * 1.4),
+        hsl(320, 60%, 70%) calc(var(--foil-def) * 2.8),
+        hsl(48, 70%, 68%) calc(var(--foil-def) * 4.2),
+        hsl(200, 70%, 70%) calc(var(--foil-def) * 5.6)
       );
-    background-size: 100% 100%, 400% 680%, 560% 380%;
+    background-size:
+      100% 100%,
+      calc(400% * var(--foil-scale)) calc(680% * var(--foil-scale)),
+      calc(560% * var(--foil-scale)) calc(380% * var(--foil-scale));
     background-position:
       0 0,
-      calc(50% + (50% - var(--mx, 50%)) * var(--foil-warp, 2.2) + var(--foil-idle))
-        calc(50% + (50% - var(--my, 50%)) * var(--foil-warp, 2.2) * 0.55 - var(--foil-idle) * 0.35),
+      calc(50% + (50% - var(--mx, 50%)) * var(--foil-amp) + var(--foil-idle))
+        calc(50% + (50% - var(--my, 50%)) * var(--foil-amp) * 0.55 - var(--foil-idle) * 0.35),
       calc(50% + (var(--my, 50%) - 50%) * 1.45 - var(--foil-idle) * 0.7)
         calc(50% + (var(--mx, 50%) - 50%) * 1.05 + var(--foil-idle) * 0.25);
     mix-blend-mode: color-dodge;
     filter: brightness(0.72) contrast(2.35) saturate(0.55);
-    opacity: calc(var(--foil-holo-opacity, 0.18) + var(--op, 0) * 0.26);
+    opacity: calc(var(--foil-holo-opacity, 0.2) + var(--op, 0) * 0.28);
     mask-image: radial-gradient(
       farthest-corner ellipse at var(--mx, 50%) var(--my, 50%),
       #000 0%,
@@ -536,17 +567,31 @@ body {
       rgb(0 0 0 / 0.45) 55%,
       transparent 78%
     );
-    animation: foil-idle-shift 14s ease-in-out infinite;
+    animation:
+      foil-holo-flow 17s ease-in-out infinite,
+      foil-holo-warp 23s ease-in-out infinite,
+      foil-holo-scale 13s ease-in-out infinite;
+    animation-delay:
+      calc(var(--foil-seed, 0.4) * -17s),
+      calc(var(--foil-seed, 0.4) * -23s),
+      calc(var(--foil-seed, 0.4) * -13s);
   }
   .foil-shimmer {
     animation:
-      foil-idle-shift 14s ease-in-out infinite,
+      foil-holo-flow 17s ease-in-out infinite,
+      foil-holo-warp 23s ease-in-out infinite,
+      foil-holo-scale 13s ease-in-out infinite,
       foil-idle-orbit 18s ease-in-out infinite;
+    animation-delay:
+      calc(var(--foil-seed, 0.4) * -17s),
+      calc(var(--foil-seed, 0.4) * -23s),
+      calc(var(--foil-seed, 0.4) * -13s),
+      calc(var(--foil-seed, 0.4) * -9s);
   }
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.2;
+    --op: 0.24;
     animation: foil-idle-orbit 18s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -592,13 +637,52 @@ body {
   }
 }
 
-@keyframes foil-idle-shift {
-  0%,
+@keyframes foil-holo-flow {
+  0% {
+    --foil-flow: -14deg;
+  }
+  28% {
+    --foil-flow: 7deg;
+  }
+  61% {
+    --foil-flow: 18deg;
+  }
   100% {
+    --foil-flow: -14deg;
+  }
+}
+
+@keyframes foil-holo-warp {
+  0% {
+    --foil-amp: 1.85;
     --foil-idle: -10%;
   }
-  50% {
-    --foil-idle: 10%;
+  40% {
+    --foil-amp: 2.55;
+    --foil-idle: 5%;
+  }
+  72% {
+    --foil-amp: 2.1;
+    --foil-idle: 12%;
+  }
+  100% {
+    --foil-amp: 1.85;
+    --foil-idle: -10%;
+  }
+}
+
+@keyframes foil-holo-scale {
+  0% {
+    --foil-scale: 0.94;
+    --foil-def: 5.3%;
+  }
+  45% {
+    --foil-scale: 1.12;
+    --foil-def: 6.7%;
+  }
+  100% {
+    --foil-scale: 0.94;
+    --foil-def: 5.3%;
   }
 }
 
@@ -607,17 +691,17 @@ body {
   100% {
     --mx: 38%;
     --my: 46%;
-    --op: 0.18;
+    --op: 0.22;
   }
   33% {
     --mx: 62%;
     --my: 40%;
-    --op: 0.24;
+    --op: 0.28;
   }
   66% {
     --mx: 46%;
     --my: 60%;
-    --op: 0.2;
+    --op: 0.24;
   }
 }
 

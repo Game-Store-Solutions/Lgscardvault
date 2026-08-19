@@ -30,8 +30,9 @@ export type TiltStyle = MotionStyle & {
 
 export interface UseTiltOptions {
   /**
-   * When true, the card slowly rocks and the sheen orbits while the pointer
-   * is away. Pointer takeovers instantly; idle resumes on leave.
+   * When true, the holographic field keeps flowing while the pointer is away
+   * (Holo warp / scale / definition), and a slow light drift reveals it.
+   * Pointer takeovers instantly; idle resumes on leave.
    */
   idle?: boolean
 }
@@ -42,7 +43,7 @@ export interface UseTiltOptions {
  * Attach `ref` + the pointer handlers to a perspective wrapper, and spread
  * `tiltStyle` onto the card (`motion.div`). Rotation is a spring; `--mx/--my/--op`
  * drive `.tilt-glare` / `.tilt-holo`. Reduced-motion skips rotation and idle,
- * and keeps pointer light tracking. `--foil-seed` varies the Holo warp per card.
+ * and keeps pointer light tracking. `--foil-seed` desyncs the Holo flow per card.
  */
 export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ref = useRef<HTMLDivElement>(null)
@@ -56,7 +57,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ry = useMotionValue(0)
   const px = useMotionValue(50)
   const py = useMotionValue(50)
-  const op = useMotionValue(idle ? 0.2 : 0)
+  const op = useMotionValue(idle ? 0.24 : 0)
 
   const srx = useSpring(rx, TILT_SPRING)
   const sry = useSpring(ry, TILT_SPRING)
@@ -71,11 +72,11 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     if (!idle || hovering.current || reduceMotion || !inView) return
     const a = (time / IDLE_A_MS) * Math.PI * 2 + phase.current
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
-    px.set(50 + Math.sin(a) * 12 + Math.sin(b * 1.15) * 5)
-    py.set(50 + Math.cos(a * 0.62) * 8 + Math.sin(b) * 4)
-    op.set(0.2 + Math.sin(a * 0.9) * 0.04)
-    rx.set(Math.sin(a * 0.55) * maxTilt * 0.06)
-    ry.set(Math.cos(a * 0.48) * maxTilt * 0.08)
+    px.set(50 + Math.sin(a) * 14 + Math.sin(b * 1.15) * 6)
+    py.set(50 + Math.cos(a * 0.62) * 10 + Math.sin(b) * 5)
+    op.set(0.24 + Math.sin(a * 0.9) * 0.05)
+    rx.set(Math.sin(a * 0.55) * maxTilt * 0.07)
+    ry.set(Math.cos(a * 0.48) * maxTilt * 0.09)
   })
 
   const onPointerEnter = useCallback(() => {

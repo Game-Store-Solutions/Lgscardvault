@@ -18,7 +18,7 @@ export interface CardTileProps {
 /**
  * CardTile — image-forward storefront result card (grid view). The art fills
  * the top with a springy pointer-driven holographic tilt. Foils keep a slow
- * idle flow (glare + light-split holo). Rarity accents add game flavor;
+ * idle Holo flow (warp, scale, definition). Rarity accents add game flavor;
  * the footer keeps the name, printing and market price scannable.
  */
 export function CardTile({ item, slug }: CardTileProps) {
