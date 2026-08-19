@@ -20,6 +20,7 @@ import { guestCartKey, guestCartLines, resetGuestCart } from '../hooks/useGuestC
 import { BackButton, Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
 import { CheckoutPanel } from '../components/payments/CheckoutPanel'
 import { CardImage, SpotlightCard } from '../components/cards'
+import { FoilOverlays } from '../components/cards/FoilOverlays'
 import { cx } from '../lib/cx'
 import { finishName } from '../lib/finishes'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
@@ -807,12 +808,7 @@ function CartLine({
         style={{ borderColor: accent }}
       >
         <CardImage src={image} alt={item.card.name} className="size-full" />
-        {item.isFoil && (
-          <span
-            aria-hidden
-            className="foil-shimmer pointer-events-none absolute inset-0"
-          />
-        )}
+        {item.isFoil && <FoilOverlays foil glare={false} />}
       </Link>
 
       <div className="min-w-0 space-y-4">

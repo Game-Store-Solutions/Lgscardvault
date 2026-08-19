@@ -44,40 +44,10 @@ html {
   initial-value: 0;
 }
 
-@property --foil-idle {
-  syntax: "<percentage>";
-  inherits: true;
-  initial-value: 0%;
-}
-
 @property --foil-seed {
   syntax: "<number>";
   inherits: true;
   initial-value: 0.4;
-}
-
-@property --foil-flow {
-  syntax: "<angle>";
-  inherits: true;
-  initial-value: 0deg;
-}
-
-@property --foil-amp {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 2.2;
-}
-
-@property --foil-scale {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 1;
-}
-
-@property --foil-def {
-  syntax: "<percentage>";
-  inherits: true;
-  initial-value: 6%;
 }
 
 @theme {
@@ -475,15 +445,14 @@ body {
 
 @layer components {
   /*
-   * Holographic foil — Framer Holo + simeydotme.
+   * Pokemon-style holographic foil (effect-labs / trading-card holo).
    *
-   * Holo does not paint a rainbow. It splits light: a huge spectral field
-   * slides under the art, warp/definition shape the flow, and color-dodge +
-   * a contrast crush make hues emerge only where the surface is lit.
-   * Sparkle glitter is intentionally absent — it reads as noise on a grid.
+   * Rainbow gradient in color-dodge + fine cross-grid. holo-gradient animates
+   * the spectrum; --op brightens both layers on pointer (0.7 / 1.0 at full).
+   * Idle stays visible so foils read in a grid without hovering.
    */
   .foil-card {
-    --foil-holo-opacity: 0.34;
+    --foil-holo-opacity: 0.38;
   }
   .tilt-card {
     isolation: isolate;
@@ -492,106 +461,61 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.42) 8%,
-      hsla(0, 0%, 100%, 0.1) 26%,
-      hsla(0, 0%, 0%, 0.22) 72%,
-      transparent 100%
+      hsla(0, 0%, 100%, 0.35) 8%,
+      hsla(0, 0%, 100%, 0.08) 28%,
+      transparent 58%
     );
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.48);
+    opacity: calc(var(--op, 0) * 0.42);
+    transition: opacity 0.3s ease;
   }
   .tilt-holo,
   .foil-shimmer {
-    --foil-idle: 0%;
-    --foil-amp: 2.2;
-    --foil-def: 6%;
-    --foil-flow: 0deg;
-    --foil-scale: 1;
-    /*
-     * 1) Iridescence — bloom at the light (Holo "fringe")
-     * 2) Spectral field at ~400% scale (Holo "definition" / light-split)
-     * 3) Crossed field at a different scale (Holo "warp" / flow)
-     *
-     * Idle is the shader flowing — speed, scale, amplitude, definition, warp —
-     * not a spotlight orbit. Seed offsets the loop so a grid does not sync.
-     */
-    background-image:
-      radial-gradient(
-        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        hsla(188, 75%, 76%, 0.72) 0%,
-        hsla(268, 62%, 70%, 0.32) 20%,
-        hsla(42, 65%, 66%, 0.14) 36%,
-        transparent 56%
-      ),
-      repeating-linear-gradient(
-        calc(118deg + (var(--foil-seed, 0.4) - 0.4) * 36deg + var(--foil-flow)),
-        hsl(176, 85%, 72%) 0,
-        hsl(228, 80%, 74%) var(--foil-def),
-        hsl(283, 75%, 73%) calc(var(--foil-def) * 2),
-        hsl(2, 80%, 72%) calc(var(--foil-def) * 3),
-        hsl(53, 82%, 70%) calc(var(--foil-def) * 4),
-        hsl(176, 85%, 72%) calc(var(--foil-def) * 5)
-      ),
-      repeating-linear-gradient(
-        calc(186deg + (var(--foil-seed, 0.4) - 0.4) * 36deg + var(--foil-flow)),
-        hsl(200, 70%, 70%) 0,
-        hsl(268, 65%, 72%) calc(var(--foil-def) * 1.4),
-        hsl(320, 60%, 70%) calc(var(--foil-def) * 2.8),
-        hsl(48, 70%, 68%) calc(var(--foil-def) * 4.2),
-        hsl(200, 70%, 70%) calc(var(--foil-def) * 5.6)
-      );
-    background-size:
-      100% 100%,
-      calc(400% * var(--foil-scale)) calc(680% * var(--foil-scale)),
-      calc(560% * var(--foil-scale)) calc(380% * var(--foil-scale));
-    background-position:
-      0 0,
-      calc(50% + (50% - var(--mx, 50%)) * var(--foil-amp) + var(--foil-idle))
-        calc(50% + (50% - var(--my, 50%)) * var(--foil-amp) * 0.55 - var(--foil-idle) * 0.35),
-      calc(50% + (var(--my, 50%) - 50%) * 1.45 - var(--foil-idle) * 0.7)
-        calc(50% + (var(--mx, 50%) - 50%) * 1.05 + var(--foil-idle) * 0.25);
+    background: linear-gradient(
+      125deg,
+      #ff0080,
+      #ff8c00,
+      #40e0d0,
+      #7b68ee,
+      #ff0080,
+      #ff8c00,
+      #40e0d0,
+      #7b68ee,
+      #ff0080,
+      #ff8c00,
+      #40e0d0
+    );
+    background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    filter: brightness(0.82) contrast(2.15) saturate(0.72);
-    opacity: calc(var(--foil-holo-opacity, 0.34) + var(--op, 0) * 0.36);
-    mask-image: radial-gradient(
-      farthest-corner ellipse at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 40%,
-      rgb(0 0 0 / 0.72) 66%,
-      transparent 92%
-    );
-    -webkit-mask-image: radial-gradient(
-      farthest-corner ellipse at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 40%,
-      rgb(0 0 0 / 0.72) 66%,
-      transparent 92%
-    );
-    animation:
-      foil-holo-flow 11s ease-in-out infinite,
-      foil-holo-warp 15s ease-in-out infinite,
-      foil-holo-scale 9s ease-in-out infinite;
-    animation-delay:
-      calc(var(--foil-seed, 0.4) * -11s),
-      calc(var(--foil-seed, 0.4) * -15s),
-      calc(var(--foil-seed, 0.4) * -9s);
+    opacity: calc(var(--foil-holo-opacity, 0.38) + var(--op, 0) * 0.32);
+    transition: opacity 0.3s ease;
+    animation: holo-gradient 5s ease infinite;
+    animation-delay: calc(var(--foil-seed, 0.4) * -5s);
   }
-  .foil-shimmer {
-    animation:
-      foil-holo-flow 11s ease-in-out infinite,
-      foil-holo-warp 15s ease-in-out infinite,
-      foil-holo-scale 9s ease-in-out infinite,
-      foil-idle-orbit 14s ease-in-out infinite;
-    animation-delay:
-      calc(var(--foil-seed, 0.4) * -11s),
-      calc(var(--foil-seed, 0.4) * -15s),
-      calc(var(--foil-seed, 0.4) * -9s),
-      calc(var(--foil-seed, 0.4) * -7s);
+  .tilt-grid {
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgb(255 255 255 / 0.03) 2px,
+        rgb(255 255 255 / 0.03) 4px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgb(255 255 255 / 0.03) 2px,
+        rgb(255 255 255 / 0.03) 4px
+      );
+    opacity: calc(0.28 + var(--op, 0) * 0.72);
+    transition: opacity 0.3s ease;
+    pointer-events: none;
   }
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.5;
+    --op: 0.45;
     animation: foil-idle-orbit 14s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -625,64 +549,13 @@ body {
   animation: logo-breathe 1.6s ease-in-out infinite;
 }
 
-@keyframes foil-sweep {
-  0% {
+@keyframes holo-gradient {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
     background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes foil-holo-flow {
-  0% {
-    --foil-flow: -22deg;
-  }
-  28% {
-    --foil-flow: 12deg;
-  }
-  61% {
-    --foil-flow: 28deg;
-  }
-  100% {
-    --foil-flow: -22deg;
-  }
-}
-
-@keyframes foil-holo-warp {
-  0% {
-    --foil-amp: 2.15;
-    --foil-idle: -18%;
-  }
-  40% {
-    --foil-amp: 3.05;
-    --foil-idle: 8%;
-  }
-  72% {
-    --foil-amp: 2.55;
-    --foil-idle: 20%;
-  }
-  100% {
-    --foil-amp: 2.15;
-    --foil-idle: -18%;
-  }
-}
-
-@keyframes foil-holo-scale {
-  0% {
-    --foil-scale: 0.9;
-    --foil-def: 4.8%;
-  }
-  45% {
-    --foil-scale: 1.22;
-    --foil-def: 7.4%;
-  }
-  100% {
-    --foil-scale: 0.9;
-    --foil-def: 4.8%;
   }
 }
 
@@ -691,17 +564,17 @@ body {
   100% {
     --mx: 34%;
     --my: 42%;
-    --op: 0.46;
+    --op: 0.4;
   }
   33% {
     --mx: 66%;
     --my: 36%;
-    --op: 0.56;
+    --op: 0.55;
   }
   66% {
     --mx: 44%;
     --my: 64%;
-    --op: 0.5;
+    --op: 0.48;
   }
 }
 
@@ -775,27 +648,6 @@ select:not([multiple]) {
   50% {
     translate: 0 -6px;
   }
-}
-
-.hero-foil-shimmer {
-  position: relative;
-}
-
-.hero-foil-shimmer::after {
-  content: '';
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    105deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.45) 50%,
-    transparent 65%
-  );
-  background-size: 200% 100%;
-  animation: foil-sweep 4s ease-in-out infinite;
-  mix-blend-mode: soft-light;
 }
 
 .hero-snow {
