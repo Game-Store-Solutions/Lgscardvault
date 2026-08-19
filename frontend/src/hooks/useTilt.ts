@@ -67,11 +67,11 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   useAnimationFrame((time) => {
     if (!idle || hovering.current || reduceMotion || !inView) return
     const angle = (time / IDLE_PERIOD_MS) * Math.PI * 2 + phase.current
-    px.set(50 + Math.sin(angle) * 34)
-    py.set(50 + Math.cos(angle * 0.78) * 22)
-    op.set(0.24 + Math.sin(angle * 1.6) * 0.05)
-    rx.set(Math.sin(angle * 0.95) * maxTilt * 0.28)
-    ry.set(Math.cos(angle) * maxTilt * 0.32)
+    px.set(50 + Math.sin(angle) * 39)
+    py.set(50 + Math.cos(angle * 0.78) * 25)
+    op.set(0.28 + Math.sin(angle * 1.6) * 0.06)
+    rx.set(Math.sin(angle * 0.95) * maxTilt * 0.32)
+    ry.set(Math.cos(angle) * maxTilt * 0.37)
   })
 
   const onPointerEnter = useCallback(() => {
