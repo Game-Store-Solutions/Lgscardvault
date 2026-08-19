@@ -650,69 +650,6 @@ select:not([multiple]) {
   }
 }
 
-.hero-foil-shimmer {
-  position: relative;
-  isolation: isolate;
-}
-
-.hero-foil-shimmer::before {
-  content: '';
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border-radius: inherit;
-  background: linear-gradient(
-    125deg,
-    #ff0080,
-    #ff8c00,
-    #40e0d0,
-    #7b68ee,
-    #ff0080,
-    #ff8c00,
-    #40e0d0,
-    #7b68ee,
-    #ff0080,
-    #ff8c00,
-    #40e0d0
-  );
-  background-size: 200% 200%;
-  mix-blend-mode: color-dodge;
-  opacity: var(--foil-holo-opacity, 0.38);
-  animation: holo-gradient 5s ease infinite;
-}
-
-.hero-foil-shimmer::after {
-  content: '';
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border-radius: inherit;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgb(255 255 255 / 0.03) 2px,
-      rgb(255 255 255 / 0.03) 4px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 2px,
-      rgb(255 255 255 / 0.03) 2px,
-      rgb(255 255 255 / 0.03) 4px
-    );
-  opacity: 0.55;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-foil-shimmer::before {
-    animation: none;
-  }
-}
-
 .hero-snow {
   background-image: radial-gradient(2px 2px at 20% 30%, white, transparent),
     radial-gradient(2px 2px at 60% 70%, white, transparent),
