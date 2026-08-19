@@ -455,7 +455,7 @@ body {
    * --foil-holo-opacity: rest-state rainbow strength.
    */
   .foil-card {
-    --foil-holo-opacity: 0.4;
+    --foil-holo-opacity: 0.22;
   }
   .tilt-card {
     isolation: isolate;
@@ -464,16 +464,16 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(195, 50%, 92%, 0.38) 0%,
-      hsla(280, 40%, 88%, 0.12) 26%,
-      hsla(0, 0%, 100%, 0) 58%
+      hsla(200, 30%, 88%, 0.22) 0%,
+      hsla(280, 24%, 82%, 0.08) 24%,
+      hsla(0, 0%, 100%, 0) 52%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.48);
+    opacity: calc(var(--op, 0) * 0.32);
   }
   /*
-   * Two rainbows at crossed angles so the bands interfere like real holofoil.
-   * The travelling band is ice-tinted, not white, so color stays the star.
+   * Crossed rainbows for the shimmer they love. soft-light (not color-dodge)
+   * so light art and text boxes stay readable — jewel tones, not a wash.
    */
   .tilt-holo,
   .foil-shimmer {
@@ -481,27 +481,27 @@ body {
     background-image:
       linear-gradient(
         118deg,
-        transparent 34%,
-        hsla(195, 80%, 88%, calc(0.04 + var(--op, 0) * 0.16)) 48%,
-        transparent 64%
+        transparent 38%,
+        hsla(195, 60%, 80%, calc(0.03 + var(--op, 0) * 0.1)) 49%,
+        transparent 62%
       ),
       repeating-linear-gradient(
         122deg,
-        hsl(340 100% 64%) 0%,
-        hsl(22 100% 60%) 6%,
-        hsl(48 100% 58%) 12%,
-        hsl(145 92% 52%) 18%,
-        hsl(190 100% 56%) 24%,
-        hsl(230 96% 64%) 30%,
-        hsl(286 92% 64%) 36%,
-        hsl(340 100% 64%) 42%
+        hsl(340 78% 52%) 0%,
+        hsl(22 80% 48%) 6%,
+        hsl(46 78% 46%) 12%,
+        hsl(148 70% 42%) 18%,
+        hsl(192 78% 48%) 24%,
+        hsl(230 72% 54%) 30%,
+        hsl(286 70% 52%) 36%,
+        hsl(340 78% 52%) 42%
       ),
       repeating-linear-gradient(
         56deg,
-        hsl(198 100% 60%) 0%,
-        hsl(286 90% 64%) 14%,
-        hsl(48 100% 58%) 28%,
-        hsl(198 100% 60%) 42%
+        hsl(198 76% 48%) 0%,
+        hsl(286 68% 52%) 14%,
+        hsl(46 78% 46%) 28%,
+        hsl(198 76% 48%) 42%
       );
     background-size: 210% 210%, 300% 300%, 190% 190%;
     background-position:
@@ -510,22 +510,22 @@ body {
         calc(var(--my, 50%) - (var(--foil-idle) * 0.4 * (1 - var(--op, 0)))),
       calc(var(--my, 50%) + (var(--foil-idle) * 0.55 * (1 - var(--op, 0))))
         calc(var(--mx, 50%) - (var(--foil-idle) * 0.3 * (1 - var(--op, 0))));
-    mix-blend-mode: color-dodge;
-    filter: brightness(0.8) contrast(1.4) saturate(1.18);
-    opacity: calc(var(--foil-holo-opacity, 0.4) + var(--op, 0) * 0.34);
+    mix-blend-mode: soft-light;
+    filter: contrast(1.15) saturate(1.05);
+    opacity: calc(var(--foil-holo-opacity, 0.22) + var(--op, 0) * 0.2);
     animation: foil-idle-shift 7.5s ease-in-out infinite;
   }
-  /* Prism bloom at the light — color pop without a white flash. */
+  /* Hue bloom only — tints the light, does not bleach the art. */
   .tilt-prism {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(190, 95%, 68%, 0.42) 0%,
-      hsla(300, 88%, 66%, 0.26) 20%,
-      hsla(48, 95%, 62%, 0.14) 36%,
-      transparent 60%
+      hsla(192, 70%, 58%, 0.22) 0%,
+      hsla(300, 62%, 56%, 0.12) 22%,
+      hsla(46, 70%, 52%, 0.06) 40%,
+      transparent 58%
     );
-    mix-blend-mode: overlay;
-    opacity: calc(0.22 + var(--op, 0) * 0.4);
+    mix-blend-mode: color;
+    opacity: calc(0.1 + var(--op, 0) * 0.18);
   }
   .foil-shimmer {
     animation:
@@ -534,9 +534,9 @@ body {
   }
   .tilt-sparkle {
     background-image:
-      radial-gradient(circle, hsla(190, 100%, 78%, 0.95) 0 0.55px, transparent 0.85px),
-      radial-gradient(circle, hsla(318, 100%, 76%, 0.8) 0 0.45px, transparent 0.75px),
-      radial-gradient(circle, hsla(48, 100%, 70%, 0.75) 0 0.4px, transparent 0.7px);
+      radial-gradient(circle, hsla(190, 80%, 70%, 0.7) 0 0.5px, transparent 0.8px),
+      radial-gradient(circle, hsla(318, 75%, 68%, 0.55) 0 0.4px, transparent 0.7px),
+      radial-gradient(circle, hsla(46, 80%, 62%, 0.5) 0 0.35px, transparent 0.65px);
     background-size: 13px 16px, 18px 11px, 9px 14px;
     background-position:
       calc(var(--mx, 50%) * 0.45) calc(var(--my, 50%) * 0.4),
@@ -544,8 +544,8 @@ body {
       calc(var(--my, 50%) * 0.3) calc(var(--mx, 50%) * 0.2);
     mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 62%);
     -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 62%);
-    mix-blend-mode: plus-lighter;
-    opacity: calc(0.14 + var(--op, 0) * 0.4);
+    mix-blend-mode: overlay;
+    opacity: calc(0.06 + var(--op, 0) * 0.2);
   }
   /*
    * Flip / DFC faces cannot use the pointer hook (drag is the flip). CSS
@@ -554,7 +554,7 @@ body {
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.38;
+    --op: 0.24;
     animation: foil-idle-orbit 8s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -615,17 +615,17 @@ body {
   100% {
     --mx: 22%;
     --my: 40%;
-    --op: 0.34;
+    --op: 0.2;
   }
   33% {
     --mx: 74%;
     --my: 28%;
-    --op: 0.44;
+    --op: 0.28;
   }
   66% {
     --mx: 40%;
     --my: 72%;
-    --op: 0.38;
+    --op: 0.24;
   }
 }
 
