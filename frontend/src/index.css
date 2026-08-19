@@ -543,7 +543,7 @@ body {
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.32;
+    --op: 0.49;
     animation: foil-idle-orbit 14s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -592,17 +592,17 @@ body {
   100% {
     --mx: 34%;
     --my: 42%;
-    --op: 0.28;
+    --op: 0.43;
   }
   33% {
     --mx: 66%;
     --my: 36%;
-    --op: 0.38;
+    --op: 0.58;
   }
   66% {
     --mx: 44%;
     --my: 64%;
-    --op: 0.32;
+    --op: 0.49;
   }
 }
 
