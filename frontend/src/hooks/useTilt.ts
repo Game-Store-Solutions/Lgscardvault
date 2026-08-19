@@ -54,7 +54,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ry = useMotionValue(0)
   const px = useMotionValue(50)
   const py = useMotionValue(50)
-  const op = useMotionValue(idle ? 0.54 : 0)
+  const op = useMotionValue(idle ? 0.34 : 0)
 
   const srx = useSpring(rx, TILT_SPRING)
   const sry = useSpring(ry, TILT_SPRING)
@@ -69,11 +69,11 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     if (!idle || hovering.current || reduceMotion || !inView) return
     const a = (time / IDLE_A_MS) * Math.PI * 2 + phase.current
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
-    px.set(50 + Math.sin(a) * 20 + Math.sin(b * 1.15) * 8)
-    py.set(50 + Math.cos(a * 0.62) * 14 + Math.sin(b) * 6)
-    op.set(0.54 + Math.sin(a * 1.05) * 0.08)
-    rx.set(Math.sin(a * 0.55) * maxTilt * 0.1)
-    ry.set(Math.cos(a * 0.48) * maxTilt * 0.12)
+    px.set(50 + Math.sin(a) * 16 + Math.sin(b * 1.15) * 6)
+    py.set(50 + Math.cos(a * 0.62) * 11 + Math.sin(b) * 5)
+    op.set(0.34 + Math.sin(a * 0.9) * 0.06)
+    rx.set(Math.sin(a * 0.55) * maxTilt * 0.08)
+    ry.set(Math.cos(a * 0.48) * maxTilt * 0.1)
   })
 
   const onPointerEnter = useCallback(() => {
