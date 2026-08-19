@@ -6,6 +6,7 @@ import { cx } from '../../../lib/cx'
 import { parseInventoryNotes } from '../../../lib/inventoryNotes'
 import { FOIL_GRADIENT, rarityAccent } from '../../../lib/mtg'
 import { finishName } from '../../../lib/finishes'
+import { FoilOverlays } from '../../../components/cards/FoilOverlays'
 
 export interface InventoryResultCardProps {
   item: InventoryItem
@@ -47,12 +48,7 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
         ) : (
           <div className="grid h-full place-items-center px-2 text-center text-xs text-fg-muted">No image</div>
         )}
-        {item.isFoil && (
-          <span
-            aria-hidden
-            className="foil-shimmer pointer-events-none absolute inset-0"
-          />
-        )}
+        {item.isFoil && <FoilOverlays foil glare={false} />}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
