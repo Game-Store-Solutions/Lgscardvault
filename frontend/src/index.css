@@ -445,14 +445,13 @@ body {
 
 @layer components {
   /*
-   * Pokemon-style holographic foil (effect-labs / trading-card holo).
+   * Pokemon-style holo (effect-labs rainbow + grid), scoped to the light.
    *
-   * Rainbow gradient in color-dodge + fine cross-grid. holo-gradient animates
-   * the spectrum; --op brightens both layers on pointer (0.7 / 1.0 at full).
-   * Idle stays visible so foils read in a grid without hovering.
+   * Full-card color-dodge reads as a neon wash — mask both layers to the
+   * hotspot and keep idle quiet. Pointer/hover opens it up toward 0.55.
    */
   .foil-card {
-    --foil-holo-opacity: 0.38;
+    --foil-holo-opacity: 0.14;
   }
   .tilt-card {
     isolation: isolate;
@@ -487,10 +486,25 @@ body {
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    opacity: calc(var(--foil-holo-opacity, 0.38) + var(--op, 0) * 0.32);
+    filter: brightness(0.62) contrast(1.32) saturate(0.58);
+    opacity: calc(var(--foil-holo-opacity, 0.14) + var(--op, 0) * 0.48);
     transition: opacity 0.3s ease;
     animation: holo-gradient 5s ease infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -5s);
+    mask-image: radial-gradient(
+      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+      #000 0%,
+      #000 24%,
+      rgb(0 0 0 / 0.4) 50%,
+      transparent 74%
+    );
+    -webkit-mask-image: radial-gradient(
+      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+      #000 0%,
+      #000 24%,
+      rgb(0 0 0 / 0.4) 50%,
+      transparent 74%
+    );
   }
   .tilt-grid {
     background-image:
@@ -498,24 +512,38 @@ body {
         0deg,
         transparent,
         transparent 2px,
-        rgb(255 255 255 / 0.03) 2px,
-        rgb(255 255 255 / 0.03) 4px
+        rgb(255 255 255 / 0.025) 2px,
+        rgb(255 255 255 / 0.025) 4px
       ),
       repeating-linear-gradient(
         90deg,
         transparent,
         transparent 2px,
-        rgb(255 255 255 / 0.03) 2px,
-        rgb(255 255 255 / 0.03) 4px
+        rgb(255 255 255 / 0.025) 2px,
+        rgb(255 255 255 / 0.025) 4px
       );
-    opacity: calc(0.28 + var(--op, 0) * 0.72);
+    opacity: calc(var(--op, 0) * 0.42);
     transition: opacity 0.3s ease;
     pointer-events: none;
+    mask-image: radial-gradient(
+      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+      #000 0%,
+      #000 20%,
+      rgb(0 0 0 / 0.35) 44%,
+      transparent 68%
+    );
+    -webkit-mask-image: radial-gradient(
+      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+      #000 0%,
+      #000 20%,
+      rgb(0 0 0 / 0.35) 44%,
+      transparent 68%
+    );
   }
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.45;
+    --op: 0.28;
     animation: foil-idle-orbit 14s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -564,17 +592,17 @@ body {
   100% {
     --mx: 34%;
     --my: 42%;
-    --op: 0.4;
+    --op: 0.24;
   }
   33% {
     --mx: 66%;
     --my: 36%;
-    --op: 0.55;
+    --op: 0.34;
   }
   66% {
     --mx: 44%;
     --my: 64%;
-    --op: 0.48;
+    --op: 0.28;
   }
 }
 
