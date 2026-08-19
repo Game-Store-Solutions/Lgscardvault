@@ -455,7 +455,7 @@ body {
    * --foil-holo-opacity: rest-state rainbow strength.
    */
   .foil-card {
-    --foil-holo-opacity: 0.26;
+    --foil-holo-opacity: 0.52;
   }
   .tilt-card {
     isolation: isolate;
@@ -464,16 +464,16 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(200, 30%, 88%, 0.22) 0%,
-      hsla(280, 24%, 82%, 0.08) 24%,
-      hsla(0, 0%, 100%, 0) 52%
+      hsla(200, 28%, 88%, 0.16) 0%,
+      hsla(280, 20%, 82%, 0.05) 22%,
+      hsla(0, 0%, 100%, 0) 48%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.37);
+    opacity: calc(var(--op, 0) * 0.2);
   }
   /*
-   * Crossed rainbows for the shimmer they love. soft-light (not color-dodge)
-   * so light art and text boxes stay readable — jewel tones, not a wash.
+   * overlay (not color-dodge, not soft-light): rainbow actually reads on a
+   * thumbnail without bleaching text boxes. No white slash — color is the foil.
    */
   .tilt-holo,
   .foil-shimmer {
@@ -481,71 +481,72 @@ body {
     background-image:
       linear-gradient(
         118deg,
-        transparent 38%,
-        hsla(195, 60%, 80%, calc(0.045 + var(--op, 0) * 0.13)) 49%,
-        transparent 62%
+        transparent 36%,
+        hsla(190, 80%, 66%, calc(0.12 + var(--op, 0) * 0.16)) 47%,
+        hsla(300, 72%, 64%, calc(0.08 + var(--op, 0) * 0.1)) 52%,
+        transparent 64%
       ),
       repeating-linear-gradient(
         122deg,
-        hsl(340 78% 52%) 0%,
-        hsl(22 80% 48%) 6%,
-        hsl(46 78% 46%) 12%,
-        hsl(148 70% 42%) 18%,
-        hsl(192 78% 48%) 24%,
-        hsl(230 72% 54%) 30%,
-        hsl(286 70% 52%) 36%,
-        hsl(340 78% 52%) 42%
+        hsl(332 86% 58%) 0%,
+        hsl(22 84% 54%) 6%,
+        hsl(46 86% 52%) 12%,
+        hsl(148 76% 48%) 18%,
+        hsl(192 88% 54%) 24%,
+        hsl(230 80% 60%) 30%,
+        hsl(286 78% 58%) 36%,
+        hsl(332 86% 58%) 42%
       ),
       repeating-linear-gradient(
         56deg,
-        hsl(198 76% 48%) 0%,
-        hsl(286 68% 52%) 14%,
-        hsl(46 78% 46%) 28%,
-        hsl(198 76% 48%) 42%
+        hsl(198 84% 54%) 0%,
+        hsl(286 76% 58%) 14%,
+        hsl(46 86% 52%) 28%,
+        hsl(198 84% 54%) 42%
       );
-    background-size: 210% 210%, 300% 300%, 190% 190%;
+    background-size: 220% 220%, 280% 280%, 200% 200%;
     background-position:
-      calc(var(--mx, 50%) * 1.2) var(--my, 50%),
-      calc(var(--mx, 50%) + (var(--foil-idle) * (1 - var(--op, 0))))
-        calc(var(--my, 50%) - (var(--foil-idle) * 0.4 * (1 - var(--op, 0)))),
-      calc(var(--my, 50%) + (var(--foil-idle) * 0.55 * (1 - var(--op, 0))))
-        calc(var(--mx, 50%) - (var(--foil-idle) * 0.3 * (1 - var(--op, 0))));
-    mix-blend-mode: soft-light;
-    filter: contrast(1.2) saturate(1.12);
-    opacity: calc(var(--foil-holo-opacity, 0.26) + var(--op, 0) * 0.24);
-    animation: foil-idle-shift 7.5s ease-in-out infinite;
+      calc(var(--mx, 50%) * 1.15) var(--my, 50%),
+      calc(var(--mx, 50%) + (var(--foil-idle) * (1 - var(--op, 0) * 0.45)))
+        calc(var(--my, 50%) - (var(--foil-idle) * 0.4 * (1 - var(--op, 0) * 0.45))),
+      calc(var(--my, 50%) + (var(--foil-idle) * 0.55))
+        calc(var(--mx, 50%) - (var(--foil-idle) * 0.3));
+    mix-blend-mode: overlay;
+    filter: saturate(1.2) contrast(1.08);
+    opacity: calc(var(--foil-holo-opacity, 0.52) + var(--op, 0) * 0.18);
+    animation: foil-idle-shift 9s ease-in-out infinite;
   }
-  /* Hue bloom only — tints the light, does not bleach the art. */
   .tilt-prism {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(192, 70%, 58%, 0.22) 0%,
-      hsla(300, 62%, 56%, 0.12) 22%,
-      hsla(46, 70%, 52%, 0.06) 40%,
-      transparent 58%
+      hsla(190, 85%, 62%, 0.38) 0%,
+      hsla(300, 75%, 60%, 0.2) 24%,
+      hsla(46, 80%, 56%, 0.1) 42%,
+      transparent 62%
     );
-    mix-blend-mode: color;
-    opacity: calc(0.12 + var(--op, 0) * 0.22);
+    mix-blend-mode: overlay;
+    opacity: calc(0.28 + var(--op, 0) * 0.22);
   }
   .foil-shimmer {
     animation:
-      foil-idle-shift 7.5s ease-in-out infinite,
-      foil-idle-orbit 8s ease-in-out infinite;
+      foil-idle-shift 9s ease-in-out infinite,
+      foil-idle-orbit 14s ease-in-out infinite;
   }
+  /* 1–2px glints — 0.5px dots vanish on a grid thumbnail. */
   .tilt-sparkle {
     background-image:
-      radial-gradient(circle, hsla(190, 80%, 70%, 0.7) 0 0.5px, transparent 0.8px),
-      radial-gradient(circle, hsla(318, 75%, 68%, 0.55) 0 0.4px, transparent 0.7px),
-      radial-gradient(circle, hsla(46, 80%, 62%, 0.5) 0 0.35px, transparent 0.65px);
-    background-size: 13px 16px, 18px 11px, 9px 14px;
+      radial-gradient(circle, #d8f6ff 0 1.15px, transparent 1.7px),
+      radial-gradient(circle, #ffc4ee 0 1px, transparent 1.45px),
+      radial-gradient(circle, #ffe9a8 0 0.9px, transparent 1.3px);
+    background-size: 22px 28px, 32px 20px, 16px 24px;
     background-position:
-      calc(var(--mx, 50%) * 0.45) calc(var(--my, 50%) * 0.4),
-      calc(var(--mx, 50%) * -0.25) calc(var(--my, 50%) * 0.55),
-      calc(var(--my, 50%) * 0.3) calc(var(--mx, 50%) * 0.2);
-    mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 62%);
-    -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 62%);
-    mix-blend-mode: overlay;
-    opacity: calc(0.08 + var(--op, 0) * 0.24);
+      calc(var(--mx, 50%) * 0.5) calc(var(--my, 50%) * 0.45),
+      calc(var(--mx, 50%) * -0.3) calc(var(--my, 50%) * 0.6),
+      calc(var(--my, 50%) * 0.35) calc(var(--mx, 50%) * 0.25);
+    mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 8%, #000 42%, transparent 78%);
+    -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 8%, #000 42%, transparent 78%);
+    mix-blend-mode: plus-lighter;
+    opacity: calc(0.42 + var(--op, 0) * 0.28);
   }
   /*
    * Flip / DFC faces cannot use the pointer hook (drag is the flip). CSS
@@ -554,8 +555,8 @@ body {
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.28;
-    animation: foil-idle-orbit 8s ease-in-out infinite;
+    --op: 0.52;
+    animation: foil-idle-orbit 14s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
     animation-play-state: paused;
@@ -603,29 +604,29 @@ body {
 @keyframes foil-idle-shift {
   0%,
   100% {
-    --foil-idle: -28%;
+    --foil-idle: -22%;
   }
   50% {
-    --foil-idle: 35%;
+    --foil-idle: 26%;
   }
 }
 
 @keyframes foil-idle-orbit {
   0%,
   100% {
-    --mx: 18%;
-    --my: 38%;
-    --op: 0.23;
+    --mx: 28%;
+    --my: 42%;
+    --op: 0.48;
   }
   33% {
-    --mx: 78%;
-    --my: 26%;
-    --op: 0.32;
+    --mx: 70%;
+    --my: 32%;
+    --op: 0.58;
   }
   66% {
-    --mx: 38%;
-    --my: 74%;
-    --op: 0.28;
+    --mx: 42%;
+    --my: 68%;
+    --op: 0.52;
   }
 }
 
