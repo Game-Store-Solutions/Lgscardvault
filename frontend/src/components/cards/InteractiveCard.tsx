@@ -23,9 +23,9 @@ export interface InteractiveCardProps {
 /**
  * InteractiveCard — a pointer-driven holographic tilt for a card image
  * (inspired by simeydotme/pokemon-cards-css). Moving the pointer springs the
- * card in 3D, drifts a glare highlight, and — for foil cards — locks a rainbow
- * holo + sparkle to the light. Foils keep a slow idle orbit when the pointer is
- * away. Falls back to a static image under reduced-motion.
+ * card in 3D, drifts a glare highlight, and — for foil cards — locks a Holo
+ * light-split field to the hotspot. Foils keep a slow idle flow when the
+ * pointer is away. Falls back to a static image under reduced-motion.
  */
 export function InteractiveCard({ image, alt, foil = false, accent = '#c6a035', maxTilt = 14, shadow = true, borderless = false, className }: InteractiveCardProps) {
   const { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle } = useTilt(maxTilt, { idle: foil })

@@ -50,6 +50,12 @@ html {
   initial-value: 0%;
 }
 
+@property --foil-seed {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.4;
+}
+
 @theme {
   /*
    * Brand — dual-tone.
@@ -445,14 +451,18 @@ body {
 
 @layer components {
   /*
-   * Holographic foil — Framer Holo / simeydotme approach.
+   * Holographic foil — Framer Holo + simeydotme.
    *
-   * Light splits into a thin spectral fringe; colors emerge from that math
-   * instead of a painted rainbow overlay. Warp follows --mx/--my. Idle is a
-   * slow flow, not a disco wash.
+   * Holo does not paint a rainbow. It splits light: a huge spectral field
+   * slides under the art, warp/definition shape the flow, and color-dodge +
+   * a contrast crush make hues emerge only where the surface is lit.
+   * Sparkle glitter is intentionally absent — it reads as noise on a grid.
    */
   .foil-card {
-    --foil-holo-opacity: 0.28;
+    --foil-holo-opacity: 0.18;
+    --foil-warp: 2.2;
+    --foil-space: 6%;
+    --foil-angle: calc(118deg + (var(--foil-seed, 0.4) - 0.4) * 36deg);
   }
   .tilt-card {
     isolation: isolate;
@@ -461,77 +471,83 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.28) 0%,
-      hsla(0, 0%, 100%, 0.06) 22%,
-      transparent 52%
+      hsla(0, 0%, 100%, 0.42) 8%,
+      hsla(0, 0%, 100%, 0.1) 26%,
+      hsla(0, 0%, 0%, 0.22) 72%,
+      transparent 100%
     );
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.35);
+    opacity: calc(var(--op, 0) * 0.38);
   }
   .tilt-holo,
   .foil-shimmer {
     --foil-idle: 0%;
     /*
-     * 1) Iridescent bloom at the light (fringe)
-     * 2) Sparse spectral lines (definition) — most of the card is transparent
-     * 3) Crossed warp of the same fringe at a different scale (flow)
+     * 1) Iridescence — bloom at the light (Holo "fringe")
+     * 2) Spectral field at ~400% scale (Holo "definition" / light-split)
+     * 3) Crossed field at a different scale (Holo "warp" / flow)
      */
     background-image:
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        hsla(188, 85%, 68%, 0.42) 0%,
-        hsla(292, 70%, 64%, 0.16) 16%,
-        hsla(48, 80%, 60%, 0.08) 28%,
-        transparent 48%
+        hsla(188, 70%, 74%, 0.55) 0%,
+        hsla(268, 55%, 68%, 0.2) 18%,
+        hsla(42, 60%, 64%, 0.08) 32%,
+        transparent 52%
       ),
       repeating-linear-gradient(
-        122deg,
-        transparent 0 12px,
-        hsla(192, 90%, 62%, 0.55) 13px,
-        hsla(286, 80%, 62%, 0.4) 14px,
-        hsla(48, 90%, 58%, 0.28) 15px,
-        transparent 17px 30px
+        var(--foil-angle, 118deg),
+        hsl(176, 85%, 72%) 0,
+        hsl(228, 80%, 74%) var(--foil-space),
+        hsl(283, 75%, 73%) calc(var(--foil-space) * 2),
+        hsl(2, 80%, 72%) calc(var(--foil-space) * 3),
+        hsl(53, 82%, 70%) calc(var(--foil-space) * 4),
+        hsl(176, 85%, 72%) calc(var(--foil-space) * 5)
       ),
       repeating-linear-gradient(
-        56deg,
-        transparent 0 18px,
-        hsla(200, 85%, 60%, 0.32) 19px,
-        hsla(320, 75%, 62%, 0.22) 20px,
-        transparent 22px 38px
+        calc(var(--foil-angle, 118deg) + 68deg),
+        hsl(200, 70%, 70%) 0,
+        hsl(268, 65%, 72%) calc(var(--foil-space) * 1.4),
+        hsl(320, 60%, 70%) calc(var(--foil-space) * 2.8),
+        hsl(48, 70%, 68%) calc(var(--foil-space) * 4.2),
+        hsl(200, 70%, 70%) calc(var(--foil-space) * 5.6)
       );
-    background-size: 100% 100%, 160% 220%, 190% 160%;
+    background-size: 100% 100%, 400% 680%, 560% 380%;
     background-position:
       0 0,
-      calc(var(--mx, 50%) + var(--foil-idle)) calc(var(--my, 50%) - var(--foil-idle) * 0.35),
-      calc(var(--my, 50%) - var(--foil-idle) * 0.4) calc(var(--mx, 50%) + var(--foil-idle) * 0.2);
+      calc(50% + (50% - var(--mx, 50%)) * var(--foil-warp, 2.2) + var(--foil-idle))
+        calc(50% + (50% - var(--my, 50%)) * var(--foil-warp, 2.2) * 0.55 - var(--foil-idle) * 0.35),
+      calc(50% + (var(--my, 50%) - 50%) * 1.45 - var(--foil-idle) * 0.7)
+        calc(50% + (var(--mx, 50%) - 50%) * 1.05 + var(--foil-idle) * 0.25);
     mix-blend-mode: color-dodge;
-    filter: brightness(0.48) contrast(1.28) saturate(0.62);
-    opacity: calc(var(--foil-holo-opacity, 0.28) + var(--op, 0) * 0.22);
-    animation: foil-idle-shift 11s ease-in-out infinite;
+    filter: brightness(0.72) contrast(2.35) saturate(0.55);
+    opacity: calc(var(--foil-holo-opacity, 0.18) + var(--op, 0) * 0.26);
+    mask-image: radial-gradient(
+      farthest-corner ellipse at var(--mx, 50%) var(--my, 50%),
+      #000 0%,
+      #000 28%,
+      rgb(0 0 0 / 0.45) 55%,
+      transparent 78%
+    );
+    -webkit-mask-image: radial-gradient(
+      farthest-corner ellipse at var(--mx, 50%) var(--my, 50%),
+      #000 0%,
+      #000 28%,
+      rgb(0 0 0 / 0.45) 55%,
+      transparent 78%
+    );
+    animation: foil-idle-shift 14s ease-in-out infinite;
   }
   .foil-shimmer {
     animation:
-      foil-idle-shift 11s ease-in-out infinite,
-      foil-idle-orbit 16s ease-in-out infinite;
-  }
-  .tilt-sparkle {
-    background-image:
-      radial-gradient(circle, hsla(0, 0%, 100%, 0.85) 0 0.55px, transparent 0.85px),
-      radial-gradient(circle, hsla(192, 90%, 80%, 0.7) 0 0.45px, transparent 0.75px);
-    background-size: 17px 21px, 23px 15px;
-    background-position:
-      calc(var(--mx, 50%) * 0.4) calc(var(--my, 50%) * 0.35),
-      calc(var(--mx, 50%) * -0.2) calc(var(--my, 50%) * 0.5);
-    mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 55%);
-    -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 55%);
-    mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.42);
+      foil-idle-shift 14s ease-in-out infinite,
+      foil-idle-orbit 18s ease-in-out infinite;
   }
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.34;
-    animation: foil-idle-orbit 16s ease-in-out infinite;
+    --op: 0.2;
+    animation: foil-idle-orbit 18s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
     animation-play-state: paused;
@@ -579,29 +595,29 @@ body {
 @keyframes foil-idle-shift {
   0%,
   100% {
-    --foil-idle: -18%;
+    --foil-idle: -10%;
   }
   50% {
-    --foil-idle: 18%;
+    --foil-idle: 10%;
   }
 }
 
 @keyframes foil-idle-orbit {
   0%,
   100% {
-    --mx: 32%;
-    --my: 44%;
-    --op: 0.3;
+    --mx: 38%;
+    --my: 46%;
+    --op: 0.18;
   }
   33% {
-    --mx: 66%;
-    --my: 36%;
-    --op: 0.4;
+    --mx: 62%;
+    --my: 40%;
+    --op: 0.24;
   }
   66% {
-    --mx: 44%;
-    --my: 64%;
-    --op: 0.34;
+    --mx: 46%;
+    --my: 60%;
+    --op: 0.2;
   }
 }
 
