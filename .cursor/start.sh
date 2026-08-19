@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Per-boot service reconciliation for the LGS Card Vault Cloud Agent.
+# Per-boot service startup for the LGS Card Vault Cloud Agent.
 #
-# Brings up the stateful infrastructure the dev servers depend on (PostgreSQL
-# and Mailpit) and returns. The application processes themselves (backend API,
-# CSV worker, frontend dev server) run as named terminals. Safe to re-run.
+# Brings up the stateful infrastructure (PostgreSQL, Mailpit) and the three
+# application processes (backend API, CSV import worker, frontend dev server)
+# in the background, then returns. Logs stream to /tmp/*.log. Safe to re-run:
+# every service is guarded so a second invocation does not spawn duplicates.
 set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "==> Starting PostgreSQL"
 sudo install -d -o postgres -g postgres /var/run/postgresql
@@ -18,9 +21,19 @@ done
 pg_isready -h 127.0.0.1 -p 5432
 
 echo "==> Starting Mailpit (SMTP :1025, web UI :8025)"
-if ! pgrep -x mailpit >/dev/null 2>&1; then
-  nohup mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025 >/tmp/mailpit.log 2>&1 &
-  disown || true
-fi
+pgrep -x mailpit >/dev/null 2>&1 \
+  || nohup mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025 >/tmp/mailpit.log 2>&1 &
+
+echo "==> Starting backend API (http://127.0.0.1:8000)"
+pgrep -f 'php -S 127.0.0.1:8000' >/dev/null 2>&1 \
+  || (cd "$ROOT_DIR/backend" && nohup php -S 127.0.0.1:8000 -t public >/tmp/backend.log 2>&1 &)
+
+echo "==> Starting CSV import worker"
+pgrep -f 'messenger:consume async' >/dev/null 2>&1 \
+  || (cd "$ROOT_DIR/backend" && nohup php bin/console messenger:consume async -vv >/tmp/worker.log 2>&1 &)
+
+echo "==> Starting frontend dev server (http://localhost:5173)"
+pgrep -f 'vite' >/dev/null 2>&1 \
+  || (cd "$ROOT_DIR/frontend" && nohup npm run dev -- --host >/tmp/frontend.log 2>&1 &)
 
 echo "==> Start complete"
