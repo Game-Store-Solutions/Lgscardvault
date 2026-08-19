@@ -451,7 +451,7 @@ body {
    * hotspot and keep idle quiet. Pointer/hover opens it up toward 0.55.
    */
   .foil-card {
-    --foil-holo-opacity: 0.14;
+    --foil-holo-opacity: 0.18;
   }
   .tilt-card {
     isolation: isolate;
@@ -460,12 +460,12 @@ body {
   .tilt-glare {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.35) 8%,
-      hsla(0, 0%, 100%, 0.08) 28%,
+      hsla(0, 0%, 100%, 0.42) 8%,
+      hsla(0, 0%, 100%, 0.1) 28%,
       transparent 58%
     );
     mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.42);
+    opacity: calc(var(--op, 0) * 0.5);
     transition: opacity 0.3s ease;
   }
   .tilt-holo,
@@ -486,8 +486,8 @@ body {
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    filter: brightness(0.62) contrast(1.32) saturate(0.58);
-    opacity: calc(var(--foil-holo-opacity, 0.14) + var(--op, 0) * 0.48);
+    filter: brightness(0.74) contrast(1.28) saturate(0.66);
+    opacity: calc(var(--foil-holo-opacity, 0.18) + var(--op, 0) * 0.5);
     transition: opacity 0.3s ease;
     animation: holo-gradient 5s ease infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -5s);
@@ -543,7 +543,7 @@ body {
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.28;
+    --op: 0.32;
     animation: foil-idle-orbit 14s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -592,17 +592,17 @@ body {
   100% {
     --mx: 34%;
     --my: 42%;
-    --op: 0.24;
+    --op: 0.28;
   }
   33% {
     --mx: 66%;
     --my: 36%;
-    --op: 0.34;
+    --op: 0.38;
   }
   66% {
     --mx: 44%;
     --my: 64%;
-    --op: 0.28;
+    --op: 0.32;
   }
 }
 
