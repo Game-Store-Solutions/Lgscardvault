@@ -469,7 +469,7 @@ body {
       hsla(0, 0%, 100%, 0) 52%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.32);
+    opacity: calc(var(--op, 0) * 0.37);
   }
   /*
    * Crossed rainbows for the shimmer they love. soft-light (not color-dodge)
