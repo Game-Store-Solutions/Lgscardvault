@@ -455,7 +455,7 @@ body {
    * --foil-holo-opacity: rest-state rainbow strength.
    */
   .foil-card {
-    --foil-holo-opacity: 0.22;
+    --foil-holo-opacity: 0.26;
   }
   .tilt-card {
     isolation: isolate;
@@ -482,7 +482,7 @@ body {
       linear-gradient(
         118deg,
         transparent 38%,
-        hsla(195, 60%, 80%, calc(0.03 + var(--op, 0) * 0.1)) 49%,
+        hsla(195, 60%, 80%, calc(0.045 + var(--op, 0) * 0.13)) 49%,
         transparent 62%
       ),
       repeating-linear-gradient(
@@ -511,8 +511,8 @@ body {
       calc(var(--my, 50%) + (var(--foil-idle) * 0.55 * (1 - var(--op, 0))))
         calc(var(--mx, 50%) - (var(--foil-idle) * 0.3 * (1 - var(--op, 0))));
     mix-blend-mode: soft-light;
-    filter: contrast(1.15) saturate(1.05);
-    opacity: calc(var(--foil-holo-opacity, 0.22) + var(--op, 0) * 0.2);
+    filter: contrast(1.2) saturate(1.12);
+    opacity: calc(var(--foil-holo-opacity, 0.26) + var(--op, 0) * 0.24);
     animation: foil-idle-shift 7.5s ease-in-out infinite;
   }
   /* Hue bloom only — tints the light, does not bleach the art. */
@@ -525,7 +525,7 @@ body {
       transparent 58%
     );
     mix-blend-mode: color;
-    opacity: calc(0.1 + var(--op, 0) * 0.18);
+    opacity: calc(0.12 + var(--op, 0) * 0.22);
   }
   .foil-shimmer {
     animation:
@@ -545,7 +545,7 @@ body {
     mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 62%);
     -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #000 0%, transparent 62%);
     mix-blend-mode: overlay;
-    opacity: calc(0.06 + var(--op, 0) * 0.2);
+    opacity: calc(0.08 + var(--op, 0) * 0.24);
   }
   /*
    * Flip / DFC faces cannot use the pointer hook (drag is the flip). CSS
@@ -554,7 +554,7 @@ body {
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.24;
+    --op: 0.28;
     animation: foil-idle-orbit 8s ease-in-out infinite;
   }
   .foil-idle-orbit:hover {
@@ -603,29 +603,29 @@ body {
 @keyframes foil-idle-shift {
   0%,
   100% {
-    --foil-idle: -24%;
+    --foil-idle: -28%;
   }
   50% {
-    --foil-idle: 30%;
+    --foil-idle: 35%;
   }
 }
 
 @keyframes foil-idle-orbit {
   0%,
   100% {
-    --mx: 22%;
-    --my: 40%;
-    --op: 0.2;
+    --mx: 18%;
+    --my: 38%;
+    --op: 0.23;
   }
   33% {
-    --mx: 74%;
-    --my: 28%;
-    --op: 0.28;
+    --mx: 78%;
+    --my: 26%;
+    --op: 0.32;
   }
   66% {
-    --mx: 40%;
-    --my: 72%;
-    --op: 0.24;
+    --mx: 38%;
+    --my: 74%;
+    --op: 0.28;
   }
 }
 
