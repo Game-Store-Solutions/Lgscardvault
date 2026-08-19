@@ -472,21 +472,21 @@ body {
   .foil-shimmer {
     background: linear-gradient(
       125deg,
-      #ff0080,
-      #ff8c00,
-      #40e0d0,
-      #7b68ee,
-      #ff0080,
-      #ff8c00,
-      #40e0d0,
-      #7b68ee,
-      #ff0080,
-      #ff8c00,
-      #40e0d0
+      #ff006e,
+      #ff7a00,
+      #00d9c8,
+      #6b4dff,
+      #ff006e,
+      #ff7a00,
+      #00d9c8,
+      #6b4dff,
+      #ff006e,
+      #ff7a00,
+      #00d9c8
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
-    filter: brightness(0.74) contrast(1.28) saturate(0.66);
+    filter: brightness(0.7) contrast(1.32) saturate(0.92);
     opacity: calc(var(--foil-holo-opacity, 0.18) + var(--op, 0) * 0.5);
     transition: opacity 0.3s ease;
     animation: holo-gradient 5s ease infinite;
