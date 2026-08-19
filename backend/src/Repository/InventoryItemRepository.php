@@ -483,6 +483,74 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * Candidate pool for the commander deck builder (recommendations + 100-card
+     * assembly).
+     *
+     * Two things distinguish this from findInStockMagicForStore():
+     *  1. Color identity is filtered in SQL, so a commander only ever sees cards
+     *     legal in its identity — this alone shrinks most stores below the cap.
+     *  2. Rows are ordered by EDHREC rank (most-played first) rather than price,
+     *     so when a large store DOES exceed the cap we keep the most relevant,
+     *     impactful cards (including expensive rares/mythics and format staples)
+     *     instead of the cheapest commons. Unranked cards sort last.
+     *
+     * @param list<string>|null $commanderColorIdentity WUBRG letters; null skips the color filter
+     *
+     * @return list<InventoryItem>
+     */
+    public function findRecommendationCandidates(
+        Store $store,
+        ?array $commanderColorIdentity = null,
+        int $limit = 4000,
+    ): array {
+        $qb = $this->createQueryBuilder('i')
+            ->join('i.card', 'c')
+            ->addSelect('c')
+            // COALESCE gives unranked cards a sentinel so they sort last (DQL
+            // has no NULLS LAST); ordering by the selected HIDDEN alias keeps
+            // the expression out of the hydrated result.
+            ->addSelect('COALESCE(c.edhrecRank, 2147483647) AS HIDDEN edhrecSort')
+            ->andWhere('i.store = :store')
+            ->andWhere('i.quantity > 0')
+            ->setParameter('store', $store)
+            ->orderBy('edhrecSort', 'ASC')
+            ->addOrderBy('i.priceCents', 'ASC')
+            ->addOrderBy('i.id', 'ASC')
+            ->setMaxResults($limit);
+
+        $this->scopeToGame($qb, Game::CODE_MTG);
+        $this->applyColorIdentitySubset($qb, $commanderColorIdentity);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Restrict a query to cards legal in a commander's color identity: a card
+     * qualifies when it has no color pip outside the commander's identity
+     * (colorless cards are always legal). Mirrors ColorIdentityParser::isSubsetOf()
+     * in SQL so the filter runs before the candidate cap. A null identity skips
+     * the filter entirely.
+     *
+     * @param list<string>|null $commanderColorIdentity
+     */
+    private function applyColorIdentitySubset(QueryBuilder $qb, ?array $commanderColorIdentity): void
+    {
+        if (null === $commanderColorIdentity) {
+            return;
+        }
+
+        $allowed = array_map('strval', $commanderColorIdentity);
+        foreach (['W', 'U', 'B', 'R', 'G'] as $letter) {
+            if (in_array($letter, $allowed, true)) {
+                continue;
+            }
+            $param = 'ciExclude'.$letter;
+            $qb->andWhere('(c.colorIdentity IS NULL OR CAST_AS_TEXT(c.colorIdentity) NOT LIKE :'.$param.')')
+                ->setParameter($param, '%"'.$letter.'"%');
+        }
+    }
+
+    /**
      * Best storefront listing to open for a want-list row at this store.
      * Prefers exact finish, in-stock copies, then lowest price.
      */

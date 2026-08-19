@@ -79,7 +79,10 @@ final class CommanderRecommender
             ));
         }
 
-        $candidates = $this->inventoryItems->findInStockMagicForStore($store);
+        $candidates = $this->inventoryItems->findRecommendationCandidates(
+            $store,
+            $commander->getColorIdentity() ?? [],
+        );
         $ranked = [];
         foreach ($candidates as $item) {
             $card = $item->getCard();
@@ -112,21 +115,35 @@ final class CommanderRecommender
             $strategyMatch = [] === $classification['reasons'] ? 0.0 : 0.45;
             $curveFit = $this->curveFit($commanderCmc, $card->getCmc());
             $stockBoost = min(0.15, 0.03 * min(5, $item->getQuantity()));
+            // EDHREC "staple floor": how widely the card is actually played,
+            // independent of this commander's theme. Keeps format staples
+            // (Sol Ring, Swords to Plowshares, Rhystic Study, Force of Will)
+            // and impactful rares/mythics in the mix even when their thematic
+            // synergy is low.
+            $edhrecRank = $card->getEdhrecRank();
+            $stapleScore = $this->stapleScore($edhrecRank);
 
-            $score = (0.40 * $strategyMatch)
-                + (0.25 * $roleBoost / 0.35)
-                + (0.15 * $overlap['score'])
-                + (0.10 * $edgeWeight)
-                + (0.05 * $curveFit)
-                + (0.05 * ($stockBoost / 0.15));
+            // Synergy + strategy still dominate (0.82 of the weight); the EDHREC
+            // staple floor (0.12) surfaces high-playability cards that pure
+            // theme-matching misses. Price is deliberately not a ranking factor.
+            $score = (0.34 * $strategyMatch)
+                + (0.20 * $roleBoost / 0.35)
+                + (0.16 * $overlap['score'])
+                + (0.12 * $edgeWeight)
+                + (0.12 * $stapleScore)
+                + (0.04 * $curveFit)
+                + (0.02 * ($stockBoost / 0.15));
 
-            // Strategy builds require a role/signal hit once inventory is rich.
+            // Drop cards with no signal at all once inventory is rich — but never
+            // drop a genuine EDHREC staple (top ~1000), which is worth surfacing
+            // even without a thematic hit.
             if (
                 $score < 0.12
                 && count($candidates) > 12
                 && [] === $classification['reasons']
                 && 0.0 === $overlap['score']
                 && 0.0 === $edgeWeight
+                && $stapleScore < 0.30
             ) {
                 continue;
             }
@@ -136,6 +153,9 @@ final class CommanderRecommender
                 $classification['reasons'],
                 $overlap['shared'],
                 $edge['tags'] ?? [],
+                // Explain staple inclusions so a low-synergy goodstuff card
+                // doesn't look out of place in the list.
+                null !== $edhrecRank && $edhrecRank <= 500 ? [sprintf('EDHREC #%d', $edhrecRank)] : [],
             )));
 
             $ranked[] = [
@@ -263,5 +283,22 @@ final class CommanderRecommender
         $delta = abs($cardCmc - max(2.0, $commanderCmc * 0.6));
 
         return max(0.0, 1.0 - ($delta / 6.0));
+    }
+
+    /**
+     * Maps an EDHREC rank (1 = most played) to a 0..1 "staple" weight on a log
+     * scale, giving widely-played cards a ranking floor regardless of thematic
+     * synergy. Rank 1 → 1.0; rank ~20k and beyond → 0. Unranked cards score 0.
+     */
+    private function stapleScore(?int $edhrecRank): float
+    {
+        if (null === $edhrecRank || $edhrecRank < 1) {
+            return 0.0;
+        }
+
+        // log10(20000) ≈ 4.30103 sets the point where popularity stops helping.
+        $score = (4.30103 - log10((float) $edhrecRank)) / 4.30103;
+
+        return max(0.0, min(1.0, $score));
     }
 }
