@@ -17,8 +17,9 @@ const TILT_SPRING = { stiffness: 320, damping: 22, mass: 0.45 }
 /** Softer light follow so the sheen trails the pointer like a physical surface. */
 const LIGHT_SPRING = { stiffness: 170, damping: 24, mass: 0.5 }
 
-/** Slow display-case orbit. Long enough to feel like catching light, not fidgeting. */
-const IDLE_PERIOD_MS = 8000
+/** Two incommensurate periods so idle light drifts instead of looping in a circle. */
+const IDLE_A_MS = 14000
+const IDLE_B_MS = 21000
 
 export type TiltStyle = MotionStyle & {
   '--mx': MotionValue<string>
@@ -53,7 +54,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ry = useMotionValue(0)
   const px = useMotionValue(50)
   const py = useMotionValue(50)
-  const op = useMotionValue(0)
+  const op = useMotionValue(idle ? 0.54 : 0)
 
   const srx = useSpring(rx, TILT_SPRING)
   const sry = useSpring(ry, TILT_SPRING)
@@ -66,12 +67,13 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
 
   useAnimationFrame((time) => {
     if (!idle || hovering.current || reduceMotion || !inView) return
-    const angle = (time / IDLE_PERIOD_MS) * Math.PI * 2 + phase.current
-    px.set(50 + Math.sin(angle) * 39)
-    py.set(50 + Math.cos(angle * 0.78) * 25)
-    op.set(0.28 + Math.sin(angle * 1.6) * 0.06)
-    rx.set(Math.sin(angle * 0.95) * maxTilt * 0.32)
-    ry.set(Math.cos(angle) * maxTilt * 0.37)
+    const a = (time / IDLE_A_MS) * Math.PI * 2 + phase.current
+    const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
+    px.set(50 + Math.sin(a) * 20 + Math.sin(b * 1.15) * 8)
+    py.set(50 + Math.cos(a * 0.62) * 14 + Math.sin(b) * 6)
+    op.set(0.54 + Math.sin(a * 1.05) * 0.08)
+    rx.set(Math.sin(a * 0.55) * maxTilt * 0.1)
+    ry.set(Math.cos(a * 0.48) * maxTilt * 0.12)
   })
 
   const onPointerEnter = useCallback(() => {

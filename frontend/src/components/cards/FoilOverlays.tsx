@@ -2,8 +2,8 @@
  * Shared holographic layers for card art.
  *
  * Glare is always present (non-foils still catch a specular highlight). Rainbow
- * holo, prism bloom, and sparkle only render for foil printings. Pointer-driven
- * CSS variables (`--mx/--my/--op`) come from `useTilt`, including the idle orbit.
+ * holo, prism bloom, and sparkle only render for foil printings. Idle keeps
+ * rainbow + glints visible so a grid of foils reads as foil at rest.
  */
 export function FoilOverlays({ foil = false, glare = true }: { foil?: boolean; glare?: boolean }) {
   return (
