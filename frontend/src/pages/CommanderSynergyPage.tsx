@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import {
   Check,
   CheckCircle2,
+  ChevronDown,
   Crown,
   Fuel,
   Gem,
@@ -49,6 +50,7 @@ import {
   Tabs,
   TabPanel,
 } from '../components/ui'
+import { AnimatePresence, EASE_PREMIUM, motion } from '../components/motion'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
@@ -357,6 +359,7 @@ export default function CommanderSynergyPage() {
   const [maxCardDollars, setMaxCardDollars] = useState(() => searchParams.get('maxCard') ?? '')
   const [bracket, setBracket] = useState(() => parseDeckBuilderBracket(searchParams.get('bracket')))
   const [includeOutOfStock, setIncludeOutOfStock] = useState(true)
+  const [constraintsOpen, setConstraintsOpen] = useState(false)
   const debouncedBudgetDollars = useDebouncedValue(budgetDollars, 400)
   const debouncedMaxCardDollars = useDebouncedValue(maxCardDollars, 400)
 
@@ -573,6 +576,7 @@ export default function CommanderSynergyPage() {
   function clearCommander() {
     setSelected(null)
     setStrategyId(null)
+    setConstraintsOpen(false)
     resetPicks()
     setQuery('')
     saveDeckBuilderSession(slug, null)
@@ -753,15 +757,7 @@ export default function CommanderSynergyPage() {
           </div>
         ) : (
           <>
-            <aside
-              className={cx(
-                'w-full shrink-0 space-y-4',
-                // Sticky left rail on wide screens: cap height to the viewport so
-                // long strategy lists stay reachable instead of clipping under the fold.
-                'xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:w-[22rem] xl:self-start',
-                'xl:overflow-y-auto xl:overscroll-y-contain',
-              )}
-            >
+            <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:self-start">
               <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
                 <div className="flex gap-4 p-4">
                   <div className="w-24 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-28">
@@ -802,6 +798,110 @@ export default function CommanderSynergyPage() {
                       Change commander
                     </button>
                   </div>
+                </div>
+
+                <div className="border-t border-border">
+                  <button
+                    type="button"
+                    aria-expanded={constraintsOpen}
+                    aria-controls="deck-builder-constraints"
+                    onClick={() => setConstraintsOpen((open) => !open)}
+                    className="flex w-full items-start gap-2 px-4 py-3 text-left transition-colors hover:bg-bg/50"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
+                        Build constraints
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-fg-muted">
+                        {[
+                          includeOutOfStock ? 'Out of stock on' : 'In stock only',
+                          budgetDollars.trim() ? `Budget $${budgetDollars.trim()}` : null,
+                          maxCardDollars.trim() ? `Max $${maxCardDollars.trim()}` : null,
+                          bracket !== 'auto' ? `Bracket ${bracket}` : 'Auto bracket',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      aria-hidden
+                      className={cx(
+                        'mt-0.5 size-4 shrink-0 text-fg-muted transition-transform duration-200',
+                        constraintsOpen && 'rotate-180',
+                      )}
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {constraintsOpen && (
+                      <motion.div
+                        id="deck-builder-constraints"
+                        key="constraints"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.28, ease: EASE_PREMIUM }}
+                        className="overflow-hidden"
+                      >
+                        <div className="space-y-3 px-4 pb-4">
+                          <p className="text-xs leading-relaxed text-fg-muted">
+                            Caps apply to the 100-card list. Combos stay legal in this
+                            commander&apos;s colors.
+                          </p>
+                          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-bg px-3 py-2.5">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 size-4 rounded border-border text-brand-600 focus:ring-brand-500"
+                              checked={includeOutOfStock}
+                              onChange={(e) => {
+                                setIncludeOutOfStock(e.target.checked)
+                                resetPicks()
+                              }}
+                            />
+                            <span>
+                              <span className="block text-sm font-semibold text-fg">
+                                Include out of stock
+                              </span>
+                              <span className="mt-0.5 block text-xs leading-relaxed text-fg-muted">
+                                Still recommend cards this store does not carry — flagged, not
+                                buyable.
+                              </span>
+                            </span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Input
+                              label="Deck budget"
+                              inputMode="decimal"
+                              placeholder="500"
+                              value={budgetDollars}
+                              onChange={(e) => setBudgetDollars(e.target.value)}
+                              hint="USD total"
+                            />
+                            <Input
+                              label="Card max"
+                              inputMode="decimal"
+                              placeholder="25"
+                              value={maxCardDollars}
+                              onChange={(e) => setMaxCardDollars(e.target.value)}
+                              hint="USD each"
+                            />
+                          </div>
+                          <Select
+                            label="Commander bracket"
+                            value={bracket}
+                            onChange={(e) => setBracket(parseDeckBuilderBracket(e.target.value))}
+                            hint="Auto uses Scryfall Game Changers this store stocks in-identity."
+                          >
+                            <option value="auto">Auto from store stock</option>
+                            <option value="1">1 · Exhibition (no Game Changers)</option>
+                            <option value="2">2 · Core (no Game Changers)</option>
+                            <option value="3">3 · Upgraded (up to 3 Game Changers)</option>
+                            <option value="4">4 · Optimized</option>
+                            <option value="5">5 · cEDH</option>
+                          </Select>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -866,65 +966,6 @@ export default function CommanderSynergyPage() {
                     )
                   })}
                 </div>
-              </div>
-
-              <div className="rounded-card border border-border bg-surface p-4 shadow-sm">
-                <p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
-                  Build constraints
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-fg-muted">
-                  Caps apply to the 100-card list. Combos stay legal in this commander&apos;s
-                  colors.
-                </p>
-                <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-bg px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-4 rounded border-border text-brand-600 focus:ring-brand-500"
-                    checked={includeOutOfStock}
-                    onChange={(e) => {
-                      setIncludeOutOfStock(e.target.checked)
-                      resetPicks()
-                    }}
-                  />
-                  <span>
-                    <span className="block text-sm font-semibold text-fg">Include out of stock</span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-fg-muted">
-                      Still recommend cards this store does not carry — flagged, not buyable.
-                    </span>
-                  </span>
-                </label>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Input
-                    label="Deck budget"
-                    inputMode="decimal"
-                    placeholder="500"
-                    value={budgetDollars}
-                    onChange={(e) => setBudgetDollars(e.target.value)}
-                    hint="USD total"
-                  />
-                  <Input
-                    label="Card max"
-                    inputMode="decimal"
-                    placeholder="25"
-                    value={maxCardDollars}
-                    onChange={(e) => setMaxCardDollars(e.target.value)}
-                    hint="USD each"
-                  />
-                </div>
-                <Select
-                  label="Commander bracket"
-                  wrapperClassName="mt-3"
-                  value={bracket}
-                  onChange={(e) => setBracket(parseDeckBuilderBracket(e.target.value))}
-                  hint="Auto uses Scryfall Game Changers this store stocks in-identity."
-                >
-                  <option value="auto">Auto from store stock</option>
-                  <option value="1">1 · Exhibition (no Game Changers)</option>
-                  <option value="2">2 · Core (no Game Changers)</option>
-                  <option value="3">3 · Upgraded (up to 3 Game Changers)</option>
-                  <option value="4">4 · Optimized</option>
-                  <option value="5">5 · cEDH</option>
-                </Select>
               </div>
             </aside>
 
