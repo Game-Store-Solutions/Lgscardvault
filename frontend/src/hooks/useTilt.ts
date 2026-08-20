@@ -14,8 +14,8 @@ import {
 /** Snappy 3D follow — the card should feel in the hand, not swimming. */
 const TILT_SPRING = { stiffness: 320, damping: 22, mass: 0.45 }
 
-/** Softer light follow so the sheen trails the pointer like a physical surface. */
-const LIGHT_SPRING = { stiffness: 170, damping: 24, mass: 0.5 }
+/** Softer light follow so the sheen glides without stepping. */
+const LIGHT_SPRING = { stiffness: 120, damping: 28, mass: 0.65 }
 
 /** Two incommensurate periods so idle light drifts instead of looping in a circle. */
 const IDLE_A_MS = 14000
@@ -71,8 +71,8 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     if (!idle || hovering.current || reduceMotion || !inView) return
     const a = (time / IDLE_A_MS) * Math.PI * 2 + phase.current
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
-    px.set(50 + Math.sin(a) * 18 + Math.sin(b * 1.15) * 8)
-    py.set(50 + Math.cos(a * 0.62) * 14 + Math.sin(b) * 7)
+    px.set(50 + Math.sin(a) * 14 + Math.sin(b * 1.15) * 6)
+    py.set(50 + Math.cos(a * 0.62) * 11 + Math.sin(b) * 5)
     op.set(0.4 + Math.sin(a * 0.9) * 0.08)
     rx.set(Math.sin(a * 0.55) * maxTilt * 0.08)
     ry.set(Math.cos(a * 0.48) * maxTilt * 0.1)

@@ -445,124 +445,180 @@ body {
 
 @layer components {
   /*
-   * Foil sheen — soft iridescence at the light, not neon color bands.
+   * Foil sheen — soft light catching across the art.
    *
-   * A white specular tracks --mx/--my; a low-sat spectral film slides under it
-   * so hues blend into each other. Masked to the hotspot so idle/hover reads
-   * as foil catching light rather than a rainbow stamp.
+   * Soft-light (not color-dodge) keeps hues blended without posterized bands.
+   * The spectral film drifts slowly; the specular follows --mx/--my for a
+   * continuous catch-light rather than a hard stripe.
    */
   .foil-card {
-    --foil-holo-opacity: 0.28;
+    --foil-holo-opacity: 0.32;
   }
   .tilt-card {
     isolation: isolate;
     transform-style: preserve-3d;
   }
   .tilt-glare {
+    border-radius: inherit;
+    overflow: hidden;
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.42) 0%,
-      hsla(0, 0%, 100%, 0.14) 16%,
-      hsla(0, 0%, 100%, 0.04) 32%,
-      transparent 52%
+      hsla(0, 0%, 100%, 0.28) 0%,
+      hsla(0, 0%, 100%, 0.1) 22%,
+      hsla(0, 0%, 100%, 0.03) 42%,
+      transparent 62%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.55);
-    transition: opacity 0.3s ease;
+    opacity: calc(var(--op, 0) * 0.5);
+    transition: opacity 0.45s ease;
+    /* Keep glare off the rounded rim so edges stay clean. */
+    -webkit-mask-image: radial-gradient(
+      farthest-side ellipse at 50% 50%,
+      #000 0%,
+      #000 72%,
+      transparent 100%
+    );
+    mask-image: radial-gradient(
+      farthest-side ellipse at 50% 50%,
+      #000 0%,
+      #000 72%,
+      transparent 100%
+    );
   }
   .tilt-holo,
   .foil-shimmer {
+    border-radius: inherit;
+    overflow: hidden;
     background-image:
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        hsla(0, 0%, 100%, 0.55) 0%,
-        hsla(195, 45%, 78%, 0.28) 14%,
-        hsla(280, 35%, 72%, 0.12) 32%,
-        transparent 58%
+        hsla(0, 0%, 100%, 0.28) 0%,
+        hsla(200, 30%, 80%, 0.16) 20%,
+        hsla(280, 22%, 78%, 0.08) 40%,
+        transparent 68%
       ),
       linear-gradient(
-        125deg,
-        hsl(310, 42%, 62%),
-        hsl(350, 40%, 64%),
-        hsl(28, 48%, 60%),
-        hsl(48, 42%, 62%),
-        hsl(165, 40%, 55%),
-        hsl(195, 45%, 58%),
-        hsl(250, 40%, 62%),
-        hsl(290, 38%, 60%),
-        hsl(310, 42%, 62%),
-        hsl(350, 40%, 64%),
-        hsl(28, 48%, 60%),
-        hsl(165, 40%, 55%),
-        hsl(250, 40%, 62%)
+        122deg,
+        hsl(300, 28%, 68%),
+        hsl(330, 26%, 70%),
+        hsl(20, 30%, 68%),
+        hsl(45, 28%, 70%),
+        hsl(160, 26%, 64%),
+        hsl(195, 28%, 66%),
+        hsl(240, 26%, 68%),
+        hsl(280, 24%, 68%),
+        hsl(300, 28%, 68%),
+        hsl(330, 26%, 70%),
+        hsl(20, 30%, 68%),
+        hsl(160, 26%, 64%),
+        hsl(240, 26%, 68%)
       );
     background-size:
       100% 100%,
-      240% 240%;
+      280% 280%;
     background-position:
       0 0,
-      0% 50%;
+      20% 45%;
     background-blend-mode: soft-light, soft-light;
-    mix-blend-mode: color-dodge;
-    filter: brightness(0.78) contrast(1.12) saturate(0.72);
-    opacity: calc(var(--foil-holo-opacity, 0.28) + var(--op, 0) * 0.42);
-    transition: opacity 0.3s ease;
-    animation: holo-gradient 7s ease-in-out infinite;
-    animation-delay: calc(var(--foil-seed, 0.4) * -7s);
-    mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 30%,
-      rgb(0 0 0 / 0.55) 55%,
-      transparent 82%
-    );
-    -webkit-mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 30%,
-      rgb(0 0 0 / 0.55) 55%,
-      transparent 82%
-    );
+    mix-blend-mode: soft-light;
+    opacity: calc(var(--foil-holo-opacity, 0.32) + var(--op, 0) * 0.38);
+    transition: opacity 0.45s ease;
+    animation: holo-gradient 14s linear infinite;
+    animation-delay: calc(var(--foil-seed, 0.4) * -14s);
+    /*
+     * Hotspot follow ∩ card vignette: the sheen never paints the rim, so
+     * rounded corners and letterboxed edges stay free of fringe.
+     */
+    -webkit-mask-image:
+      radial-gradient(
+        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        #000 0%,
+        #000 28%,
+        rgb(0 0 0 / 0.55) 52%,
+        transparent 78%
+      ),
+      radial-gradient(
+        farthest-side ellipse at 50% 50%,
+        #000 0%,
+        #000 68%,
+        rgb(0 0 0 / 0.45) 84%,
+        transparent 100%
+      );
+    mask-image:
+      radial-gradient(
+        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        #000 0%,
+        #000 28%,
+        rgb(0 0 0 / 0.55) 52%,
+        transparent 78%
+      ),
+      radial-gradient(
+        farthest-side ellipse at 50% 50%,
+        #000 0%,
+        #000 68%,
+        rgb(0 0 0 / 0.45) 84%,
+        transparent 100%
+      );
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
   }
   .tilt-grid {
+    border-radius: inherit;
+    overflow: hidden;
     background-image:
       repeating-linear-gradient(
         0deg,
         transparent,
-        transparent 2px,
-        rgb(255 255 255 / 0.022) 2px,
-        rgb(255 255 255 / 0.022) 4px
+        transparent 3px,
+        rgb(255 255 255 / 0.012) 3px,
+        rgb(255 255 255 / 0.012) 6px
       ),
       repeating-linear-gradient(
         90deg,
         transparent,
-        transparent 2px,
-        rgb(255 255 255 / 0.022) 2px,
-        rgb(255 255 255 / 0.022) 4px
+        transparent 3px,
+        rgb(255 255 255 / 0.012) 3px,
+        rgb(255 255 255 / 0.012) 6px
       );
-    opacity: calc(var(--op, 0) * 0.28);
-    transition: opacity 0.3s ease;
+    opacity: calc(var(--op, 0) * 0.18);
+    transition: opacity 0.45s ease;
     pointer-events: none;
-    mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 22%,
-      rgb(0 0 0 / 0.35) 46%,
-      transparent 70%
-    );
-    -webkit-mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 22%,
-      rgb(0 0 0 / 0.35) 46%,
-      transparent 70%
-    );
+    -webkit-mask-image:
+      radial-gradient(
+        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        #000 0%,
+        #000 22%,
+        rgb(0 0 0 / 0.3) 48%,
+        transparent 70%
+      ),
+      radial-gradient(
+        farthest-side ellipse at 50% 50%,
+        #000 0%,
+        #000 65%,
+        transparent 92%
+      );
+    mask-image:
+      radial-gradient(
+        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
+        #000 0%,
+        #000 22%,
+        rgb(0 0 0 / 0.3) 48%,
+        transparent 70%
+      ),
+      radial-gradient(
+        farthest-side ellipse at 50% 50%,
+        #000 0%,
+        #000 65%,
+        transparent 92%
+      );
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
   }
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
     --op: 0.4;
-    animation: foil-idle-orbit 14s ease-in-out infinite;
+    animation: foil-idle-orbit 18s linear infinite;
   }
   .foil-idle-orbit:hover {
     animation-play-state: paused;
@@ -596,35 +652,59 @@ body {
 }
 
 @keyframes holo-gradient {
-  0%,
-  100% {
+  0% {
     background-position:
       0 0,
-      12% 40%;
+      8% 42%;
+  }
+  25% {
+    background-position:
+      0 0,
+      38% 28%;
   }
   50% {
     background-position:
       0 0,
-      88% 60%;
+      78% 58%;
+  }
+  75% {
+    background-position:
+      0 0,
+      52% 72%;
+  }
+  100% {
+    background-position:
+      0 0,
+      8% 42%;
   }
 }
 
 @keyframes foil-idle-orbit {
   0%,
   100% {
-    --mx: 34%;
+    --mx: 38%;
     --my: 42%;
     --op: 0.36;
   }
-  33% {
-    --mx: 66%;
-    --my: 36%;
+  20% {
+    --mx: 48%;
+    --my: 34%;
+    --op: 0.42;
+  }
+  40% {
+    --mx: 62%;
+    --my: 40%;
     --op: 0.46;
   }
-  66% {
-    --mx: 44%;
-    --my: 64%;
+  60% {
+    --mx: 56%;
+    --my: 58%;
     --op: 0.4;
+  }
+  80% {
+    --mx: 40%;
+    --my: 54%;
+    --op: 0.38;
   }
 }
 
