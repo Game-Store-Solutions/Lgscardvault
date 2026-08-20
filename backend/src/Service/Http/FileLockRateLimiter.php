@@ -41,6 +41,11 @@ abstract class FileLockRateLimiter
      */
     public function acquire(): void
     {
+        $dir = dirname($this->lockFilePath);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
         $handle = @fopen($this->lockFilePath, 'c+');
         if (false === $handle) {
             return;

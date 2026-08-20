@@ -35,6 +35,9 @@ services:
       - jwt_keys:/app/config/jwt
       # Persist avatar/branding uploads across image rebuilds.
       - uploads_data:/app/public/uploads
+      # Shared Archidekt throttle/circuit so every backend/worker process
+      # respects one host-wide budget (flock files, not per-container copies).
+      - archidekt_throttle:/app/var/archidekt
     depends_on:
       db:
         condition: service_healthy
@@ -50,10 +53,14 @@ services:
     env_file: [/etc/mtgstore/prod.env]
     environment:
       APP_ENV: prod
+    volumes:
+      - archidekt_throttle:/app/var/archidekt
     depends_on:
       db:
         condition: service_healthy
     # Run two workers; scale with `docker compose up --scale worker=N`.
+    # Keep at 1 while bulk-harvesting Archidekt — even with a shared lock,
+    # two consumers still serialize on the same 2s budget and finish slower.
     deploy:
       replicas: 2
     restart: unless-stopped
@@ -98,3 +105,4 @@ volumes:
   db_data:
   jwt_keys:
   uploads_data:
+  archidekt_throttle:
