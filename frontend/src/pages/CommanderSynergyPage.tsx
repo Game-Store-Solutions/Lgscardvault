@@ -753,7 +753,15 @@ export default function CommanderSynergyPage() {
           </div>
         ) : (
           <>
-            <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:self-start">
+            <aside
+              className={cx(
+                'w-full shrink-0 space-y-4',
+                // Sticky left rail on wide screens: cap height to the viewport so
+                // long strategy lists stay reachable instead of clipping under the fold.
+                'xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:w-[22rem] xl:self-start',
+                'xl:overflow-y-auto xl:overscroll-y-contain',
+              )}
+            >
               <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
                 <div className="flex gap-4 p-4">
                   <div className="w-24 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-28">
