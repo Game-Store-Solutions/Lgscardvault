@@ -91,12 +91,12 @@ services:
     # silently break the "one global budget" guarantee.
     App\Service\Recommend\Provider\Archidekt\ArchidektRateLimiter:
         arguments:
-            $lockFilePath: '%kernel.project_dir%/var/archidekt_rate.lock'
+            $lockFilePath: '%kernel.project_dir%/var/archidekt/rate.lock'
             $minIntervalMicroseconds: '%commander_intelligence.archidekt.min_interval_us%'
 
     App\Service\Recommend\Provider\Archidekt\ArchidektCircuitBreaker:
         arguments:
-            $stateFilePath: '%kernel.project_dir%/var/archidekt_circuit.json'
+            $stateFilePath: '%kernel.project_dir%/var/archidekt/circuit.json'
             $failureThreshold: '%commander_intelligence.archidekt.circuit_failure_threshold%'
             $cooldownSeconds: '%commander_intelligence.archidekt.circuit_cooldown_seconds%'
 

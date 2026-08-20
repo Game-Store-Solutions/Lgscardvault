@@ -54,12 +54,13 @@ parameters:
     commander_intelligence.archidekt.enabled: '%env(bool:ARCHIDEKT_ENABLED)%'
     # Archidekt documents no rate limit. One request per second plus a week-long
     # cache keeps our footprint negligible; a commander is harvested once.
-    commander_intelligence.archidekt.min_interval_us: 1000000
+    commander_intelligence.archidekt.min_interval_us: 2000000
     commander_intelligence.archidekt.cache_ttl: 604800
     # Fail open after this many consecutive HTTP/transport failures; cool down
     # before probing again so a blocked endpoint cannot stall the worker.
     commander_intelligence.archidekt.circuit_failure_threshold: 5
-    commander_intelligence.archidekt.circuit_cooldown_seconds: 3600
+    # Longer than the default hour: after a 429 burst Archidekt stays hot.
+    commander_intelligence.archidekt.circuit_cooldown_seconds: 7200
     commander_intelligence.mtgjson_precon.enabled: true
     commander_intelligence.mtgjson_precon.cache_ttl: 2592000
     commander_intelligence.local_decks.enabled: true
