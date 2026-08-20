@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 import { cx } from '../../../lib/cx'
 import type { HeroCardImage } from './heroCardPool'
+import { FoilOverlays } from '../../cards/FoilOverlays'
 
 function HeroCardImg({
   card,
@@ -26,11 +27,7 @@ function HeroCardImg({
   }
   return (
     <span
-      className={cx(
-        'relative block overflow-hidden rounded-md shadow-lg ring-1 ring-black/20',
-        card.isFoil && 'hero-foil-shimmer',
-        className,
-      )}
+      className={cx('relative block overflow-hidden rounded-md shadow-lg ring-1 ring-black/20', card.isFoil && 'foil-card', className)}
       style={style}
       aria-hidden
     >
@@ -41,6 +38,7 @@ function HeroCardImg({
         className="size-full rounded-md object-cover"
         onError={() => setFailed(true)}
       />
+      {card.isFoil && <FoilOverlays foil glare={false} />}
     </span>
   )
 }
