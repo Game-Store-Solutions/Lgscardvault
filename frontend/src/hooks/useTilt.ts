@@ -18,8 +18,8 @@ const TILT_SPRING = { stiffness: 380, damping: 24, mass: 0.4 }
 const LIGHT_SPRING = { stiffness: 260, damping: 28, mass: 0.4 }
 
 /** Two incommensurate periods so idle light drifts instead of looping in a circle. */
-const IDLE_A_MS = 9000
-const IDLE_B_MS = 13500
+const IDLE_A_MS = 6500
+const IDLE_B_MS = 9500
 
 const DEFAULT_IDLE_OP = 0.4
 
