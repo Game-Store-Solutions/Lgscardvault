@@ -1,8 +1,10 @@
 # Architecture
 
-End-to-end maps of the MTG Store platform, from the React page a user clicks, through the HTTP route, backend entry point, services, repositories, and database rows.
+End-to-end maps of **LGS Card Vault**, from the React page a user clicks, through the HTTP route, backend entry point, services, repositories, and database rows.
 
 Each feature doc pairs flow diagrams with a "where to go" table listing the exact classes/files at each layer.
+
+Product overview: [root README](../README.md).
 
 ## How to read these docs
 
@@ -34,6 +36,13 @@ Two backend styles coexist:
 | **Commander deck builder** | Reference-deck harvesting, strategy classification, card relationships, contextual scoring, and 100-card construction | [commander-deck-builder.md](commander-deck-builder.md) |
 | **CSV import** | Async bulk import lifecycle, failed-row recovery, card resolution, inventory writes, and live polling | [csv-import.md](csv-import.md) |
 | **Customers & orders** | Per-store customer profiles, favorites, want lists, cart, test checkout, order workflow, notifications, and reports | [customers-and-orders.md](customers-and-orders.md) |
+
+## Ops & developer guides
+
+| Doc | What it covers |
+|-----|----------------|
+| **[Commands](commands.md)** | Every `app:*` console command, Messenger workers, deploy helpers |
+| **[Local development](local-development.md)** | Prerequisites, quick start, Square sandbox, catalog/Scryfall sync, testing, production config, troubleshooting |
 
 ## System context
 

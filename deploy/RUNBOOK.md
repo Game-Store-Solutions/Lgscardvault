@@ -1,7 +1,7 @@
 # Operations runbook
 
 Operational reference for running the MTG Store platform in production. Pairs
-with the README's [Production configuration](../README.md#production-configuration)
+with the [Production configuration](../architecture/local-development.md#production-configuration) guide
 section (secrets, container images, health probes).
 
 **First time going live?** Start with [`LAUNCH.md`](LAUNCH.md) (DNS, secrets
