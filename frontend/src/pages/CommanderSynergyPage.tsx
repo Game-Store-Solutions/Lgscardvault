@@ -905,7 +905,7 @@ export default function CommanderSynergyPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="min-h-0">
                 <p className="mb-2 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
                   Strategy
                 </p>
@@ -915,7 +915,14 @@ export default function CommanderSynergyPage() {
                     <Skeleton className="h-20 w-full" />
                   </div>
                 )}
-                <div className="space-y-2">
+                <div
+                  className={cx(
+                    'space-y-2 overflow-y-auto overscroll-contain pe-1',
+                    // Cap the list so long strategy sets scroll in-place; commander
+                    // + constraints stay put above without a full-rail scrollbar.
+                    'max-h-[min(28rem,calc(100dvh-22rem))]',
+                  )}
+                >
                   {(strategiesQuery.data ?? []).map((strategy) => {
                     const active = strategyId === strategy.id
                     const confidence = Math.round(strategy.confidence * 100)
