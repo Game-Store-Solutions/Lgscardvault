@@ -299,7 +299,7 @@ class InventoryItemRepository extends ServiceEntityRepository
             return;
         }
 
-        $qb->andWhere('JSONB_CONTAINS(c.artistCredits, :artistCredit)')
+        $qb->andWhere('JSONB_CONTAINS(c.artistCredits, :artistCredit) = TRUE')
             ->setParameter('artistCredit', $param);
     }
 
