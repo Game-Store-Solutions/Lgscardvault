@@ -762,10 +762,11 @@ export default function CommanderSynergyPage() {
             <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:self-start">
               <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
                 <div className="flex gap-3.5 p-4">
-                  <div className="relative aspect-5/7 w-20 shrink-0 overflow-hidden rounded-md bg-bg shadow-sm sm:w-24">
+                  <div className="relative aspect-5/7 w-28 shrink-0 overflow-hidden rounded-md bg-bg shadow-sm sm:w-32">
                     <CardImage
                       src={selected.imageUrl}
                       alt={selected.name}
+                      fit="contain"
                       className="absolute inset-0 size-full"
                       showLabel={false}
                     />
@@ -788,7 +789,7 @@ export default function CommanderSynergyPage() {
                     )}
                     <button
                       type="button"
-                      className="mt-2.5 text-sm font-semibold text-brand-600 transition-colors hover:text-brand-500"
+                      className="mt-2.5 text-sm font-semibold text-brand-600 underline-offset-2 transition-colors hover:text-brand-500 hover:underline"
                       onClick={clearCommander}
                     >
                       Change commander
@@ -949,13 +950,7 @@ export default function CommanderSynergyPage() {
                             <Skeleton className="h-20 w-full" />
                           </div>
                         )}
-                        <div
-                          className={cx(
-                            'space-y-2 overflow-y-auto overscroll-contain pe-1',
-                            // Cap the list so long strategy sets scroll in-place.
-                            'max-h-[min(22rem,calc(100dvh-20rem))]',
-                          )}
-                        >
+                        <div className="space-y-2">
                           {(strategiesQuery.data ?? []).map((strategy) => {
                             const active = strategyId === strategy.id
                             const confidence = Math.round(strategy.confidence * 100)
