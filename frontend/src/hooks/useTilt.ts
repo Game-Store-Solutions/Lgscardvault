@@ -30,9 +30,8 @@ export type TiltStyle = MotionStyle & {
 
 export interface UseTiltOptions {
   /**
-   * When true, the holographic field keeps flowing while the pointer is away
-   * (Holo warp / scale / definition), and a slow light drift reveals it.
-   * Pointer takeovers instantly; idle resumes on leave.
+   * When true, the holo keeps animating while the pointer is away and the light
+   * drifts so a masked fringe is visible. Pointer takeovers instantly.
    */
   idle?: boolean
 }
@@ -42,8 +41,8 @@ export interface UseTiltOptions {
  *
  * Attach `ref` + the pointer handlers to a perspective wrapper, and spread
  * `tiltStyle` onto the card (`motion.div`). Rotation is a spring; `--mx/--my/--op`
- * drive `.tilt-glare` / `.tilt-holo`. Reduced-motion skips rotation and idle,
- * and keeps pointer light tracking. `--foil-seed` desyncs the Holo flow per card.
+ * drive `.tilt-glare` / `.tilt-holo` / `.tilt-grid`. Reduced-motion skips rotation
+ * and idle, and keeps pointer light tracking. `--foil-seed` desyncs holo-gradient.
  */
 export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ref = useRef<HTMLDivElement>(null)
@@ -57,7 +56,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ry = useMotionValue(0)
   const px = useMotionValue(50)
   const py = useMotionValue(50)
-  const op = useMotionValue(idle ? 0.5 : 0)
+  const op = useMotionValue(idle ? 0.49 : 0)
 
   const srx = useSpring(rx, TILT_SPRING)
   const sry = useSpring(ry, TILT_SPRING)
@@ -74,7 +73,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
     px.set(50 + Math.sin(a) * 18 + Math.sin(b * 1.15) * 8)
     py.set(50 + Math.cos(a * 0.62) * 14 + Math.sin(b) * 7)
-    op.set(0.5 + Math.sin(a * 0.9) * 0.08)
+    op.set(0.49 + Math.sin(a * 0.9) * 0.11)
     rx.set(Math.sin(a * 0.55) * maxTilt * 0.08)
     ry.set(Math.cos(a * 0.48) * maxTilt * 0.1)
   })
