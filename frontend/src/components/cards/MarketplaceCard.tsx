@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useInventoryItemLink } from '../../hooks/useInventoryItemLink'
 import { Check, ShoppingCart } from 'lucide-react'
 import { cardImage, formatPrice, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
@@ -26,11 +27,13 @@ export function MarketplaceCard({
   const accent = rarityAccent(item.card.rarity)
   const marketPrice = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
   const outOfStock = item.quantity < 1
+  const link = useInventoryItemLink(slug)
 
   return (
     <article className="@container/market-card group flex min-h-0 min-w-0 gap-3 rounded-card border border-border bg-surface p-3 shadow-card dark:glass-card ui-lift hover:border-brand-500/30 sm:min-h-56 sm:gap-5 sm:p-5">
       <Link
-        to={`/s/${slug}/cards/${item.id}`}
+        to={link.to(item.id)}
+        state={link.state}
         className="w-[5.25rem] shrink-0 self-center sm:w-24"
         aria-label={item.card.name}
       >
@@ -48,7 +51,8 @@ export function MarketplaceCard({
       <div className="flex min-w-0 flex-1 flex-col py-0.5">
         <div className="min-w-0 space-y-1">
           <Link
-            to={`/s/${slug}/cards/${item.id}`}
+            to={link.to(item.id)}
+            state={link.state}
             className="block overflow-hidden text-base font-semibold leading-snug text-fg hover:text-brand-600 sm:text-lg [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [overflow-wrap:anywhere]"
           >
             {item.card.name}

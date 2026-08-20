@@ -47,6 +47,7 @@ import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 import { setBrowsePath } from '../lib/setBrowse'
 import { artistBrowsePath, resolveCardArtist } from '../lib/artistBrowse'
 import { deckBuilderPath, isDeckBuilderNav } from '../lib/deckBuilder'
+import { isStoreSearchNav, storeSearchPath } from '../lib/storeSearch'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -83,6 +84,7 @@ export default function CardDetailsPage() {
     gameCode?: string
   } | null
   const deckNav = isDeckBuilderNav(location.state) ? location.state : null
+  const storeSearchNav = isStoreSearchNav(location.state) ? location.state : null
   const cameFromSet = setNavState?.from === 'set' && Boolean(setNavState.setCode)
   const cameFromArtist = setNavState?.from === 'artist' && Boolean(setNavState.artist)
   const backTo = deckNav
@@ -98,7 +100,9 @@ export default function CardDetailsPage() {
         ? artistBrowsePath(slug, setNavState.artist, setNavState.gameCode ?? 'mtg')
         : cameFromSet && setNavState?.setCode
           ? setBrowsePath(slug, setNavState.setCode, setNavState.gameCode)
-          : `/s/${slug}`
+          : storeSearchNav
+            ? storeSearchPath(slug, storeSearchNav.search)
+            : `/s/${slug}`
   const backLabel = deckNav
     ? 'Deck builder'
     : cameFromCaseCards
@@ -107,7 +111,9 @@ export default function CardDetailsPage() {
         ? 'Artist'
         : cameFromSet
           ? 'Set'
-          : null
+          : storeSearchNav
+            ? 'Search'
+            : null
   const { user } = useAuth()
   const canManage = useCanManageStore(slug)
   const queryClient = useQueryClient()

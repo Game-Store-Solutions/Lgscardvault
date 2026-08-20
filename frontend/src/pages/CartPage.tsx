@@ -9,7 +9,9 @@ import {
   RotateCcw,
   ShoppingCart,
   Sparkles,
+  Store,
   Trash2,
+  Truck,
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { CartItem, InventoryItem, Order, OrderFulfillment, SealedInventoryLine, StoreCreditSummary } from '../api/types'
@@ -26,6 +28,7 @@ import { cx } from '../lib/cx'
 import { finishName } from '../lib/finishes'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
+import { AnimatePresence, motion, Reveal } from '../components/motion'
 
 import { showDevCheckoutTools } from '../lib/runtimeEnv'
 
@@ -38,6 +41,26 @@ function lineUnitCents(entry: CartItem): number {
 interface RemovedLine {
   item: InventoryItem
   quantity: number
+}
+
+function useElementInView(id: string, enabled: boolean) {
+  const [inView, setInView] = useState(false)
+
+  useEffect(() => {
+    if (!enabled) {
+      setInView(false)
+      return
+    }
+    const node = document.getElementById(id)
+    if (!node) return
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      threshold: 0.18,
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [id, enabled])
+
+  return inView
 }
 
 export default function CartPage() {
@@ -162,6 +185,7 @@ export default function CartPage() {
   }, [cart])
 
   const subtotalLabel = formatPrice(subtotalCents)
+  const summaryInView = useElementInView('order-summary', cart.length > 0 && !createdOrder && !isLoading)
 
   const checkoutPath = isGuest ? `/stores/${slug}/guest/checkout` : `/stores/${slug}/customer/checkout`
   const checkoutBody = useMemo(
@@ -224,26 +248,35 @@ export default function CartPage() {
   }
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-8">
+    <div className="relative space-y-5 pb-[calc(6.75rem+env(safe-area-inset-bottom))] lg:space-y-8 lg:pb-10">
       <p role="status" aria-live="polite" className="sr-only">
         {itemCount === 0
           ? 'Your cart is empty.'
           : `Cart updated. ${itemCount} item${itemCount === 1 ? '' : 's'}, estimated total ${subtotalLabel}.`}
       </p>
 
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+      <Reveal immediate className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <BackButton to={`/s/${slug}`}>Back to store</BackButton>
-          <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Checkout</h1>
-          <p className="mt-1 text-sm text-fg-muted">{store?.name ?? 'Store'}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2.5">
+            <h1 className="font-display text-[1.65rem] font-bold leading-none tracking-tight text-fg sm:text-3xl">
+              Checkout
+            </h1>
+            {cart.length > 0 && (
+              <span className="inline-flex h-7 items-center rounded-full bg-brand-500/12 px-2.5 text-xs font-bold text-brand-700 dark:text-brand-300">
+                {itemCount} {itemCount === 1 ? 'item' : 'items'}
+              </span>
+            )}
+          </div>
+          <p className="mt-1.5 text-sm text-fg-muted">{store?.name ?? 'Store'}</p>
         </div>
         {cart.length > 0 && (
           <Button variant="ghost" size="sm" onClick={() => clear.mutate()} loading={clear.isPending} className="text-fg-muted">
             <Trash2 aria-hidden className="size-4" />
-            Clear cart
+            Clear
           </Button>
         )}
-      </header>
+      </Reveal>
 
       {isLoading ? (
         <StorePageLoader label="Loading your cart…" />
@@ -254,19 +287,19 @@ export default function CartPage() {
       ) : cart.length === 0 ? (
         <EmptyCart slug={slug} storeName={store?.name ?? 'the store'} picks={picks} />
       ) : (
-        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="space-y-8">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-10">
+          <div className="space-y-5 lg:space-y-6">
             {!kioskMode && (
-              <section className="rounded-card border border-border bg-surface p-5 shadow-card">
+              <Reveal immediate className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-base font-bold text-fg">Contact</h2>
+                  <h2 className="text-sm font-bold tracking-tight text-fg sm:text-base">Contact</h2>
                   {isGuest && (
-                    <Link to="/login" className="text-sm font-medium text-brand-600 hover:underline">
+                    <Link to="/login" className="text-xs font-semibold text-brand-600 hover:underline sm:text-sm">
                       Log in for order history
                     </Link>
                   )}
                 </div>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4">
                   <Input
                     label={isGuest ? 'Your name (required)' : 'Name'}
                     value={contactName}
@@ -274,6 +307,7 @@ export default function CartPage() {
                     placeholder="For pickup at the store"
                     maxLength={255}
                     required
+                    autoComplete="name"
                   />
                   <Input
                     label="Email"
@@ -282,62 +316,80 @@ export default function CartPage() {
                     onChange={(e) => setContactEmail(e.target.value)}
                     placeholder={isGuest ? 'Receipt & updates (optional)' : 'Receipt email'}
                     maxLength={255}
+                    autoComplete="email"
                   />
                 </div>
-              </section>
+              </Reveal>
             )}
 
             {!kioskMode && (
-              <fieldset className="rounded-card border border-border bg-surface p-5 shadow-card">
-                <legend className="px-1 text-base font-bold text-fg">Delivery</legend>
+              <Reveal immediate delay={0.04} className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
+                <h2 className="text-sm font-bold tracking-tight text-fg sm:text-base">Delivery</h2>
                 {isGuest ? (
-                  <p className="mt-4 text-sm text-fg-muted">
-                    Guest checkout is <span className="font-semibold text-fg">pickup only</span>. Reserve your order and pay at the counter when you arrive.
+                  <p className="mt-3 text-sm leading-6 text-fg-muted">
+                    Guest checkout is <span className="font-semibold text-fg">pickup only</span>. Reserve your order
+                    and pay at the counter when you arrive.
                   </p>
                 ) : (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <FulfillmentOption
                       checked={fulfillment === 'pickup'}
                       onSelect={() => setFulfillment('pickup')}
+                      icon={Store}
                       title="Pick up in store"
-                      text={`Free. Grab it at ${store?.name ?? 'the store'}.`}
+                      text={`Free at ${store?.name ?? 'the store'}`}
                     />
                     <FulfillmentOption
                       checked={fulfillment === 'shipping'}
                       onSelect={() => setFulfillment('shipping')}
+                      icon={Truck}
                       title="Ship to me"
-                      text="Shipping calculated at checkout."
+                      text="Calculated at checkout"
                     />
                   </div>
                 )}
-              </fieldset>
+              </Reveal>
             )}
 
             <section>
-              <h2 className="mb-3 text-base font-bold text-fg">Items</h2>
-              <ul className="space-y-3">
-            {cart.map((entry) =>
-              entry.sealedItem ? (
-                <SealedCartLine
-                  key={`sealed-${entry.sealedItem.id}`}
-                  entry={entry}
-                  sealed={entry.sealedItem}
-                  onSetQuantity={(quantity) =>
-                    setSealedItem.mutate({ item: entry.sealedItem!, quantity })
-                  }
-                  onRemove={() => handleRemove(entry)}
-                />
-              ) : entry.inventoryItem ? (
-                <CartLine
-                  key={entry.inventoryItem.id}
-                  entry={entry}
-                  slug={slug}
-                  item={entry.inventoryItem}
-                  onSetQuantity={(quantity) => setItem.mutate({ item: entry.inventoryItem!, quantity })}
-                  onRemove={() => handleRemove(entry)}
-                />
-              ) : null,
-            )}
+              <h2 className="mb-3 text-sm font-bold tracking-tight text-fg sm:text-base">Items</h2>
+              <ul className="space-y-2.5 sm:space-y-3">
+                <AnimatePresence initial={false}>
+                  {cart.map((entry) =>
+                    entry.sealedItem ? (
+                      <motion.li
+                        key={`sealed-${entry.sealedItem.id}`}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      >
+                        <SealedCartLine
+                          entry={entry}
+                          sealed={entry.sealedItem}
+                          onSetQuantity={(quantity) => setSealedItem.mutate({ item: entry.sealedItem!, quantity })}
+                          onRemove={() => handleRemove(entry)}
+                        />
+                      </motion.li>
+                    ) : entry.inventoryItem ? (
+                      <motion.li
+                        key={entry.inventoryItem.id}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      >
+                        <CartLine
+                          entry={entry}
+                          slug={slug}
+                          item={entry.inventoryItem}
+                          onSetQuantity={(quantity) => setItem.mutate({ item: entry.inventoryItem!, quantity })}
+                          onRemove={() => handleRemove(entry)}
+                        />
+                      </motion.li>
+                    ) : null,
+                  )}
+                </AnimatePresence>
               </ul>
             </section>
           </div>
@@ -372,10 +424,12 @@ export default function CartPage() {
       )}
 
       {removed && (
-        <div
+        <motion.div
           role="status"
           aria-live="polite"
-          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3 shadow-xl lg:bottom-6"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed inset-x-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3 shadow-xl lg:bottom-6"
         >
           <p className="min-w-0 truncate text-sm text-fg">
             Removed <span className="font-bold">{removed.item.card.name}</span>
@@ -383,30 +437,38 @@ export default function CartPage() {
           <button
             type="button"
             onClick={handleUndo}
-            className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-brand-600 hover:underline"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-sm font-bold text-brand-600 hover:underline"
           >
             <RotateCcw aria-hidden className="size-3.5" />
             Undo
           </button>
-        </div>
+        </motion.div>
       )}
 
-      {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 px-4 py-3 shadow-[0_-8px_30px_-12px_rgb(0_0_0/0.25)] backdrop-blur lg:hidden">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Estimated total</p>
-              <p className="font-display text-xl font-bold text-fg">{subtotalLabel}</p>
+      <AnimatePresence>
+        {cart.length > 0 && !createdOrder && !summaryInView && (
+          <motion.div
+            initial={{ y: 28, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 28, opacity: 0 }}
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 px-4 pt-3 shadow-[0_-12px_40px_-18px_rgb(0_0_0/0.35)] backdrop-blur-md lg:hidden"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <div className="mx-auto flex max-w-7xl items-center gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-fg-muted">
+                  {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                </p>
+                <p className="font-display text-xl font-extrabold leading-none text-fg">{subtotalLabel}</p>
+              </div>
+              <a href="#order-summary" className={cx(buttonVariants({ variant: 'primary', size: 'lg' }), 'min-h-12 flex-1')}>
+                <PackageCheck aria-hidden className="size-4" />
+                Checkout
+              </a>
             </div>
-            {/* The payment form lives in the summary panel, which is below the
-                lines on mobile. Jump to it rather than duplicating it here. */}
-            <a href="#order-summary" className={buttonVariants({ variant: 'primary', size: 'lg' })}>
-              <PackageCheck aria-hidden className="size-4" />
-              Checkout
-            </a>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -424,7 +486,11 @@ function OrderPlacedConfirmation({
   const payInStore = unpaid && (order.notes === 'Paying in store' || order.fulfillment === 'pickup')
 
   return (
-    <div className="mx-auto max-w-lg space-y-5 rounded-card border border-border bg-surface px-6 py-10 text-center shadow-card">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-auto max-w-lg space-y-5 rounded-card border border-border bg-surface px-5 py-8 text-center shadow-card sm:px-6 sm:py-10"
+    >
       <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-50 text-success-700">
         <CheckCircle2 aria-hidden className="size-7" />
       </span>
@@ -453,7 +519,7 @@ function OrderPlacedConfirmation({
           View orders
         </Link>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -472,8 +538,8 @@ function KioskOrderComplete({ reference }: { reference: string }) {
 
 function EmptyCart({ slug, storeName, picks }: { slug: string; storeName: string; picks: InventoryItem[] }) {
   return (
-    <div className="space-y-10">
-      <div className="rounded-card border border-border bg-surface shadow-card">
+    <div className="space-y-8 sm:space-y-10">
+      <Reveal immediate className="rounded-card border border-border bg-surface shadow-card">
         <EmptyState
           icon={ShoppingCart}
           title="Your cart is empty"
@@ -484,7 +550,7 @@ function EmptyCart({ slug, storeName, picks }: { slug: string; storeName: string
             </Link>
           }
         />
-      </div>
+      </Reveal>
 
       {picks.length > 0 && (
         <section>
@@ -564,7 +630,7 @@ function OrderSummary({
 }) {
   const creditApplied = !kioskMode && !isGuest && useCredit ? Math.min(creditBalanceCents, subtotalCents) : 0
   return (
-    <aside id="order-summary" className="scroll-mt-20 rounded-card border border-border bg-bg/80 p-5 shadow-card lg:sticky lg:top-20">
+    <aside id="order-summary" className="scroll-mt-24 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:sticky lg:top-20 lg:bg-bg/80">
       <h2 className="font-display text-lg font-bold text-fg">Order summary</h2>
       <p className="mt-1 text-sm text-fg-muted">
         {itemCount} {itemCount === 1 ? 'item' : 'items'}
@@ -682,19 +748,21 @@ function OrderSummary({
 function FulfillmentOption({
   checked,
   onSelect,
+  icon: Icon,
   title,
   text,
 }: {
   checked: boolean
   onSelect: () => void
+  icon: typeof Store
   title: string
   text: string
 }) {
   return (
     <label
       className={cx(
-        'flex cursor-pointer items-start gap-3 rounded-btn border p-3 transition-colors',
-        checked ? 'border-brand-500 bg-brand-50/60' : 'border-border bg-surface hover:bg-bg',
+        'flex min-h-14 cursor-pointer items-start gap-3 rounded-btn border p-3 transition-colors touch-manipulation',
+        checked ? 'border-brand-500 bg-brand-50/70 shadow-sm dark:bg-brand-500/10' : 'border-border bg-surface hover:bg-bg',
       )}
     >
       <input
@@ -702,11 +770,14 @@ function FulfillmentOption({
         name="fulfillment"
         checked={checked}
         onChange={onSelect}
-        className="mt-0.5 size-4 accent-[var(--color-brand-600,currentColor)]"
+        className="mt-1 size-4 accent-[var(--color-brand-600,currentColor)]"
       />
       <span className="min-w-0">
-        <span className="block text-sm font-bold text-fg">{title}</span>
-        <span className="block text-xs leading-5 text-fg-muted">{text}</span>
+        <span className="flex items-center gap-1.5 text-sm font-bold text-fg">
+          <Icon aria-hidden className="size-3.5 shrink-0 text-brand-600" />
+          {title}
+        </span>
+        <span className="mt-0.5 block text-xs leading-5 text-fg-muted">{text}</span>
       </span>
     </label>
   )
@@ -747,8 +818,8 @@ function SealedCartLine({
   }
 
   return (
-    <li className="grid gap-4 rounded-card border border-border bg-surface p-4 shadow-card sm:grid-cols-[6.75rem_minmax(0,1fr)] sm:p-5">
-      <div className="grid h-40 w-28 place-items-center overflow-hidden rounded-btn border border-border bg-bg sm:h-36 sm:w-full">
+    <article className="flex gap-3 rounded-card border border-border bg-surface p-3 shadow-card sm:gap-4 sm:p-4">
+      <div className="grid h-[5.5rem] w-[4rem] shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-bg sm:h-32 sm:w-24">
         <CardImage
           src={product?.imageUrl}
           alt={product?.name ?? 'Sealed product'}
@@ -757,56 +828,57 @@ function SealedCartLine({
         />
       </div>
 
-      <div className="min-w-0 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 flex-1 space-y-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-display text-xl font-extrabold leading-snug tracking-tight text-fg [overflow-wrap:anywhere]">
+            <p className="font-display text-[0.95rem] font-extrabold leading-snug tracking-tight text-fg sm:text-xl [overflow-wrap:anywhere]">
               {product?.name ?? 'Sealed product'}
             </p>
-            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-fg-muted">
+            <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-fg-muted sm:text-xs">
               {[product?.gameName ?? product?.gameCode, product?.setName].filter(Boolean).join(' / ') || 'Sealed'}
             </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               <Badge tone="brand">Sealed</Badge>
               {sealed.quantity <= 3 && <Badge tone="warning">Low stock</Badge>}
             </div>
           </div>
-
-          <div className="text-left sm:text-right">
-            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Line total</p>
-            <p className="font-display text-2xl font-extrabold text-fg">{linePrice}</p>
-          </div>
+          <p className="shrink-0 font-display text-lg font-extrabold text-fg sm:text-2xl">{linePrice}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center rounded-btn border border-border">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="inline-flex h-11 items-center overflow-hidden rounded-btn border border-border">
             <button
               type="button"
               onClick={() => step(-1)}
               disabled={entry.quantity <= 1}
               aria-label="Decrease quantity"
-              className="px-3 py-1.5 text-fg-muted disabled:opacity-40 hover:text-fg"
+              className="grid h-11 w-11 place-items-center text-fg-muted disabled:opacity-40 hover:text-fg touch-manipulation"
             >
               −
             </button>
-            <span className="min-w-10 px-2 text-center text-sm font-bold text-fg">{entry.quantity}</span>
+            <span className="min-w-8 px-1 text-center text-sm font-bold text-fg">{entry.quantity}</span>
             <button
               type="button"
               onClick={() => step(1)}
               disabled={atMax}
               aria-label="Increase quantity"
-              className="px-3 py-1.5 text-fg-muted disabled:opacity-40 hover:text-fg"
+              className="grid h-11 w-11 place-items-center text-fg-muted disabled:opacity-40 hover:text-fg touch-manipulation"
             >
               +
             </button>
           </div>
-          <span className="text-sm text-fg-muted">{formatPrice(sealed.priceCents)} each</span>
-          <Button variant="ghost" size="sm" onClick={onRemove}>
-            Remove
-          </Button>
+          <span className="text-xs text-fg-muted sm:text-sm">{formatPrice(sealed.priceCents)} each</span>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-btn px-2 text-sm font-bold text-fg-muted hover:bg-danger-50 hover:text-danger-700"
+          >
+            <Trash2 aria-hidden className="size-4" />
+            <span className="hidden sm:inline">Remove</span>
+          </button>
         </div>
       </div>
-    </li>
+    </article>
   )
 }
 
@@ -851,33 +923,36 @@ function CartLine({
   }
 
   return (
-    <li className="grid gap-4 rounded-card border border-border bg-surface p-4 shadow-card transition-shadow hover:shadow-[0_16px_40px_-18px_rgb(16_24_40/0.28)] sm:grid-cols-[6.75rem_minmax(0,1fr)] sm:p-5">
+    <article className="flex gap-3 rounded-card border border-border bg-surface p-3 shadow-card sm:gap-4 sm:p-4">
       <Link
         to={`/s/${slug}/cards/${item.id}`}
-        className={cx('relative h-40 w-28 overflow-hidden rounded-btn border-2 bg-bg sm:h-36 sm:w-full', item.isFoil && 'foil-card')}
+        className={cx(
+          'relative h-[5.5rem] w-[4rem] shrink-0 overflow-hidden rounded-btn border-2 bg-bg sm:h-32 sm:w-24',
+          item.isFoil && 'foil-card',
+        )}
         style={{ borderColor: accent }}
       >
         <CardImage src={image} alt={item.card.name} className="size-full" />
         {item.isFoil && <FoilOverlays foil glare={false} />}
       </Link>
 
-      <div className="min-w-0 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 flex-1 space-y-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <Link
               to={`/s/${slug}/cards/${item.id}`}
-              className="font-display text-xl font-extrabold leading-snug tracking-tight text-fg hover:text-brand-600 [overflow-wrap:anywhere]"
+              className="font-display text-[0.95rem] font-extrabold leading-snug tracking-tight text-fg hover:text-brand-600 sm:text-xl [overflow-wrap:anywhere]"
             >
               {item.card.name}
             </Link>
-            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-fg-muted">
+            <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-fg-muted sm:text-xs">
               {item.card.setName ?? item.card.setCode?.toUpperCase() ?? '-'} / #{item.card.collectorNumber ?? '-'}
             </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               <Badge>{item.condition}</Badge>
               {item.isFoil ? (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full border border-white/60 px-2.5 py-0.5 text-xs font-bold text-black/80"
+                  className="inline-flex items-center gap-1 rounded-full border border-white/60 px-2 py-0.5 text-[11px] font-bold text-black/80 sm:text-xs"
                   style={{ backgroundImage: FOIL_GRADIENT }}
                 >
                   <Sparkles aria-hidden className="size-3" />
@@ -889,49 +964,45 @@ function CartLine({
               {item.quantity <= 3 && <Badge tone="warning">Low stock</Badge>}
             </div>
           </div>
-
-          <div className="text-left sm:text-right">
-            <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Line total</p>
-            <p className="font-display text-2xl font-extrabold text-fg">{linePrice}</p>
-          </div>
+          <p className="shrink-0 font-display text-lg font-extrabold text-fg sm:text-2xl">{linePrice}</p>
         </div>
 
-        <div className="flex flex-col gap-4 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <QuantityControl
-              value={text}
-              atMin={entry.quantity <= 1}
-              atMax={atMax}
-              cardName={item.card.name}
-              onDecrement={() => step(-1)}
-              onIncrement={() => step(1)}
-              onTextChange={setText}
-              onBlur={() => {
-                const parsed = Number.parseInt(text, 10)
-                if (Number.isNaN(parsed) || parsed < 1) setText(String(entry.quantity))
-                else setText(String(Math.min(parsed, item.quantity)))
-              }}
-            />
-            <p className="text-xs leading-5 text-fg-muted">
-              <span className="font-bold text-fg">{formatPrice(unit)} each</span>
-              <span aria-hidden> / </span>
-              <span className={cx(atMax && 'font-bold text-warning-700')}>
-                {atMax ? `Only ${item.quantity} in stock` : `${item.quantity} in stock`}
-              </span>
-            </p>
-          </div>
-
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-3 sm:gap-3">
+          <QuantityControl
+            value={text}
+            atMin={entry.quantity <= 1}
+            atMax={atMax}
+            cardName={item.card.name}
+            onDecrement={() => step(-1)}
+            onIncrement={() => step(1)}
+            onTextChange={setText}
+            onBlur={() => {
+              const parsed = Number.parseInt(text, 10)
+              if (Number.isNaN(parsed) || parsed < 1) setText(String(entry.quantity))
+              else setText(String(Math.min(parsed, item.quantity)))
+            }}
+          />
+          <p className="min-w-0 text-[11px] leading-5 text-fg-muted sm:text-xs">
+            <span className="font-bold text-fg">{formatPrice(unit)}</span>
+            <span className="hidden sm:inline"> each</span>
+            <span className="mx-1" aria-hidden>
+              ·
+            </span>
+            <span className={cx(atMax && 'font-bold text-warning-700')}>
+              {atMax ? `${item.quantity} left` : `${item.quantity} in stock`}
+            </span>
+          </p>
           <button
             type="button"
             onClick={onRemove}
-            className="inline-flex w-fit items-center gap-1.5 rounded-btn px-2 py-1.5 text-sm font-bold text-fg-muted transition-colors hover:bg-danger-50 hover:text-danger-700"
+            className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-btn px-2 text-sm font-bold text-fg-muted transition-colors hover:bg-danger-50 hover:text-danger-700"
           >
             <Trash2 aria-hidden className="size-4" />
-            Remove
+            <span className="hidden sm:inline">Remove</span>
           </button>
         </div>
       </div>
-    </li>
+    </article>
   )
 }
 
@@ -955,13 +1026,13 @@ function QuantityControl({
   onBlur: () => void
 }) {
   return (
-    <div className="inline-flex h-10 items-stretch overflow-hidden rounded-btn border border-border bg-surface">
+    <div className="inline-flex h-11 items-stretch overflow-hidden rounded-btn border border-border bg-surface">
       <button
         type="button"
         onClick={onDecrement}
         disabled={atMin}
         aria-label="Decrease quantity"
-        className="grid w-10 place-items-center text-fg-muted transition-colors hover:bg-bg hover:text-fg disabled:opacity-40"
+        className="grid w-11 place-items-center text-fg-muted transition-colors hover:bg-bg hover:text-fg disabled:opacity-40 touch-manipulation"
       >
         <Minus aria-hidden className="size-4" />
       </button>
@@ -972,7 +1043,7 @@ function QuantityControl({
         onChange={(e) => onTextChange(e.target.value.replace(/\D/g, ''))}
         onBlur={onBlur}
         aria-label={`Quantity of ${cardName}`}
-        className="w-12 border-x border-border bg-surface text-center text-sm font-bold text-fg focus-visible:outline-none"
+        className="w-11 border-x border-border bg-surface text-center text-sm font-bold text-fg focus-visible:outline-none"
       />
       <button
         type="button"
@@ -980,7 +1051,7 @@ function QuantityControl({
         disabled={atMax}
         aria-label="Increase quantity"
         title={atMax ? 'No more in stock' : undefined}
-        className="grid w-10 place-items-center text-fg-muted transition-colors hover:bg-bg hover:text-fg disabled:opacity-40"
+        className="grid w-11 place-items-center text-fg-muted transition-colors hover:bg-bg hover:text-fg disabled:opacity-40 touch-manipulation"
       >
         <Plus aria-hidden className="size-4" />
       </button>
