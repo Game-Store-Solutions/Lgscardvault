@@ -789,7 +789,7 @@ export default function CommanderSynergyPage() {
                     )}
                     <button
                       type="button"
-                      className="mt-2.5 text-sm font-semibold text-brand-600 transition-colors hover:text-brand-500"
+                      className="mt-2.5 text-sm font-semibold text-brand-600 underline-offset-2 transition-colors hover:text-brand-500 hover:underline"
                       onClick={clearCommander}
                     >
                       Change commander
