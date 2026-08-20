@@ -44,7 +44,10 @@ export function CardTile({ item, slug }: CardTileProps) {
         className="perspective-[900px]"
       >
         <motion.div
-          className={cx('tilt-card relative aspect-5/7 overflow-hidden bg-surface-elevated dark:bg-[#18181B]', item.isFoil && 'foil-card')}
+          className={cx(
+            'tilt-card relative aspect-5/7 overflow-hidden rounded-[4.5%/3.5%] bg-surface-elevated dark:bg-[#18181B]',
+            item.isFoil && 'foil-card',
+          )}
           style={tiltStyle}
         >
           {image ? (

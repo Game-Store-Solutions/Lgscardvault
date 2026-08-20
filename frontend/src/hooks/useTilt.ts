@@ -71,8 +71,8 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     if (!idle || hovering.current || reduceMotion || !inView) return
     const a = (time / IDLE_A_MS) * Math.PI * 2 + phase.current
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
-    px.set(50 + Math.sin(a) * 18 + Math.sin(b * 1.15) * 8)
-    py.set(50 + Math.cos(a * 0.62) * 14 + Math.sin(b) * 7)
+    px.set(50 + Math.sin(a) * 14 + Math.sin(b * 1.15) * 6)
+    py.set(50 + Math.cos(a * 0.62) * 11 + Math.sin(b) * 5)
     op.set(0.4 + Math.sin(a * 0.9) * 0.08)
     rx.set(Math.sin(a * 0.55) * maxTilt * 0.08)
     ry.set(Math.cos(a * 0.48) * maxTilt * 0.1)
