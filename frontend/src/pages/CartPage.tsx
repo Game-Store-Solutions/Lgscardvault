@@ -19,6 +19,7 @@ import { customerKeys } from '../hooks/useCustomer'
 import { guestCartKey, guestCartLines, resetGuestCart } from '../hooks/useGuestCart'
 import { BackButton, Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
 import { CheckoutPanel } from '../components/payments/CheckoutPanel'
+import { PaymentQr } from '../components/payments/PaymentQr'
 import { CardImage, SpotlightCard } from '../components/cards'
 import { FoilOverlays } from '../components/cards/FoilOverlays'
 import { cx } from '../lib/cx'
@@ -86,10 +87,11 @@ export default function CartPage() {
   }, [isGuest, fulfillment])
 
   const checkoutConfigQuery = useQuery({
-    queryKey: ['store-checkout-config', slug],
+    queryKey: ['store-checkout-config', slug, isGuest ? 'guest' : 'customer'],
     enabled: Boolean(slug && !kioskMode),
     queryFn: async () => {
-      const { data } = await api.get<{ enabled: boolean }>(`/stores/${slug}/customer/checkout/config`)
+      const path = isGuest ? `/stores/${slug}/guest/checkout/config` : `/stores/${slug}/customer/checkout/config`
+      const { data } = await api.get<{ enabled: boolean }>(path)
       return data
     },
   })
@@ -247,6 +249,8 @@ export default function CartPage() {
         <StorePageLoader label="Loading your cart…" />
       ) : kioskMode && createdOrder ? (
         <KioskOrderComplete reference={createdOrder.reference} />
+      ) : createdOrder ? (
+        <OrderPlacedConfirmation slug={slug} order={createdOrder} storeName={store?.name ?? 'the store'} />
       ) : cart.length === 0 ? (
         <EmptyCart slug={slug} storeName={store?.name ?? 'the store'} picks={picks} />
       ) : (
@@ -403,6 +407,52 @@ export default function CartPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function OrderPlacedConfirmation({
+  slug,
+  order,
+  storeName,
+}: {
+  slug: string
+  order: Order
+  storeName: string
+}) {
+  const unpaid = (order.paidCents ?? 0) <= 0 && (order.creditAppliedCents ?? 0) < order.totalCents
+  const payInStore = unpaid && (order.notes === 'Paying in store' || order.fulfillment === 'pickup')
+
+  return (
+    <div className="mx-auto max-w-lg space-y-5 rounded-card border border-border bg-surface px-6 py-10 text-center shadow-card">
+      <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-50 text-success-700">
+        <CheckCircle2 aria-hidden className="size-7" />
+      </span>
+      <div>
+        <h2 className="font-display text-2xl font-bold text-fg">
+          {payInStore ? 'Order reserved' : 'Order placed'}
+        </h2>
+        <p className="mt-1 font-mono text-sm font-medium text-fg-muted">{order.reference}</p>
+      </div>
+      {payInStore ? (
+        <p className="text-sm leading-6 text-fg-muted">
+          {storeName} will hold your items. Pay at the counter when you pick up
+          {order.paymentUrl ? ', or scan the Square QR below to pay now' : ''}.
+        </p>
+      ) : (
+        <p className="text-sm leading-6 text-fg-muted">Thanks — your payment went through. We&apos;ll have it ready.</p>
+      )}
+      {order.paymentUrl ? (
+        <PaymentQr url={order.paymentUrl} caption="Scan to pay this order with Square" />
+      ) : null}
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+        <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'primary', size: 'md' })}>
+          Back to store
+        </Link>
+        <Link to={`/s/${slug}/account`} className={buttonVariants({ variant: 'secondary', size: 'md' })}>
+          View orders
+        </Link>
+      </div>
     </div>
   )
 }

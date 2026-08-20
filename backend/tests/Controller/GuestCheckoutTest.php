@@ -43,6 +43,19 @@ final class GuestCheckoutTest extends WebTestCase
         return '' === $raw ? [] : (json_decode($raw, true) ?? []);
     }
 
+    public function testGuestCheckoutConfigIsPublic(): void
+    {
+        $store = $this->fixtures->store();
+        $this->gateway->ready = true;
+
+        $config = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/guest/checkout/config");
+
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertTrue($config['enabled'] ?? false);
+        self::assertArrayHasKey('applicationId', $config);
+        self::assertArrayNotHasKey('accessToken', $config);
+    }
+
     public function testGuestCheckoutRequiresName(): void
     {
         [$store, $item] = $this->storeWithStockedListing();
@@ -95,7 +108,11 @@ final class GuestCheckoutTest extends WebTestCase
 
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
         self::assertSame('Guest Shopper', $response['customerName'] ?? null);
+        self::assertSame('Paying in store', $response['notes'] ?? null);
         self::assertNotSame('paid', $response['status'] ?? null);
+        self::assertSame(0, $response['paidCents'] ?? null);
+        self::assertNotEmpty($response['paymentUrl'] ?? null);
+        self::assertCount(1, $this->gateway->paymentLinks);
     }
 
     /** @return array{Store, InventoryItem} */

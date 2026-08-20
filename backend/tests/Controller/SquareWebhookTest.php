@@ -200,6 +200,48 @@ final class SquareWebhookTest extends WebTestCase
         self::assertNotNull($account->getLastError());
     }
 
+    public function testPayInStoreQrPaymentWebhookMarksTheOrderPaid(): void
+    {
+        $store = $this->fixtures->store();
+        $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(951), 5, priceCents: 1200);
+        $customer = $this->fixtures->user(['ROLE_USER']);
+
+        $token = static::getContainer()->get(JWTTokenManagerInterface::class)->create($customer);
+        $server = ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '.$token];
+
+        $this->client->request('PUT', "/api/stores/{$store->getSlug()}/customer/cart/{$item->getId()}", server: $server, content: json_encode(['quantity' => 1]));
+        $this->client->request('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", server: $server, content: json_encode(['fulfillment' => 'pickup']));
+
+        $order = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(201, $this->responseCode());
+        self::assertSame('Paying in store', $order['notes'] ?? null);
+
+        $this->em->clear();
+        $placed = $this->em->getRepository(Order::class)->find($order['id']);
+        self::assertInstanceOf(Order::class, $placed);
+        $squareOrderId = $placed->getSquareOrderId();
+        self::assertNotEmpty($squareOrderId);
+
+        $body = $this->send($this->event('payment.created', [
+            'payment' => [
+                'id' => 'sqpmt-qr-1',
+                'status' => 'COMPLETED',
+                'order_id' => $squareOrderId,
+                'amount_money' => ['amount' => 1200, 'currency' => 'USD'],
+                'note' => 'Paying in store — '.$order['reference'],
+            ],
+        ], 'evt-qr-1'));
+
+        self::assertSame(200, $this->responseCode());
+        self::assertSame('processed', $body['status']);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(Order::class)->find($order['id']);
+        self::assertSame(1200, $fresh->getPaidCents());
+        self::assertSame('sqpmt-qr-1', $fresh->getPaymentReference());
+        self::assertNull($fresh->getNotes());
+    }
+
     public function testUnhandledEventTypeIsAcknowledgedNotRetried(): void
     {
         $body = $this->send($this->event('inventory.count.updated', ['counts' => []]));

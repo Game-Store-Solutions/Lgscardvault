@@ -128,7 +128,7 @@ final class SquareWebhookController extends AbstractController
             return [SquareWebhookEvent::STATUS_IGNORED, 'Payment event without id.'];
         }
 
-        $order = $this->orders->findOneBy(['paymentReference' => $paymentId]);
+        $order = $this->findOrderForPayment($payment, $paymentId);
         if (!$order instanceof Order) {
             return [SquareWebhookEvent::STATUS_IGNORED, 'No LGS order for payment '.$paymentId];
         }
@@ -139,12 +139,59 @@ final class SquareWebhookController extends AbstractController
             $order->setSquareOrderId($squareOrderId);
         }
 
+        if ('COMPLETED' === $status && $order->getPaidCents() < 1) {
+            $amount = (int) ($payment['amount_money']['amount'] ?? 0);
+            if ($amount > 0) {
+                $order->setPaidCents($amount)->setPaymentReference($paymentId);
+                if (Order::NOTE_PAY_IN_STORE === $order->getNotes()) {
+                    $order->setNotes(null);
+                }
+            }
+        }
+
         return [SquareWebhookEvent::STATUS_PROCESSED, sprintf(
             'Payment %s (%s) for order %s',
             $paymentId,
             $status,
             $order->getReference(),
         )];
+    }
+
+    /**
+     * @param array<string, mixed> $payment
+     */
+    private function findOrderForPayment(array $payment, string $paymentId): ?Order
+    {
+        $order = $this->orders->findOneBy(['paymentReference' => $paymentId]);
+        if ($order instanceof Order) {
+            return $order;
+        }
+
+        $squareOrderId = $this->nullableString($payment['order_id'] ?? null);
+        if (null !== $squareOrderId) {
+            $order = $this->orders->findOneBy(['squareOrderId' => $squareOrderId]);
+            if ($order instanceof Order) {
+                return $order;
+            }
+        }
+
+        $reference = $this->nullableString($payment['reference_id'] ?? null);
+        if (null !== $reference) {
+            $order = $this->orders->findOneBy(['reference' => $reference]);
+            if ($order instanceof Order) {
+                return $order;
+            }
+        }
+
+        $note = $this->nullableString($payment['note'] ?? null);
+        if (null !== $note && 1 === preg_match('/\b(ORD-[A-Z0-9]+)\b/', $note, $matches)) {
+            $order = $this->orders->findOneBy(['reference' => $matches[1]]);
+            if ($order instanceof Order) {
+                return $order;
+            }
+        }
+
+        return null;
     }
 
     /**

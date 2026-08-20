@@ -22,7 +22,7 @@ const METHOD_BY_SDK: Record<string, PaymentMethodType> = {
   'Google Pay': 'google_pay',
 }
 
-function PaymentDivider({ label = 'Or pay with card' }: { label?: string }) {
+export function PaymentDivider({ label = 'Or pay with card' }: { label?: string }) {
   return (
     <div className="my-6 flex items-center gap-3 text-xs font-medium text-fg-muted">
       <span className="h-px flex-1 bg-border/70" />
@@ -56,6 +56,7 @@ export function SquarePaymentPanel({
   layout = 'checkout',
   saveOnly = false,
   payButtonPlacement = 'inline',
+  showCardForm = true,
   onPayActionChange,
   onTokenized,
 }: {
@@ -74,6 +75,8 @@ export function SquarePaymentPanel({
   saveOnly?: boolean
   /** When external, card pay button is omitted — parent renders it (e.g. below an accordion). */
   payButtonPlacement?: 'inline' | 'external'
+  /** Cart checkout hides the card form and uses pay-in-store instead. */
+  showCardForm?: boolean
   onPayActionChange?: (action: SquareCardPayAction | null) => void
   onTokenized: (payment: TokenizedPayment) => void
 }) {
@@ -94,7 +97,7 @@ export function SquarePaymentPanel({
   const amount = (walletDisplayCents / 100).toFixed(2)
   const vaultIntent = saveOnly || priceCents <= 0
   const showExpress = walletsEnabled && (googlePay || applePay)
-  const showWalletDivider = showExpress
+  const showWalletDivider = showExpress && showCardForm
 
   /** Square Card fails if attach runs while the host is display:none or zero-size. */
   async function attachCardWhenReady(created: Card): Promise<void> {
@@ -119,7 +122,7 @@ export function SquarePaymentPanel({
   }
 
   useEffect(() => {
-    if (!payments) return
+    if (!payments || !showCardForm) return
 
     let cancelled = false
     let instance: Card | null = null
@@ -143,7 +146,7 @@ export function SquarePaymentPanel({
       setCard(null)
       if (instance) void instance.destroy()
     }
-  }, [payments, darkMode])
+  }, [payments, darkMode, showCardForm])
 
   useEffect(() => {
     if (!payments || !walletsEnabled) return
@@ -272,22 +275,23 @@ export function SquarePaymentPanel({
   const sandboxBanner =
     environment === 'sandbox' ? (
       <p className="rounded-btn bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
-        {isDevBuild ? (
+        {showCardForm && isDevBuild ? (
           <>
             Test mode. Use card <span className="font-mono">4111 1111 1111 1111</span>, any future expiry, CVV{' '}
             <span className="font-mono">111</span>, postal <span className="font-mono">94103</span>.
           </>
         ) : (
-          <>Test mode. Cards are not charged. Use Square sandbox test card numbers.</>
+          <>Test mode. Square wallets are not charged.</>
         )}
       </p>
     ) : null
 
+  const walletCount = Number(Boolean(applePay)) + Number(Boolean(googlePay))
   const expressCheckout =
     walletsEnabled && layout === 'checkout' ? (
       <div className="mt-2 space-y-3 rounded-xl bg-bg/90 px-4 py-4 dark:bg-bg/50">
         <p className="text-sm font-bold text-fg">Express checkout</p>
-        <div className="flex flex-col gap-2.5">
+        <div className={walletCount > 1 ? 'grid grid-cols-2 items-stretch gap-2.5' : 'flex flex-col gap-2.5'}>
           {applePay && (
             <button
               type="button"
@@ -300,14 +304,18 @@ export function SquarePaymentPanel({
           )}
           <div
             ref={googlePayRef}
-            className={googlePay ? 'min-h-12 w-full [&>button]:!w-full' : 'hidden'}
+            className={googlePay ? 'flex min-h-12 w-full items-stretch [&>button]:!h-12 [&>button]:!w-full' : 'hidden'}
             onClick={() => {
               if (googlePay && !busy) void submit(() => googlePay.tokenize(), 'google_pay')
             }}
           />
         </div>
         {walletsChecked && !googlePay && !applePay && (
-          <p className="text-xs leading-5 text-fg-muted">Wallets aren&apos;t available in this browser. Use your card below.</p>
+          <p className="text-xs leading-5 text-fg-muted">
+            {showCardForm
+              ? 'Wallets aren\'t available in this browser. Use your card below.'
+              : 'Apple Pay and Google Pay aren\'t available in this browser. Reserve and pay in store, or scan the Square QR after checkout.'}
+          </p>
         )}
       </div>
     ) : null
@@ -352,7 +360,7 @@ export function SquarePaymentPanel({
         <>
           {expressCheckout}
           {showWalletDivider && <PaymentDivider />}
-          {cardBlock}
+          {showCardForm ? cardBlock : null}
         </>
       ) : (
         <>

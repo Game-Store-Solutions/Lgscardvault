@@ -743,6 +743,12 @@ export interface Order {
   totalCents: number
   /** Store credit spent on this order, in cents (0 = none). */
   creditAppliedCents?: number
+  /** Cash captured by Square, in cents. Zero for unpaid pay-in-store orders. */
+  paidCents?: number
+  /** Staff-facing checkout note, e.g. "Paying in store". */
+  notes?: string | null
+  /** Square hosted checkout URL returned once when a pay-in-store QR is minted. */
+  paymentUrl?: string | null
   createdAt: string
   lines?: OrderLine[]
 }

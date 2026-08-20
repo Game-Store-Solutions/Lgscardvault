@@ -77,7 +77,7 @@ function orderSheetHtml(order: Order): string {
           <div class="box">
             <div class="label">Status</div>
             <div class="value">${escapeHtml(ORDER_STATUS_LABELS[order.status])}</div>
-            <div class="muted">${itemCount} ${itemCount === 1 ? 'item' : 'items'}</div>
+            <div class="muted">${itemCount} ${itemCount === 1 ? 'item' : 'items'}${order.notes ? ` · ${escapeHtml(order.notes)}` : ''}</div>
           </div>
         </section>
 

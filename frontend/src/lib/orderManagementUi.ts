@@ -119,19 +119,19 @@ export function customerTierLabel(order: Order): string {
 
 
 export function paymentSubtitle(order: Order): string {
-
   if (order.channel === 'kiosk') return 'Paid in store'
 
   const credit = order.creditAppliedCents ?? 0
+  const paid = order.paidCents ?? 0
 
   if (credit > 0 && credit >= order.totalCents) return 'Paid with store credit'
-
-  if (credit > 0) return 'Card + store credit'
+  if (paid > 0 && credit > 0) return 'Paid online + store credit'
+  if (paid > 0) return 'Paid online'
+  if (order.notes === 'Paying in store' || (order.status === 'pending' && paid === 0)) return 'Pay in store'
 
   if (order.status === 'pending') return 'Awaiting payment'
 
-  return 'Paid by card'
-
+  return 'Paid online'
 }
 
 

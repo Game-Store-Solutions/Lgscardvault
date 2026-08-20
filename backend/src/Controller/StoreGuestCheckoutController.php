@@ -15,6 +15,7 @@ use App\Repository\StoreRepository;
 use App\Service\Checkout\CartOrderBuilder;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
+use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Payments\CheckoutGatewayInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,9 +33,21 @@ final class StoreGuestCheckoutController extends AbstractController
         private readonly SealedInventoryItemRepository $sealedRepository,
         private readonly CartOrderBuilder $orderBuilder,
         private readonly CheckoutGatewayInterface $checkoutGateway,
+        private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly EntityManagerInterface $entityManager,
     ) {
+    }
+
+    #[Route('/checkout/config', name: 'api_store_guest_checkout_config', methods: ['GET'])]
+    public function checkoutConfig(string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        return $this->json($this->checkoutGateway->checkoutConfig($store));
     }
 
     #[Route('/checkout', name: 'api_store_guest_checkout', methods: ['POST'])]
@@ -182,9 +195,10 @@ final class StoreGuestCheckoutController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
+        $extra = $this->payInStoreFinalizer->finalize($store, $order);
         $this->entityManager->flush();
 
-        return $this->json($this->serializeOrder($order), 201);
+        return $this->json($this->serializeOrder($order) + $extra, 201);
     }
 
     /**
@@ -267,6 +281,7 @@ final class StoreGuestCheckoutController extends AbstractController
             'totalCents' => $order->getTotalCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
+            'notes' => $order->getNotes(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),
         ];
