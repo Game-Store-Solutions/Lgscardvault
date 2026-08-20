@@ -452,7 +452,7 @@ body {
    * continuous catch-light rather than a hard stripe.
    */
   .foil-card {
-    --foil-holo-opacity: 0.4;
+    --foil-holo-opacity: 0.5;
   }
   .tilt-card {
     isolation: isolate;
@@ -463,13 +463,13 @@ body {
     overflow: hidden;
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.35) 0%,
-      hsla(0, 0%, 100%, 0.125) 22%,
-      hsla(0, 0%, 100%, 0.038) 42%,
+      hsla(0, 0%, 100%, 0.438) 0%,
+      hsla(0, 0%, 100%, 0.156) 22%,
+      hsla(0, 0%, 100%, 0.048) 42%,
       transparent 62%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.625);
+    opacity: calc(var(--op, 0) * 0.78);
     transition: opacity 0.45s ease;
     /* Keep glare off the rounded rim so edges stay clean. */
     -webkit-mask-image: radial-gradient(
@@ -492,9 +492,9 @@ body {
     background-image:
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        hsla(0, 0%, 100%, 0.35) 0%,
-        hsla(200, 30%, 80%, 0.2) 20%,
-        hsla(280, 22%, 78%, 0.1) 40%,
+        hsla(0, 0%, 100%, 0.438) 0%,
+        hsla(200, 30%, 80%, 0.25) 20%,
+        hsla(280, 22%, 78%, 0.125) 40%,
         transparent 68%
       ),
       linear-gradient(
@@ -521,7 +521,7 @@ body {
       20% 45%;
     background-blend-mode: soft-light, soft-light;
     mix-blend-mode: soft-light;
-    opacity: calc(var(--foil-holo-opacity, 0.4) + var(--op, 0) * 0.475);
+    opacity: calc(var(--foil-holo-opacity, 0.5) + var(--op, 0) * 0.594);
     transition: opacity 0.45s ease;
     animation: holo-gradient 14s linear infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -14s);
@@ -580,7 +580,7 @@ body {
         rgb(255 255 255 / 0.012) 3px,
         rgb(255 255 255 / 0.012) 6px
       );
-    opacity: calc(var(--op, 0) * 0.225);
+    opacity: calc(var(--op, 0) * 0.281);
     transition: opacity 0.45s ease;
     pointer-events: none;
     -webkit-mask-image:
@@ -617,7 +617,7 @@ body {
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.5;
+    --op: 0.625;
     animation: foil-idle-orbit 18s linear infinite;
   }
   .foil-idle-orbit:hover {
@@ -684,27 +684,27 @@ body {
   100% {
     --mx: 38%;
     --my: 42%;
-    --op: 0.45;
+    --op: 0.562;
   }
   20% {
     --mx: 48%;
     --my: 34%;
-    --op: 0.525;
+    --op: 0.656;
   }
   40% {
     --mx: 62%;
     --my: 40%;
-    --op: 0.575;
+    --op: 0.719;
   }
   60% {
     --mx: 56%;
     --my: 58%;
-    --op: 0.5;
+    --op: 0.625;
   }
   80% {
     --mx: 40%;
     --my: 54%;
-    --op: 0.475;
+    --op: 0.594;
   }
 }
 
