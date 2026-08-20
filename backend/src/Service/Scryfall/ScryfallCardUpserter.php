@@ -25,7 +25,7 @@ final class ScryfallCardUpserter
 {
     private const COLUMNS = [
         'id', 'oracle_id', 'name', 'set_code', 'collector_number', 'rarity',
-        'mana_cost', 'type_line', 'oracle_text', 'cmc', 'image_uris', 'prices',
+        'edhrec_rank', 'mana_cost', 'type_line', 'oracle_text', 'cmc', 'image_uris', 'prices',
         'set_name', 'colors', 'color_identity', 'keywords', 'power', 'toughness',
         'loyalty', 'artist', 'flavor_text', 'legalities', 'finishes', 'games',
         'released_at', 'lang', 'layout', 'scryfall_uri', 'scryfall_data',
@@ -145,6 +145,7 @@ final class ScryfallCardUpserter
             $this->truncate((string) ($data['set'] ?? ''), 10),
             $this->truncate((string) ($data['collector_number'] ?? ''), 20),
             isset($data['rarity']) ? $this->truncate((string) $data['rarity'], 20) : null,
+            isset($data['edhrec_rank']) && is_numeric($data['edhrec_rank']) ? (int) $data['edhrec_rank'] : null,
             isset($data['mana_cost']) ? $this->truncate((string) $data['mana_cost'], 64) : null,
             isset($data['type_line']) ? $this->truncate((string) $data['type_line'], 255) : null,
             isset($data['oracle_text']) ? (string) $data['oracle_text'] : null,

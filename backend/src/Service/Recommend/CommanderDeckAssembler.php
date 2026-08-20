@@ -46,7 +46,7 @@ final class CommanderDeckAssembler
         $identity = $commander->getColorIdentity() ?? [];
 
         $candidates = [];
-        foreach ($this->inventoryItems->findInStockMagicForStore($store) as $item) {
+        foreach ($this->inventoryItems->findRecommendationCandidates($store, $identity) as $item) {
             $card = $item->getCard();
             if (!$card instanceof Card) {
                 continue;
