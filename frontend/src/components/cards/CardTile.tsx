@@ -3,6 +3,7 @@ import { ImageOff } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
+import { useInventoryItemLink } from '../../hooks/useInventoryItemLink'
 import { cx } from '../../lib/cx'
 import { CardImage } from './CardImage'
 import { FoilOverlays } from './FoilOverlays'
@@ -26,10 +27,12 @@ export function CardTile({ item, slug }: CardTileProps) {
   const accent = rarityAccent(item.card.rarity)
   const price = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
   const { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle } = useTilt(9, { idle: item.isFoil })
+  const link = useInventoryItemLink(slug)
 
   return (
     <Link
-      to={`/s/${slug}/cards/${item.id}`}
+      to={link.to(item.id)}
+      state={link.state}
       className={cx(
         'group flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card dark:glass-card ui-lift',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',

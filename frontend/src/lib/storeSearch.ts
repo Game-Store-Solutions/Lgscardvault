@@ -111,11 +111,14 @@ export function hasActiveStoreSearch(params: URLSearchParams): boolean {
   )
 }
 
+/** Card links from the storefront only keep filter context when a search is active. */
 export function storefrontCardState(
   pathname: string,
   slug: string,
   search: string,
 ): StoreSearchNavState | undefined {
   if (pathname !== `/s/${slug}` && pathname !== `/s/${slug}/`) return undefined
+  const query = search.startsWith('?') ? search.slice(1) : search
+  if (!hasActiveStoreSearch(new URLSearchParams(query))) return undefined
   return { from: STORE_SEARCH_FROM, search }
 }
