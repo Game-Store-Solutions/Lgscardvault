@@ -25,6 +25,7 @@ import {
   useCommanderStrategies,
   useStore,
   useStoreTheme,
+  useDebouncedValue,
 } from '../hooks'
 import type { CommanderRecommendation, CommanderSummary, DeckCardType, DeckRole, SpellbookCombo } from '../hooks'
 import {
@@ -33,7 +34,9 @@ import {
   BackButton,
   buttonVariants,
   EmptyState,
+  Input,
   LoadingPanel,
+  Select,
   Skeleton,
   Tabs,
   TabPanel,
@@ -45,7 +48,9 @@ import { finishName } from '../lib/finishes'
 import { cx } from '../lib/cx'
 import { useAppShellFlush } from '../components/layout/AppShellLayout'
 import {
+  dollarsToCents,
   loadDeckBuilderSession,
+  parseDeckBuilderBracket,
   parseDeckBuilderPanel,
   parseDeckBuilderView,
   saveDeckBuilderSession,
@@ -297,12 +302,24 @@ export default function CommanderSynergyPage() {
   )
   const [deckBusy, setDeckBusy] = useState(false)
   const [query, setQuery] = useState(() => selected?.name ?? '')
+  const [budgetDollars, setBudgetDollars] = useState(() => searchParams.get('budget') ?? '')
+  const [maxCardDollars, setMaxCardDollars] = useState(() => searchParams.get('maxCard') ?? '')
+  const [bracket, setBracket] = useState(() => parseDeckBuilderBracket(searchParams.get('bracket')))
+  const debouncedBudgetDollars = useDebouncedValue(budgetDollars, 400)
+  const debouncedMaxCardDollars = useDebouncedValue(maxCardDollars, 400)
+
+  const budgetCents = dollarsToCents(debouncedBudgetDollars)
+  const maxCardCents = dollarsToCents(debouncedMaxCardDollars)
 
   const search = useCommanderSearch(slug, query)
   const strategiesQuery = useCommanderStrategies(slug, selected?.id ?? null)
   const recommend = useCommanderRecommendations(slug, selected?.id ?? null, strategyId)
   const combos = useCommanderCombos(slug, selected?.id ?? null, panel === 'combos' || panel === 'deck')
-  const deck = useCommanderDeck(slug, selected?.id ?? null, panel === 'deck')
+  const deck = useCommanderDeck(slug, selected?.id ?? null, panel === 'deck', {
+    budgetCents,
+    maxCardCents,
+    bracket,
+  })
   const cart = useCart(slug, signedIn)
   const cartLines = cart.query.data ?? []
   const recommendations = recommend.data?.recommendations ?? []
@@ -346,10 +363,13 @@ export default function CommanderSynergyPage() {
       if (strategyId) next.set('strategy', strategyId)
       if (panel !== 'synergy') next.set('panel', panel)
       if (view !== 'roles') next.set('view', view)
+      if (budgetDollars.trim()) next.set('budget', budgetDollars.trim())
+      if (maxCardDollars.trim()) next.set('maxCard', maxCardDollars.trim())
+      if (bracket !== 'auto') next.set('bracket', bracket)
     }
     if (next.toString() === searchParams.toString()) return
     setSearchParams(next, { replace: true })
-  }, [panel, searchParams, selected?.id, setSearchParams, strategyId, view])
+  }, [bracket, budgetDollars, maxCardDollars, panel, searchParams, selected?.id, setSearchParams, strategyId, view])
 
   useEffect(() => {
     if (!slug) return
@@ -362,8 +382,11 @@ export default function CommanderSynergyPage() {
       strategyId,
       panel,
       view,
+      budgetDollars,
+      maxCardDollars,
+      bracket,
     })
-  }, [panel, selected, slug, strategyId, view])
+  }, [bracket, budgetDollars, maxCardDollars, panel, selected, slug, strategyId, view])
 
   const cartQtyByInventoryId = new Map<number, number>()
   for (const line of cartLines) {
@@ -744,6 +767,48 @@ export default function CommanderSynergyPage() {
                   })}
                 </div>
               </div>
+
+              <div className="rounded-card border border-border bg-surface p-4 shadow-sm">
+                <p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
+                  Build constraints
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+                  Caps apply to the 100-card list. Combos stay legal in this commander&apos;s
+                  colors.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Input
+                    label="Deck budget"
+                    inputMode="decimal"
+                    placeholder="500"
+                    value={budgetDollars}
+                    onChange={(e) => setBudgetDollars(e.target.value)}
+                    hint="USD total"
+                  />
+                  <Input
+                    label="Card max"
+                    inputMode="decimal"
+                    placeholder="25"
+                    value={maxCardDollars}
+                    onChange={(e) => setMaxCardDollars(e.target.value)}
+                    hint="USD each"
+                  />
+                </div>
+                <Select
+                  label="Commander bracket"
+                  wrapperClassName="mt-3"
+                  value={bracket}
+                  onChange={(e) => setBracket(parseDeckBuilderBracket(e.target.value))}
+                  hint="Auto uses Scryfall Game Changers this store stocks in-identity."
+                >
+                  <option value="auto">Auto from store stock</option>
+                  <option value="1">1 · Exhibition (no Game Changers)</option>
+                  <option value="2">2 · Core (no Game Changers)</option>
+                  <option value="3">3 · Upgraded (up to 3 Game Changers)</option>
+                  <option value="4">4 · Optimized</option>
+                  <option value="5">5 · cEDH</option>
+                </Select>
+              </div>
             </aside>
 
             <div className="min-w-0 flex-1">
@@ -906,6 +971,9 @@ export default function CommanderSynergyPage() {
                   slug={slug}
                   loading={combos.isLoading}
                   combos={combos.data?.combos ?? []}
+                  identityCode={combos.data?.identityCode ?? recommend.data?.identityCode}
+                  colorIdentity={combos.data?.colorIdentity ?? selected.colorIdentity}
+                  filteredOutCount={combos.data?.filteredOutCount ?? 0}
                   signedIn={signedIn}
                   cartQtyByInventoryId={cartQtyByInventoryId}
                   onAdd={(item) => void addOne(item)}
@@ -937,6 +1005,9 @@ function CombosPanel({
   slug,
   loading,
   combos,
+  identityCode,
+  colorIdentity,
+  filteredOutCount,
   signedIn,
   cartQtyByInventoryId,
   onAdd,
@@ -946,6 +1017,9 @@ function CombosPanel({
   slug: string
   loading: boolean
   combos: SpellbookCombo[]
+  identityCode?: string
+  colorIdentity?: string[]
+  filteredOutCount?: number
   signedIn: boolean
   cartQtyByInventoryId: Map<number, number>
   onAdd: (item: InventoryItem) => void
@@ -960,12 +1034,24 @@ function CombosPanel({
       <EmptyState
         icon={Wand2}
         title="No combos found yet"
-        description="Commander Spellbook did not return combos for this commander, or the store has none of the pieces in stock."
+        description="Commander Spellbook did not return combos legal in this commander’s color identity, or the store has none of the pieces in stock."
       />
     )
   }
 
   return (
+    <div className="space-y-3">
+      <div className="rounded-card border border-border bg-surface px-4 py-3 text-sm">
+        <p className="font-semibold text-fg">
+          Legal in {identityCode || 'this identity'}
+          <span className="ml-2 inline-flex align-middle">{colorPips(colorIdentity)}</span>
+        </p>
+        <p className="mt-1 text-xs text-fg-muted">
+          Colorless cards are always allowed. Combos are ranked complete-in-store first, then by
+          how many pieces this store has, down to none.
+          {filteredOutCount ? ` Hidden ${filteredOutCount} off-identity combo${filteredOutCount === 1 ? '' : 's'}.` : ''}
+        </p>
+      </div>
     <ul className="space-y-3">
       {combos.map((combo) => (
         <li key={combo.id || combo.description} className="rounded-card border border-border bg-surface p-4 shadow-sm">
@@ -992,7 +1078,8 @@ function CombosPanel({
               >
                 <span className={piece.inStock ? 'font-medium text-fg' : 'text-fg-muted'}>
                   {piece.name}
-                  {!piece.inStock && ' · missing'}
+                  {piece.isCommander ? ' · commander' : ''}
+                  {!piece.inStock && !piece.isCommander && ' · missing'}
                 </span>
                 {piece.inventoryItem && (
                   <div className="flex items-center gap-2">
@@ -1026,6 +1113,7 @@ function CombosPanel({
         </li>
       ))}
     </ul>
+    </div>
   )
 }
 
@@ -1060,10 +1148,28 @@ function DeckPanel({
             {deck.filledSize} / {deck.targetSize} cards from this store
           </p>
           <p className="mt-1 text-xs text-fg-muted">
+            {deck.bracket.label} (bracket {deck.bracket.applied}
+            {deck.bracket.auto ? ', auto' : ''})
+            {deck.budget.limitCents != null
+              ? ` · ${formatPrice(deck.budget.spentCents)} of ${formatPrice(deck.budget.limitCents)}`
+              : ` · ${formatPrice(deck.budget.spentCents)}`}
+            {deck.budget.maxCardCents != null ? ` · max ${formatPrice(deck.budget.maxCardCents)} / card` : ''}
+          </p>
+          <p className="mt-1 text-xs text-fg-muted">
             Lands {deck.slots.land ?? 0} · Ramp {deck.slots.ramp ?? 0} · Draw {deck.slots.draw ?? 0} ·
             Removal {deck.slots.removal ?? 0} · Combo {deck.slots.combo ?? 0} · Synergy{' '}
             {deck.slots.synergy ?? 0}
+            {(deck.slots.game_changer ?? 0) > 0 ? ` · Game Changers ${deck.slots.game_changer}` : ''}
           </p>
+          {deck.bracket.gameChangersInStock.length > 0 && (
+            <p className="mt-1 text-xs text-fg-muted">
+              Store can supply {deck.bracket.gameChangersInStock.length} Game Changer
+              {deck.bracket.gameChangersInStock.length === 1 ? '' : 's'} in this identity
+              {deck.bracket.gameChangersIncluded.length > 0
+                ? ` · included ${deck.bracket.gameChangersIncluded.map((c) => c.name).join(', ')}`
+                : ''}
+            </p>
+          )}
           {deck.gaps.length > 0 && (
             <p className="mt-1 text-xs text-warning-700">{deck.gaps[0]}</p>
           )}
@@ -1121,7 +1227,8 @@ function DeckPanel({
                   {item.card.name}
                 </Link>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-muted">
-                  {row.slot} · {formatPrice(item.priceCents)}
+                  {row.slot}
+                  {row.gameChanger ? ' · game changer' : ''} · {formatPrice(item.priceCents)}
                 </p>
               </div>
             </li>

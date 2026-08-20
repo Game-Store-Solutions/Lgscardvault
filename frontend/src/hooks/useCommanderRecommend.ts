@@ -20,6 +20,9 @@ export interface SpellbookComboCard {
   name: string
   quantity: number
   inStock: boolean
+  isCommander?: boolean
+  colorIdentity?: string[]
+  recommendedColors?: string[]
   inventoryItem: InventoryItem | null
 }
 
@@ -29,14 +32,20 @@ export interface SpellbookCombo {
   status: string
   produces: string[]
   cards: SpellbookComboCard[]
+  pieceCount?: number
   inStockCount: number
   missingCount: number
   missing: string[]
   completeInStore: boolean
+  coverage?: number
 }
 
 export interface CommanderCombosResponse {
   commander: string
+  colorIdentity?: string[]
+  identityCode?: string
+  legalColors?: string[]
+  filteredOutCount?: number
   combos: SpellbookCombo[]
   source: string
 }
@@ -44,7 +53,27 @@ export interface CommanderCombosResponse {
 export interface AssembledDeckCard {
   slot: string
   score: number
+  gameChanger?: boolean
+  priceCents?: number
   inventoryItem: InventoryItem
+}
+
+export interface AssembledDeckBudget {
+  limitCents: number | null
+  maxCardCents: number | null
+  spentCents: number
+  remainingCents: number | null
+}
+
+export interface AssembledDeckBracket {
+  requested: number | null
+  applied: number
+  label: string
+  auto: boolean
+  maxGameChangers: number | null
+  gameChangersInStock: { name: string; oracleId: string; priceCents: number }[]
+  gameChangersIncluded: { name: string; oracleId: string; slot: string; priceCents: number }[]
+  accommodated: boolean
 }
 
 export interface AssembledDeckResponse {
@@ -56,6 +85,8 @@ export interface AssembledDeckResponse {
   gaps: string[]
   cards: AssembledDeckCard[]
   combos: SpellbookCombo[]
+  budget: AssembledDeckBudget
+  bracket: AssembledDeckBracket
   inventoryIds: number[]
 }
 
@@ -164,8 +195,14 @@ export function commanderCombosKey(slug: string, cardId: string) {
   return ['commander-combos', slug, cardId] as const
 }
 
-export function commanderDeckKey(slug: string, cardId: string) {
-  return ['commander-deck', slug, cardId] as const
+export function commanderDeckKey(
+  slug: string,
+  cardId: string,
+  budgetCents: number | null = null,
+  maxCardCents: number | null = null,
+  bracket = 'auto',
+) {
+  return ['commander-deck', slug, cardId, budgetCents, maxCardCents, bracket] as const
 }
 
 /** Spellbook combos for a commander, intersected with this store's stock. */
@@ -175,7 +212,7 @@ export function useCommanderCombos(slug: string, cardId: string | null, enabled 
     queryFn: async () => {
       const { data } = await api.get<CommanderCombosResponse>(
         `/stores/${slug}/recommend/commander/${cardId}/combos`,
-        { params: { limit: 16 } },
+        { params: { limit: 24 } },
       )
       return data
     },
@@ -184,12 +221,27 @@ export function useCommanderCombos(slug: string, cardId: string | null, enabled 
 }
 
 /** ~100-card deck assembled from store stock + synergy + combo packages. */
-export function useCommanderDeck(slug: string, cardId: string | null, enabled = true) {
+export function useCommanderDeck(
+  slug: string,
+  cardId: string | null,
+  enabled = true,
+  opts?: { budgetCents?: number | null; maxCardCents?: number | null; bracket?: string },
+) {
+  const budgetCents = opts?.budgetCents ?? null
+  const maxCardCents = opts?.maxCardCents ?? null
+  const bracket = opts?.bracket && opts.bracket !== 'auto' ? opts.bracket : 'auto'
   return useQuery({
-    queryKey: commanderDeckKey(slug, cardId ?? ''),
+    queryKey: commanderDeckKey(slug, cardId ?? '', budgetCents, maxCardCents, bracket),
     queryFn: async () => {
       const { data } = await api.get<AssembledDeckResponse>(
         `/stores/${slug}/recommend/commander/${cardId}/deck`,
+        {
+          params: {
+            budgetCents: budgetCents ?? undefined,
+            maxCardCents: maxCardCents ?? undefined,
+            bracket: bracket === 'auto' ? undefined : bracket,
+          },
+        },
       )
       return data
     },

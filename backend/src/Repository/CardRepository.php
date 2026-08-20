@@ -643,6 +643,63 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Color identity keyed by lowercase exact name (front face of a DFC
+     * matches the name before " // "). First printing wins.
+     *
+     * @param list<string> $lowerNames
+     * @return array<string, list<string>>
+     */
+    public function mapColorIdentityByLowerNames(array $lowerNames): array
+    {
+        $names = [];
+        foreach ($lowerNames as $name) {
+            $trimmed = mb_strtolower(trim((string) $name));
+            if ('' !== $trimmed) {
+                $names[$trimmed] = $trimmed;
+            }
+        }
+        if ([] === $names) {
+            return [];
+        }
+
+        $qb = $this->magicScoped();
+        $or = $qb->expr()->orX('LOWER(c.name) IN (:names)');
+        $i = 0;
+        foreach (array_values($names) as $name) {
+            $or->add('LOWER(c.name) LIKE :front'.$i);
+            $qb->setParameter('front'.$i, $name.' //%');
+            ++$i;
+            if ($i >= 40) {
+                break;
+            }
+        }
+        $cards = $qb
+            ->andWhere($or)
+            ->setParameter('names', array_values($names))
+            ->setMaxResults(200)
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($cards as $card) {
+            if (!$card instanceof Card) {
+                continue;
+            }
+            $full = mb_strtolower($card->getName());
+            $front = str_contains($full, ' // ') ? trim(explode(' // ', $full, 2)[0]) : $full;
+            $identity = $card->getColorIdentity() ?? [];
+            if (!isset($map[$full])) {
+                $map[$full] = $identity;
+            }
+            if (!isset($map[$front])) {
+                $map[$front] = $identity;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * Base query for the LEGACY helpers above (name search, exact name,
      * natural key, set-code lookups). Those all predate the multi-game
      * catalog and back Magic-only surfaces — deck imports, CSV resolution,

@@ -26,30 +26,91 @@ final class FakeSpellbookClient implements SpellbookClientInterface
             return [];
         }
 
-        return [
-            [
-                'id' => 'test-combo-1',
-                'status' => 'OK',
-                'description' => 'Test infinite proliferate loop.',
-                'uses' => [
-                    [
-                        'card' => ['name' => $needle, 'oracleId' => null],
-                        'quantity' => 1,
-                    ],
-                    [
-                        'card' => ['name' => 'Proliferate Buddy', 'oracleId' => null],
-                        'quantity' => 1,
-                    ],
-                    [
-                        'card' => ['name' => 'Missing Combo Piece', 'oracleId' => null],
-                        'quantity' => 1,
-                    ],
+        $complete = [
+            'id' => 'test-combo-complete',
+            'status' => 'OK',
+            'identity' => 'WUBG',
+            'description' => 'Two-card proliferate loop fully stocked.',
+            'uses' => [
+                [
+                    'card' => ['name' => $needle, 'identity' => 'WUBG'],
+                    'quantity' => 1,
                 ],
-                'produces' => [
-                    ['feature' => ['name' => 'Infinite proliferate'], 'quantity' => 1],
+                [
+                    'card' => ['name' => 'Proliferate Buddy', 'identity' => 'U'],
+                    'quantity' => 1,
                 ],
             ],
+            'produces' => [
+                ['feature' => ['name' => 'Infinite proliferate'], 'quantity' => 1],
+            ],
         ];
+
+        $partial = [
+            'id' => 'test-combo-1',
+            'status' => 'OK',
+            'identity' => 'WUBG',
+            'description' => 'Test infinite proliferate loop.',
+            'uses' => [
+                [
+                    'card' => ['name' => $needle, 'identity' => 'WUBG'],
+                    'quantity' => 1,
+                ],
+                [
+                    'card' => ['name' => 'Proliferate Buddy', 'identity' => 'U'],
+                    'quantity' => 1,
+                ],
+                [
+                    'card' => ['name' => 'Missing Combo Piece', 'identity' => 'C'],
+                    'quantity' => 1,
+                ],
+            ],
+            'produces' => [
+                ['feature' => ['name' => 'Infinite proliferate'], 'quantity' => 1],
+            ],
+        ];
+
+        $illegal = [
+            'id' => 'test-combo-illegal',
+            'status' => 'OK',
+            'identity' => 'WUBRG',
+            'description' => 'Illegal outside Atraxa identity.',
+            'uses' => [
+                [
+                    'card' => ['name' => $needle, 'identity' => 'WUBG'],
+                    'quantity' => 1,
+                ],
+                [
+                    'card' => ['name' => 'Lightning Bolt', 'identity' => 'R'],
+                    'quantity' => 1,
+                ],
+            ],
+            'produces' => [
+                ['feature' => ['name' => 'Damage'], 'quantity' => 1],
+            ],
+        ];
+
+        $emptyStock = [
+            'id' => 'test-combo-empty',
+            'status' => 'OK',
+            'identity' => 'U',
+            'description' => 'No store pieces besides the commander.',
+            'uses' => [
+                [
+                    'card' => ['name' => $needle, 'identity' => 'WUBG'],
+                    'quantity' => 1,
+                ],
+                [
+                    'card' => ['name' => 'Ghostly Completely Missing', 'identity' => 'U'],
+                    'quantity' => 1,
+                ],
+            ],
+            'produces' => [
+                ['feature' => ['name' => 'Draw'], 'quantity' => 1],
+            ],
+        ];
+
+        return array_slice([$complete, $partial, $emptyStock, $illegal], 0, max(1, $pageSize));
     }
 
     public function findMyCombos(array $mainNames, array $commanderNames = []): array

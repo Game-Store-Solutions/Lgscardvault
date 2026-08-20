@@ -16,6 +16,10 @@ use App\Service\CaseCards\SectionSerializer;
  * Slot floors (lands / ramp / draw / removal) are filled first, then Spellbook
  * combo packages with high in-stock coverage, then theme/synergy fill until
  * we hit 99 non-commander cards (100 including the commander).
+ *
+ * Optional shopper constraints:
+ *  - deck budget and per-card price cap (store prices)
+ *  - Commander bracket, using Scryfall `game_changer` metadata and inventory
  */
 final class CommanderDeckAssembler
 {
@@ -36,16 +40,26 @@ final class CommanderDeckAssembler
     }
 
     /**
+     * @param array{
+     *   budgetCents?: int|null,
+     *   maxCardCents?: int|null,
+     *   bracket?: int|null
+     * } $options
+     *
      * @return array<string, mixed>
      */
-    public function assemble(Store $store, Card $commander): array
+    public function assemble(Store $store, Card $commander, array $options = []): array
     {
+        $budgetCents = $this->positiveCents($options['budgetCents'] ?? null);
+        $maxCardCents = $this->positiveCents($options['maxCardCents'] ?? null);
+
         $commanderTags = $this->tokenizer->tokenize($commander);
         $commanderOracle = (string) $commander->getOracleId();
         $edgeWeights = $this->synergies->weightsForOracle($commander->getOracleId());
         $identity = $commander->getColorIdentity() ?? [];
 
         $candidates = [];
+        $gameChangersInStock = [];
         foreach ($this->inventoryItems->findInStockMagicForStore($store) as $item) {
             $card = $item->getCard();
             if (!$card instanceof Card) {
@@ -61,6 +75,18 @@ final class CommanderDeckAssembler
                 continue;
             }
 
+            $isGameChanger = $card->isGameChanger();
+            if ($isGameChanger) {
+                $oracleKey = (string) $card->getOracleId();
+                if (!isset($gameChangersInStock[$oracleKey])) {
+                    $gameChangersInStock[$oracleKey] = [
+                        'name' => $card->getName(),
+                        'oracleId' => $oracleKey,
+                        'priceCents' => $item->getPriceCents(),
+                    ];
+                }
+            }
+
             $tags = $this->tokenizer->tokenize($card);
             $overlap = $this->tokenizer->overlap($commanderTags, $tags);
             $oracleKey = (string) $card->getOracleId();
@@ -74,10 +100,18 @@ final class CommanderDeckAssembler
                 'score' => $score,
                 'oracle' => $oracleKey,
                 'isLand' => $this->isLand($card),
+                'isBasicLand' => $this->isBasicLand($card),
+                'isGameChanger' => $isGameChanger,
+                'priceCents' => $item->getPriceCents(),
             ];
         }
 
         usort($candidates, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
+
+        $gcStockCount = count($gameChangersInStock);
+        $requestedBracket = CommanderBracket::clamp(isset($options['bracket']) ? (int) $options['bracket'] : null);
+        $appliedBracket = $requestedBracket ?? CommanderBracket::suggestFromGameChangerCount($gcStockCount);
+        $maxGameChangers = CommanderBracket::maxGameChangers($appliedBracket);
 
         $picked = [];
         $slots = [
@@ -88,21 +122,59 @@ final class CommanderDeckAssembler
             'removal' => 0,
             'combo' => 0,
             'synergy' => 0,
+            'game_changer' => 0,
         ];
+        $spentCents = 0;
+        $includedGameChangers = [];
 
         $targetNonCommander = self::DECK_SIZE - 1;
 
-        $pick = function (array $row, string $slot) use (&$picked, &$slots): void {
+        $pick = function (array $row, string $slot) use (
+            &$picked,
+            &$slots,
+            &$spentCents,
+            &$includedGameChangers,
+            $budgetCents,
+            $maxCardCents,
+            $maxGameChangers,
+        ): bool {
             $oracle = $row['oracle'];
             if ('' === $oracle || isset($picked[$oracle])) {
-                return;
+                return false;
             }
+            $price = (int) $row['priceCents'];
+            $isBasic = (bool) $row['isBasicLand'];
+            if (null !== $maxCardCents && !$isBasic && $price > $maxCardCents) {
+                return false;
+            }
+            if (null !== $budgetCents && ($spentCents + $price) > $budgetCents) {
+                return false;
+            }
+            $isGc = (bool) $row['isGameChanger'];
+            if ($isGc && count($includedGameChangers) >= $maxGameChangers) {
+                return false;
+            }
+
             $picked[$oracle] = [
                 'slot' => $slot,
                 'score' => round((float) $row['score'], 4),
+                'gameChanger' => $isGc,
+                'priceCents' => $price,
                 'inventoryItem' => $this->sectionSerializer->serializeInventoryItem($row['item']),
             ];
             ++$slots[$slot];
+            $spentCents += $price;
+            if ($isGc) {
+                ++$slots['game_changer'];
+                $includedGameChangers[] = [
+                    'name' => $row['card']->getName(),
+                    'oracleId' => $oracle,
+                    'slot' => $slot,
+                    'priceCents' => $price,
+                ];
+            }
+
+            return true;
         };
 
         foreach ($candidates as $row) {
@@ -216,6 +288,9 @@ final class CommanderDeckAssembler
         if (count($cards) < $targetNonCommander) {
             $gaps[] = sprintf('Deck short %d cards from store stock', $targetNonCommander - count($cards));
         }
+        if (null !== $budgetCents && $spentCents > $budgetCents) {
+            $gaps[] = 'Deck exceeds the requested budget';
+        }
 
         return [
             'commander' => [
@@ -236,6 +311,23 @@ final class CommanderDeckAssembler
             'gaps' => $gaps,
             'cards' => $cards,
             'combos' => $combos['combos'],
+            'budget' => [
+                'limitCents' => $budgetCents,
+                'maxCardCents' => $maxCardCents,
+                'spentCents' => $spentCents,
+                'remainingCents' => null === $budgetCents ? null : max(0, $budgetCents - $spentCents),
+            ],
+            'bracket' => [
+                'requested' => $requestedBracket,
+                'applied' => $appliedBracket,
+                'label' => CommanderBracket::label($appliedBracket),
+                'auto' => null === $requestedBracket,
+                'maxGameChangers' => $maxGameChangers === \PHP_INT_MAX ? null : $maxGameChangers,
+                'gameChangersInStock' => array_values($gameChangersInStock),
+                'gameChangersIncluded' => $includedGameChangers,
+                'accommodated' => $gcStockCount >= min(3, $maxGameChangers === \PHP_INT_MAX ? 4 : $maxGameChangers)
+                    || 0 === CommanderBracket::maxGameChangers($appliedBracket),
+            ],
             'inventoryIds' => array_values(array_filter(array_map(
                 static fn (array $row): ?int => isset($row['inventoryItem']['id']) ? (int) $row['inventoryItem']['id'] : null,
                 $cards,
@@ -243,11 +335,28 @@ final class CommanderDeckAssembler
         ];
     }
 
+    private function positiveCents(mixed $value): ?int
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        $cents = (int) $value;
+
+        return $cents > 0 ? $cents : null;
+    }
+
     private function isLand(Card $card): bool
     {
         $type = strtolower($card->getTypeLine() ?? '');
 
         return str_contains($type, 'land');
+    }
+
+    private function isBasicLand(Card $card): bool
+    {
+        $type = strtolower($card->getTypeLine() ?? '');
+
+        return str_contains($type, 'basic') && str_contains($type, 'land');
     }
 
     /** @param list<string> $tags @param list<string> $needles */
