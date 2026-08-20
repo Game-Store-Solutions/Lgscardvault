@@ -69,22 +69,35 @@ export function unwrapCollection<T>(data: T[] | { member?: T[]; 'hydra:member'?:
   return []
 }
 
-export function cardImage(card: {
-  imageUrl?: string
-  imageUris?: { png?: string; large?: string; normal?: string; small?: string }
-  cardFaces?: { imageUrl?: string; imageUris?: { png?: string; large?: string; normal?: string; small?: string } }[]
-}): string | undefined {
+export function cardImage(
+  card: {
+    imageUrl?: string
+    imageUris?: { png?: string; large?: string; normal?: string; small?: string }
+    cardFaces?: { imageUrl?: string; imageUris?: { png?: string; large?: string; normal?: string; small?: string } }[]
+  },
+  opts?: { quality?: 'display' | 'full' },
+): string | undefined {
+  const hq = opts?.quality === 'full'
   const front = card.cardFaces?.[0]
   return (
-    card.imageUris?.large ??
-    card.imageUris?.normal ??
-    card.imageUris?.small ??
+    pickImageUri(card.imageUris, hq) ??
     card.imageUrl ??
-    front?.imageUris?.large ??
-    front?.imageUris?.normal ??
-    front?.imageUris?.small ??
+    pickImageUri(front?.imageUris, hq) ??
     front?.imageUrl
   )
+}
+
+function pickImageUri(
+  uris: { png?: string; large?: string; normal?: string; small?: string } | undefined,
+  hq: boolean,
+): string | undefined {
+  if (!uris) {
+    return undefined
+  }
+  if (hq) {
+    return uris.png ?? uris.large ?? uris.normal ?? uris.small
+  }
+  return uris.large ?? uris.normal ?? uris.small ?? uris.png
 }
 
 export function formatPrice(cents: number): string {

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { Palette, Search } from 'lucide-react'
 import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
-import { useInventory, useStore, useStoreTheme } from '../hooks'
+import { useInventoryCatalog, useStore, useStoreTheme } from '../hooks'
 import { BackButton, Button, EmptyState, Input, Modal } from '../components/ui'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
@@ -53,7 +53,13 @@ export default function ArtistBrowsePage() {
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
-  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
+  const game = searchParams.get('game')?.trim() || nav.gameCode || undefined
+  const { data: inventory = [], isLoading } = useInventoryCatalog(slug, {
+    artist,
+    inStockOnly: true,
+    game,
+    enabled: Boolean(artist),
+  })
 
   const [search, setSearch] = useState('')
   const [noStockModalOpen, setNoStockModalOpen] = useState(true)
@@ -134,7 +140,9 @@ export default function ArtistBrowsePage() {
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg">{artist}</h1>
           <p className="mt-1 text-sm text-fg-muted">
             {isLoading
-              ? 'Checking inventory…'
+              ? inStore.length > 0
+                ? `${groupedAll.length} printing${groupedAll.length === 1 ? '' : 's'} in stock`
+                : 'Checking inventory…'
               : inStore.length === 0
                 ? 'Nothing in stock for this artist.'
                 : `${groupedAll.length} printing${groupedAll.length === 1 ? '' : 's'} in stock`}
@@ -152,8 +160,8 @@ export default function ArtistBrowsePage() {
         )}
       </header>
 
-      {isLoading ? (
-        <StorePageLoader label="Loading store inventory…" />
+      {isLoading && inStore.length === 0 ? (
+        <StorePageLoader label="Loading artist printings…" />
       ) : inStore.length === 0 ? (
         <EmptyState
           icon={Palette}

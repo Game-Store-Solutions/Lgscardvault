@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { Layers, Search, Sparkles } from 'lucide-react'
 import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
-import { useInventory, useStore, useStoreTheme } from '../hooks'
+import { useInventoryCatalog, useStore, useStoreTheme } from '../hooks'
 import { BackButton, Badge, EmptyState, Input, Select } from '../components/ui'
 import { CardImage } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
@@ -14,6 +14,14 @@ import { cx } from '../lib/cx'
 import { normalizeSetCode } from '../lib/setBrowse'
 
 type SortMode = 'collector' | 'name' | 'price-asc' | 'price-desc'
+
+type SetNavState = {
+  from?: string
+  inventoryId?: string | number
+  setCode?: string
+  gameCode?: string
+  seedItems?: InventoryItem[]
+}
 
 function collectorSortKey(collectorNumber?: string | null): number {
   if (!collectorNumber) return Number.MAX_SAFE_INTEGER
@@ -46,20 +54,30 @@ function groupByPrinting(items: InventoryItem[]) {
 export default function SetBrowsePage() {
   const { slug = '', setCode: setCodeParam = '' } = useParams()
   const setCodeNorm = normalizeSetCode(decodeURIComponent(setCodeParam))
+  const [searchParams] = useSearchParams()
+  const nav = (useLocation().state as SetNavState | null) ?? {}
+  const game = searchParams.get('game')?.trim() || nav.gameCode || undefined
   const { data: store } = useStore(slug)
   useStoreTheme(store)
-  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
+  const { data: inventory = [], isLoading } = useInventoryCatalog(slug, {
+    set: setCodeNorm,
+    inStockOnly: true,
+    game,
+    enabled: Boolean(setCodeNorm),
+  })
 
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortMode>('collector')
 
-  const inSet = useMemo(
-    () =>
-      inventory.filter(
-        (item) => item.quantity > 0 && normalizeSetCode(item.card.setCode ?? '') === setCodeNorm,
-      ),
-    [inventory, setCodeNorm],
-  )
+  const inSet = useMemo(() => {
+    const byId = new Map<number, InventoryItem>()
+    for (const item of [...inventory, ...(nav.seedItems ?? [])]) {
+      if (item.quantity > 0 && normalizeSetCode(item.card.setCode ?? '') === setCodeNorm) {
+        byId.set(item.id, item)
+      }
+    }
+    return [...byId.values()]
+  }, [inventory, nav.seedItems, setCodeNorm])
 
   const setMeta = inSet[0]?.card
   const setName = setMeta?.setName ?? setCodeNorm.toUpperCase()
@@ -166,7 +184,7 @@ export default function SetBrowsePage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isLoading && inSet.length === 0 ? (
         <StorePageLoader label="Loading set…" />
       ) : inSet.length === 0 ? (
         <EmptyState

@@ -263,6 +263,22 @@ class InventoryItemRepository extends ServiceEntityRepository
                 ->setParameter('emptySet', '');
         }
 
+        if ('' !== $filters->artist) {
+            $artist = mb_strtolower($filters->artist);
+            $escaped = addcslashes($artist, '%_\\');
+            // Credit lives on cards.artist for ordinary printings; DFC / split
+            // faces keep their own artist inside the raw Scryfall JSON.
+            $qb->andWhere(
+                'LOWER(TRIM(COALESCE(c.artist, :emptyArtist))) = :artistExact
+                 OR LOWER(CAST_AS_TEXT(c.scryfallData)) LIKE :artistJsonSpaced
+                 OR LOWER(CAST_AS_TEXT(c.scryfallData)) LIKE :artistJsonTight',
+            )
+                ->setParameter('emptyArtist', '')
+                ->setParameter('artistExact', $artist)
+                ->setParameter('artistJsonSpaced', '%"artist": "'.$escaped.'"%')
+                ->setParameter('artistJsonTight', '%"artist":"'.$escaped.'"%');
+        }
+
         if ('' !== $filters->type) {
             $qb->andWhere('LOWER(COALESCE(c.typeLine, :emptyType)) LIKE :type')
                 ->setParameter('type', '%'.mb_strtolower($filters->type).'%')
