@@ -1369,6 +1369,8 @@ function DeckPanel({
   onAddAll: () => void
   linkState?: DeckBuilderNavState
 }) {
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
+
   if (loading || !deck) {
     return <LoadingPanel label="Assembling a deck from store inventory…" />
   }
@@ -1377,6 +1379,12 @@ function DeckPanel({
   const structure = deck.structure?.actual ?? {}
   const targets = deck.structure?.targets ?? {}
   const inStockCount = deck.cards.filter((row) => row.inventoryItem).length
+  const outOfStockCount = deck.cards.length - inStockCount
+  const visibleCards = deck.cards.filter((row) => {
+    if (stockFilter === 'in_stock') return Boolean(row.inventoryItem)
+    if (stockFilter === 'out_of_stock') return !row.inventoryItem
+    return true
+  })
   const intelLine = intelligenceSummary(deck.intelligence)
 
   const structureLine = (['lands', 'ramp', 'draw', 'removal'] as const)
@@ -1439,6 +1447,35 @@ function DeckPanel({
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex rounded-btn border border-border bg-bg p-0.5">
+          {(
+            [
+              { id: 'all', label: `All (${deck.cards.length})` },
+              { id: 'in_stock', label: `In stock (${inStockCount})` },
+              { id: 'out_of_stock', label: `Not stocked (${outOfStockCount})` },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setStockFilter(option.id)}
+              className={cx(
+                'rounded-btn px-2.5 py-1 text-xs font-bold transition-colors',
+                stockFilter === option.id
+                  ? 'bg-brand-500 text-white'
+                  : 'text-fg-muted hover:text-fg',
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-fg-muted">
+          Showing {visibleCards.length} of {deck.cards.length}
+        </p>
+      </div>
+
       <div className="flex flex-wrap gap-1.5">
         {slotEntries.map(([slot, count]) => (
           <Badge key={slot} tone="neutral">
@@ -1454,59 +1491,71 @@ function DeckPanel({
         </p>
       )}
 
-      <ul className="grid gap-2 sm:grid-cols-2">
-        {deck.cards.map((row) => {
-          const item = row.inventoryItem
-          const name = item?.card.name ?? row.card.name
-          const image = cardImage(item?.card ?? row.card)
-          const detailPath = item ? `/s/${slug}/cards/${item.id}` : null
-          const meta = [
-            row.quantity > 1 ? `${row.quantity}×` : null,
-            row.slot.replaceAll('_', ' '),
-            row.gameChanger ? 'game changer' : null,
-            item ? formatPrice(item.priceCents) : 'not stocked',
-          ]
-            .filter(Boolean)
-            .join(' · ')
+      {visibleCards.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title={stockFilter === 'in_stock' ? 'No in-stock cards in this list' : 'No out-of-stock cards'}
+          description={
+            stockFilter === 'in_stock'
+              ? 'This build has no buyable printings here. Switch to All or Not stocked to review the full list.'
+              : 'Every card in this build is available at this store.'
+          }
+        />
+      ) : (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {visibleCards.map((row) => {
+            const item = row.inventoryItem
+            const name = item?.card.name ?? row.card.name
+            const image = cardImage(item?.card ?? row.card)
+            const detailPath = item ? `/s/${slug}/cards/${item.id}` : null
+            const meta = [
+              row.quantity > 1 ? `${row.quantity}×` : null,
+              row.slot.replaceAll('_', ' '),
+              row.gameChanger ? 'game changer' : null,
+              item ? formatPrice(item.priceCents) : 'not stocked',
+            ]
+              .filter(Boolean)
+              .join(' · ')
 
-          return (
-            <li
-              key={row.card.oracleId}
-              className={cx(
-                'flex gap-2 rounded-card border border-border bg-surface p-2',
-                !item && 'opacity-70',
-              )}
-              title={row.reasons?.slice(0, 3).join(' · ')}
-            >
-              {detailPath ? (
-                <Link to={detailPath} state={linkState} className="w-12 shrink-0 overflow-hidden rounded-md">
-                  <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
-                </Link>
-              ) : (
-                <div className="w-12 shrink-0 overflow-hidden rounded-md">
-                  <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
-                </div>
-              )}
-              <div className="min-w-0 self-center">
+            return (
+              <li
+                key={row.card.oracleId}
+                className={cx(
+                  'flex gap-2 rounded-card border border-border bg-surface p-2',
+                  !item && 'opacity-70',
+                )}
+                title={row.reasons?.slice(0, 3).join(' · ')}
+              >
                 {detailPath ? (
-                  <Link
-                    to={detailPath}
-                    state={linkState}
-                    className="block truncate text-sm font-semibold text-fg hover:text-brand-600"
-                  >
-                    {name}
+                  <Link to={detailPath} state={linkState} className="w-12 shrink-0 overflow-hidden rounded-md">
+                    <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
                   </Link>
                 ) : (
-                  <span className="block truncate text-sm font-semibold text-fg">{name}</span>
+                  <div className="w-12 shrink-0 overflow-hidden rounded-md">
+                    <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
+                  </div>
                 )}
-                <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-muted">
-                  {meta}
-                </p>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+                <div className="min-w-0 self-center">
+                  {detailPath ? (
+                    <Link
+                      to={detailPath}
+                      state={linkState}
+                      className="block truncate text-sm font-semibold text-fg hover:text-brand-600"
+                    >
+                      {name}
+                    </Link>
+                  ) : (
+                    <span className="block truncate text-sm font-semibold text-fg">{name}</span>
+                  )}
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-muted">
+                    {meta}
+                  </p>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
