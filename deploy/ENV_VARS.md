@@ -115,10 +115,11 @@ own users have saved. The deck builder keeps working — it just has less data t
 learn from, and says so via the `intelligence.confidence` field on every
 response.
 
-Requests are throttled to one per second host-wide and cached for a week, since a
-commander only needs harvesting once. After consecutive failures a host-wide
-circuit breaker opens for an hour so a blocked Archidekt endpoint cannot stall
-the messenger worker; MTGJSON precons and local decks keep feeding the engine.
+Requests are throttled to one request every two seconds host-wide and successful
+responses are cached for a week. HTTP failures (including 429) are never written
+to that cache. After consecutive failures a host-wide circuit breaker opens for
+two hours so a blocked Archidekt endpoint cannot stall the messenger worker;
+MTGJSON precons and local decks keep feeding the engine.
 
 ---
 
