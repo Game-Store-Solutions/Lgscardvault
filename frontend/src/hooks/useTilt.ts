@@ -14,8 +14,8 @@ import {
 /** Snappy 3D follow — the card should feel in the hand, not swimming. */
 const TILT_SPRING = { stiffness: 320, damping: 22, mass: 0.45 }
 
-/** Softer light follow so the sheen trails the pointer like a physical surface. */
-const LIGHT_SPRING = { stiffness: 170, damping: 24, mass: 0.5 }
+/** Softer light follow so the sheen glides without stepping. */
+const LIGHT_SPRING = { stiffness: 120, damping: 28, mass: 0.65 }
 
 /** Two incommensurate periods so idle light drifts instead of looping in a circle. */
 const IDLE_A_MS = 14000
