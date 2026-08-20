@@ -89,7 +89,7 @@ final class SectionSerializer
             'condition' => $item->getCondition()->value,
             'finish' => $item->getFinish(),
             'isFoil' => $item->isFoil(),
-            'card' => null !== $card ? $this->catalogCardResolver->serializeCard($card) : null,
+            'card' => null !== $card ? $this->catalogCardResolver->serializeCardPreview($card) : null,
         ];
     }
 }

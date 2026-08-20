@@ -17,6 +17,7 @@ export function useStoreCases(slug?: string) {
   return useQuery({
     queryKey: storeCasesKey(slug ?? ''),
     enabled: Boolean(slug),
+    staleTime: 30 * 1000,
     queryFn: async () => {
       const { data } = await api.get<StoreCaseSummary[]>(`/stores/${slug}/cases`)
       return data
