@@ -39,7 +39,7 @@ final class ArchidektDeckDataProvider implements DeckDataProviderInterface
         private readonly StrategyTaxonomy $taxonomy,
         private readonly LoggerInterface $logger,
         private readonly bool $enabled = false,
-        private readonly int $harvestDepth = 50,
+        private readonly int $harvestDepth = 12,
     ) {
     }
 
