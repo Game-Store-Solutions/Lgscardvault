@@ -15,6 +15,7 @@ final readonly class InventoryCatalogFilters
     public function __construct(
         public string $q = '',
         public string $set = '',
+        public string $artist = '',
         public string $type = '',
         public string $finish = 'all',
         public array $colors = [],
@@ -48,6 +49,7 @@ final readonly class InventoryCatalogFilters
         return new self(
             q: trim((string) ($query['q'] ?? '')),
             set: trim((string) ($query['set'] ?? '')),
+            artist: trim((string) ($query['artist'] ?? '')),
             type: trim((string) ($query['type'] ?? '')),
             finish: $finish,
             colors: self::parseColors((string) ($query['colors'] ?? '')),
@@ -61,6 +63,7 @@ final readonly class InventoryCatalogFilters
     {
         return '' === $this->q
             && '' === $this->set
+            && '' === $this->artist
             && '' === $this->type
             && 'all' === $this->finish
             && [] === $this->colors

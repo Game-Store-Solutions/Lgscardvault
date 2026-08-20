@@ -79,6 +79,7 @@ final class CatalogFixtures
         $card->setColorIdentity($data['color_identity'] ?? null);
         $card->setKeywords($data['keywords'] ?? null);
         $card->setLegalities($data['legalities'] ?? null);
+        $card->setArtist(isset($data['artist']) ? (string) $data['artist'] : null);
         $card->setScryfallData($data);
         $this->em->persist($card);
         $this->em->flush();

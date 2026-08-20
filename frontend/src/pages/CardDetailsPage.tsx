@@ -97,7 +97,7 @@ export default function CardDetailsPage() {
       : cameFromArtist && setNavState?.artist
         ? artistBrowsePath(slug, setNavState.artist, setNavState.gameCode ?? 'mtg')
         : cameFromSet && setNavState?.setCode
-          ? setBrowsePath(slug, setNavState.setCode)
+          ? setBrowsePath(slug, setNavState.setCode, setNavState.gameCode)
           : `/s/${slug}`
   const backLabel = deckNav
     ? 'Deck builder'
@@ -350,14 +350,20 @@ export default function CardDetailsPage() {
               : 'Singles'
 
   const setDisplay = card.setName ?? (card.setCode ? card.setCode.toUpperCase() : '')
-  const setPageUrl = card.setCode ? setBrowsePath(slug, card.setCode) : null
+  const setPageUrl = card.setCode ? setBrowsePath(slug, card.setCode, card.gameCode) : null
+  const setBrowseNavState = {
+    from: 'card' as const,
+    inventoryId: item.id,
+    setCode: card.setCode,
+    gameCode: card.gameCode ?? 'mtg',
+    seedItems: [item],
+  }
   const productTitle = setDisplay ? `${card.name} - ${setDisplay}` : card.name
   const colPad = 'px-4 py-5 sm:px-8 sm:py-8 lg:px-10'
   const displayArtist = resolveCardArtist(card, faceIndex)
 
-  // Navigate straight through: the artist page loads that store's inventory
-  // itself and shows its own "nothing in stock" state, so gating the click on a
-  // full inventory download here just made the link feel broken while loading.
+  // Navigate straight through: the artist page queries this store's inventory
+  // for that artist (not the whole catalog) and shows its own empty state.
   const openArtistBrowse = () => {
     if (!displayArtist || !item) {
       return
@@ -386,7 +392,7 @@ export default function CardDetailsPage() {
             {setDisplay && setPageUrl && (
               <>
                 <ChevronSep />
-                <Link to={setPageUrl} className="truncate text-fg hover:text-brand-600 hover:underline">
+                <Link to={setPageUrl} state={setBrowseNavState} className="truncate text-fg hover:text-brand-600 hover:underline">
                   {setDisplay}
                 </Link>
               </>
@@ -476,6 +482,7 @@ export default function CardDetailsPage() {
               {setDisplay && setPageUrl && (
                 <Link
                   to={setPageUrl}
+                  state={setBrowseNavState}
                   className="mt-1 inline-block text-sm text-brand-600 underline-offset-2 hover:underline"
                 >
                   {setDisplay}
@@ -759,6 +766,7 @@ export default function CardDetailsPage() {
               {alternateListings.length > 0 && lowestAlternateCents != null && (
                 <Link
                   to={setPageUrl ?? `/s/${slug}#store-search`}
+                  state={setPageUrl ? setBrowseNavState : undefined}
                   className="tcg-buy-box block p-4 text-center text-sm transition-colors hover:bg-bg/50"
                 >
                   <span className="font-semibold text-brand-600 underline-offset-2 hover:underline">

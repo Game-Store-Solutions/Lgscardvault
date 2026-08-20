@@ -1,21 +1,23 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ChevronDown, GalleryHorizontalEnd } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { cardImage, formatPrice } from '../api/client'
-import { useStore, useStoreCases, useStoreTheme } from '../hooks'
+import { useStore, useStoreCases, useStoreTheme, useTilt } from '../hooks'
 import { BackButton, Card, CardBody, EmptyState } from '../components/ui'
 import type { StoreSectionCard } from '../api/types'
 import { CardImage } from '../components/cards'
+import { FoilOverlays } from '../components/cards/FoilOverlays'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { finishName } from '../lib/finishes'
+import { cx } from '../lib/cx'
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
 /**
- * Storefront Case Cards page (/s/:slug/case-cards). Deliberately restrained:
- * each display case is a clean surface panel in the store's own theme, its
- * sections laid out as responsive grids of lightweight static tiles — no
- * animations, no side-scrolling — so the whole case scans at a glance.
- * Sold-out pool cards, empty sections, and empty cases are hidden.
+ * Storefront Case Cards page (/s/:slug/case-cards). Each display case is a
+ * clean surface panel in the store's own theme, sections as a grid of
+ * high-resolution tiles with the same holographic foil overlay used on the
+ * storefront. Sold-out pool cards, empty sections, and empty cases are hidden.
  */
 export default function CaseCardsPage() {
   const { slug = '' } = useParams()
@@ -140,14 +142,17 @@ function caseCardCount(sections: { cards: RenderableCard[] }[]): number {
 }
 
 /**
- * One case card: a static, fast tile — lazy image, name, set/finish, price.
- * The only motion is a subtle hover lift. Links to the listing's details.
+ * One case card: full-quality art, holographic foil overlay on foils, and a
+ * subtle hover lift. Links to the listing's details.
  */
 function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) {
   const { inventoryItem } = entry
   const card = inventoryItem.card
-  const image = cardImage(card)
+  const image = cardImage(card, { quality: 'full' })
   const lastOne = entry.remaining === 1
+  const { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle } = useTilt(9, {
+    idle: inventoryItem.isFoil,
+  })
 
   return (
     <Link
@@ -160,8 +165,17 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
           Last one
         </span>
       )}
-      <div className="aspect-[5/7] overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-card">
-        <CardImage src={image} alt={card.name} className="h-full w-full" label={card.name} />
+      <div ref={ref} onPointerEnter={onPointerEnter} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} className="perspective-[900px]">
+        <motion.div
+          className={cx(
+            'tilt-card relative aspect-[5/7] overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-card',
+            inventoryItem.isFoil && 'foil-card',
+          )}
+          style={tiltStyle}
+        >
+          <CardImage src={image} alt={card.name} className="h-full w-full" label={card.name} />
+          {image && <FoilOverlays foil={inventoryItem.isFoil} />}
+        </motion.div>
       </div>
       <div className="mt-2 px-0.5">
         <h4 className="truncate text-sm font-bold text-fg group-hover:text-brand-600">{card.name}</h4>

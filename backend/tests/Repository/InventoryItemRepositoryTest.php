@@ -156,4 +156,56 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         $codes = array_column($sets, 'code');
         self::assertSame(['lea'], $codes);
     }
+
+    public function testCatalogPageFiltersByArtistIncludingFaceCredits(): void
+    {
+        $store = $this->fixtures->store();
+        $credited = $this->fixtures->card(301, [
+            'name' => 'Land Tax',
+            'set' => 'leg',
+            'artist' => 'Brian Snoddy',
+        ]);
+        $other = $this->fixtures->card(302, [
+            'name' => 'Lightning Bolt',
+            'set' => 'lea',
+            'artist' => 'Christopher Rush',
+        ]);
+        $faceOnly = $this->fixtures->card(303, [
+            'name' => 'Transforming Horror',
+            'set' => 'mid',
+            'artist' => 'Someone Else',
+            'card_faces' => [
+                ['name' => 'Front', 'artist' => 'Chris Rahn'],
+                ['name' => 'Back', 'artist' => 'Chris Rahn'],
+            ],
+        ]);
+        $this->fixtures->inventoryItem($store, $credited, 2);
+        $this->fixtures->inventoryItem($store, $other, 4);
+        $this->fixtures->inventoryItem($store, $faceOnly, 1);
+
+        $byName = new \App\Service\Inventory\InventoryCatalogFilters(artist: 'Brian Snoddy');
+        $named = $this->repo->findCatalogPage($store, 0, 24, null, true, $byName);
+        self::assertCount(1, $named);
+        self::assertSame('Land Tax', $named[0]->getCard()?->getName());
+        self::assertSame(1, $this->repo->countCatalog($store, null, true, $byName));
+
+        $byFace = new \App\Service\Inventory\InventoryCatalogFilters(artist: 'Chris Rahn');
+        $faces = $this->repo->findCatalogPage($store, 0, 24, null, true, $byFace);
+        self::assertCount(1, $faces);
+        self::assertSame('Transforming Horror', $faces[0]->getCard()?->getName());
+    }
+
+    public function testCatalogPageFiltersByExactSetCode(): void
+    {
+        $store = $this->fixtures->store();
+        $alpha = $this->fixtures->card(401, ['name' => 'Alpha Bolt', 'set' => 'lea']);
+        $legends = $this->fixtures->card(402, ['name' => 'Legends Tax', 'set' => 'leg']);
+        $this->fixtures->inventoryItem($store, $alpha, 1);
+        $this->fixtures->inventoryItem($store, $legends, 1);
+
+        $filters = new \App\Service\Inventory\InventoryCatalogFilters(set: 'lea');
+        $page = $this->repo->findCatalogPage($store, 0, 24, null, true, $filters);
+        self::assertCount(1, $page);
+        self::assertSame('lea', $page[0]->getCard()?->getSetCode());
+    }
 }

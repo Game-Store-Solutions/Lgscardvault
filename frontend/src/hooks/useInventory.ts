@@ -14,6 +14,7 @@ export type InventoryQueryOptions = {
 export type InventoryPageFilters = {
   q?: string
   set?: string
+  artist?: string
   type?: string
   finish?: 'all' | 'foil' | 'nonfoil'
   colors?: string
@@ -105,6 +106,7 @@ export function useInventoryPage(slug: string, filters: InventoryPageFilters) {
       itemsPerPage,
       filters.q ?? '',
       filters.set ?? '',
+      filters.artist ?? '',
       filters.type ?? '',
       filters.finish ?? 'all',
       filters.colors ?? '',
@@ -117,22 +119,83 @@ export function useInventoryPage(slug: string, filters: InventoryPageFilters) {
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data } = await api.get(`/stores/${slug}/inventory`, {
-        params: {
-          page,
-          itemsPerPage,
-          ...(inStockOnly ? { inStockOnly: 1 } : {}),
-          ...(game ? { game } : {}),
-          ...(filters.q?.trim() ? { q: filters.q.trim() } : {}),
-          ...(filters.set?.trim() ? { set: filters.set.trim() } : {}),
-          ...(filters.type?.trim() ? { type: filters.type.trim() } : {}),
-          ...(filters.finish && filters.finish !== 'all' ? { finish: filters.finish } : {}),
-          ...(filters.colors ? { colors: filters.colors } : {}),
-          ...(filters.minPriceCents != null ? { minPriceCents: filters.minPriceCents } : {}),
-          ...(filters.maxPriceCents != null ? { maxPriceCents: filters.maxPriceCents } : {}),
-          ...(filters.sort && filters.sort !== 'name' ? { sort: filters.sort } : {}),
-        },
+        params: catalogRequestParams(filters, page, itemsPerPage),
       })
       return parseInventoryPage(data, page, itemsPerPage)
+    },
+  })
+}
+
+function catalogRequestParams(filters: InventoryPageFilters, page: number, itemsPerPage: number) {
+  const game = filters.game?.trim() || undefined
+  const inStockOnly = Boolean(filters.inStockOnly)
+
+  return {
+    page,
+    itemsPerPage,
+    ...(inStockOnly ? { inStockOnly: 1 } : {}),
+    ...(game ? { game } : {}),
+    ...(filters.q?.trim() ? { q: filters.q.trim() } : {}),
+    ...(filters.set?.trim() ? { set: filters.set.trim() } : {}),
+    ...(filters.artist?.trim() ? { artist: filters.artist.trim() } : {}),
+    ...(filters.type?.trim() ? { type: filters.type.trim() } : {}),
+    ...(filters.finish && filters.finish !== 'all' ? { finish: filters.finish } : {}),
+    ...(filters.colors ? { colors: filters.colors } : {}),
+    ...(filters.minPriceCents != null ? { minPriceCents: filters.minPriceCents } : {}),
+    ...(filters.maxPriceCents != null ? { maxPriceCents: filters.maxPriceCents } : {}),
+    ...(filters.sort && filters.sort !== 'name' ? { sort: filters.sort } : {}),
+  }
+}
+
+/**
+ * Every listing that matches the catalog filters. Walks SQL pages of the
+ * filtered set (never the whole store) so artist/set browse stays one or two
+ * requests even when the store has tens of thousands of singles.
+ */
+export function useInventoryCatalog(slug: string, filters: InventoryPageFilters) {
+  const game = filters.game?.trim() || undefined
+  const inStockOnly = Boolean(filters.inStockOnly)
+  const itemsPerPage = Math.min(PAGE_SIZE, Math.max(1, filters.itemsPerPage ?? PAGE_SIZE))
+
+  return useQuery({
+    queryKey: [
+      ...inventoryPageKey(slug),
+      'catalog-all',
+      inStockOnly ? 'in-stock' : 'all',
+      game ?? '',
+      itemsPerPage,
+      filters.q ?? '',
+      filters.set ?? '',
+      filters.artist ?? '',
+      filters.type ?? '',
+      filters.finish ?? 'all',
+      filters.colors ?? '',
+      filters.minPriceCents ?? '',
+      filters.maxPriceCents ?? '',
+      filters.sort ?? 'name',
+    ],
+    enabled: (filters.enabled ?? true) && Boolean(slug),
+    staleTime: 30 * 1000,
+    queryFn: async () => {
+      const seen = new Map<number, InventoryItem>()
+      let page = 1
+      let total = Number.POSITIVE_INFINITY
+      for (let n = 0; n < MAX_PAGES && seen.size < total; n++) {
+        const { data } = await api.get(`/stores/${slug}/inventory`, {
+          params: catalogRequestParams(filters, page, itemsPerPage),
+        })
+        const parsed = parseInventoryPage(data, page, itemsPerPage)
+        total = parsed.total
+        for (const item of parsed.items) {
+          seen.set(item.id, item)
+        }
+        if (parsed.items.length < itemsPerPage) {
+          break
+        }
+        page += 1
+      }
+
+      return sortInventory([...seen.values()])
     },
   })
 }
