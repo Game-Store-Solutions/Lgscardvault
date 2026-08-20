@@ -954,7 +954,6 @@ export default function CommanderSynergyPage() {
                           {(strategiesQuery.data ?? []).map((strategy) => {
                             const active = strategyId === strategy.id
                             const confidence = Math.round(strategy.confidence * 100)
-                            const deckCount = strategy.deckCount ?? strategy.sampleSize ?? 0
                             return (
                               <button
                                 key={strategy.id}
@@ -981,11 +980,6 @@ export default function CommanderSynergyPage() {
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="text-sm font-bold text-fg">{strategy.label}</p>
                                   <div className="flex shrink-0 items-center gap-1.5">
-                                    {deckCount > 0 && (
-                                      <span className="rounded-full bg-bg px-1.5 py-0.5 text-[0.6rem] font-bold tabular-nums text-fg-muted">
-                                        {deckCount} deck{deckCount === 1 ? '' : 's'}
-                                      </span>
-                                    )}
                                     {active ? (
                                       <CheckCircle2 aria-hidden className="size-4 text-brand-600" />
                                     ) : (
