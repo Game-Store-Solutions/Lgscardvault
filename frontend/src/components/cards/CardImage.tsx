@@ -40,6 +40,8 @@ export function CardImage({
       <img
         src={src}
         alt={alt}
+        width={488}
+        height={680}
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}

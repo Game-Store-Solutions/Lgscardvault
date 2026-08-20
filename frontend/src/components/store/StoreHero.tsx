@@ -63,7 +63,7 @@ export function HeroLogo({
       )}
     >
       {logoUrl?.trim() ? (
-        <img src={logoUrl} alt="" className="size-full object-cover" />
+        <img src={logoUrl} alt="" width={56} height={56} className="size-full object-cover" />
       ) : (
         <StoreIcon aria-hidden className={cx('size-6', glass ? 'text-white' : 'text-fg-muted')} />
       )}

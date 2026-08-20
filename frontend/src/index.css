@@ -7,6 +7,20 @@
 
 html {
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+/*
+ * Geist is font-display: swap. Pair it with a metric-matched Arial stand-in so
+ * the fallback → webfont swap does not reflow headlines and body copy (CLS).
+ */
+@font-face {
+  font-family: "Geist Fallback";
+  src: local("Arial");
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  size-adjust: 104%;
 }
 
 /*
@@ -99,8 +113,8 @@ html {
   --shadow-card: 0 1px 2px rgb(10 10 11 / 0.04), 0 8px 24px rgb(10 10 11 / 0.06);
 
   /* Fonts */
-  --font-sans: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
-  --font-display: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, sans-serif;
+  --font-sans: "Geist Variable", "Geist Fallback", "Geist", "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
+  --font-display: "Geist Variable", "Geist Fallback", "Geist", "Plus Jakarta Sans Variable", system-ui, sans-serif;
 
   /*
    * Editorial display scale. Headline sizes get progressively tighter tracking —

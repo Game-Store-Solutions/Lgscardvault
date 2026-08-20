@@ -12,19 +12,33 @@ export function Skeleton({ className }: SkeletonProps) {
 /** Grid of card-shaped skeletons for storefront inventory loading. */
 export function InventoryGridSkeleton({ count = 10 }: { count?: number }) {
   return (
-    <div
-      className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
-      aria-busy="true"
-      aria-label="Loading inventory"
-    >
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="glass-card overflow-hidden rounded-card">
-          <Skeleton className="aspect-5/7 w-full rounded-none" />
-          <div className="space-y-2 p-3">
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-3 w-1/3" />
+    <div className="space-y-6" aria-busy="true" aria-label="Loading inventory">
+      <div className="h-9" />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="glass-card overflow-hidden rounded-card">
+            <Skeleton className="aspect-5/7 w-full rounded-none" />
+            <div className="space-y-2 p-3">
+              <Skeleton className="h-4 w-4/5" />
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
           </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Horizontal card rail used by storefront spotlight rows. */
+export function SpotlightRailSkeleton({ count = 6, label = 'Loading spotlight' }: { count?: number; label?: string }) {
+  return (
+    <div className="flex gap-4 overflow-hidden pl-4 sm:pl-14" aria-busy="true" aria-label={label}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="w-40 shrink-0 sm:w-52">
+          <Skeleton className="aspect-[5/7] w-full rounded-card" />
+          <Skeleton className="mt-2 h-4 w-4/5" />
+          <Skeleton className="mt-1 h-3 w-1/2" />
         </div>
       ))}
     </div>

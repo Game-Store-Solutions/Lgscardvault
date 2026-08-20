@@ -33,7 +33,9 @@ export function TradePromoBanner({ slug, showSellLink = false }: { slug: string;
           Boosted trade-in rates are live. {rates.cashPercent}% cash / {rates.creditPercent}% store credit of market
           price!
         </p>
-        {countdown && <p className="text-sm text-white/85">Ends in {countdown}</p>}
+        {rates.promoEndsAt ? (
+          <p className="min-h-5 text-sm text-white/85">{countdown ? `Ends in ${countdown}` : '\u00a0'}</p>
+        ) : null}
       </div>
       {showSellLink && (
         <Link

@@ -40,7 +40,7 @@ export function InteractiveCard({ image, alt, foil = false, accent = '#c6a035', 
     >
       <motion.div
         className={cx(
-          'tilt-card relative overflow-hidden rounded-[4.5%/3.5%]',
+          'tilt-card relative aspect-[5/7] overflow-hidden rounded-[4.5%/3.5%] bg-surface-elevated',
           !borderless && 'rounded-2xl border-2',
           foil && 'foil-card',
           shadow && 'shadow-card',
@@ -51,9 +51,18 @@ export function InteractiveCard({ image, alt, foil = false, accent = '#c6a035', 
         }}
       >
         {image ? (
-          <img src={image} alt={alt} loading="lazy" decoding="async" className="block w-full select-none" draggable={false} />
+          <img
+            src={image}
+            alt={alt}
+            width={488}
+            height={680}
+            loading="lazy"
+            decoding="async"
+            className="block size-full select-none object-contain"
+            draggable={false}
+          />
         ) : (
-          <div className="grid aspect-[5/7] place-items-center bg-surface text-fg-muted">
+          <div className="grid size-full place-items-center bg-surface text-fg-muted">
             <ImageOff aria-hidden className="size-8" />
           </div>
         )}

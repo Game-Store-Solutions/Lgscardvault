@@ -34,7 +34,7 @@ export type { ModalProps } from './Modal'
 export { Spinner, LoadingPanel, EmptyState, ErrorState } from './Feedback'
 export type { SpinnerProps, LoadingPanelProps, EmptyStateProps, ErrorStateProps } from './Feedback'
 
-export { Skeleton, InventoryGridSkeleton, InventoryAdminListSkeleton } from './Skeleton'
+export { Skeleton, InventoryGridSkeleton, InventoryAdminListSkeleton, SpotlightRailSkeleton } from './Skeleton'
 export type { SkeletonProps } from './Skeleton'
 
 export { PageHeader } from './PageHeader'
