@@ -50,7 +50,7 @@ final class CommanderIntelligenceRefresher
         private readonly CommanderStrategyStatRepository $strategyStats,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
-        private readonly int $harvestDepth = 50,
+        private readonly int $harvestDepth = 12,
         private readonly int $decksPerStrategy = 10,
     ) {
     }

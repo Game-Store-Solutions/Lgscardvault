@@ -236,9 +236,10 @@ we keep long-term is the derived statistics tables.
 
 ## Backfill cost
 
-About 3,500 legal commanders. At one request per second, a commander costs
-roughly a minute (one search plus ~50 deck fetches), so the few hundred that
-matter finish in a few hours and the rest warm on first use. Refresh is far
+About 3,500 legal commanders. Archidekt search is ordered by view count; we only
+fetch the top `harvest_depth` decks (default 12). At two seconds per request, a
+commander costs roughly half a minute (one search plus ~12 deck fetches), so a
+few hundred finish in a few hours and the rest warm on first use. Refresh is far
 cheaper: the search response carries `updatedAt` per deck, so only changed decks
 need re-fetching.
 

@@ -36,9 +36,12 @@ parameters:
 
     # Reference deck harvesting.
     # Candidate decks pulled from a provider before strategy filtering.
-    commander_intelligence.harvest_depth: 50
+    # Archidekt search is already ordered by viewCount (most liked first), so
+    # keep this small: each deck is a separate rate-limited HTTP fetch. 12 top
+    # decks ≈ enough sample for stats without multi-day backfills.
+    commander_intelligence.harvest_depth: 12
     # Decks kept per (commander, strategy) — also the co-occurrence sample size.
-    commander_intelligence.decks_per_strategy: 10
+    commander_intelligence.decks_per_strategy: 8
     # Aggregates older than this trigger a background refresh on next request.
     commander_intelligence.max_age_days: 90
 
@@ -52,8 +55,9 @@ parameters:
     # Provider toggles. The engine only ever reads our own tables, so turning a
     # provider off degrades data freshness, never availability.
     commander_intelligence.archidekt.enabled: '%env(bool:ARCHIDEKT_ENABLED)%'
-    # Archidekt documents no rate limit. One request per second plus a week-long
-    # cache keeps our footprint negligible; a commander is harvested once.
+    # Archidekt documents no rate limit. Two seconds between requests plus a
+    # week-long cache keeps our footprint small; we only fetch the top N decks
+    # (harvest_depth), already sorted by view count.
     commander_intelligence.archidekt.min_interval_us: 2000000
     commander_intelligence.archidekt.cache_ttl: 604800
     # Fail open after this many consecutive HTTP/transport failures; cool down
