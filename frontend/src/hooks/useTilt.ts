@@ -105,7 +105,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
       hovering.current = true
       const el = ref.current
       if (!el) {
-        op.set(0.92)
+        op.set(1)
         return
       }
       const rect = el.getBoundingClientRect()
@@ -113,7 +113,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
       const y = (event.clientY - rect.top) / rect.height
       px.set(x * 100)
       py.set(y * 100)
-      op.set(0.92)
+      op.set(1)
       if (!reduceMotion) {
         rx.set((0.5 - y) * maxTilt * 0.85)
         ry.set((x - 0.5) * maxTilt * 0.85)
