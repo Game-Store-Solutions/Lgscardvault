@@ -2,14 +2,13 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { BellPlus, Check, CheckCircle2, ClipboardList, HelpCircle, LayoutGrid, List, Search, ShoppingCart, XCircle } from 'lucide-react'
-import api, { cardImage, formatPrice, scryfallPriceCents } from '../api/client'
+import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { InventoryItem } from '../api/types'
-import { useInventory, useStore, useStoreCart, useStoreTheme } from '../hooks'
+import { searchInventoryByNames, useStore, useStoreCart, useStoreTheme } from '../hooks'
 import { customerKeys } from '../hooks/useCustomer'
 import { useAuth } from '../context/AuthContext'
-import { Badge, BackButton, Button, Card, CardBody, CardHeader, EmptyState, Textarea } from '../components/ui'
+import { Badge, BackButton, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Skeleton, Textarea } from '../components/ui'
 import { CardImage } from '../components/cards'
-import { StorePageLoader } from '../components/store/StorePageLoader'
 import { finishName } from '../lib/finishes'
 
 /** One parsed request line: how many copies of which card name. */
@@ -104,7 +103,6 @@ export default function MassSearchPage() {
   const { data: store } = useStore(slug)
   useStoreTheme(store)
 
-  const { data: inventory = [], isLoading } = useInventory(slug, { inStockOnly: true })
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
@@ -159,7 +157,6 @@ export default function MassSearchPage() {
     />
   )
 
-  // A deck's "check availability" hand-off drops its list here (one-shot).
   const [text, setText] = useState(() => {
     try {
       const prefill = sessionStorage.getItem('mass-search-prefill')
@@ -173,7 +170,33 @@ export default function MassSearchPage() {
     return ''
   })
   const [submitted, setSubmitted] = useState<RequestLine[] | null>(null)
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [view, setView] = useState<'list' | 'grid'>('list')
+
+  const search = useMutation({
+    mutationFn: async (lines: RequestLine[]) => {
+      const hits = await searchInventoryByNames(
+        slug,
+        lines.map((line) => line.name),
+      )
+      return { lines, inventory: hits }
+    },
+    onSuccess: ({ lines, inventory: hits }) => {
+      setSubmitted(lines)
+      setInventory(hits)
+    },
+  })
+
+  function runSearch() {
+    const lines = parseDecklist(text)
+    if (lines.length === 0) {
+      setSubmitted([])
+      setInventory([])
+      search.reset()
+      return
+    }
+    search.mutate(lines)
+  }
 
   const results = useMemo(() => {
     if (!submitted) return null
@@ -231,7 +254,7 @@ export default function MassSearchPage() {
               aria-label="Card list"
             />
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={() => setSubmitted(parseDecklist(text))} disabled={!text.trim() || isLoading}>
+              <Button className="flex-1" onClick={runSearch} disabled={!text.trim()} loading={search.isPending}>
                 <Search aria-hidden className="size-4" />
                 Search list
               </Button>
@@ -241,6 +264,8 @@ export default function MassSearchPage() {
                   onClick={() => {
                     setText('')
                     setSubmitted(null)
+                    setInventory([])
+                    search.reset()
                   }}
                 >
                   Clear
@@ -252,8 +277,18 @@ export default function MassSearchPage() {
 
         {/* Results */}
         <div className="min-w-0 space-y-4">
-          {isLoading ? (
-            <StorePageLoader label="Loading inventory…" />
+          {search.isPending ? (
+            <ResultsSkeleton />
+          ) : search.isError ? (
+            <Card>
+              <CardBody>
+                <ErrorState
+                  title="Could not search inventory"
+                  description={extractErrorMessage(search.error, 'Please try again.')}
+                  onRetry={runSearch}
+                />
+              </CardBody>
+            </Card>
           ) : !results ? (
             <Card>
               <CardBody>
@@ -500,6 +535,25 @@ function ResultTile({ result, slug, actions }: { result: LineResult; slug: strin
         {body}
       </Link>
       {actions && <div className="mt-2 px-0.5">{actions}</div>}
+    </div>
+  )
+}
+
+function ResultsSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Searching inventory">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="rounded-card border border-border bg-surface p-4 shadow-card">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-16 w-12 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

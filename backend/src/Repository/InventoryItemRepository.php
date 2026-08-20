@@ -221,6 +221,45 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * In-stock listings whose card name matches any of the given names.
+     * Comparison is case-insensitive; double-faced cards also match on the
+     * front face (`Fire // Ice` satisfies `Fire`), same as the storefront
+     * mass-search matcher. Callers should pass already-trimmed, lowercased,
+     * unique names — empty input returns no rows rather than an invalid IN ().
+     *
+     * @param list<string> $names
+     *
+     * @return list<InventoryItem>
+     */
+    public function findInStockByCardNames(Store $store, array $names): array
+    {
+        $normalized = [];
+        foreach ($names as $name) {
+            $key = mb_strtolower(trim($name));
+            if ('' !== $key) {
+                $normalized[$key] = $key;
+            }
+        }
+        if ([] === $normalized) {
+            return [];
+        }
+
+        $names = array_values($normalized);
+
+        return $this->listingQuery($store, true, null)
+            ->andWhere(
+                'LOWER(c.name) IN (:names) OR (
+                    LOCATE(:dfcSep, c.name) > 0
+                    AND LOWER(TRIM(SUBSTRING(c.name, 1, LOCATE(:dfcSep, c.name) - 1))) IN (:names)
+                )',
+            )
+            ->setParameter('names', $names)
+            ->setParameter('dfcSep', ' // ')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Shared listing query: card + game are eager so serializing `gameCode`
      * never N+1s a 500-row page (18k listings × one Game SELECT each is what
      * made the storefront crawl after a large import).

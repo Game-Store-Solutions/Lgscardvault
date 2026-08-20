@@ -80,13 +80,15 @@ export default function CardDetailsPage() {
     from?: string
     setCode?: string
     artist?: string
-    inventoryId?: string
+    inventoryId?: string | number
+    originInventoryId?: string | number
     gameCode?: string
   } | null
   const deckNav = isDeckBuilderNav(location.state) ? location.state : null
   const storeSearchNav = storeSearchFromNavState(location.state)
   const cameFromSet = setNavState?.from === 'set' && Boolean(setNavState.setCode)
   const cameFromArtist = setNavState?.from === 'artist' && Boolean(setNavState.artist)
+  const artistOriginId = cameFromArtist ? setNavState?.originInventoryId : undefined
   const backTo = deckNav
     ? deckBuilderPath(slug, {
         commanderId: deckNav.commanderId,
@@ -103,10 +105,19 @@ export default function CardDetailsPage() {
           : storeSearchNav
             ? storeSearchPath(slug, storeSearchNav.search)
             : `/s/${slug}`
-  // Returning to a set / artist page has to carry the singles search with it,
-  // or the next "Back to store" from there lands on an unfiltered storefront.
-  const backState =
-    (cameFromArtist || cameFromSet) && storeSearchNav ? { storeSearch: storeSearchNav } : undefined
+  // Returning to artist/set has to keep the shopper's singles search AND the
+  // card they originally opened the artist page from, so "Back to card" still
+  // works after card → artist → other card → artist.
+  const backState = cameFromArtist
+    ? withStoreSearchNav(
+        artistOriginId
+          ? { from: 'card' as const, inventoryId: artistOriginId, gameCode: setNavState?.gameCode }
+          : {},
+        storeSearchNav,
+      )
+    : cameFromSet && storeSearchNav
+      ? { storeSearch: storeSearchNav }
+      : undefined
   const backLabel = deckNav
     ? 'Deck builder'
     : cameFromCaseCards

@@ -209,4 +209,38 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         self::assertCount(1, $page);
         self::assertSame('lea', $page[0]->getCard()?->getSetCode());
     }
+
+    public function testMassSearchMatchesExactNameAndDfcFrontFace(): void
+    {
+        $store = $this->fixtures->store();
+        $other = $this->fixtures->store();
+
+        $bolt = $this->fixtures->card(501, ['name' => 'Lightning Bolt', 'set' => 'lea']);
+        $dfc = $this->fixtures->card(502, ['name' => 'Fire // Ice', 'set' => 'apc']);
+        $soldOut = $this->fixtures->card(503, ['name' => 'Counterspell', 'set' => 'lea']);
+        $unrelated = $this->fixtures->card(504, ['name' => 'Sol Ring', 'set' => 'lea']);
+
+        $this->fixtures->inventoryItem($store, $bolt, 4);
+        $this->fixtures->inventoryItem($store, $dfc, 2);
+        $this->fixtures->inventoryItem($store, $soldOut, 0);
+        $this->fixtures->inventoryItem($other, $unrelated, 8);
+
+        $hits = $this->repo->findInStockByCardNames($store, ['lightning bolt', 'Fire', 'counterspell', 'sol ring']);
+        $names = array_map(static fn (InventoryItem $item): string => (string) $item->getCard()?->getName(), $hits);
+        sort($names);
+
+        self::assertSame(['Fire // Ice', 'Lightning Bolt'], $names);
+
+        $byFullDfc = $this->repo->findInStockByCardNames($store, ['fire // ice']);
+        self::assertCount(1, $byFullDfc);
+        self::assertSame('Fire // Ice', $byFullDfc[0]->getCard()?->getName());
+    }
+
+    public function testMassSearchEmptyNamesReturnsNothing(): void
+    {
+        $store = $this->seed(3);
+
+        self::assertSame([], $this->repo->findInStockByCardNames($store, []));
+        self::assertSame([], $this->repo->findInStockByCardNames($store, ['  ', '']));
+    }
 }

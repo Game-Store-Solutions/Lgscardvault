@@ -206,6 +206,7 @@ export default function ArtistBrowsePage() {
                 slug={slug}
                 artist={artist}
                 entry={entry}
+                originInventoryId={nav.from === 'card' ? nav.inventoryId : undefined}
                 storeSearchNav={storeSearchNav}
               />
             </StaggerItem>
@@ -220,10 +221,12 @@ function ArtistCardTile({
   slug,
   artist,
   entry,
+  originInventoryId,
   storeSearchNav,
 }: {
   slug: string
   artist: string
+  originInventoryId?: string | number
   storeSearchNav?: StoreSearchNavState
   entry: {
     representative: InventoryItem
@@ -245,7 +248,7 @@ function ArtistCardTile({
         {
           from: 'artist',
           artist,
-          inventoryId: representative.id,
+          originInventoryId,
           gameCode: card.gameCode ?? 'mtg',
         },
         storeSearchNav,
