@@ -18,7 +18,7 @@ import { formatPrice, parsePriceInput } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useCanManageStore, useDebouncedValue, useInventoryPage, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
-import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, Skeleton } from '../components/ui'
+import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, SpotlightRailSkeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
 import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
 import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
@@ -515,11 +515,13 @@ export default function StorePage() {
       </section>
 
       {/* Game switcher. Only when this store actually carries more than one */}
-      {gameOptions.length > 1 && (
+      {gamesLoading ? (
+        <div className="h-10 sm:h-9" aria-hidden />
+      ) : gameOptions.length > 1 ? (
         <section aria-label="Choose a game">
           <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Browse by game" />
         </section>
-      )}
+      ) : null}
 
       {/* Spotlight. Holographic cards in a lively persistent rail */}
       {(spotlightLoading || spotlightItems.length > 0) && (
@@ -538,15 +540,7 @@ export default function StorePage() {
             </div>
           </div>
           {spotlightLoading ? (
-            <div
-              className="flex gap-4 overflow-hidden pl-4 sm:pl-14"
-              aria-busy="true"
-              aria-label="Loading spotlight"
-            >
-              {Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="h-64 w-40 flex-shrink-0 rounded-card" />
-              ))}
-            </div>
+            <SpotlightRailSkeleton />
           ) : (
             <div className="relative">
               <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-bg to-transparent" />

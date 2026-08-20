@@ -34,6 +34,8 @@ function HeroCardImg({
       <img
         src={card.imageUrl.split('#')[0]}
         alt=""
+        width={488}
+        height={680}
         draggable={false}
         className="size-full rounded-md object-cover"
         onError={() => setFailed(true)}

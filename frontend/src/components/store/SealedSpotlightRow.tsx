@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
 import { useSealedSpotlight, useStoreCart } from '../../hooks'
+import { SpotlightRailSkeleton } from '../ui'
 import { SealedProductCard } from './SealedProductCard'
 
 const VIEW_ALL_AFTER = 10
@@ -10,14 +11,14 @@ const VIEW_ALL_AFTER = 10
 /** In-stock sealed row — same tile width and rail as the singles spotlight. */
 export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?: string }) {
   const { user } = useAuth()
-  const { data } = useSealedSpotlight(slug, gameCode)
+  const { data, isPending } = useSealedSpotlight(slug, gameCode)
   const { query: cartQuery, setSealedItem } = useStoreCart(slug, Boolean(user))
   const railRef = useRef<HTMLDivElement>(null)
 
   const lines = data?.items ?? []
   const total = data?.total ?? lines.length
 
-  if (lines.length === 0) return null
+  if (!isPending && lines.length === 0) return null
 
   const cart = cartQuery.data ?? []
   const viewAllTo = gameCode ? `/s/${slug}/sealed?game=${encodeURIComponent(gameCode)}` : `/s/${slug}/sealed`
@@ -42,7 +43,13 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
           <p className="text-sm text-fg-muted">
-            <span className="font-bold text-fg">{total}</span> {total === 1 ? 'item' : 'items'}
+            {isPending ? (
+              <span className="inline-block h-4 w-24 rounded skeleton-shimmer" />
+            ) : (
+              <>
+                <span className="font-bold text-fg">{total}</span> {total === 1 ? 'item' : 'items'}
+              </>
+            )}
           </p>
           {total > VIEW_ALL_AFTER ? (
             <Link to={viewAllTo} className="text-sm font-bold text-brand-600 hover:underline">
@@ -52,48 +59,53 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
         </div>
       </div>
 
-      <div className="relative">
-        <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-bg to-transparent" />
-        <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-bg to-transparent" />
-        <button
-          type="button"
-          onClick={() => scrollRail(-1)}
-          aria-label="Scroll sealed products left"
-          className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
-        >
-          <ChevronLeft aria-hidden className="size-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => scrollRail(1)}
-          aria-label="Scroll sealed products right"
-          className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
-        >
-          <ChevronRight aria-hidden className="size-5" />
-        </button>
-        <div
-          ref={railRef}
-              className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
-        >
-          {lines.map((line) => (
-            <SealedProductCard
-              key={line.id}
-              className="w-40 shrink-0 snap-start sm:w-52"
-              line={line}
-              cartQty={cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0}
-              pending={setSealedItem.isPending}
-              onAdd={() =>
-                setSealedItem.mutate({
-                  item: line,
-                  quantity: (cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0) + 1,
-                })
-              }
-            />
-          ))}
+      {isPending ? (
+        <SpotlightRailSkeleton label="Loading sealed products" />
+      ) : (
+        <div className="relative">
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-bg to-transparent" />
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-bg to-transparent" />
+          <button
+            type="button"
+            onClick={() => scrollRail(-1)}
+            aria-label="Scroll sealed products left"
+            className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+          >
+            <ChevronLeft aria-hidden className="size-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollRail(1)}
+            aria-label="Scroll sealed products right"
+            className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+          >
+            <ChevronRight aria-hidden className="size-5" />
+          </button>
+          <div
+            ref={railRef}
+            className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
+          >
+            {lines.map((line) => (
+              <SealedProductCard
+                key={line.id}
+                className="w-40 shrink-0 snap-start sm:w-52"
+                line={line}
+                cartQty={cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0}
+                pending={setSealedItem.isPending}
+                onAdd={() =>
+                  setSealedItem.mutate({
+                    item: line,
+                    quantity: (cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0) + 1,
+                  })
+                }
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   )
 }
 
 export default SealedSpotlightRow
+

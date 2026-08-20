@@ -64,7 +64,14 @@ function Face({
       }}
     >
       {image ? (
-        <img src={image} alt={alt} className="block size-full select-none object-cover" draggable={false} />
+        <img
+          src={image}
+          alt={alt}
+          width={488}
+          height={680}
+          className="block size-full select-none object-cover"
+          draggable={false}
+        />
       ) : (
         <div className="grid size-full place-items-center bg-surface text-fg-muted">
           <ImageOff aria-hidden className="size-8" />
