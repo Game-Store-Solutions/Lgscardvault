@@ -48,7 +48,26 @@ echo "==> Migrations"
   php bin/console doctrine:migrations:migrate --no-interaction
 
 echo "==> Roll app / workers / scheduler / frontend"
-"${COMPOSE[@]}" up -d --remove-orphans
+# Recreate app containers even when the frontend image is unchanged. nginx
+# otherwise keeps a stale Docker DNS IP for `backend` after a backend-only
+# roll and smoke checks 502 until the next frontend bounce.
+"${COMPOSE[@]}" up -d --remove-orphans --force-recreate backend worker scheduler frontend
+
+echo "==> Wait for backend health"
+backend_ok=0
+for _ in $(seq 1 30); do
+  if "${COMPOSE[@]}" exec -T backend curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+    backend_ok=1
+    break
+  fi
+  sleep 2
+done
+if [[ "${backend_ok}" -ne 1 ]]; then
+  echo "Backend never became healthy" >&2
+  "${COMPOSE[@]}" ps >&2 || true
+  "${COMPOSE[@]}" logs --tail=80 backend >&2 || true
+  exit 1
+fi
 
 echo "==> Smoke checks against ${SMOKE_BASE}"
 # Frontend/nginx and backend need a few seconds after `up -d` before accepting.
