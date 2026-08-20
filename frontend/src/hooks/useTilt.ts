@@ -12,10 +12,10 @@ import {
 } from 'framer-motion'
 
 /** Snappy 3D follow — the card should feel in the hand, not swimming. */
-const TILT_SPRING = { stiffness: 320, damping: 22, mass: 0.45 }
+const TILT_SPRING = { stiffness: 380, damping: 24, mass: 0.4 }
 
-/** Softer light follow so the sheen glides without stepping. */
-const LIGHT_SPRING = { stiffness: 120, damping: 28, mass: 0.65 }
+/** Pointer light: responsive on hover so the sheen tracks the cursor cleanly. */
+const LIGHT_SPRING = { stiffness: 260, damping: 28, mass: 0.4 }
 
 /** Two incommensurate periods so idle light drifts instead of looping in a circle. */
 const IDLE_A_MS = 9000
@@ -31,7 +31,7 @@ export type TiltStyle = MotionStyle & {
 export interface UseTiltOptions {
   /**
    * When true, the holo keeps animating while the pointer is away and the light
-   * drifts so a masked fringe is visible. Pointer takeovers instantly.
+   * drifts across the card. Pointer takeovers instantly; leave resumes idle.
    */
   idle?: boolean
 }
@@ -56,7 +56,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ry = useMotionValue(0)
   const px = useMotionValue(50)
   const py = useMotionValue(50)
-  const op = useMotionValue(idle ? 0.625 : 0)
+  const op = useMotionValue(idle ? 0.5 : 0)
 
   const srx = useSpring(rx, TILT_SPRING)
   const sry = useSpring(ry, TILT_SPRING)
@@ -73,14 +73,32 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
     px.set(50 + Math.sin(a) * 14 + Math.sin(b * 1.15) * 6)
     py.set(50 + Math.cos(a * 0.62) * 11 + Math.sin(b) * 5)
-    op.set(0.625 + Math.sin(a * 0.9) * 0.125)
+    op.set(0.5 + Math.sin(a * 0.9) * 0.1)
     rx.set(Math.sin(a * 0.55) * maxTilt * 0.08)
     ry.set(Math.cos(a * 0.48) * maxTilt * 0.1)
   })
 
-  const onPointerEnter = useCallback(() => {
-    hovering.current = true
-  }, [])
+  const onPointerEnter = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      hovering.current = true
+      const el = ref.current
+      if (!el) {
+        op.set(0.92)
+        return
+      }
+      const rect = el.getBoundingClientRect()
+      const x = (event.clientX - rect.left) / rect.width
+      const y = (event.clientY - rect.top) / rect.height
+      px.set(x * 100)
+      py.set(y * 100)
+      op.set(0.92)
+      if (!reduceMotion) {
+        rx.set((0.5 - y) * maxTilt * 0.85)
+        ry.set((x - 0.5) * maxTilt * 0.85)
+      }
+    },
+    [maxTilt, op, px, py, reduceMotion, rx, ry],
+  )
 
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -106,9 +124,13 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
 
   const onPointerLeave = useCallback(() => {
     hovering.current = false
-    if (idle && !reduceMotion) return
     rx.set(0)
     ry.set(0)
+    if (idle && !reduceMotion) {
+      // Hand light back to the idle drift; keep a soft resting sheen.
+      op.set(0.5)
+      return
+    }
     px.set(50)
     py.set(50)
     op.set(0)

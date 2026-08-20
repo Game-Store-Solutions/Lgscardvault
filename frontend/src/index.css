@@ -451,7 +451,7 @@ body {
    * film covers the full card face (clipped only by border-radius).
    */
   .foil-card {
-    --foil-holo-opacity: 0.49;
+    --foil-holo-opacity: 0.45;
   }
   .tilt-card {
     isolation: isolate;
@@ -462,14 +462,14 @@ body {
     overflow: hidden;
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.15) 0%,
-      hsla(0, 0%, 100%, 0.05) 28%,
-      hsla(0, 0%, 100%, 0.016) 52%,
-      transparent 78%
+      hsla(0, 0%, 100%, 0.18) 0%,
+      hsla(0, 0%, 100%, 0.06) 26%,
+      hsla(0, 0%, 100%, 0.02) 48%,
+      transparent 74%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.27);
-    transition: opacity 0.45s ease;
+    /* Driven by spring --op; CSS opacity transitions lagged the pointer. */
+    opacity: calc(var(--op, 0) * 0.42);
   }
   .tilt-holo,
   .foil-shimmer {
@@ -509,10 +509,17 @@ body {
       20% 45%;
     background-blend-mode: soft-light, soft-light;
     mix-blend-mode: soft-light;
-    opacity: calc(var(--foil-holo-opacity, 0.49) + var(--op, 0) * 0.53);
-    transition: opacity 0.45s ease;
+    /* Idle stays gentle (tone-down); hover (--op → 1) opens the sheen clearly. */
+    opacity: calc(var(--foil-holo-opacity, 0.45) + var(--op, 0) * 0.68);
     animation: holo-gradient 9s linear infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -9s);
+  }
+  /* While hovering, pause the film drift so the pointer owns the sheen. */
+  .tilt-card:hover .tilt-holo,
+  .tilt-card:hover .foil-shimmer,
+  .tilt-card:active .tilt-holo,
+  .tilt-card:active .foil-shimmer {
+    animation-play-state: paused;
   }
   .tilt-grid {
     border-radius: inherit;
@@ -532,8 +539,7 @@ body {
         rgb(255 255 255 / 0.01) 3px,
         rgb(255 255 255 / 0.01) 6px
       );
-    opacity: calc(var(--op, 0) * 0.24);
-    transition: opacity 0.45s ease;
+    opacity: calc(var(--op, 0) * 0.3);
     pointer-events: none;
   }
   .foil-idle-orbit {
