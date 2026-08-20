@@ -451,7 +451,7 @@ body {
    * film covers the full card face (clipped only by border-radius).
    */
   .foil-card {
-    --foil-holo-opacity: 0.38;
+    --foil-holo-opacity: 0.45;
   }
   .tilt-card {
     isolation: isolate;
@@ -479,26 +479,28 @@ body {
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
         hsla(0, 0%, 100%, 0.1) 0%,
-        hsla(195, 50%, 62%, 0.31) 18%,
+        hsla(195, 72%, 62%, 0.44) 18%,
+        /* Magenta/purple fringe ~30% quieter */
         hsla(310, 48%, 60%, 0.22) 38%,
-        hsla(42, 46%, 58%, 0.13) 58%,
-        hsla(155, 42%, 52%, 0.07) 78%,
+        hsla(42, 65%, 58%, 0.18) 58%,
+        hsla(155, 60%, 52%, 0.1) 78%,
         transparent 100%
       ),
       linear-gradient(
         122deg,
+        /* Purple family dialed down ~30%; other hues unchanged */
         hsl(300, 50%, 56%),
         hsl(330, 49%, 58%),
-        hsl(12, 52%, 54%),
-        hsl(42, 50%, 56%),
-        hsl(155, 48%, 46%),
-        hsl(192, 52%, 48%),
+        hsl(12, 75%, 54%),
+        hsl(42, 72%, 56%),
+        hsl(155, 68%, 46%),
+        hsl(192, 74%, 48%),
         hsl(245, 49%, 54%),
         hsl(285, 48%, 54%),
         hsl(300, 50%, 56%),
         hsl(330, 49%, 58%),
-        hsl(12, 52%, 54%),
-        hsl(155, 48%, 46%),
+        hsl(12, 75%, 54%),
+        hsl(155, 68%, 46%),
         hsl(245, 49%, 54%)
       );
     background-size:
@@ -510,7 +512,7 @@ body {
     background-blend-mode: soft-light, soft-light;
     mix-blend-mode: soft-light;
     /* Idle stays gentle; hover (--op → 1) opens the sheen clearly. */
-    opacity: calc(var(--foil-holo-opacity, 0.38) + var(--op, 0) * 0.55);
+    opacity: calc(var(--foil-holo-opacity, 0.45) + var(--op, 0) * 0.68);
     animation: holo-gradient 9s linear infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -9s);
   }
