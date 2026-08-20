@@ -287,7 +287,7 @@ export default function CartPage() {
       ) : cart.length === 0 ? (
         <EmptyCart slug={slug} storeName={store?.name ?? 'the store'} picks={picks} />
       ) : (
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-10">
+        <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-10">
           <div className="space-y-5 lg:space-y-6">
             {!kioskMode && (
               <Reveal immediate className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
@@ -630,7 +630,7 @@ function OrderSummary({
 }) {
   const creditApplied = !kioskMode && !isGuest && useCredit ? Math.min(creditBalanceCents, subtotalCents) : 0
   return (
-    <aside id="order-summary" className="scroll-mt-24 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:sticky lg:top-20 lg:bg-bg/80">
+    <aside id="order-summary" className="scroll-mt-24 min-w-0 overflow-x-clip rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:sticky lg:top-20 lg:bg-bg/80">
       <h2 className="font-display text-lg font-bold text-fg">Order summary</h2>
       <p className="mt-1 text-sm text-fg-muted">
         {itemCount} {itemCount === 1 ? 'item' : 'items'}

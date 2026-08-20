@@ -177,7 +177,7 @@ export function CheckoutPanel({
   }
 
   return (
-    <div className="mt-5 pt-5">
+    <div className="mt-5 min-w-0 pt-5">
       <p className="text-sm font-semibold text-fg">Payment</p>
 
       {fullyCovered ? (
@@ -191,7 +191,7 @@ export function CheckoutPanel({
           Place order with store credit
         </Button>
       ) : (
-        <div className="mt-3 space-y-1">
+        <div className="mt-3 min-w-0 space-y-1">
           <SquarePaymentPanel
             applicationId={config.applicationId}
             locationId={config.locationId}
