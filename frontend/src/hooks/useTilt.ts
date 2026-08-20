@@ -18,8 +18,8 @@ const TILT_SPRING = { stiffness: 320, damping: 22, mass: 0.45 }
 const LIGHT_SPRING = { stiffness: 120, damping: 28, mass: 0.65 }
 
 /** Two incommensurate periods so idle light drifts instead of looping in a circle. */
-const IDLE_A_MS = 14000
-const IDLE_B_MS = 21000
+const IDLE_A_MS = 9000
+const IDLE_B_MS = 13500
 
 export type TiltStyle = MotionStyle & {
   '--mx': MotionValue<string>

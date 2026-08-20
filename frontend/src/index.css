@@ -523,8 +523,8 @@ body {
     mix-blend-mode: soft-light;
     opacity: calc(var(--foil-holo-opacity, 0.5) + var(--op, 0) * 0.594);
     transition: opacity 0.45s ease;
-    animation: holo-gradient 14s linear infinite;
-    animation-delay: calc(var(--foil-seed, 0.4) * -14s);
+    animation: holo-gradient 9s linear infinite;
+    animation-delay: calc(var(--foil-seed, 0.4) * -9s);
     /*
      * Hotspot follow ∩ card vignette: the sheen never paints the rim, so
      * rounded corners and letterboxed edges stay free of fringe.
@@ -618,7 +618,7 @@ body {
     --mx: 50%;
     --my: 50%;
     --op: 0.625;
-    animation: foil-idle-orbit 18s linear infinite;
+    animation: foil-idle-orbit 11s linear infinite;
   }
   .foil-idle-orbit:hover {
     animation-play-state: paused;
