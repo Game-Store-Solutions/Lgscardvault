@@ -94,7 +94,10 @@ final class CommanderRecommendControllerTest extends WebTestCase
         }
         self::assertNotNull($buddy);
         self::assertGreaterThan(0.0, $buddy['score']);
-        self::assertContains('proliferate', $buddy['reasons']);
+        // Raw matched tags live in `signals`; `reasons` holds the human-readable
+        // explanation the scoring process produced.
+        self::assertContains('proliferate', $buddy['signals']);
+        self::assertNotEmpty($buddy['reasons']);
         self::assertSame(3, $buddy['inventoryItem']['quantity']);
         self::assertArrayHasKey('id', $buddy['inventoryItem'], 'inventory id is required for cart PUT');
         self::assertArrayHasKey('strategy', $payload);
@@ -333,7 +336,9 @@ final class CommanderRecommendControllerTest extends WebTestCase
         $payload = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame(100, $payload['targetSize']);
         self::assertGreaterThanOrEqual(10, $payload['filledSize']);
-        self::assertGreaterThanOrEqual(1, $payload['slots']['land']);
+        self::assertGreaterThanOrEqual(1, $payload['slots']['lands']);
+        self::assertArrayHasKey('structure', $payload);
+        self::assertArrayHasKey('strategy', $payload);
         self::assertNotEmpty($payload['inventoryIds']);
         self::assertArrayHasKey('combos', $payload);
         self::assertArrayHasKey('budget', $payload);
@@ -403,7 +408,7 @@ final class CommanderRecommendControllerTest extends WebTestCase
         $payload = json_decode($this->client->getResponse()->getContent(), true);
 
         $names = array_map(
-            static fn (array $row): string => $row['inventoryItem']['card']['name'],
+            static fn (array $row): string => (string) $row['card']['name'],
             $payload['cards'],
         );
         self::assertContains('Cheap Draw', $names);

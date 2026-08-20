@@ -72,7 +72,7 @@ services:
   scheduler:
     build:
       context: ../backend
-    command: php bin/console messenger:consume scheduler_catalog scheduler_billing --time-limit=3600 --memory-limit=256M -v
+    command: php bin/console messenger:consume scheduler_catalog scheduler_billing scheduler_commanders --time-limit=3600 --memory-limit=256M -v
     env_file: [/etc/mtgstore/prod.env]
     environment:
       APP_ENV: prod

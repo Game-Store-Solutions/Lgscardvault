@@ -21,9 +21,46 @@ final class FakeSpellbookClient implements SpellbookClientInterface
                 $needle = 'Kiki-Jiki, Mirror Breaker';
                 break;
             }
+            if (str_contains(strtolower((string) $name), 'tidespout')) {
+                $needle = 'Tidespout Combo Test';
+                break;
+            }
         }
         if (null === $needle) {
             return [];
+        }
+
+        if ('Tidespout Combo Test' === $needle) {
+            return [
+                [
+                    'id' => 'test-combo-tidespout-ring',
+                    'status' => 'OK',
+                    'identity' => 'U',
+                    'description' => 'Infinite colorless mana · Infinite storm count.',
+                    'uses' => [
+                        [
+                            'card' => [
+                                'name' => 'Tidespout Tyrant',
+                                'identity' => 'U',
+                                'oracleId' => '00000000-0000-4000-8000-000000000099',
+                            ],
+                            'quantity' => 1,
+                        ],
+                        [
+                            'card' => [
+                                'name' => 'Sol Ring',
+                                'identity' => 'C',
+                                'oracleId' => '00000000-0000-4000-8000-000000000098',
+                            ],
+                            'quantity' => 1,
+                        ],
+                    ],
+                    'produces' => [
+                        ['feature' => ['name' => 'Infinite colorless mana'], 'quantity' => 1],
+                        ['feature' => ['name' => 'Infinite storm count'], 'quantity' => 1],
+                    ],
+                ],
+            ];
         }
 
         $complete = [

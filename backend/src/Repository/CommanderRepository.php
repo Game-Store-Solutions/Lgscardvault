@@ -40,6 +40,28 @@ class CommanderRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    /**
+     * Commanders worth precomputing first, most-played first.
+     *
+     * EDHREC rank on the underlying card is the best proxy we have for demand
+     * before the store has its own usage history. Unranked commanders sort last
+     * rather than being excluded, so a full backfill still reaches everything.
+     *
+     * @return list<Commander>
+     */
+    public function findMostPlayed(int $limit = 200, int $offset = 0): array
+    {
+        return $this->createQueryBuilder('cmd')
+            ->join('cmd.card', 'c')->addSelect('c')
+            ->addSelect('COALESCE(c.edhrecRank, 2147483647) AS HIDDEN edhrecSort')
+            ->orderBy('edhrecSort', 'ASC')
+            ->addOrderBy('cmd.name', 'ASC')
+            ->setFirstResult(max(0, $offset))
+            ->setMaxResults(max(1, $limit))
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findOneByOracleId(Uuid $oracleId): ?Commander
     {
         return $this->find($oracleId);

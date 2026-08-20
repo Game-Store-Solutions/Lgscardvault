@@ -1,0 +1,128 @@
+<?php
+
+namespace App\Service\Recommend\Provider\Archidekt;
+
+use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+
+/**
+ * Transport for Archidekt's deck API.
+ *
+ * Operational notes, because this endpoint carries real risk:
+ *
+ *  - Archidekt publishes no API documentation and has said publicly they do not
+ *    intend to maintain a public API, so response shapes can change without
+ *    notice. Every read here is defensive and failures degrade to empty results.
+ *  - Their terms grant a personal, noncommercial license and prohibit automated
+ *    queries, so this client is gated behind ARCHIDEKT_ENABLED and should not be
+ *    switched on for commercial traffic without written permission.
+ *  - No documented rate limit exists. We self-impose one request per second via
+ *    a host-wide lock and cache aggressively (a week by default), because the
+ *    harvester only needs a commander's decks once.
+ *
+ * `deckFormat=3` is Archidekt's Commander/EDH format id.
+ */
+final class ArchidektClient implements ArchidektClientInterface
+{
+    private const BASE = 'https://archidekt.com/api';
+    private const FORMAT_COMMANDER = 3;
+    private const SEARCH_TIMEOUT = 15;
+    private const DECK_TIMEOUT = 25;
+
+    public function __construct(
+        private readonly HttpClientInterface $httpClient,
+        private readonly CacheInterface $cache,
+        private readonly LoggerInterface $logger,
+        private readonly ArchidektRateLimiter $rateLimiter,
+        private readonly ArchidektCircuitBreaker $circuitBreaker,
+        private readonly int $cacheTtl = 604800,
+        private readonly string $userAgent = 'LgsCardVault/1.0 (+deck recommendation engine)',
+    ) {
+    }
+
+    public function searchCommanderDecks(string $commanderName, int $pageSize): array
+    {
+        $name = trim($commanderName);
+        if ('' === $name) {
+            return [];
+        }
+        $pageSize = max(1, min(100, $pageSize));
+        $cacheKey = 'archidekt_search_'.hash('xxh128', $name.'|'.$pageSize);
+
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($name, $pageSize): array {
+            $item->expiresAfter($this->cacheTtl);
+            $payload = $this->request(self::BASE.'/decks/v3/', [
+                'formats' => self::FORMAT_COMMANDER,
+                'orderBy' => '-viewCount',
+                'commanderName' => $name,
+                'pageSize' => $pageSize,
+            ], self::SEARCH_TIMEOUT);
+
+            $results = $payload['results'] ?? null;
+
+            return is_array($results) ? array_values(array_filter($results, 'is_array')) : [];
+        });
+    }
+
+    public function fetchDeck(int $deckId): ?array
+    {
+        if ($deckId <= 0) {
+            return null;
+        }
+
+        return $this->cache->get('archidekt_deck_'.$deckId, function (ItemInterface $item) use ($deckId): ?array {
+            $item->expiresAfter($this->cacheTtl);
+            $payload = $this->request(self::BASE.'/decks/'.$deckId.'/', [], self::DECK_TIMEOUT);
+
+            return isset($payload['cards']) && is_array($payload['cards']) ? $payload : null;
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     *
+     * @return array<string, mixed>
+     */
+    private function request(string $url, array $query, int $timeout): array
+    {
+        if (!$this->circuitBreaker->allow()) {
+            $this->logger->warning('Archidekt circuit open; skipping {url}', ['url' => $url]);
+
+            return [];
+        }
+
+        $this->rateLimiter->acquire();
+
+        try {
+            $response = $this->httpClient->request('GET', $url, [
+                'query' => $query,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'User-Agent' => $this->userAgent,
+                ],
+                'timeout' => $timeout,
+            ]);
+            if ($response->getStatusCode() >= 400) {
+                $this->circuitBreaker->recordFailure();
+                $this->logger->warning('Archidekt request returned {status} for {url}', [
+                    'status' => $response->getStatusCode(),
+                    'url' => $url,
+                ]);
+
+                return [];
+            }
+
+            $payload = $response->toArray(false);
+            $this->circuitBreaker->recordSuccess();
+
+            return is_array($payload) ? $payload : [];
+        } catch (\Throwable $e) {
+            $this->circuitBreaker->recordFailure();
+            $this->logger->warning('Archidekt request failed: '.$e->getMessage(), ['url' => $url]);
+
+            return [];
+        }
+    }
+}

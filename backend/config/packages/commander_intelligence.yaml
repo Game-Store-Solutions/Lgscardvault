@@ -1,0 +1,65 @@
+# Commander Intelligence & Synergy Engine.
+#
+# Every tunable lives here so scoring can be re-balanced without touching
+# service code. The weights are normalized (they sum to 1.0) and encode the
+# recommendation hierarchy: legality is a hard gate applied during candidate
+# generation, then strategy dominates, then deck needs and card relationships,
+# and generic popularity is deliberately the weakest signal.
+#
+# Parameters are flat because Symfony cannot reference a nested key of a
+# parameter array; only `weights` is injected as a whole map.
+parameters:
+    commander_intelligence.weights:
+        # "Is this card good for THIS strategy?" — the headline signal.
+        strategy_affinity: 0.26
+        # "Does it play well with what the user already picked?"
+        existing_deck_synergy: 0.16
+        # "Does the deck still need this role?" (ramp/draw/removal/payoff/...)
+        role_need: 0.14
+        # Lift-based co-occurrence with the current deck's cards.
+        relationship: 0.12
+        # Raw inclusion rate across strategy-matched reference decks.
+        reference_frequency: 0.10
+        # Bonus for completing a partially-assembled synergy package.
+        package_completion: 0.08
+        # "Is this card good with this commander generally?" (strategy-agnostic)
+        commander_affinity: 0.07
+        # Distance from the strategy's ideal mana curve.
+        mana_curve: 0.04
+        # EDHREC rank. Intentionally small so goodstuff cannot dominate.
+        popularity: 0.03
+
+    # Applied after the weighted sum, so stock never reorders strategy fit — it
+    # only breaks ties between comparably good cards. Stock is a signal, not a
+    # filter: out-of-stock cards are still recommended, and flagged as such.
+    commander_intelligence.stock_bonus: 0.03
+
+    # Reference deck harvesting.
+    # Candidate decks pulled from a provider before strategy filtering.
+    commander_intelligence.harvest_depth: 50
+    # Decks kept per (commander, strategy) — also the co-occurrence sample size.
+    commander_intelligence.decks_per_strategy: 10
+    # Aggregates older than this trigger a background refresh on next request.
+    commander_intelligence.max_age_days: 90
+
+    # Drop reference decks whose fetchedAt is older than this. Keep it above
+    # max_age_days so the weekly refresh can touch active commanders first;
+    # what gets pruned are orphans and abandoned commanders.
+    commander_intelligence.prune_age_days: 120
+    commander_intelligence.prune_batch_size: 500
+    commander_intelligence.prune_delete_decks: true
+
+    # Provider toggles. The engine only ever reads our own tables, so turning a
+    # provider off degrades data freshness, never availability.
+    commander_intelligence.archidekt.enabled: '%env(bool:ARCHIDEKT_ENABLED)%'
+    # Archidekt documents no rate limit. One request per second plus a week-long
+    # cache keeps our footprint negligible; a commander is harvested once.
+    commander_intelligence.archidekt.min_interval_us: 1000000
+    commander_intelligence.archidekt.cache_ttl: 604800
+    # Fail open after this many consecutive HTTP/transport failures; cool down
+    # before probing again so a blocked endpoint cannot stall the worker.
+    commander_intelligence.archidekt.circuit_failure_threshold: 5
+    commander_intelligence.archidekt.circuit_cooldown_seconds: 3600
+    commander_intelligence.mtgjson_precon.enabled: true
+    commander_intelligence.mtgjson_precon.cache_ttl: 2592000
+    commander_intelligence.local_decks.enabled: true

@@ -45,7 +45,6 @@ final class StoreComboAnalyzer
     public function analyzeForCommander(Store $store, Card $commander, array $extraCardNames = [], int $limit = 20): array
     {
         $limit = max(1, min(40, $limit));
-        $stockIndex = $this->buildStockIndex($store);
         $commanderName = $this->frontFace($commander->getName());
         $commanderIdentity = $commander->getColorIdentity() ?? [];
         $identityCode = $this->colorIdentity->identityCode($commanderIdentity);
@@ -63,8 +62,9 @@ final class StoreComboAnalyzer
             $variants = $this->spellbook->searchVariants([$commanderName], 50);
         }
 
+        $stockIndex = $this->buildStockIndexForComboPieces($store, $variants, $deckNames);
         $identityIndex = $this->buildIdentityIndex($variants, $stockIndex);
-        $catalogOracleByName = $this->buildCatalogOracleIndex($variants, $stockIndex, $identityIndex);
+        $catalogOracleByName = $this->buildCatalogOracleIndex($variants, $stockIndex);
 
         $combos = [];
         $filteredOut = 0;
@@ -119,6 +119,102 @@ final class StoreComboAnalyzer
     }
 
     /**
+     * Build a stock index scoped to combo pieces only — uses the same direct
+     * name / oracle lookups as mass search instead of a capped full-store scan.
+     *
+     * @param list<array<string, mixed>> $variants
+     * @param list<string> $extraNames
+     * @return array{
+     *   byOracle: array<string, array{listing: InventoryItem, quantity: int}>,
+     *   byName: array<string, string>,
+     *   byNormalized: array<string, string>
+     * }
+     */
+    private function buildStockIndexForComboPieces(Store $store, array $variants, array $extraNames): array
+    {
+        $names = [];
+        $oracles = [];
+
+        foreach ($extraNames as $name) {
+            $front = $this->frontFace($name);
+            if ('' !== $front) {
+                $names[strtolower($front)] = true;
+            }
+        }
+
+        foreach ($variants as $variant) {
+            $uses = is_array($variant['uses'] ?? null) ? $variant['uses'] : [];
+            foreach ($uses as $use) {
+                $card = is_array($use['card'] ?? null) ? $use['card'] : [];
+                $front = $this->frontFace((string) ($card['name'] ?? ''));
+                if ('' !== $front) {
+                    $names[strtolower($front)] = true;
+                }
+                foreach (['oracleId', 'oracle_id', 'scryfallOracleId'] as $field) {
+                    $raw = $card[$field] ?? null;
+                    if (is_string($raw) && '' !== trim($raw)) {
+                        $oracles[strtolower(trim($raw))] = true;
+                    }
+                }
+            }
+        }
+
+        $byOracle = [];
+        $byName = [];
+        $byNormalized = [];
+
+        if ([] !== $names) {
+            foreach ($this->inventoryItems->findInStockByCardNames($store, array_keys($names)) as $item) {
+                $this->accumulateStockItem($item, $byOracle, $byName, $byNormalized);
+            }
+        }
+
+        if ([] !== $oracles) {
+            foreach ($this->inventoryItems->findInStockByOracleIds($store, array_keys($oracles)) as $item) {
+                $this->accumulateStockItem($item, $byOracle, $byName, $byNormalized);
+            }
+        }
+
+        return [
+            'byOracle' => $byOracle,
+            'byName' => $byName,
+            'byNormalized' => $byNormalized,
+        ];
+    }
+
+    /**
+     * @param array<string, array{listing: InventoryItem, quantity: int}> $byOracle
+     * @param array<string, string> $byName
+     * @param array<string, string> $byNormalized
+     */
+    private function accumulateStockItem(
+        InventoryItem $item,
+        array &$byOracle,
+        array &$byName,
+        array &$byNormalized,
+    ): void {
+        $card = $item->getCard();
+        if (!$card instanceof Card) {
+            return;
+        }
+
+        $oracleKey = strtolower((string) $card->getOracleId());
+        $qty = $item->getQuantity();
+        if (!isset($byOracle[$oracleKey])) {
+            $byOracle[$oracleKey] = ['listing' => $item, 'quantity' => $qty];
+        } else {
+            $byOracle[$oracleKey]['quantity'] += $qty;
+            if ($item->getPriceCents() < $byOracle[$oracleKey]['listing']->getPriceCents()) {
+                $byOracle[$oracleKey]['listing'] = $item;
+            }
+        }
+
+        $nameKey = strtolower($this->frontFace($card->getName()));
+        $byName[$nameKey] = $oracleKey;
+        $byNormalized[$this->normalizeComboName($card->getName())] = $oracleKey;
+    }
+
+    /**
      * @return array{
      *   byOracle: array<string, array{listing: InventoryItem, quantity: int}>,
      *   byName: array<string, string>,
@@ -132,25 +228,7 @@ final class StoreComboAnalyzer
         $byNormalized = [];
 
         foreach ($this->inventoryItems->findInStockMagicForStore($store) as $item) {
-            $card = $item->getCard();
-            if (!$card instanceof Card) {
-                continue;
-            }
-
-            $oracleKey = strtolower((string) $card->getOracleId());
-            $qty = $item->getQuantity();
-            if (!isset($byOracle[$oracleKey])) {
-                $byOracle[$oracleKey] = ['listing' => $item, 'quantity' => $qty];
-            } else {
-                $byOracle[$oracleKey]['quantity'] += $qty;
-                if ($item->getPriceCents() < $byOracle[$oracleKey]['listing']->getPriceCents()) {
-                    $byOracle[$oracleKey]['listing'] = $item;
-                }
-            }
-
-            $nameKey = strtolower($this->frontFace($card->getName()));
-            $byName[$nameKey] = $oracleKey;
-            $byNormalized[$this->normalizeComboName($card->getName())] = $oracleKey;
+            $this->accumulateStockItem($item, $byOracle, $byName, $byNormalized);
         }
 
         return [
@@ -167,10 +245,9 @@ final class StoreComboAnalyzer
      *   byName: array<string, string>,
      *   byNormalized: array<string, string>
      * } $stockIndex
-     * @param array<string, list<string>|null> $identityIndex
      * @return array<string, string> lowercase spellbook name → oracle id
      */
-    private function buildCatalogOracleIndex(array $variants, array $stockIndex, array $identityIndex): array
+    private function buildCatalogOracleIndex(array $variants, array $stockIndex): array
     {
         $needLookup = [];
         foreach ($variants as $variant) {
@@ -426,12 +503,6 @@ final class StoreComboAnalyzer
         array $catalogOracleByName,
     ): ?string {
         $card = is_array($use['card'] ?? null) ? $use['card'] : [];
-        foreach (['oracleId', 'oracle_id', 'scryfallOracleId'] as $field) {
-            $raw = $card[$field] ?? null;
-            if (is_string($raw) && '' !== trim($raw)) {
-                return strtolower(trim($raw));
-            }
-        }
 
         if (isset($stockIndex['byName'][$nameKey])) {
             return $stockIndex['byName'][$nameKey];
@@ -442,8 +513,21 @@ final class StoreComboAnalyzer
             return $stockIndex['byNormalized'][$normalized];
         }
 
+        foreach (['oracleId', 'oracle_id', 'scryfallOracleId'] as $field) {
+            $raw = $card[$field] ?? null;
+            if (is_string($raw) && '' !== trim($raw)) {
+                $key = strtolower(trim($raw));
+                if (isset($stockIndex['byOracle'][$key])) {
+                    return $key;
+                }
+            }
+        }
+
         if (isset($catalogOracleByName[$nameKey])) {
-            return $catalogOracleByName[$nameKey];
+            $key = $catalogOracleByName[$nameKey];
+            if (isset($stockIndex['byOracle'][$key])) {
+                return $key;
+            }
         }
 
         return null;

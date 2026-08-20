@@ -3,6 +3,7 @@
 namespace App\Service\Recommend;
 
 use App\Entity\Card;
+use App\Service\Recommend\Intelligence\StrategyTaxonomy;
 
 /**
  * Curated commander strategies with enabler / fuel / payoff role rules.
@@ -11,6 +12,11 @@ use App\Entity\Card;
  * (from ThemeTokenizer) or oracle-text needles. Cards are then classified
  * into deck roles for that strategy so the builder can supply a focused
  * package rather than a flat popularity list.
+ *
+ * The curated list covers ten archetypes in depth. StrategyTaxonomy covers every
+ * archetype reference deck providers actually tag, so `get()` synthesizes a role
+ * definition for taxonomy-only strategies instead of returning null — otherwise
+ * picking "Aggro" or "Artifacts" would silently classify every card as support.
  */
 final class StrategyCatalog
 {
@@ -36,6 +42,15 @@ final class StrategyCatalog
         'planeswalker',
         'other',
     ];
+
+    private readonly StrategyTaxonomy $taxonomy;
+
+    public function __construct(?StrategyTaxonomy $taxonomy = null)
+    {
+        // Defaulted so the catalog stays constructible on its own; the taxonomy
+        // is a stateless lookup table with no dependencies of its own.
+        $this->taxonomy = $taxonomy ?? new StrategyTaxonomy();
+    }
 
     /**
      * @return list<array{
@@ -368,7 +383,59 @@ final class StrategyCatalog
             }
         }
 
-        return null;
+        return $this->synthesize($id);
+    }
+
+    /**
+     * Build role rules for a taxonomy strategy that has no curated entry.
+     *
+     * The taxonomy already describes each archetype's engine as package
+     * components, which map cleanly onto the three roles: whatever produces the
+     * resource is the enabler, whatever amplifies or supports it is fuel, and
+     * whatever converts it into a win is the payoff.
+     *
+     * @return ?array{id: string, label: string, description: string, commanderTags: list<string>, commanderNeedles: list<string>, roles: array<string, array{tags: list<string>, needles: list<string>}>}
+     */
+    private function synthesize(string $id): ?array
+    {
+        if (!$this->taxonomy->has($id)) {
+            return null;
+        }
+
+        $package = $this->taxonomy->package($id);
+        $tags = $this->taxonomy->tags($id);
+        $needles = $this->taxonomy->needles($id);
+
+        $component = static fn (string $key): array => $package[$key]['needles'] ?? [];
+
+        $enablerNeedles = $component(StrategyTaxonomy::COMPONENT_GENERATOR);
+        $fuelNeedles = array_merge(
+            $component(StrategyTaxonomy::COMPONENT_ENABLER),
+            $component(StrategyTaxonomy::COMPONENT_MULTIPLIER),
+        );
+        $payoffNeedles = $component(StrategyTaxonomy::COMPONENT_PAYOFF);
+
+        return [
+            'id' => $id,
+            'label' => $this->taxonomy->label($id),
+            'description' => $this->taxonomy->description($id),
+            'commanderTags' => $tags,
+            'commanderNeedles' => $needles,
+            'roles' => [
+                self::ROLE_ENABLER => [
+                    'tags' => $tags,
+                    'needles' => [] !== $enablerNeedles ? $enablerNeedles : $needles,
+                ],
+                self::ROLE_FUEL => [
+                    'tags' => [],
+                    'needles' => $fuelNeedles,
+                ],
+                self::ROLE_PAYOFF => [
+                    'tags' => [],
+                    'needles' => $payoffNeedles,
+                ],
+            ],
+        ];
     }
 
     /**

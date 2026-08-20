@@ -398,6 +398,40 @@ Super-admins can also trigger a sync via `POST /api/admin/scryfall/sync` (defaul
 
 ---
 
+## Commander deck builder
+
+The deck builder learns from real Commander decklists rather than ranking cards
+by popularity. Full design in
+[architecture/commander-deck-builder.md](architecture/commander-deck-builder.md).
+
+```bash
+php bin/console app:commanders:sync                                  # legal commanders (weekly, from Scryfall)
+php bin/console app:commanders:intelligence --commander="Anim Pakal, Thousandth Moon"
+php bin/console app:commanders:intelligence --top=400 --async        # warm the commanders that matter
+php bin/console app:commanders:prune-reference-decks                 # drop orphaned reference lists
+php bin/console messenger:consume scheduler_commanders async         # tickers + workers
+```
+
+Harvesting and aggregation run in a worker; recommendation requests only read
+precomputed statistics. A commander nobody has warmed yet queues a refresh on
+first use and is served from a lower-confidence fallback in the meantime, so the
+feature degrades rather than stalling. Confirm production consumes
+`scheduler_commanders` (Sunday catalog sync, intelligence sweep, reference-deck
+prune).
+
+### Reference deck sources
+
+| Source | Default | Notes |
+|--------|---------|-------|
+| Archidekt | on (`ARCHIDEKT_ENABLED`) | Best data by far — oracle ids and builder-authored strategy tags. Undocumented API; their terms grant a personal, noncommercial license and prohibit automated queries, so review that risk (ideally get written permission) before running this against production traffic. Throttled to 1 req/s and cached for a week. |
+| MTGJSON precons | on | ~190 official Commander products. Risk-free but thin: most commanders have zero or one. |
+| Saved user decks | on | First-party, no external terms, and it improves as the platform is used. |
+
+Turning a source off reduces data freshness, never availability — the engine only
+ever reads our own tables, and falls back to card metadata when it has nothing.
+
+---
+
 ## Services & ports
 
 | Service | URL |

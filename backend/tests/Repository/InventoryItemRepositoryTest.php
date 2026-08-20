@@ -2,11 +2,13 @@
 
 namespace App\Tests\Repository;
 
+use App\Entity\Card;
 use App\Entity\InventoryItem;
 use App\Repository\InventoryItemRepository;
 use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * The store inventory listing is served page-by-page so a single request never
@@ -242,5 +244,36 @@ final class InventoryItemRepositoryTest extends KernelTestCase
 
         self::assertSame([], $this->repo->findInStockByCardNames($store, []));
         self::assertSame([], $this->repo->findInStockByCardNames($store, ['  ', '']));
+    }
+
+    public function testFindInStockByOracleIdsMatchesAnyPrinting(): void
+    {
+        $store = $this->fixtures->store();
+        $oracle = Uuid::fromString('aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee');
+        $alpha = $this->fixtures->card(601, ['name' => 'Oracle Alpha', 'set' => 'lea', 'oracle_id' => $oracle]);
+        $beta = $this->makePrinting($oracle, 602, 'Oracle Alpha', 'c21', '1');
+        $this->em->persist($beta);
+        $other = $this->fixtures->card(603, ['name' => 'Other Card', 'set' => 'lea']);
+        $this->fixtures->inventoryItem($store, $beta, 2);
+        $this->fixtures->inventoryItem($store, $other, 1);
+        $this->em->flush();
+
+        $hits = $this->repo->findInStockByOracleIds($store, [(string) $oracle, 'not-a-uuid', '']);
+        self::assertCount(1, $hits);
+        self::assertSame('Oracle Alpha', $hits[0]->getCard()?->getName());
+        self::assertSame('c21', $hits[0]->getCard()?->getSetCode());
+    }
+
+    private function makePrinting(Uuid $oracleId, int $seed, string $name, string $set, string $number): Card
+    {
+        $hex = str_pad(dechex($seed), 8, '0', STR_PAD_LEFT);
+        $card = new Card(Uuid::fromString(sprintf('%s-1111-4222-8333-%012d', $hex, $seed)));
+        $card->setOracleId($oracleId);
+        $card->setName($name);
+        $card->setSetCode($set);
+        $card->setCollectorNumber($number);
+        $card->setColorIdentity([]);
+
+        return $card;
     }
 }

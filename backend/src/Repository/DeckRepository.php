@@ -6,6 +6,7 @@ use App\Entity\Deck;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * @extends ServiceEntityRepository<Deck>
@@ -32,5 +33,42 @@ class DeckRepository extends ServiceEntityRepository
     public function findOneForUser(User $user, int $id): ?Deck
     {
         return $this->findOneBy(['user' => $user, 'id' => $id]);
+    }
+
+    /**
+     * Saved decks that contain a given oracle identity, for use as reference
+     * decks. First-party data: no external terms, no rate limits, and it gets
+     * better as the platform is used.
+     *
+     * Card lines are eager-loaded because the caller needs every row; without
+     * the join this would be one query per deck.
+     *
+     * @return list<Deck>
+     */
+    public function findContainingOracleId(Uuid $oracleId, int $limit = 50): array
+    {
+        $ids = $this->createQueryBuilder('d')
+            ->select('DISTINCT d.id')
+            ->join('d.cards', 'dc')
+            ->join('dc.card', 'c')
+            ->andWhere('c.oracleId = :oracle')
+            ->setParameter('oracle', $oracleId)
+            ->orderBy('d.id', 'DESC')
+            ->setMaxResults(max(1, $limit))
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        if ([] === $ids) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('d')
+            ->leftJoin('d.cards', 'dc')->addSelect('dc')
+            ->leftJoin('dc.card', 'c')->addSelect('c')
+            ->andWhere('d.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->orderBy('d.updatedAt', 'DESC')
+            ->getQuery()
+            ->getResult();
     }
 }
