@@ -11,9 +11,9 @@ use Doctrine\ORM\Query\TokenType;
 /**
  * DQL JSONB_CONTAINS(field, value) → PostgreSQL field @> CAST(value AS jsonb).
  *
- * Stock DQL has no JSONB containment operator. Artist filters use this so the
- * GIN index on cards.artist_credits can satisfy `@>` instead of a sequential
- * LIKE over the raw Scryfall payload.
+ * Stock DQL has no JSONB containment operator. Artist filters use this so a
+ * tiny artist_credits array can satisfy `@>` instead of LIKE over the raw
+ * Scryfall payload.
  */
 final class JsonbContainsFunction extends FunctionNode
 {

@@ -1,4 +1,5 @@
 import { cx } from '../../lib/cx'
+import { Stagger, StaggerItem } from '../motion'
 
 export interface SkeletonProps {
   className?: string
@@ -10,22 +11,35 @@ export function Skeleton({ className }: SkeletonProps) {
 }
 
 /** Grid of card-shaped skeletons for storefront inventory loading. */
-export function InventoryGridSkeleton({ count = 10 }: { count?: number }) {
+export function InventoryGridSkeleton({
+  count = 10,
+  compact = false,
+}: {
+  count?: number
+  /** Skip the pagination-height spacer (artist / set browse). */
+  compact?: boolean
+}) {
   return (
-    <div className="space-y-6" aria-busy="true" aria-label="Loading inventory">
-      <div className="h-9" />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+    <div className={cx('space-y-6', compact && 'mt-6')} aria-busy="true" aria-label="Loading inventory">
+      {!compact && <div className="h-9" />}
+      <Stagger
+        immediate
+        gap={0.045}
+        className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+      >
         {Array.from({ length: count }, (_, i) => (
-          <div key={i} className="glass-card overflow-hidden rounded-card">
-            <Skeleton className="aspect-5/7 w-full rounded-none" />
-            <div className="space-y-2 p-3">
-              <Skeleton className="h-4 w-4/5" />
-              <Skeleton className="h-3 w-2/3" />
-              <Skeleton className="h-3 w-1/3" />
+          <StaggerItem key={i}>
+            <div className="glass-card overflow-hidden rounded-card">
+              <Skeleton className="aspect-5/7 w-full rounded-none" />
+              <div className="space-y-2 p-3">
+                <Skeleton className="h-4 w-4/5" />
+                <Skeleton className="h-3 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
             </div>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
     </div>
   )
 }

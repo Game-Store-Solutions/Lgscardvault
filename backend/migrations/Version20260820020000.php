@@ -8,22 +8,22 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Promote artist credits (top-level + per-face) to an indexed JSONB column.
+ * Promote artist credits (top-level + per-face) to a small JSONB column.
  *
  * Storefront artist pages previously filtered inventory with
  * LOWER(CAST(scryfall_data AS TEXT)) LIKE '%"artist": "…"%'. That expression
- * cannot use an index and stringifies every card's full Scryfall payload
- * (tens of KB) for every in-stock listing — the reason those pages felt
- * like they would never load.
+ * stringifies every card's full Scryfall payload (tens of KB) for every
+ * in-stock listing — the reason those pages felt like they would never load.
  *
- * artist_credits is a tiny JSONB array of lowercase names. GIN `@>` looks
- * up the handful of matching printings directly.
+ * artist_credits is a tiny JSONB array of lowercase names. Matching against
+ * that array is cheap enough without a dedicated index; a GIN here would be
+ * maintained on every Scryfall upsert of the whole catalog.
  */
 final class Version20260820020000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Add cards.artist_credits (jsonb, GIN) and backfill from artist + card_faces';
+        return 'Add cards.artist_credits (jsonb) and backfill from artist + card_faces';
     }
 
     public function up(Schema $schema): void
@@ -58,13 +58,10 @@ final class Version20260820020000 extends AbstractMigration
             ) AS src
             WHERE c.id = src.id
             SQL);
-
-        $this->addSql('CREATE INDEX idx_card_artist_credits ON cards USING gin (artist_credits)');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DROP INDEX idx_card_artist_credits');
         $this->addSql('ALTER TABLE cards DROP artist_credits');
     }
 }

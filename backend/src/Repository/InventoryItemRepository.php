@@ -286,9 +286,9 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
-     * Exact artist match via the indexed artist_credits JSONB array (top-level
-     * credit plus each face). Scanning CAST(scryfall_data AS TEXT) LIKE was
-     * what made storefront artist pages sequential-scan every listing.
+     * Exact artist match via the artist_credits JSONB array (top-level credit
+     * plus each face). Scanning CAST(scryfall_data AS TEXT) LIKE was what made
+     * storefront artist pages sequential-scan every listing.
      */
     private function constrainArtist(QueryBuilder $qb, string $artist): void
     {

@@ -50,8 +50,8 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
-     * All catalog printings credited to an artist (exact name match on the
-     * indexed artist_credits column — top-level credit plus each face).
+     * All catalog printings credited to an artist (exact name match on
+     * artist_credits — top-level credit plus each face).
      *
      * @return list<Card>
      */
@@ -93,8 +93,8 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
-     * Exact artist match via the indexed artist_credits JSONB array (top-level
-     * credit plus each face). Never scans scryfall_data.
+     * Exact artist match via the artist_credits JSONB array (top-level credit
+     * plus each face). Never scans scryfall_data.
      */
     private function constrainArtist(QueryBuilder $qb, string $artist): void
     {

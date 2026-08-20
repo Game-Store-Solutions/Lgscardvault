@@ -137,8 +137,8 @@ class Card
 
     /**
      * Lowercase artist names for this printing (top-level credit plus each
-     * face). Indexed JSONB so storefront artist pages can `@>` match without
-     * scanning the raw scryfall_data payload.
+     * face). Kept as a tiny JSONB array so storefront artist pages can `@>`
+     * match without scanning the raw scryfall_data payload.
      *
      * @var list<string>|null
      */

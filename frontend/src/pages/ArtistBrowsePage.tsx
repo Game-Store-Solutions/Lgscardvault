@@ -4,9 +4,9 @@ import { Palette, Search } from 'lucide-react'
 import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import { useInventoryCatalog, useStore, useStoreTheme } from '../hooks'
-import { BackButton, Button, EmptyState, Input, Modal } from '../components/ui'
+import { BackButton, Button, EmptyState, Input, InventoryGridSkeleton, Modal } from '../components/ui'
 import { CardImage } from '../components/cards'
-import { StorePageLoader } from '../components/store/StorePageLoader'
+import { Stagger, StaggerItem } from '../components/motion'
 import { inventoryByArtist } from '../lib/artistBrowse'
 import { rarityAccent, rarityLabel } from '../lib/mtg'
 import { cx } from '../lib/cx'
@@ -179,7 +179,7 @@ export default function ArtistBrowsePage() {
       </header>
 
       {isLoading && inStore.length === 0 ? (
-        <StorePageLoader label="Loading artist printings…" />
+        <InventoryGridSkeleton compact count={12} />
       ) : inStore.length === 0 ? (
         <EmptyState
           icon={Palette}
@@ -195,17 +195,22 @@ export default function ArtistBrowsePage() {
           description="Try a different filter."
         />
       ) : (
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        <Stagger
+          immediate
+          gap={0.04}
+          className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+        >
           {grouped.map((entry) => (
-            <ArtistCardTile
-              key={entry.representative.card.id}
-              slug={slug}
-              artist={artist}
-              entry={entry}
-              storeSearchNav={storeSearchNav}
-            />
+            <StaggerItem key={entry.representative.card.id} className="h-full">
+              <ArtistCardTile
+                slug={slug}
+                artist={artist}
+                entry={entry}
+                storeSearchNav={storeSearchNav}
+              />
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       )}
     </div>
   )
@@ -246,7 +251,7 @@ function ArtistCardTile({
         storeSearchNav,
       )}
       className={cx(
-        'group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
+        'group relative flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
         'transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-500/35 dark:glass-card ui-lift',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
       )}

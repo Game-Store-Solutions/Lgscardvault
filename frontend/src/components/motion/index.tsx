@@ -88,14 +88,16 @@ export function Stagger({
   children,
   gap = 0.06,
   delay = 0,
+  immediate = false,
   className,
   ...rest
-}: DivMotionProps & { gap?: number; delay?: number }) {
+}: DivMotionProps & { gap?: number; delay?: number; immediate?: boolean }) {
   return (
     <motion.div
       initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, margin: '-60px' }}
+      {...(immediate
+        ? { animate: 'show' }
+        : { whileInView: 'show', viewport: { once: true, margin: '-60px' } })}
       variants={{
         hidden: {},
         show: { transition: { staggerChildren: gap, delayChildren: delay } },

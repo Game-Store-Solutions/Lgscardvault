@@ -6,9 +6,9 @@ namespace App\Service\Catalog;
  * Searchable artist credits for a printing: the top-level Scryfall `artist`
  * plus each face's own credit (DFC / split / reversible).
  *
- * Stored lowercase so inventory artist filters can hit an indexed JSONB
- * containment check instead of LOWER(CAST(scryfall_data AS TEXT)) LIKE — that
- * sequential scan of the raw payload is what made artist pages crawl.
+ * Stored lowercase so inventory artist filters can JSONB-containment match
+ * instead of LOWER(CAST(scryfall_data AS TEXT)) LIKE — that sequential scan
+ * of the raw payload is what made artist pages crawl.
  */
 final class ArtistCredits
 {
