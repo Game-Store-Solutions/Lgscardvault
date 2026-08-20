@@ -447,9 +447,8 @@ body {
   /*
    * Foil sheen — soft light catching across the art.
    *
-   * Soft-light (not color-dodge) keeps hues blended without posterized bands.
-   * The spectral film drifts slowly; the specular follows --mx/--my for a
-   * continuous catch-light rather than a hard stripe.
+   * Soft-light keeps hues blended. White specular stays quiet; the spectral
+   * film carries most of the rainbow so foil reads colorful without flash.
    */
   .foil-card {
     --foil-holo-opacity: 0.5;
@@ -463,13 +462,13 @@ body {
     overflow: hidden;
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.438) 0%,
-      hsla(0, 0%, 100%, 0.156) 22%,
-      hsla(0, 0%, 100%, 0.048) 42%,
+      hsla(0, 0%, 100%, 0.18) 0%,
+      hsla(0, 0%, 100%, 0.06) 22%,
+      hsla(0, 0%, 100%, 0.02) 42%,
       transparent 62%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.78);
+    opacity: calc(var(--op, 0) * 0.32);
     transition: opacity 0.45s ease;
     /* Keep glare off the rounded rim so edges stay clean. */
     -webkit-mask-image: radial-gradient(
@@ -492,26 +491,27 @@ body {
     background-image:
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        hsla(0, 0%, 100%, 0.438) 0%,
-        hsla(200, 30%, 80%, 0.25) 20%,
-        hsla(280, 22%, 78%, 0.125) 40%,
-        transparent 68%
+        hsla(0, 0%, 100%, 0.14) 0%,
+        hsla(195, 58%, 68%, 0.4) 16%,
+        hsla(310, 52%, 66%, 0.3) 34%,
+        hsla(45, 48%, 64%, 0.14) 52%,
+        transparent 70%
       ),
       linear-gradient(
         122deg,
-        hsl(300, 28%, 68%),
-        hsl(330, 26%, 70%),
-        hsl(20, 30%, 68%),
-        hsl(45, 28%, 70%),
-        hsl(160, 26%, 64%),
-        hsl(195, 28%, 66%),
-        hsl(240, 26%, 68%),
-        hsl(280, 24%, 68%),
-        hsl(300, 28%, 68%),
-        hsl(330, 26%, 70%),
-        hsl(20, 30%, 68%),
-        hsl(160, 26%, 64%),
-        hsl(240, 26%, 68%)
+        hsl(300, 55%, 60%),
+        hsl(330, 52%, 62%),
+        hsl(15, 58%, 58%),
+        hsl(42, 55%, 60%),
+        hsl(155, 52%, 50%),
+        hsl(192, 58%, 52%),
+        hsl(245, 54%, 58%),
+        hsl(285, 52%, 58%),
+        hsl(300, 55%, 60%),
+        hsl(330, 52%, 62%),
+        hsl(15, 58%, 58%),
+        hsl(155, 52%, 50%),
+        hsl(245, 54%, 58%)
       );
     background-size:
       100% 100%,
