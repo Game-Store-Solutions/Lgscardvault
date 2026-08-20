@@ -460,16 +460,16 @@ body {
    *   --foil-idle-op        resting --op for CSS orbit helpers
    */
   .foil-card {
-    --foil-holo-opacity: 0.45;
-    --foil-hover-boost: 0.68;
-    --foil-glare: 0.42;
-    --foil-white: 1;
+    --foil-holo-opacity: 0.36; /* was 0.45; ~20% quieter film */
+    --foil-hover-boost: 0.54; /* was 0.68 */
+    --foil-glare: 0.5; /* slightly stronger specular with more white */
+    --foil-white: 1.3; /* a little more white sheen */
     --foil-rainbow-sat: 1;
     --foil-purple-sat: 0.7;
-    --foil-grid: 0.3;
+    --foil-grid: 0.24;
     --foil-holo-duration: 9s;
     --foil-orbit-duration: 11s;
-    --foil-idle-op: 0.5;
+    --foil-idle-op: 0.4;
   }
   .tilt-card {
     isolation: isolate;

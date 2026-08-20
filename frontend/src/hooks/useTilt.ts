@@ -21,7 +21,7 @@ const LIGHT_SPRING = { stiffness: 260, damping: 28, mass: 0.4 }
 const IDLE_A_MS = 9000
 const IDLE_B_MS = 13500
 
-const DEFAULT_IDLE_OP = 0.5
+const DEFAULT_IDLE_OP = 0.4
 
 /** Read `--foil-idle-op` from `.foil-card` (or the tilt root) so CSS knobs drive idle sheen. */
 function readFoilIdleOp(root: HTMLElement | null): number {
