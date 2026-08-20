@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import {
   Calendar,
@@ -173,7 +173,7 @@ export default function StorePage() {
       page,
     })
     if (next.toString() === searchParams.toString()) return
-    setSearchParams(next, { replace: true })
+    setSearchParams(next, { replace: true, preventScrollReset: true })
   }, [
     search,
     gameFilter,
@@ -276,6 +276,13 @@ export default function StorePage() {
     scrollToSinglesSection()
   }
 
+  /** Sticky sidebar controls: native click-focus would scroll the page to the
+   *  aside's in-flow position (just below spotlight) once the column is stuck. */
+  function retainViewportOnFilterClick(event: MouseEvent<HTMLElement>) {
+    event.preventDefault()
+    event.currentTarget.focus({ preventScroll: true })
+  }
+
   const chips: { label: string; onClear: () => void }[] = []
 
   if (search.trim()) chips.push({ label: `“${search.trim()}”`, onClear: () => setSearch('') })
@@ -350,6 +357,7 @@ export default function StorePage() {
               <button
                 key={option.key}
                 type="button"
+                onMouseDown={retainViewportOnFilterClick}
                 onClick={() => setFinishFilter(option.key)}
                 aria-pressed={finishFilter === option.key}
                 className={cx(
@@ -372,6 +380,7 @@ export default function StorePage() {
                 <button
                   key={color.key}
                   type="button"
+                  onMouseDown={retainViewportOnFilterClick}
                   onClick={() => toggleColor(color.key)}
                   aria-pressed={active}
                   title={`${color.label} only`}
@@ -579,14 +588,14 @@ export default function StorePage() {
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
+          <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain [overflow-anchor:none] rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
                 <p className="text-sm text-fg-muted">{resultTotal} {resultTotal === 1 ? 'result' : 'results'}</p>
               </div>
               {chips.length > 0 && (
-                <button type="button" onClick={clearFilters} className="text-xs font-bold text-brand-600 hover:underline">
+                <button type="button" onMouseDown={retainViewportOnFilterClick} onClick={clearFilters} className="text-xs font-bold text-brand-600 hover:underline">
                   Clear
                 </button>
               )}
@@ -610,6 +619,7 @@ export default function StorePage() {
                   <button
                     key={`${chip.label}-${i}`}
                     type="button"
+                    onMouseDown={retainViewportOnFilterClick}
                     onClick={chip.onClear}
                     className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors hover:text-brand-600"
                   >
@@ -618,7 +628,7 @@ export default function StorePage() {
                   </button>
                 ))}
                 {chips.length > 0 && (
-                  <button type="button" onClick={clearFilters} className="text-xs font-bold text-brand-600 hover:underline">
+                  <button type="button" onMouseDown={retainViewportOnFilterClick} onClick={clearFilters} className="text-xs font-bold text-brand-600 hover:underline">
                     Clear all
                   </button>
                 )}
@@ -690,7 +700,7 @@ export default function StorePage() {
               />
             </div>
           ) : (
-            <div className={cx('space-y-6', listingsRefreshing && 'opacity-70')}>
+            <div className={cx('space-y-6 [overflow-anchor:none]', listingsRefreshing && 'opacity-70')}>
               <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={goToResultsPage} totalItems={resultTotal} />
               {cardDisplayStyle === 'marketplace' ? (
                 <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
