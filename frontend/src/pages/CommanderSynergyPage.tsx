@@ -360,6 +360,7 @@ export default function CommanderSynergyPage() {
   const [bracket, setBracket] = useState(() => parseDeckBuilderBracket(searchParams.get('bracket')))
   const [includeOutOfStock, setIncludeOutOfStock] = useState(true)
   const [constraintsOpen, setConstraintsOpen] = useState(false)
+  const [strategiesOpen, setStrategiesOpen] = useState(true)
   const debouncedBudgetDollars = useDebouncedValue(budgetDollars, 400)
   const debouncedMaxCardDollars = useDebouncedValue(maxCardDollars, 400)
 
@@ -577,6 +578,7 @@ export default function CommanderSynergyPage() {
     setSelected(null)
     setStrategyId(null)
     setConstraintsOpen(false)
+    setStrategiesOpen(true)
     resetPicks()
     setQuery('')
     saveDeckBuilderSession(slug, null)
@@ -905,74 +907,125 @@ export default function CommanderSynergyPage() {
                 </div>
               </div>
 
-              <div className="min-h-0">
-                <p className="mb-2 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
-                  Strategy
-                </p>
-                {strategiesQuery.isLoading && (
-                  <div className="space-y-2">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
-                  </div>
-                )}
-                <div
-                  className={cx(
-                    'space-y-2 overflow-y-auto overscroll-contain pe-1',
-                    // Cap the list so long strategy sets scroll in-place; commander
-                    // + constraints stay put above without a full-rail scrollbar.
-                    'max-h-[min(28rem,calc(100dvh-22rem))]',
-                  )}
+              <div className="min-h-0 overflow-hidden rounded-card border border-border bg-surface shadow-sm">
+                <button
+                  type="button"
+                  aria-expanded={strategiesOpen}
+                  aria-controls="deck-builder-strategies"
+                  onClick={() => setStrategiesOpen((open) => !open)}
+                  className="flex w-full items-start gap-2 px-4 py-3 text-left transition-colors hover:bg-bg/50"
                 >
-                  {(strategiesQuery.data ?? []).map((strategy) => {
-                    const active = strategyId === strategy.id
-                    const confidence = Math.round(strategy.confidence * 100)
-                    const deckCount = strategy.deckCount ?? strategy.sampleSize ?? 0
-                    return (
-                      <button
-                        key={strategy.id}
-                        type="button"
-                        onClick={() => {
-                          setStrategyId(strategy.id)
-                          resetPicks()
-                        }}
-                        className={cx(
-                          'w-full rounded-card border px-3.5 py-3 text-left transition-all duration-200',
-                          active
-                            ? 'border-brand-400 bg-brand-50/70 shadow-sm dark:bg-brand-500/12'
-                            : 'border-border bg-surface hover:border-brand-300/70',
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-bold text-fg">{strategy.label}</p>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            {deckCount > 0 && (
-                              <span className="rounded-full bg-bg px-1.5 py-0.5 text-[0.6rem] font-bold tabular-nums text-fg-muted">
-                                {deckCount} deck{deckCount === 1 ? '' : 's'}
-                              </span>
-                            )}
-                            {active ? (
-                              <CheckCircle2 aria-hidden className="size-4 text-brand-600" />
-                            ) : (
-                              <span className="text-[0.65rem] font-bold tabular-nums text-fg-muted">
-                                {confidence}%
-                              </span>
-                            )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
+                      Strategy
+                    </span>
+                    <span className="mt-1 block text-sm font-semibold text-fg">
+                      {strategiesQuery.data?.find((s) => s.id === strategyId)?.label ??
+                        (strategiesQuery.isLoading ? 'Loading strategies…' : 'Pick a strategy')}
+                    </span>
+                    {strategyId && (
+                      <span className="mt-0.5 block text-xs text-fg-muted">
+                        Tap to {strategiesOpen ? 'hide' : 'change'} strategies
+                      </span>
+                    )}
+                  </span>
+                  <ChevronDown
+                    aria-hidden
+                    className={cx(
+                      'mt-0.5 size-4 shrink-0 text-fg-muted transition-transform duration-200',
+                      strategiesOpen && 'rotate-180',
+                    )}
+                  />
+                </button>
+                <AnimatePresence initial={false}>
+                  {strategiesOpen && (
+                    <motion.div
+                      id="deck-builder-strategies"
+                      key="strategies"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: EASE_PREMIUM }}
+                      className="overflow-hidden border-t border-border"
+                    >
+                      <div className="p-3">
+                        {strategiesQuery.isLoading && (
+                          <div className="space-y-2">
+                            <Skeleton className="h-20 w-full" />
+                            <Skeleton className="h-20 w-full" />
                           </div>
+                        )}
+                        <div
+                          className={cx(
+                            'space-y-2 overflow-y-auto overscroll-contain pe-1',
+                            // Cap the list so long strategy sets scroll in-place.
+                            'max-h-[min(22rem,calc(100dvh-20rem))]',
+                          )}
+                        >
+                          {(strategiesQuery.data ?? []).map((strategy) => {
+                            const active = strategyId === strategy.id
+                            const confidence = Math.round(strategy.confidence * 100)
+                            const deckCount = strategy.deckCount ?? strategy.sampleSize ?? 0
+                            return (
+                              <button
+                                key={strategy.id}
+                                type="button"
+                                onClick={() => {
+                                  setStrategyId(strategy.id)
+                                  resetPicks()
+                                  // On stacked (mobile/tablet) layouts, collapse so the
+                                  // package list moves up without another page scroll.
+                                  if (
+                                    typeof window !== 'undefined' &&
+                                    !window.matchMedia('(min-width: 1280px)').matches
+                                  ) {
+                                    setStrategiesOpen(false)
+                                  }
+                                }}
+                                className={cx(
+                                  'w-full rounded-card border px-3.5 py-3 text-left transition-all duration-200',
+                                  active
+                                    ? 'border-brand-400 bg-brand-50/70 shadow-sm dark:bg-brand-500/12'
+                                    : 'border-border bg-bg/40 hover:border-brand-300/70',
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-sm font-bold text-fg">{strategy.label}</p>
+                                  <div className="flex shrink-0 items-center gap-1.5">
+                                    {deckCount > 0 && (
+                                      <span className="rounded-full bg-bg px-1.5 py-0.5 text-[0.6rem] font-bold tabular-nums text-fg-muted">
+                                        {deckCount} deck{deckCount === 1 ? '' : 's'}
+                                      </span>
+                                    )}
+                                    {active ? (
+                                      <CheckCircle2 aria-hidden className="size-4 text-brand-600" />
+                                    ) : (
+                                      <span className="text-[0.65rem] font-bold tabular-nums text-fg-muted">
+                                        {confidence}%
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+                                  {strategy.description}
+                                </p>
+                                <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-bg">
+                                  <div
+                                    className={cx(
+                                      'h-full rounded-full transition-all duration-500',
+                                      active ? 'bg-brand-500' : 'bg-fg-muted/35',
+                                    )}
+                                    style={{ width: `${confidence}%` }}
+                                  />
+                                </div>
+                              </button>
+                            )
+                          })}
                         </div>
-                        <p className="mt-1 text-xs leading-relaxed text-fg-muted">{strategy.description}</p>
-                        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-bg">
-                          <div
-                            className={cx(
-                              'h-full rounded-full transition-all duration-500',
-                              active ? 'bg-brand-500' : 'bg-fg-muted/35',
-                            )}
-                            style={{ width: `${confidence}%` }}
-                          />
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </aside>
 
