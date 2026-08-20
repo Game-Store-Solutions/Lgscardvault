@@ -12,6 +12,12 @@ import { rarityAccent, rarityLabel } from '../lib/mtg'
 import { formatDate } from '../lib/format'
 import { cx } from '../lib/cx'
 import { normalizeSetCode } from '../lib/setBrowse'
+import {
+  storeSearchFromNavState,
+  storefrontReturnPath,
+  withStoreSearchNav,
+  type StoreSearchNavState,
+} from '../lib/storeSearch'
 
 type SortMode = 'collector' | 'name' | 'price-asc' | 'price-desc'
 
@@ -21,6 +27,7 @@ type SetNavState = {
   setCode?: string
   gameCode?: string
   seedItems?: InventoryItem[]
+  storeSearch?: StoreSearchNavState
 }
 
 function collectorSortKey(collectorNumber?: string | null): number {
@@ -55,7 +62,20 @@ export default function SetBrowsePage() {
   const { slug = '', setCode: setCodeParam = '' } = useParams()
   const setCodeNorm = normalizeSetCode(decodeURIComponent(setCodeParam))
   const [searchParams] = useSearchParams()
-  const nav = (useLocation().state as SetNavState | null) ?? {}
+  const location = useLocation()
+  const nav = (location.state as SetNavState | null) ?? {}
+  const storeSearchNav = storeSearchFromNavState(nav)
+  const storeHomeTo = storefrontReturnPath(slug, storeSearchNav)
+  const backTo =
+    nav.from === 'card' && nav.inventoryId ? `/s/${slug}/cards/${nav.inventoryId}` : storeHomeTo
+  const backState =
+    nav.from === 'card' && nav.inventoryId
+      ? withStoreSearchNav(
+          { from: 'card', inventoryId: nav.inventoryId, gameCode: nav.gameCode },
+          storeSearchNav,
+        )
+      : undefined
+  const backLabel = nav.from === 'card' ? 'Card' : storeSearchNav ? 'Search' : null
   const game = searchParams.get('game')?.trim() || nav.gameCode || undefined
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -136,7 +156,9 @@ export default function SetBrowsePage() {
   return (
     <div className="storefront-atmosphere space-y-6 pb-12 sm:space-y-8">
       <div className="space-y-4">
-        <BackButton to={`/s/${slug}`}>Back to store</BackButton>
+        <BackButton to={backTo} state={backState}>
+          {backLabel ? `Back to ${backLabel}` : 'Back to store'}
+        </BackButton>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card dark:glass-card">
           <div className="relative px-4 py-5 sm:px-10 sm:py-10">
@@ -192,7 +214,7 @@ export default function SetBrowsePage() {
           title="No cards from this set in stock"
           description={`${store?.name ?? 'This store'} doesn't have any listings for ${setName} right now.`}
           action={
-            <Link to={`/s/${slug}`} className="font-semibold text-brand-600 hover:underline">
+            <Link to={storeHomeTo} className="font-semibold text-brand-600 hover:underline">
               Browse all inventory
             </Link>
           }
@@ -231,7 +253,7 @@ export default function SetBrowsePage() {
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {grouped.map((entry) => (
-                <SetCardTile key={entry.representative.card.id} slug={slug} entry={entry} />
+                <SetCardTile key={entry.representative.card.id} slug={slug} entry={entry} storeSearchNav={storeSearchNav} />
               ))}
             </div>
           )}
@@ -244,8 +266,10 @@ export default function SetBrowsePage() {
 function SetCardTile({
   slug,
   entry,
+  storeSearchNav,
 }: {
   slug: string
+  storeSearchNav?: StoreSearchNavState
   entry: {
     representative: InventoryItem
     listingCount: number
@@ -262,7 +286,15 @@ function SetCardTile({
   return (
     <Link
       to={`/s/${slug}/cards/${representative.id}`}
-      state={{ from: 'set', setCode: card.setCode }}
+      state={withStoreSearchNav(
+        {
+          from: 'set',
+          setCode: card.setCode,
+          gameCode: card.gameCode ?? 'mtg',
+          inventoryId: representative.id,
+        },
+        storeSearchNav,
+      )}
       className={cx(
         'group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
         'transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-500/35 dark:glass-card ui-lift',
