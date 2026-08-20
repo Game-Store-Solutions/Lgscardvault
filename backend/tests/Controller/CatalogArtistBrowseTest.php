@@ -39,4 +39,33 @@ final class CatalogArtistBrowseTest extends WebTestCase
         self::assertContains('Artist Card A', $names);
         self::assertContains('Artist Card B', $names);
     }
+
+    public function testByArtistMatchesFaceOnlyCredits(): void
+    {
+        $this->fixtures->card(8810, [
+            'name' => 'Transforming Horror',
+            'set' => 'mid',
+            'collector_number' => '10',
+            'artist' => 'Someone Else',
+            'card_faces' => [
+                ['name' => 'Front', 'artist' => 'Chris Rahn'],
+                ['name' => 'Back', 'artist' => 'Chris Rahn'],
+            ],
+        ]);
+        $this->fixtures->card(8811, [
+            'name' => 'Unrelated',
+            'set' => 'mid',
+            'collector_number' => '11',
+            'artist' => 'John Avon',
+        ]);
+
+        $this->client->request('GET', '/api/catalog/by-artist?'.http_build_query([
+            'artist' => 'chris rahn',
+            'game' => 'mtg',
+        ]));
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(1, $payload['total']);
+        self::assertSame('Transforming Horror', $payload['items'][0]['name']);
+    }
 }

@@ -102,4 +102,22 @@ final class ScryfallCardUpserterTest extends KernelTestCase
         self::assertLessThanOrEqual(255, mb_strlen($stored));
         self::assertSame(255, mb_strlen($stored));
     }
+
+    public function testArtistCreditsIncludeTopLevelAndFaceNames(): void
+    {
+        $this->upserter->upsertOne(CatalogFixtures::scryfallPayload(12, [
+            'artist' => 'Someone Else',
+            'card_faces' => [
+                ['name' => 'Front', 'artist' => 'Chris Rahn'],
+                ['name' => 'Back', 'artist' => 'Chris Rahn'],
+            ],
+        ]));
+
+        $raw = $this->connection->fetchOne('SELECT artist_credits FROM cards WHERE collector_number = ?', ['12']);
+        self::assertNotFalse($raw);
+        $credits = is_array($raw) ? $raw : json_decode((string) $raw, true);
+        self::assertIsArray($credits);
+        sort($credits);
+        self::assertSame(['chris rahn', 'someone else'], $credits);
+    }
 }

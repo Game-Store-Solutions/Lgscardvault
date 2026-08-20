@@ -16,6 +16,7 @@ doctrine:
         dql:
             string_functions:
                 CAST_AS_TEXT: App\Doctrine\CastAsTextFunction
+                JSONB_CONTAINS: App\Doctrine\JsonbContainsFunction
         filters:
             tenant:
                 class: App\MultiTenancy\TenantFilter
