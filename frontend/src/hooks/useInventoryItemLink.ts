@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router'
-import { storefrontCardState, type StoreSearchNavState } from '../lib/storeSearch'
+import { storefrontCardState, storeSearchFromNavState, type StoreSearchNavState } from '../lib/storeSearch'
 
 export function inventoryItemPath(slug: string, id: number): string {
   return `/s/${slug}/cards/${id}`
@@ -13,6 +13,6 @@ export function useInventoryItemLink(slug: string): {
   const location = useLocation()
   return {
     to: (id: number) => inventoryItemPath(slug, id),
-    state: storefrontCardState(location.pathname, slug, location.search),
+    state: storefrontCardState(location.pathname, slug, location.search) ?? storeSearchFromNavState(location.state),
   }
 }

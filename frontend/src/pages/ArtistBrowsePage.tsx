@@ -11,6 +11,12 @@ import { inventoryByArtist } from '../lib/artistBrowse'
 import { rarityAccent, rarityLabel } from '../lib/mtg'
 import { cx } from '../lib/cx'
 import { finishName } from '../lib/finishes'
+import {
+  storeSearchFromNavState,
+  storefrontReturnPath,
+  withStoreSearchNav,
+  type StoreSearchNavState,
+} from '../lib/storeSearch'
 
 type ArtistNavState = {
   from?: string
@@ -18,6 +24,7 @@ type ArtistNavState = {
   artist?: string
   gameCode?: string
   seedItems?: InventoryItem[]
+  storeSearch?: StoreSearchNavState
 }
 
 function groupByPrinting(items: InventoryItem[]) {
@@ -47,9 +54,18 @@ export default function ArtistBrowsePage() {
   const artist = searchParams.get('name')?.trim() ?? ''
   const location = useLocation()
   const nav = (location.state as ArtistNavState | null) ?? {}
+  const storeSearchNav = storeSearchFromNavState(nav)
+  const storeHomeTo = storefrontReturnPath(slug, storeSearchNav)
   const backTo =
-    nav.from === 'card' && nav.inventoryId ? `/s/${slug}/cards/${nav.inventoryId}` : `/s/${slug}`
-  const backLabel = nav.from === 'card' ? 'Card' : null
+    nav.from === 'card' && nav.inventoryId ? `/s/${slug}/cards/${nav.inventoryId}` : storeHomeTo
+  const backState =
+    nav.from === 'card' && nav.inventoryId
+      ? withStoreSearchNav(
+          { from: 'card', inventoryId: nav.inventoryId, gameCode: nav.gameCode },
+          storeSearchNav,
+        )
+      : undefined
+  const backLabel = nav.from === 'card' ? 'Card' : storeSearchNav ? 'Search' : null
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -87,7 +103,7 @@ export default function ArtistBrowsePage() {
   if (!artist) {
     return (
       <div>
-        <BackButton to={`/s/${slug}`}>Back to store</BackButton>
+        <BackButton to={storeHomeTo}>Back to store</BackButton>
         <EmptyState
           className="mt-8"
           icon={Palette}
@@ -103,7 +119,9 @@ export default function ArtistBrowsePage() {
 
   return (
     <div>
-      <BackButton to={backTo}>{backLabel ? `Back to ${backLabel}` : 'Back to store'}</BackButton>
+      <BackButton to={backTo} state={backState}>
+        {backLabel ? `Back to ${backLabel}` : 'Back to store'}
+      </BackButton>
 
       <Modal
         open={showNoStockModal}
@@ -115,9 +133,9 @@ export default function ArtistBrowsePage() {
             onClick={() => {
               setNoStockModalOpen(false)
               if (nav.from === 'card' && nav.inventoryId) {
-                navigate(`/s/${slug}/cards/${nav.inventoryId}`)
+                navigate(`/s/${slug}/cards/${nav.inventoryId}`, { state: backState })
               } else {
-                navigate(`/s/${slug}`)
+                navigate(storeHomeTo)
               }
             }}
           >
@@ -179,7 +197,13 @@ export default function ArtistBrowsePage() {
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {grouped.map((entry) => (
-            <ArtistCardTile key={entry.representative.card.id} slug={slug} artist={artist} entry={entry} />
+            <ArtistCardTile
+              key={entry.representative.card.id}
+              slug={slug}
+              artist={artist}
+              entry={entry}
+              storeSearchNav={storeSearchNav}
+            />
           ))}
         </div>
       )}
@@ -191,9 +215,11 @@ function ArtistCardTile({
   slug,
   artist,
   entry,
+  storeSearchNav,
 }: {
   slug: string
   artist: string
+  storeSearchNav?: StoreSearchNavState
   entry: {
     representative: InventoryItem
     listingCount: number
@@ -210,12 +236,15 @@ function ArtistCardTile({
   return (
     <Link
       to={`/s/${slug}/cards/${representative.id}`}
-      state={{
-        from: 'artist',
-        artist,
-        inventoryId: representative.id,
-        gameCode: card.gameCode ?? 'mtg',
-      }}
+      state={withStoreSearchNav(
+        {
+          from: 'artist',
+          artist,
+          inventoryId: representative.id,
+          gameCode: card.gameCode ?? 'mtg',
+        },
+        storeSearchNav,
+      )}
       className={cx(
         'group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
         'transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-500/35 dark:glass-card ui-lift',

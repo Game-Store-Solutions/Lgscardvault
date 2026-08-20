@@ -47,7 +47,7 @@ import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 import { setBrowsePath } from '../lib/setBrowse'
 import { artistBrowsePath, resolveCardArtist } from '../lib/artistBrowse'
 import { deckBuilderPath, isDeckBuilderNav } from '../lib/deckBuilder'
-import { isStoreSearchNav, storeSearchPath } from '../lib/storeSearch'
+import { storeSearchFromNavState, storeSearchPath, withStoreSearchNav } from '../lib/storeSearch'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -84,7 +84,7 @@ export default function CardDetailsPage() {
     gameCode?: string
   } | null
   const deckNav = isDeckBuilderNav(location.state) ? location.state : null
-  const storeSearchNav = isStoreSearchNav(location.state) ? location.state : null
+  const storeSearchNav = storeSearchFromNavState(location.state)
   const cameFromSet = setNavState?.from === 'set' && Boolean(setNavState.setCode)
   const cameFromArtist = setNavState?.from === 'artist' && Boolean(setNavState.artist)
   const backTo = deckNav
@@ -357,13 +357,16 @@ export default function CardDetailsPage() {
 
   const setDisplay = card.setName ?? (card.setCode ? card.setCode.toUpperCase() : '')
   const setPageUrl = card.setCode ? setBrowsePath(slug, card.setCode, card.gameCode) : null
-  const setBrowseNavState = {
-    from: 'card' as const,
-    inventoryId: item.id,
-    setCode: card.setCode,
-    gameCode: card.gameCode ?? 'mtg',
-    seedItems: [item],
-  }
+  const setBrowseNavState = withStoreSearchNav(
+    {
+      from: 'card' as const,
+      inventoryId: item.id,
+      setCode: card.setCode,
+      gameCode: card.gameCode ?? 'mtg',
+      seedItems: [item],
+    },
+    storeSearchNav,
+  )
   const productTitle = setDisplay ? `${card.name} - ${setDisplay}` : card.name
   const colPad = 'px-4 py-5 sm:px-8 sm:py-8 lg:px-10'
   const displayArtist = resolveCardArtist(card, faceIndex)
@@ -375,13 +378,16 @@ export default function CardDetailsPage() {
       return
     }
     navigate(artistBrowsePath(slug, displayArtist, card.gameCode ?? 'mtg'), {
-      state: {
-        from: 'card',
-        inventoryId: item.id,
-        artist: displayArtist,
-        gameCode: card.gameCode ?? 'mtg',
-        seedItems: [item],
-      },
+      state: withStoreSearchNav(
+        {
+          from: 'card',
+          inventoryId: item.id,
+          artist: displayArtist,
+          gameCode: card.gameCode ?? 'mtg',
+          seedItems: [item],
+        },
+        storeSearchNav,
+      ),
     })
   }
 
@@ -771,7 +777,7 @@ export default function CardDetailsPage() {
 
               {alternateListings.length > 0 && lowestAlternateCents != null && (
                 <Link
-                  to={setPageUrl ?? `/s/${slug}#store-search`}
+                  to={setPageUrl ?? (storeSearchNav ? storeSearchPath(slug, storeSearchNav.search) : `/s/${slug}#store-search`)}
                   state={setPageUrl ? setBrowseNavState : undefined}
                   className="tcg-buy-box block p-4 text-center text-sm transition-colors hover:bg-bg/50"
                 >
@@ -816,7 +822,10 @@ export default function CardDetailsPage() {
           <section className="border-t border-border/40 px-5 py-8 sm:px-8 lg:px-10">
             <div className="mb-4 flex items-end justify-between">
               <h2 className="font-display text-xl font-bold tracking-tight text-fg">More from {store?.name ?? 'this store'}</h2>
-              <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              <Link
+                to={storeSearchNav ? storeSearchPath(slug, storeSearchNav.search) : `/s/${slug}`}
+                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+              >
                 View all
               </Link>
             </div>

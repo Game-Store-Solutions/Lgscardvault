@@ -32,6 +32,28 @@ export function isStoreSearchNav(state: unknown): state is StoreSearchNavState {
   return candidate.from === STORE_SEARCH_FROM && typeof candidate.search === 'string'
 }
 
+/** Read storefront filter context from card / artist / set navigation state. */
+export function storeSearchFromNavState(state: unknown): StoreSearchNavState | undefined {
+  if (isStoreSearchNav(state)) return state
+  if (!state || typeof state !== 'object') return undefined
+  const nested = (state as { storeSearch?: unknown }).storeSearch
+  return isStoreSearchNav(nested) ? nested : undefined
+}
+
+/** Attach an active singles search to browse or card links. */
+export function withStoreSearchNav<T extends Record<string, unknown>>(
+  state: T,
+  storeSearch?: StoreSearchNavState | null,
+): T & { storeSearch?: StoreSearchNavState } {
+  if (!storeSearch) return state
+  return { ...state, storeSearch }
+}
+
+/** Storefront home, restoring filters when the shopper arrived from a singles search. */
+export function storefrontReturnPath(slug: string, storeSearch?: StoreSearchNavState | null): string {
+  return storeSearch ? storeSearchPath(slug, storeSearch.search) : `/s/${slug}`
+}
+
 /** Storefront pathname plus the current query, so Back lands on the same singles search. */
 export function storeSearchPath(slug: string, search = ''): string {
   const query = search.startsWith('?') ? search : search ? `?${search}` : ''

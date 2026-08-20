@@ -34,14 +34,15 @@ type BackButtonVariantProps = VariantProps<typeof backButtonVariants>
 
 export interface BackButtonProps extends BackButtonVariantProps {
   to: string
+  state?: unknown
   children: ReactNode
   className?: string
 }
 
 /** Pill back navigation — use instead of underlined text links. */
-export function BackButton({ to, children, tone, size, className }: BackButtonProps) {
+export function BackButton({ to, state, children, tone, size, className }: BackButtonProps) {
   return (
-    <Link to={to} className={cx(backButtonVariants({ tone, size }), className)}>
+    <Link to={to} state={state} className={cx(backButtonVariants({ tone, size }), className)}>
       <ArrowLeft aria-hidden className="size-4 shrink-0" />
       <span className="truncate">{children}</span>
     </Link>
