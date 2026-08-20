@@ -79,6 +79,8 @@ class Order
     public const CHANNEL_KIOSK = 'kiosk';
     public const CHANNELS = [self::CHANNEL_ONLINE, self::CHANNEL_KIOSK];
 
+    public const NOTE_PAY_IN_STORE = 'Paying in store';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -154,6 +156,14 @@ class Order
     #[ORM\Column(length: 128, nullable: true)]
     #[Groups(['order:read'])]
     private ?string $squareOrderId = null;
+
+    /**
+     * Staff-facing checkout note, e.g. "Paying in store" for reserved pickup
+     * orders that have not captured a Square payment yet.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $notes = null;
 
     #[ORM\Column]
     #[Groups(['order:read'])]
@@ -342,6 +352,19 @@ class Order
     public function setSquareOrderId(?string $squareOrderId): static
     {
         $this->squareOrderId = $squareOrderId;
+
+        return $this;
+    }
+
+    public function getNotes(): ?string
+    {
+        return $this->notes;
+    }
+
+    public function setNotes(?string $notes): static
+    {
+        $trimmed = null !== $notes ? trim($notes) : '';
+        $this->notes = '' === $trimmed ? null : mb_substr($trimmed, 0, 255);
 
         return $this;
     }

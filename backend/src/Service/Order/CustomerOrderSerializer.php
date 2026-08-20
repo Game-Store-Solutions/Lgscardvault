@@ -24,6 +24,7 @@ final class CustomerOrderSerializer
             'totalCents' => $order->getTotalCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
+            'notes' => $order->getNotes(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeLine(...), $order->getLines()->toArray()),
         ];

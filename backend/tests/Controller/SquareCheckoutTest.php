@@ -191,6 +191,50 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertSame(1000, $credit['balanceCents'], 'a failed charge must not consume credit');
     }
 
+    public function testPayInStoreIsAllowedWhenSquareIsReady(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 4, priceCents: 1800);
+        $this->fillCart($store, $customer, $item, 1);
+        $this->gateway->ready = true;
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'pickup',
+        ]);
+
+        self::assertSame(201, $this->responseCode());
+        self::assertSame('pending', $order['status']);
+        self::assertSame('Paying in store', $order['notes']);
+        self::assertSame(0, $order['paidCents']);
+        self::assertSame(1800, $order['totalCents']);
+        self::assertNotEmpty($order['paymentUrl']);
+        self::assertCount(1, $this->gateway->paymentLinks);
+        self::assertSame($order['reference'].'-link', $this->gateway->paymentLinks[0]['idempotencyKey']);
+        self::assertSame([], $this->gateway->charges, 'pay in store must not capture a card');
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(3, $fresh->getQuantity(), 'pay in store still reserves stock');
+    }
+
+    public function testPayInStoreIsRejectedForShipping(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 3, priceCents: 900);
+        $this->fillCart($store, $customer, $item, 1);
+
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'shipping',
+        ]);
+
+        self::assertSame(422, $this->responseCode());
+        self::assertStringContainsString('pickup', strtolower((string) ($body['detail'] ?? '')));
+        self::assertSame([], $this->gateway->paymentLinks);
+        self::assertSame([], $this->gateway->charges);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(3, $fresh->getQuantity(), 'a rejected pay-in-store checkout never touches stock');
+    }
+
     public function testCheckoutIsRejectedWhenTheStoreHasNotConnectedSquare(): void
     {
         [$store, $item, $customer] = $this->storeWithStockedListing();

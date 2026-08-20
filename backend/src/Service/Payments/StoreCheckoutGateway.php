@@ -189,14 +189,16 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             try {
                 $squareOrderId = $this->createSquareOrder(
                     $account,
-                    $locationId,
                     $idempotencyKey.'-order',
-                    $lineItems,
-                    $creditCents,
-                    $referenceId,
-                    $buyerEmail,
-                    $buyerName,
-                    $fulfillment,
+                    $this->squareOrderPayload(
+                        $locationId,
+                        $lineItems,
+                        $creditCents,
+                        $referenceId,
+                        $buyerEmail,
+                        $buyerName,
+                        $fulfillment,
+                    ),
                 );
             } catch (\RuntimeException $e) {
                 // Checkout must still succeed if Orders API hiccups; payment alone is enough.
@@ -274,20 +276,101 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         );
     }
 
+    public function createPaymentLink(
+        Store $store,
+        int $amountCents,
+        string $idempotencyKey,
+        string $referenceId,
+        array $lineItems,
+        int $creditCents = 0,
+        ?string $buyerEmail = null,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
+        ?string $paymentNote = null,
+    ): array {
+        if ($amountCents <= 0) {
+            throw new \RuntimeException('There is nothing to charge.');
+        }
+
+        $account = $this->connectedAccount($store);
+        if (null === $account) {
+            throw new \RuntimeException('This store is not accepting online payments right now.');
+        }
+
+        $locationId = (string) $account->getProviderLocationId();
+        if ('' === $locationId) {
+            throw new \RuntimeException('This store has not finished its payment setup.');
+        }
+
+        $note = trim((string) $paymentNote);
+        if ('' === $note) {
+            $note = 'Paying in store — '.$referenceId;
+        }
+
+        $payload = [
+            'idempotency_key' => $idempotencyKey,
+            'payment_note' => mb_substr($note, 0, 500),
+            'checkout_options' => [
+                'ask_for_shipping_address' => false,
+                'accepted_payment_methods' => [
+                    'apple_pay' => true,
+                    'google_pay' => true,
+                    'cash_app_pay' => true,
+                ],
+            ],
+        ];
+
+        if ([] !== $lineItems) {
+            $payload['order'] = $this->squareOrderPayload(
+                $locationId,
+                $lineItems,
+                $creditCents,
+                $referenceId,
+                $buyerEmail,
+                $buyerName,
+                $fulfillment,
+            );
+        } else {
+            $payload['quick_pay'] = [
+                'name' => mb_substr('Order '.$referenceId, 0, 255),
+                'price_money' => ['amount' => $amountCents, 'currency' => $this->credentials->currency()],
+                'location_id' => $locationId,
+            ];
+        }
+
+        if (null !== $buyerEmail && '' !== trim($buyerEmail)) {
+            $payload['pre_populated_data'] = ['buyer_email' => trim($buyerEmail)];
+        }
+
+        $response = $this->request($account, 'POST', '/v2/online-checkout/payment-links', $payload);
+        $link = is_array($response['payment_link'] ?? null) ? $response['payment_link'] : [];
+        $url = trim((string) ($link['url'] ?? $link['long_url'] ?? ''));
+        if ('' === $url) {
+            throw new \RuntimeException('Square did not return a payment link.');
+        }
+
+        $squareOrderId = isset($link['order_id']) ? trim((string) $link['order_id']) : '';
+
+        return [
+            'url' => $url,
+            'squareOrderId' => '' !== $squareOrderId ? $squareOrderId : null,
+        ];
+    }
+
     /**
      * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     *
+     * @return array<string, mixed>
      */
-    private function createSquareOrder(
-        StorePaymentAccount $account,
+    private function squareOrderPayload(
         string $locationId,
-        string $idempotencyKey,
         array $lineItems,
         int $creditCents,
         ?string $referenceId,
         ?string $buyerEmail,
         ?string $buyerName,
         string $fulfillment,
-    ): string {
+    ): array {
         $currency = $this->credentials->currency();
         $squareLines = [];
         foreach ($lineItems as $i => $item) {
@@ -341,6 +424,17 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             ]];
         }
 
+        return $orderPayload;
+    }
+
+    /**
+     * @param array<string, mixed> $orderPayload
+     */
+    private function createSquareOrder(
+        StorePaymentAccount $account,
+        string $idempotencyKey,
+        array $orderPayload,
+    ): string {
         $response = $this->request($account, 'POST', '/v2/orders', [
             'idempotency_key' => $idempotencyKey,
             'order' => $orderPayload,

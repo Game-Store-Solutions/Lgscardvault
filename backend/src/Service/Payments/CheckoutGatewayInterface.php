@@ -70,6 +70,28 @@ interface CheckoutGatewayInterface
     public function refund(Store $store, string $paymentId, int $amountCents, string $idempotencyKey, ?string $reason = null): array;
 
     /**
+     * Square-hosted checkout page (and QR) for an unpaid pickup order.
+     *
+     * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     *
+     * @return array{url: string, squareOrderId: string|null}
+     *
+     * @throws \RuntimeException when the store is not connected or Square declines
+     */
+    public function createPaymentLink(
+        Store $store,
+        int $amountCents,
+        string $idempotencyKey,
+        string $referenceId,
+        array $lineItems,
+        int $creditCents = 0,
+        ?string $buyerEmail = null,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
+        ?string $paymentNote = null,
+    ): array;
+
+    /**
      * Save a tokenized payment method on the store's Square account for faster checkout.
      *
      * @param array{email?: string, name?: string, reference?: string} $buyer

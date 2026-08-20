@@ -27,6 +27,7 @@ use App\Enum\OrderStatus;
 use App\Service\Checkout\CartOrderBuilder;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
+use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CheckoutGatewayInterface;
@@ -61,6 +62,7 @@ final class StoreCustomerController extends AbstractController
         private readonly CartOrderBuilder $orderBuilder,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly CheckoutGatewayInterface $checkoutGateway,
+        private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly CustomerPaymentProfileSync $paymentProfileSync,
         private readonly EntityManagerInterface $entityManager,
         private readonly KernelInterface $kernel,
@@ -624,8 +626,8 @@ final class StoreCustomerController extends AbstractController
     }
 
     /**
-     * Reserve stock for pickup and pay at the counter when online card checkout
-     * is unavailable. Only allowed while Square checkout is disabled.
+     * Reserve stock for pickup and pay at the counter. Online wallets stay
+     * available when Square is connected; this path is always offered for pickup.
      */
     #[Route('/checkout/pay-in-store', name: 'api_store_customer_checkout_pay_in_store', methods: ['POST'])]
     public function payInStore(Request $request, string $slug): JsonResponse
@@ -633,10 +635,6 @@ final class StoreCustomerController extends AbstractController
         $store = $this->resolveStore($slug);
         if (!$store instanceof Store) {
             return $this->json(['detail' => 'Store not found.'], 404);
-        }
-
-        if ($this->checkoutGateway->isReady($store)) {
-            return $this->json(['detail' => 'Online card checkout is available. Use Pay with card instead.'], 422);
         }
 
         $user = $this->getUser();
@@ -687,9 +685,10 @@ final class StoreCustomerController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
+        $extra = $this->payInStoreFinalizer->finalize($store, $order);
         $this->entityManager->flush();
 
-        return $this->json($this->customerOrderSerializer->serialize($order), 201);
+        return $this->json($this->customerOrderSerializer->serialize($order) + $extra, 201);
     }
 
     /**

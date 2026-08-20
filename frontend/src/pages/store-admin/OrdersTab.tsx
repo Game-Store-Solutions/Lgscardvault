@@ -749,6 +749,12 @@ function OrderDetailModal({
                 <span className="font-semibold text-fg">{order.fulfillment === 'shipping' ? 'Shipping' : 'Pickup'}</span>
               </p>
             )}
+            {order.notes ? (
+              <p className="mt-2 text-sm text-fg-muted">
+                Note: <span className="font-semibold text-fg">{order.notes}</span>
+              </p>
+            ) : null}
+            <p className="mt-2 text-sm text-fg-muted">{paymentSubtitle(order)}</p>
           </div>
         </div>
         <div>

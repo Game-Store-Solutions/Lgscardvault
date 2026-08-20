@@ -1,15 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Lock, PackageCheck, ShieldCheck, Store } from 'lucide-react'
+import { PackageCheck, ShieldCheck, Store } from 'lucide-react'
 import { Link } from 'react-router'
 import api, { extractErrorMessage, formatPrice } from '../../api/client'
 import type { Order, OrderFulfillment, StoreCheckoutConfig } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { Button } from '../ui'
-import { checkoutPayButtonClass, SquarePaymentPanel, type TokenizedPayment } from './SquarePaymentPanel'
+import {
+  checkoutPayButtonClass,
+  PaymentDivider,
+  SquarePaymentPanel,
+  type TokenizedPayment,
+} from './SquarePaymentPanel'
 
 /**
- * Store checkout: guests reserve pickup orders and pay in store; signed-in shoppers
- * pay with Square per order (no saved wallet).
+ * Store checkout: Apple Pay / Google Pay when Square is connected, plus pay in
+ * store for pickup (with a Square QR when the store can take online payments).
  */
 export function CheckoutPanel({
   slug,
@@ -39,14 +44,16 @@ export function CheckoutPanel({
   onPlaced: (order: Order) => void
 }) {
   const queryClient = useQueryClient()
+  const pickupAvailable = fulfillment === 'pickup'
 
   const configQuery = useQuery({
-    queryKey: ['store-checkout-config', slug],
+    queryKey: ['store-checkout-config', slug, isGuest ? 'guest' : 'customer'],
     queryFn: async () => {
-      const { data } = await api.get<StoreCheckoutConfig>(`/stores/${slug}/customer/checkout/config`)
+      const { data } = await api.get<StoreCheckoutConfig>(
+        isGuest ? `/stores/${slug}/guest/checkout/config` : `/stores/${slug}/customer/checkout/config`,
+      )
       return data
     },
-    enabled: !isGuest,
   })
 
   const checkout = useMutation({
@@ -87,36 +94,9 @@ export function CheckoutPanel({
     onSuccess: onPlaced,
   })
 
-  if (isGuest) {
-    return (
-      <div className="mt-5 space-y-3">
-        <p className="text-sm text-fg-muted">
-          We&apos;ll hold your items. Pay at the counter when you pick up. No card needed online.
-        </p>
-        {!paymentReady ? (
-          <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{paymentBlockedMessage}</p>
-        ) : (
-          <Button
-            className={checkoutPayButtonClass}
-            size="lg"
-            loading={payInStore.isPending}
-            onClick={() => payInStore.mutate()}
-          >
-            <Store aria-hidden className="size-4" />
-            Reserve order · pay in store {formatPrice(amountDueCents)}
-          </Button>
-        )}
-        {payInStore.isError ? (
-          <p role="alert" className="rounded-btn bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-700">
-            {extractErrorMessage(payInStore.error, 'Could not reserve your order.')}
-          </p>
-        ) : null}
-      </div>
-    )
-  }
-
   const config = configQuery.data
   const loadingConfig = configQuery.isLoading
+  const squareEnabled = config?.enabled === true
 
   if (loadingConfig) {
     return (
@@ -127,20 +107,47 @@ export function CheckoutPanel({
     )
   }
 
-  if (!config?.enabled) {
+  const payInStoreBlock = pickupAvailable ? (
+    <div className="space-y-3">
+      <p className="text-sm text-fg-muted">
+        {squareEnabled
+          ? 'We\'ll hold your items. Pay at the counter, or scan the Square QR after you reserve.'
+          : 'We\'ll hold your items. Pay at the counter when you pick up. No card needed online.'}
+      </p>
+      {!paymentReady ? (
+        <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{paymentBlockedMessage}</p>
+      ) : (
+        <Button
+          className={checkoutPayButtonClass}
+          size="lg"
+          loading={payInStore.isPending}
+          onClick={() => payInStore.mutate()}
+        >
+          <Store aria-hidden className="size-4" />
+          Reserve order · pay in store {formatPrice(amountDueCents)}
+        </Button>
+      )}
+      {payInStore.isError ? (
+        <p role="alert" className="rounded-btn bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-700">
+          {extractErrorMessage(payInStore.error, 'Could not reserve your order.')}
+        </p>
+      ) : null}
+    </div>
+  ) : (
+    <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">
+      Switch to <span className="font-bold text-fg">Pick up in store</span> above to reserve this order and pay at the
+      counter.
+    </p>
+  )
+
+  if (!squareEnabled) {
     const shopperMessage =
       config?.message?.trim() ||
-      'Online card checkout isn\'t available right now. Reserve your order and pay in store at pickup.'
+      'Online wallets aren\'t available right now. Reserve your order and pay in store at pickup.'
     const ownerMessage = config?.ownerMessage?.trim()
-    const pickupAvailable = fulfillment === 'pickup'
 
     return (
       <div className="mt-5 space-y-3">
-        <Button className="w-full" size="lg" disabled title="Online card checkout is unavailable">
-          <Lock aria-hidden className="size-4" />
-          Pay with card
-        </Button>
-
         {showOwnerDiagnostics && ownerMessage ? (
           <p className="rounded-btn bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-800 dark:bg-warning-950/40 dark:text-warning-200">
             {ownerMessage}
@@ -156,31 +163,7 @@ export function CheckoutPanel({
         ) : (
           <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{shopperMessage}</p>
         )}
-
-        {pickupAvailable && paymentReady ? (
-          <Button
-            className={checkoutPayButtonClass}
-            size="lg"
-            loading={payInStore.isPending}
-            onClick={() => payInStore.mutate()}
-          >
-            <Store aria-hidden className="size-4" />
-            Reserve &amp; pay in store {formatPrice(amountDueCents)}
-          </Button>
-        ) : !paymentReady ? (
-          <p className="text-xs text-fg-muted">{paymentBlockedMessage}</p>
-        ) : (
-          <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">
-            Switch to <span className="font-bold text-fg">Pick up in store</span> above to reserve this order and pay at
-            the counter.
-          </p>
-        )}
-
-        {payInStore.isError ? (
-          <p role="alert" className="rounded-btn bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-700">
-            {extractErrorMessage(payInStore.error, 'Could not reserve your order.')}
-          </p>
-        ) : null}
+        {payInStoreBlock}
       </div>
     )
   }
@@ -192,8 +175,6 @@ export function CheckoutPanel({
       <p className="mt-5 rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{paymentBlockedMessage}</p>
     )
   }
-
-  const payLabel = `Pay ${formatPrice(amountDueCents)}`
 
   return (
     <div className="mt-5 pt-5">
@@ -210,7 +191,7 @@ export function CheckoutPanel({
           Place order with store credit
         </Button>
       ) : (
-        <div className="mt-3">
+        <div className="mt-3 space-y-1">
           <SquarePaymentPanel
             applicationId={config.applicationId}
             locationId={config.locationId}
@@ -219,12 +200,15 @@ export function CheckoutPanel({
             currency={config.currency}
             countryCode={config.countryCode}
             billingEmail={buyerEmail}
-            confirmLabel={payLabel}
+            confirmLabel={`Pay ${formatPrice(amountDueCents)}`}
             paymentRequestLabel="Order total"
             layout="checkout"
             payButtonPlacement="inline"
+            showCardForm={false}
             onTokenized={(payment) => checkout.mutate(payment)}
           />
+          {pickupAvailable ? <PaymentDivider label="Or pay in store" /> : null}
+          {payInStoreBlock}
         </div>
       )}
 
@@ -245,7 +229,7 @@ export function CheckoutPanel({
 
       <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-muted">
         <ShieldCheck aria-hidden className="size-3.5 shrink-0 text-success-700" />
-        Payments are processed by Square. We never store your full card number.
+        Wallets and QR payments are processed by Square.
       </p>
     </div>
   )

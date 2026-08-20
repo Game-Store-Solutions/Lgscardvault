@@ -23,6 +23,9 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     /** @var list<array{paymentId: string, amount: int, idempotencyKey: string, reason: ?string}> */
     public array $refunds = [];
 
+    /** @var list<array{amount: int, idempotencyKey: string, referenceId: string}> */
+    public array $paymentLinks = [];
+
     /** Message thrown instead of refunding; null means the refund succeeds. */
     public ?string $refundDeclineWith = null;
 
@@ -125,6 +128,36 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
         return [
             'refundId' => 'sqrfd_'.count($this->refunds),
             'status' => 'COMPLETED',
+        ];
+    }
+
+    public function createPaymentLink(
+        Store $store,
+        int $amountCents,
+        string $idempotencyKey,
+        string $referenceId,
+        array $lineItems,
+        int $creditCents = 0,
+        ?string $buyerEmail = null,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
+        ?string $paymentNote = null,
+    ): array {
+        if (null !== $this->declineWith) {
+            throw new \RuntimeException($this->declineWith);
+        }
+
+        $this->paymentLinks[] = [
+            'amount' => $amountCents,
+            'idempotencyKey' => $idempotencyKey,
+            'referenceId' => $referenceId,
+        ];
+
+        $n = count($this->paymentLinks);
+
+        return [
+            'url' => 'https://square.link/u/test-'.$referenceId,
+            'squareOrderId' => 'sqord_link_'.$n,
         ];
     }
 
