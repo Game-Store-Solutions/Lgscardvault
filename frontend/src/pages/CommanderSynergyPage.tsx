@@ -957,9 +957,11 @@ export default function CommanderSynergyPage() {
                         )}
                         <div
                           className={cx(
-                            'space-y-2 overflow-y-auto overscroll-contain pe-1',
+                            'space-y-2 overflow-y-auto overscroll-contain pe-0.5',
                             // Cap the list so long strategy sets scroll in-place.
                             'max-h-[min(22rem,calc(100dvh-20rem))]',
+                            // Keep touch/trackpad scroll; hide the browser chrome.
+                            '[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                           )}
                         >
                           {(strategiesQuery.data ?? []).map((strategy) => {
