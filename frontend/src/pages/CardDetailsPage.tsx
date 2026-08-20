@@ -103,6 +103,10 @@ export default function CardDetailsPage() {
           : storeSearchNav
             ? storeSearchPath(slug, storeSearchNav.search)
             : `/s/${slug}`
+  // Returning to a set / artist page has to carry the singles search with it,
+  // or the next "Back to store" from there lands on an unfiltered storefront.
+  const backState =
+    (cameFromArtist || cameFromSet) && storeSearchNav ? { storeSearch: storeSearchNav } : undefined
   const backLabel = deckNav
     ? 'Deck builder'
     : cameFromCaseCards
@@ -395,7 +399,7 @@ export default function CardDetailsPage() {
     <div className="pb-12">
       <div className="flex flex-wrap items-center justify-between gap-3 py-4">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
-          <BackButton to={backTo} className="shrink-0">
+          <BackButton to={backTo} state={backState} className="shrink-0">
             {backLabel ? `Back to ${backLabel}` : 'Back to store'}
           </BackButton>
           <span aria-hidden className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
