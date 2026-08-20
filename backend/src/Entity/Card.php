@@ -5,6 +5,7 @@ namespace App\Entity;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use App\Repository\CardRepository;
+use App\Service\Catalog\ArtistCredits;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
@@ -133,6 +134,16 @@ class Card
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['card:read', 'inventory:read'])]
     private ?string $artist = null;
+
+    /**
+     * Lowercase artist names for this printing (top-level credit plus each
+     * face). Kept as a tiny JSONB array so storefront artist pages can `@>`
+     * match without scanning the raw scryfall_data payload.
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
+    private ?array $artistCredits = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['card:read', 'inventory:read'])]
@@ -459,8 +470,15 @@ class Card
     public function setArtist(?string $artist): static
     {
         $this->artist = $artist;
+        $this->refreshArtistCredits();
 
         return $this;
+    }
+
+    /** @return list<string>|null */
+    public function getArtistCredits(): ?array
+    {
+        return $this->artistCredits;
     }
 
     public function getFlavorText(): ?string
@@ -575,8 +593,15 @@ class Card
     public function setScryfallData(?array $scryfallData): static
     {
         $this->scryfallData = $scryfallData;
+        $this->refreshArtistCredits();
 
         return $this;
+    }
+
+    private function refreshArtistCredits(): void
+    {
+        $credits = ArtistCredits::collect($this->artist, $this->scryfallData);
+        $this->artistCredits = [] === $credits ? null : $credits;
     }
 
     public function getScryfallUpdatedAt(): ?\DateTimeImmutable

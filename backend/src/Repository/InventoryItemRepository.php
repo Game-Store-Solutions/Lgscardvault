@@ -6,6 +6,7 @@ use App\Entity\Card;
 use App\Entity\InventoryItem;
 use App\Entity\Game;
 use App\Entity\Store;
+use App\Service\Catalog\ArtistCredits;
 use App\Service\Catalog\FinishVocabulary;
 use App\Service\Inventory\InventoryCatalogFilters;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -264,19 +265,7 @@ class InventoryItemRepository extends ServiceEntityRepository
         }
 
         if ('' !== $filters->artist) {
-            $artist = mb_strtolower($filters->artist);
-            $escaped = addcslashes($artist, '%_\\');
-            // Credit lives on cards.artist for ordinary printings; DFC / split
-            // faces keep their own artist inside the raw Scryfall JSON.
-            $qb->andWhere(
-                'LOWER(TRIM(COALESCE(c.artist, :emptyArtist))) = :artistExact
-                 OR LOWER(CAST_AS_TEXT(c.scryfallData)) LIKE :artistJsonSpaced
-                 OR LOWER(CAST_AS_TEXT(c.scryfallData)) LIKE :artistJsonTight',
-            )
-                ->setParameter('emptyArtist', '')
-                ->setParameter('artistExact', $artist)
-                ->setParameter('artistJsonSpaced', '%"artist": "'.$escaped.'"%')
-                ->setParameter('artistJsonTight', '%"artist":"'.$escaped.'"%');
+            $this->constrainArtist($qb, $filters->artist);
         }
 
         if ('' !== $filters->type) {
@@ -294,6 +283,24 @@ class InventoryItemRepository extends ServiceEntityRepository
         if (null !== $filters->maxPriceCents) {
             $qb->andWhere('i.priceCents <= :maxPrice')->setParameter('maxPrice', $filters->maxPriceCents);
         }
+    }
+
+    /**
+     * Exact artist match via the artist_credits JSONB array (top-level credit
+     * plus each face). Scanning CAST(scryfall_data AS TEXT) LIKE was what made
+     * storefront artist pages sequential-scan every listing.
+     */
+    private function constrainArtist(QueryBuilder $qb, string $artist): void
+    {
+        $param = ArtistCredits::containsParam($artist);
+        if (null === $param) {
+            $qb->andWhere('1 = 0');
+
+            return;
+        }
+
+        $qb->andWhere('JSONB_CONTAINS(c.artistCredits, :artistCredit) = TRUE')
+            ->setParameter('artistCredit', $param);
     }
 
     private function applyFinishFilter(QueryBuilder $qb, string $finish): void

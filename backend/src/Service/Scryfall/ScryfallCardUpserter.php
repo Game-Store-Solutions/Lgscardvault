@@ -2,6 +2,7 @@
 
 namespace App\Service\Scryfall;
 
+use App\Service\Catalog\ArtistCredits;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 
@@ -27,7 +28,7 @@ final class ScryfallCardUpserter
         'id', 'oracle_id', 'name', 'set_code', 'collector_number', 'rarity',
         'edhrec_rank', 'mana_cost', 'type_line', 'oracle_text', 'cmc', 'image_uris', 'prices',
         'set_name', 'colors', 'color_identity', 'keywords', 'power', 'toughness',
-        'loyalty', 'artist', 'flavor_text', 'legalities', 'finishes', 'games',
+        'loyalty', 'artist', 'artist_credits', 'flavor_text', 'legalities', 'finishes', 'games',
         'released_at', 'lang', 'layout', 'scryfall_uri', 'scryfall_data',
         'scryfall_updated_at',
     ];
@@ -160,6 +161,7 @@ final class ScryfallCardUpserter
             isset($data['toughness']) ? $this->truncate((string) $data['toughness'], 16) : null,
             isset($data['loyalty']) ? $this->truncate((string) $data['loyalty'], 16) : null,
             isset($data['artist']) ? $this->truncate((string) $data['artist'], 255) : null,
+            $this->encodeArtistCredits($data),
             isset($data['flavor_text']) ? (string) $data['flavor_text'] : null,
             $this->encodeJson($data['legalities'] ?? null),
             $this->encodeJsonList($data['finishes'] ?? null),
@@ -178,6 +180,19 @@ final class ScryfallCardUpserter
         if (!$this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
             throw new \RuntimeException('ScryfallCardUpserter requires PostgreSQL (INSERT ... ON CONFLICT).');
         }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function encodeArtistCredits(array $data): ?string
+    {
+        $credits = ArtistCredits::collect(
+            isset($data['artist']) ? (string) $data['artist'] : null,
+            $data,
+        );
+
+        return $this->encodeJsonList([] === $credits ? null : $credits);
     }
 
     private function encodeJson(mixed $value): ?string

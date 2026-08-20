@@ -189,10 +189,11 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         self::assertSame('Land Tax', $named[0]->getCard()?->getName());
         self::assertSame(1, $this->repo->countCatalog($store, null, true, $byName));
 
-        $byFace = new \App\Service\Inventory\InventoryCatalogFilters(artist: 'Chris Rahn');
+        $byFace = new \App\Service\Inventory\InventoryCatalogFilters(artist: 'chris rahn');
         $faces = $this->repo->findCatalogPage($store, 0, 24, null, true, $byFace);
         self::assertCount(1, $faces);
         self::assertSame('Transforming Horror', $faces[0]->getCard()?->getName());
+        self::assertSame(1, $this->repo->countCatalog($store, null, true, $byFace));
     }
 
     public function testCatalogPageFiltersByExactSetCode(): void

@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Card;
 use App\Entity\Game;
+use App\Service\Catalog\ArtistCredits;
 use App\Service\Catalog\SearchTextNormalizer;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -49,7 +50,8 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
-     * All catalog printings credited to an artist (exact name match).
+     * All catalog printings credited to an artist (exact name match on
+     * artist_credits — top-level credit plus each face).
      *
      * @return list<Card>
      */
@@ -63,10 +65,10 @@ class CardRepository extends ServiceEntityRepository
         $limit = min(120, max(1, $limit));
         $offset = max(0, $offset);
 
-        return $this->scopedToGame($game)
-            ->andWhere('c.artist IS NOT NULL')
-            ->andWhere('LOWER(TRIM(c.artist)) = LOWER(TRIM(:artist))')
-            ->setParameter('artist', $needle)
+        $qb = $this->scopedToGame($game);
+        $this->constrainArtist($qb, $needle);
+
+        return $qb
             ->orderBy('c.releasedAt', 'DESC')
             ->addOrderBy('c.name', 'ASC')
             ->addOrderBy('c.setCode', 'ASC')
@@ -84,13 +86,27 @@ class CardRepository extends ServiceEntityRepository
             return 0;
         }
 
-        return (int) $this->scopedToGame($game)
-            ->select('COUNT(c.id)')
-            ->andWhere('c.artist IS NOT NULL')
-            ->andWhere('LOWER(TRIM(c.artist)) = LOWER(TRIM(:artist))')
-            ->setParameter('artist', $needle)
-            ->getQuery()
-            ->getSingleScalarResult();
+        $qb = $this->scopedToGame($game)->select('COUNT(c.id)');
+        $this->constrainArtist($qb, $needle);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Exact artist match via the artist_credits JSONB array (top-level credit
+     * plus each face). Never scans scryfall_data.
+     */
+    private function constrainArtist(QueryBuilder $qb, string $artist): void
+    {
+        $param = ArtistCredits::containsParam($artist);
+        if (null === $param) {
+            $qb->andWhere('1 = 0');
+
+            return;
+        }
+
+        $qb->andWhere('JSONB_CONTAINS(c.artistCredits, :artistCredit) = TRUE')
+            ->setParameter('artistCredit', $param);
     }
 
     /**
