@@ -545,6 +545,39 @@ class InventoryItemRepository extends ServiceEntityRepository
     }
 
     /**
+     * In-stock listings for any printing of the given Scryfall oracle ids.
+     * Uses the same listing query as mass search (no arbitrary row cap).
+     *
+     * @param list<string> $oracleIds
+     *
+     * @return list<InventoryItem>
+     */
+    public function findInStockByOracleIds(Store $store, array $oracleIds): array
+    {
+        $uuids = [];
+        foreach ($oracleIds as $raw) {
+            $trimmed = strtolower(trim((string) $raw));
+            if ('' === $trimmed) {
+                continue;
+            }
+            try {
+                $uuids[$trimmed] = \Symfony\Component\Uid\Uuid::fromString($trimmed);
+            } catch (\InvalidArgumentException) {
+                continue;
+            }
+        }
+        if ([] === $uuids) {
+            return [];
+        }
+
+        return $this->listingQuery($store, true, null)
+            ->andWhere('c.oracleId IN (:oracles)')
+            ->setParameter('oracles', array_values($uuids))
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Candidate pool for the commander deck builder (recommendations + 100-card
      * assembly).
      *

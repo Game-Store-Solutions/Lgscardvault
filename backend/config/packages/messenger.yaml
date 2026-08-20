@@ -28,3 +28,6 @@ framework:
             App\Message\SyncScryfallCatalogMessage: async
             App\Message\SyncGameCatalogMessage: async
             App\Message\SyncCommanderCatalogMessage: async
+            App\Message\RefreshCommanderIntelligenceMessage: async
+            App\Message\RefreshStaleCommanderIntelligenceMessage: async
+            App\Message\PruneReferenceDecksMessage: async

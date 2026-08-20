@@ -4,19 +4,30 @@ namespace App\Service\Recommend;
 
 use App\Entity\Card;
 use App\Entity\Store;
-use App\Repository\CardSynergyRepository;
-use App\Repository\InventoryItemRepository;
 use App\Service\CaseCards\ColorIdentityParser;
 use App\Service\CaseCards\SectionSerializer;
+use App\Service\Recommend\Intelligence\CandidateGenerator;
+use App\Service\Recommend\Intelligence\CommanderIntelligence;
+use App\Service\Recommend\Intelligence\CommanderIntelligenceProvider;
+use App\Service\Recommend\Intelligence\DeckContextAnalyzer;
+use App\Service\Recommend\Intelligence\RecommendationEngine;
+use App\Service\Recommend\Intelligence\ScoredCard;
+use App\Service\Recommend\Intelligence\StrategyClassifier;
+use App\Service\Recommend\Intelligence\StrategyTaxonomy;
 
 /**
- * Store-scoped commander deck builder recommendations.
+ * Commander deck builder recommendations.
  *
- * Pipeline:
- *  1. Detect strategies the commander supports
- *  2. Filter in-stock, color-legal inventory
- *  3. For a chosen strategy, classify cards into enabler / fuel / payoff
- *  4. Rank within roles and group by card type for a complete focused list
+ * The pipeline this orchestrates:
+ *
+ *   commander → strategy → reference decks → card relationships
+ *             → existing deck → best next cards
+ *
+ * Reference statistics are precomputed by CommanderIntelligenceRefresher, so
+ * this class does indexed reads plus in-memory scoring. Candidates come from the
+ * reference sample *and* store stock, so a card that belongs in the deck is
+ * recommended and flagged as unstocked rather than silently dropped — stock is a
+ * signal here, not a filter.
  */
 final class CommanderRecommender
 {
@@ -26,24 +37,88 @@ final class CommanderRecommender
     private const PER_TYPE_CAP = 40;
 
     public function __construct(
-        private readonly InventoryItemRepository $inventoryItems,
-        private readonly CardSynergyRepository $synergies,
-        private readonly ThemeTokenizer $tokenizer,
         private readonly ColorIdentityParser $colorIdentity,
         private readonly SectionSerializer $sectionSerializer,
         private readonly StrategyCatalog $strategies,
+        private readonly StrategyTaxonomy $taxonomy,
+        private readonly StrategyClassifier $classifier,
+        private readonly CommanderIntelligenceProvider $intelligenceProvider,
+        private readonly CandidateGenerator $candidates,
+        private readonly RecommendationEngine $engine,
+        private readonly DeckContextAnalyzer $deckAnalyzer,
+        private readonly ThemeTokenizer $tokenizer,
     ) {
     }
 
     /**
-     * @return list<array{id: string, label: string, description: string, confidence: float, matchedSignals: list<string>}>
+     * Strategies this commander can be built around.
+     *
+     * Merges what we have actually observed in reference decks with what the
+     * commander's own text suggests. Observed strategies rank first and carry
+     * real deck counts; text-derived ones fill in for commanders we have not
+     * harvested yet, so the picker is never empty.
+     *
+     * @return list<array{id: string, label: string, description: string, confidence: float, matchedSignals: list<string>, deckCount: int, sampleSize: int, source: string}>
      */
     public function strategiesFor(Card $commander): array
     {
-        return $this->strategies->strategiesForCommander($commander, $this->tokenizer);
+        $out = [];
+
+        foreach ($this->intelligenceProvider->observedStrategies($commander) as $observed) {
+            $out[$observed['id']] = [
+                'id' => $observed['id'],
+                'label' => $observed['label'],
+                'description' => $observed['description'],
+                'confidence' => round($observed['confidence'], 3),
+                'matchedSignals' => [sprintf('%d of %d reference decks', $observed['deckCount'], max(1, $observed['sampleSize']))],
+                'deckCount' => $observed['deckCount'],
+                'sampleSize' => $observed['sampleSize'],
+                'source' => $observed['source'],
+            ];
+        }
+
+        foreach ($this->classifier->classifyCommander($commander) as $detected) {
+            $id = $detected['id'];
+            if (isset($out[$id])) {
+                continue;
+            }
+            $out[$id] = [
+                'id' => $id,
+                'label' => $this->taxonomy->label($id),
+                'description' => $this->taxonomy->description($id),
+                'confidence' => round($detected['score'], 3),
+                'matchedSignals' => $detected['signals'],
+                'deckCount' => 0,
+                'sampleSize' => 0,
+                'source' => $detected['source'],
+            ];
+        }
+
+        $ranked = array_values($out);
+        // Provenance leads, then how many decks back it up. A label a deck's own
+        // author wrote is better evidence than one we inferred from card text,
+        // even when the inferred one matches more decks — text matching is loose
+        // enough that a broad theme can otherwise shadow the real archetype.
+        $provenanceRank = static fn (array $row): int => match ($row['source'] ?? '') {
+            'provider' => 3,
+            'classifier' => 2,
+            default => 1,
+        };
+        usort($ranked, static function (array $a, array $b) use ($provenanceRank): int {
+            return ($provenanceRank($b) <=> $provenanceRank($a))
+                ?: ($b['deckCount'] <=> $a['deckCount'])
+                ?: ($b['confidence'] <=> $a['confidence'])
+                ?: strcmp((string) $a['id'], (string) $b['id']);
+        });
+
+        return $ranked;
     }
 
     /**
+     * @param list<string> $deckOracleIds cards already in the user's deck, which
+     *                                    is what makes recommendations move as
+     *                                    the deck is edited
+     *
      * @return array<string, mixed>
      */
     public function recommendForStore(
@@ -51,165 +126,165 @@ final class CommanderRecommender
         Card $commander,
         ?string $strategyId = null,
         int $limit = self::DEFAULT_LIMIT,
+        array $deckOracleIds = [],
+        bool $includeOutOfStock = true,
     ): array {
         $limit = max(1, min(self::MAX_LIMIT, $limit));
-        $commanderTags = $this->tokenizer->tokenize($commander);
-        $commanderOracle = $commander->getOracleId();
-        $edgeWeights = $this->synergies->weightsForOracle($commanderOracle);
-        $commanderCmc = $commander->getCmc() ?? 0.0;
-
         $supported = $this->strategiesFor($commander);
-        $selectedId = $strategyId;
-        if (null === $selectedId || '' === $selectedId) {
-            $selectedId = $supported[0]['id'] ?? 'staples';
-        }
+        $selectedId = $this->resolveStrategyId($commander, $strategyId, $supported);
 
-        $strategy = $this->strategies->get($selectedId);
-        if (null === $strategy) {
-            throw new \InvalidArgumentException(sprintf('Unknown strategy "%s".', $selectedId));
-        }
+        $intelligence = $this->intelligenceProvider->forCommander($commander, $selectedId);
+        $deckContext = $this->deckAnalyzer->analyze($deckOracleIds, $selectedId);
 
-        // Reject strategies the commander does not support (except staples).
-        $supportedIds = array_column($supported, 'id');
-        if ('staples' !== $selectedId && !in_array($selectedId, $supportedIds, true)) {
-            throw new \InvalidArgumentException(sprintf(
-                'Strategy "%s" is not supported by %s.',
-                $selectedId,
-                $commander->getName(),
-            ));
-        }
-
-        $candidates = $this->inventoryItems->findRecommendationCandidates(
+        $generated = $this->candidates->generate(
             $store,
-            $commander->getColorIdentity() ?? [],
+            $commander,
+            $intelligence,
+            $deckOracleIds,
+            $includeOutOfStock,
         );
-        $ranked = [];
-        foreach ($candidates as $item) {
-            $card = $item->getCard();
-            if (!$card instanceof Card) {
-                continue;
-            }
-            if ((string) $card->getOracleId() === (string) $commanderOracle) {
-                continue;
-            }
-            if (!$this->colorIdentity->isSubsetOf($commander->getColorIdentity(), $card->getColorIdentity())) {
-                continue;
-            }
-            if (!$this->isCommanderLegal($card)) {
-                continue;
-            }
 
-            $classification = $this->strategies->classifyCard($card, $strategy, $this->tokenizer);
-            $cardTags = $this->tokenizer->tokenize($card);
-            $overlap = $this->tokenizer->overlap($commanderTags, $cardTags);
-            $oracleKey = (string) $card->getOracleId();
-            $edge = $edgeWeights[$oracleKey] ?? null;
-            $edgeWeight = (float) ($edge['weight'] ?? 0.0);
+        $scored = $this->engine->score(
+            $commander,
+            $selectedId,
+            $intelligence,
+            $deckContext,
+            $generated['candidates'],
+            $generated['stockByOracle'],
+        );
 
-            $roleBoost = match ($classification['primary']) {
-                StrategyCatalog::ROLE_PAYOFF => 0.35,
-                StrategyCatalog::ROLE_ENABLER => 0.30,
-                StrategyCatalog::ROLE_FUEL => 0.25,
-                default => 0.10,
-            };
-            $strategyMatch = [] === $classification['reasons'] ? 0.0 : 0.45;
-            $curveFit = $this->curveFit($commanderCmc, $card->getCmc());
-            $stockBoost = min(0.15, 0.03 * min(5, $item->getQuantity()));
-            // EDHREC "staple floor": how widely the card is actually played,
-            // independent of this commander's theme. Keeps format staples
-            // (Sol Ring, Swords to Plowshares, Rhystic Study, Force of Will)
-            // and impactful rares/mythics in the mix even when their thematic
-            // synergy is low.
-            $edhrecRank = $card->getEdhrecRank();
-            $stapleScore = $this->stapleScore($edhrecRank);
-
-            // Synergy + strategy still dominate (0.82 of the weight); the EDHREC
-            // staple floor (0.12) surfaces high-playability cards that pure
-            // theme-matching misses. Price is deliberately not a ranking factor.
-            $score = (0.34 * $strategyMatch)
-                + (0.20 * $roleBoost / 0.35)
-                + (0.16 * $overlap['score'])
-                + (0.12 * $edgeWeight)
-                + (0.12 * $stapleScore)
-                + (0.04 * $curveFit)
-                + (0.02 * ($stockBoost / 0.15));
-
-            // Drop cards with no signal at all once inventory is rich — but never
-            // drop a genuine EDHREC staple (top ~1000), which is worth surfacing
-            // even without a thematic hit.
-            if (
-                $score < 0.12
-                && count($candidates) > 12
-                && [] === $classification['reasons']
-                && 0.0 === $overlap['score']
-                && 0.0 === $edgeWeight
-                && $stapleScore < 0.30
-            ) {
-                continue;
-            }
-
-            $cardType = $this->strategies->primaryCardType($card);
-            $reasons = array_values(array_unique(array_merge(
-                $classification['reasons'],
-                $overlap['shared'],
-                $edge['tags'] ?? [],
-                // Explain staple inclusions so a low-synergy goodstuff card
-                // doesn't look out of place in the list.
-                null !== $edhrecRank && $edhrecRank <= 500 ? [sprintf('EDHREC #%d', $edhrecRank)] : [],
-            )));
-
-            $ranked[] = [
-                'score' => round($score, 4),
-                'role' => $classification['primary'],
-                'roles' => $classification['roles'],
-                'cardType' => $cardType,
-                'reasons' => $reasons,
-                'inventoryItem' => $this->sectionSerializer->serializeInventoryItem($item),
-            ];
-        }
-
-        usort($ranked, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
-
-        $seenOracle = [];
-        $deduped = [];
-        foreach ($ranked as $row) {
-            $oracle = (string) ($row['inventoryItem']['card']['oracleId'] ?? '');
-            if ('' !== $oracle && isset($seenOracle[$oracle])) {
-                continue;
-            }
-            if ('' !== $oracle) {
-                $seenOracle[$oracle] = true;
-            }
-            $deduped[] = $row;
-            if (count($deduped) >= $limit) {
-                break;
-            }
+        $rows = [];
+        foreach (array_slice($scored, 0, $limit) as $card) {
+            $rows[] = $this->serialize($card);
         }
 
         return [
             'commander' => [
                 'id' => (string) $commander->getId(),
-                'oracleId' => (string) $commanderOracle,
+                'oracleId' => (string) $commander->getOracleId(),
                 'name' => $commander->getName(),
                 'typeLine' => $commander->getTypeLine(),
                 'manaCost' => $commander->getManaCost(),
                 'cmc' => $commander->getCmc(),
                 'colorIdentity' => $commander->getColorIdentity() ?? [],
                 'imageUrl' => $commander->getImageUrl(),
-                'themes' => $commanderTags,
+                'themes' => $this->tokenizer->tokenize($commander),
             ],
             'colorIdentity' => $commander->getColorIdentity() ?? [],
             'identityCode' => $this->colorIdentity->identityCode($commander->getColorIdentity()),
             'strategies' => $supported,
             'strategy' => [
-                'id' => $strategy['id'],
-                'label' => $strategy['label'],
-                'description' => $strategy['description'],
+                'id' => $selectedId,
+                'label' => $this->taxonomy->label($selectedId),
+                'description' => $this->taxonomy->description($selectedId),
             ],
-            'totalCandidates' => count($ranked),
-            'recommendations' => $deduped,
-            'byRole' => $this->groupByRole($deduped),
-            'byType' => $this->groupByType($deduped),
+            // Provenance travels with the payload so the UI can be honest about
+            // a thin sample instead of presenting it as authoritative.
+            'intelligence' => $intelligence->toArray(),
+            'deckContext' => $deckContext->toArray(),
+            'totalCandidates' => count($scored),
+            'consideredCards' => $generated['consideredCount'],
+            'excludedByLegality' => $generated['rejected'],
+            'recommendations' => $rows,
+            'byRole' => $this->groupByRole($rows),
+            'byType' => $this->groupByType($rows),
+        ];
+    }
+
+    /**
+     * Score a single candidate list without store context, for the assembler and
+     * for tests.
+     *
+     * @param list<string> $deckOracleIds
+     *
+     * @return list<ScoredCard>
+     */
+    public function scoreCandidates(
+        ?Store $store,
+        Card $commander,
+        string $strategyId,
+        array $deckOracleIds = [],
+        bool $includeOutOfStock = true,
+    ): array {
+        $intelligence = $this->intelligenceProvider->forCommander($commander, $strategyId);
+        $deckContext = $this->deckAnalyzer->analyze($deckOracleIds, $strategyId);
+        $generated = $this->candidates->generate($store, $commander, $intelligence, $deckOracleIds, $includeOutOfStock);
+
+        return $this->engine->score(
+            $commander,
+            $strategyId,
+            $intelligence,
+            $deckContext,
+            $generated['candidates'],
+            $generated['stockByOracle'],
+        );
+    }
+
+    /**
+     * Resolve the requested strategy, rejecting anything this commander cannot
+     * support so a typo produces a 422 rather than a plausible-looking list of
+     * unrelated cards.
+     *
+     * @param list<array{id: string}> $supported
+     */
+    private function resolveStrategyId(Card $commander, ?string $requested, array $supported): string
+    {
+        $ids = array_column($supported, 'id');
+
+        if (null === $requested || '' === trim($requested)) {
+            return $ids[0] ?? StrategyTaxonomy::FALLBACK_ID;
+        }
+
+        $normalized = $this->taxonomy->normalizeTag($requested) ?? $requested;
+        if (!$this->taxonomy->has($normalized)) {
+            throw new \InvalidArgumentException(sprintf('Unknown strategy "%s".', $requested));
+        }
+        if (StrategyTaxonomy::FALLBACK_ID !== $normalized && !in_array($normalized, $ids, true)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Strategy "%s" is not supported by %s.',
+                $requested,
+                $commander->getName(),
+            ));
+        }
+
+        return $normalized;
+    }
+
+    /** @return array<string, mixed> */
+    private function serialize(ScoredCard $card): array
+    {
+        $item = $card->inventoryItem;
+
+        return [
+            'score' => $card->score,
+            'confidence' => round($card->confidence, 3),
+            // Strategy-package role, which is what the UI groups by.
+            'role' => $card->strategyRole,
+            'roles' => $card->strategyRoles,
+            // Structural deck roles (ramp/draw/removal/...) — a card can fill
+            // several, and often should.
+            'deckRoles' => $card->roles,
+            'packageComponents' => $card->packageComponents,
+            'cardType' => $card->cardType(),
+            'reasons' => $card->reasons,
+            'signals' => $card->signals,
+            'scoreBreakdown' => $card->components,
+            'inStock' => $card->isInStock(),
+            'stockQuantity' => $card->stockQuantity,
+            'priceCents' => $card->priceCents,
+            'card' => [
+                'id' => (string) $card->profile->card->getId(),
+                'oracleId' => $card->oracleId(),
+                'name' => $card->profile->name,
+                'typeLine' => $card->profile->card->getTypeLine(),
+                'manaCost' => $card->profile->card->getManaCost(),
+                'cmc' => $card->profile->cmc,
+                'colorIdentity' => $card->profile->colorIdentity,
+                'imageUrl' => $card->profile->card->getImageUrl(),
+                'edhrecRank' => $card->profile->edhrecRank,
+                'gameChanger' => $card->profile->isGameChanger,
+            ],
+            'inventoryItem' => null !== $item ? $this->sectionSerializer->serializeInventoryItem($item) : null,
         ];
     }
 
@@ -263,42 +338,5 @@ final class CommanderRecommender
         }
 
         return $groups;
-    }
-
-    private function isCommanderLegal(Card $card): bool
-    {
-        $legalities = $card->getLegalities();
-        if (!is_array($legalities) || !isset($legalities['commander'])) {
-            return true;
-        }
-
-        return in_array((string) $legalities['commander'], ['legal', 'restricted'], true);
-    }
-
-    private function curveFit(float $commanderCmc, ?float $cardCmc): float
-    {
-        if (null === $cardCmc) {
-            return 0.4;
-        }
-        $delta = abs($cardCmc - max(2.0, $commanderCmc * 0.6));
-
-        return max(0.0, 1.0 - ($delta / 6.0));
-    }
-
-    /**
-     * Maps an EDHREC rank (1 = most played) to a 0..1 "staple" weight on a log
-     * scale, giving widely-played cards a ranking floor regardless of thematic
-     * synergy. Rank 1 → 1.0; rank ~20k and beyond → 0. Unranked cards score 0.
-     */
-    private function stapleScore(?int $edhrecRank): float
-    {
-        if (null === $edhrecRank || $edhrecRank < 1) {
-            return 0.0;
-        }
-
-        // log10(20000) ≈ 4.30103 sets the point where popularity stops helping.
-        $score = (4.30103 - log10((float) $edhrecRank)) / 4.30103;
-
-        return max(0.0, min(1.0, $score));
     }
 }

@@ -3,47 +3,73 @@
 namespace App\Service\Recommend;
 
 use App\Entity\Card;
-use App\Entity\InventoryItem;
 use App\Entity\Store;
-use App\Repository\CardSynergyRepository;
-use App\Repository\InventoryItemRepository;
 use App\Service\CaseCards\ColorIdentityParser;
 use App\Service\CaseCards\SectionSerializer;
+use App\Service\Recommend\Intelligence\CandidateGenerator;
+use App\Service\Recommend\Intelligence\CommanderIntelligenceProvider;
+use App\Service\Recommend\Intelligence\CommanderLegalityValidator;
+use App\Service\Recommend\Intelligence\DeckContextAnalyzer;
+use App\Service\Recommend\Intelligence\PreparedCandidate;
+use App\Service\Recommend\Intelligence\RecommendationEngine;
+use App\Service\Recommend\Intelligence\ScoredCard;
+use App\Service\Recommend\Intelligence\StrategyTaxonomy;
 
 /**
- * Builds a ~100-card Commander list from store stock.
+ * Builds a 100-card Commander deck around a commander *and a strategy*.
  *
- * Slot floors (lands / ramp / draw / removal) are filled first, then Spellbook
- * combo packages with high in-stock coverage, then theme/synergy fill until
- * we hit 99 non-commander cards (100 including the commander).
+ * The previous assembler ignored strategy entirely and filled fixed quotas from
+ * a stock list ordered by EDHREC rank, which is why its output read as "99
+ * popular cards in these colors" rather than a deck with a plan. This version
+ * drives the recommendation engine and re-scores between picks, so every choice
+ * is made in the context of what has already been chosen.
  *
- * Optional shopper constraints:
- *  - deck budget and per-card price cap (store prices)
- *  - Commander bracket, using Scryfall `game_changer` metadata and inventory
+ * Construction order is deliberate. Structural requirements are satisfied first
+ * but only ever from strategy-appropriate cards, so hitting a ramp quota cannot
+ * pull in an off-plan mana rock when an on-plan one exists. Requirements are
+ * per-strategy, not universal: a landfall deck wants more lands and ramp, a token
+ * deck wants fewer board wipes, an artifact deck counts its mana rocks as both
+ * ramp and strategy density.
+ *
+ * Legality is never negotiable — singleton, color identity, and format legality
+ * are enforced at pick time regardless of how well a card scores.
  */
 final class CommanderDeckAssembler
 {
     private const DECK_SIZE = 100;
-    private const LANDS = 36;
-    private const RAMP = 10;
-    private const DRAW = 10;
-    private const REMOVAL = 8;
+
+    /**
+     * Cards picked between re-scores. One-at-a-time would be ideal but costs 99
+     * passes; a small batch keeps the deck responsive to its own contents while
+     * holding the build well under a second.
+     */
+    private const RESCORE_BATCH = 6;
+
+    /** Safety valve on the greedy loop. */
+    private const MAX_ROUNDS = 40;
 
     public function __construct(
-        private readonly InventoryItemRepository $inventoryItems,
-        private readonly CardSynergyRepository $synergies,
-        private readonly ThemeTokenizer $tokenizer,
         private readonly ColorIdentityParser $colorIdentity,
         private readonly SectionSerializer $sectionSerializer,
+        private readonly StrategyTaxonomy $taxonomy,
+        private readonly CommanderRecommender $recommender,
+        private readonly CommanderIntelligenceProvider $intelligenceProvider,
+        private readonly CandidateGenerator $candidates,
+        private readonly RecommendationEngine $engine,
+        private readonly DeckContextAnalyzer $deckAnalyzer,
+        private readonly CommanderLegalityValidator $legality,
+        private readonly ThemeTokenizer $tokenizer,
         private readonly StoreComboAnalyzer $comboAnalyzer,
     ) {
     }
 
     /**
      * @param array{
+     *   strategy?: string|null,
      *   budgetCents?: int|null,
      *   maxCardCents?: int|null,
-     *   bracket?: int|null
+     *   bracket?: int|null,
+     *   includeOutOfStock?: bool
      * } $options
      *
      * @return array<string, mixed>
@@ -52,263 +78,213 @@ final class CommanderDeckAssembler
     {
         $budgetCents = $this->positiveCents($options['budgetCents'] ?? null);
         $maxCardCents = $this->positiveCents($options['maxCardCents'] ?? null);
+        $includeOutOfStock = (bool) ($options['includeOutOfStock'] ?? true);
 
-        $commanderTags = $this->tokenizer->tokenize($commander);
-        $commanderOracle = (string) $commander->getOracleId();
-        $edgeWeights = $this->synergies->weightsForOracle($commander->getOracleId());
-        $identity = $commander->getColorIdentity() ?? [];
+        $supported = $this->recommender->strategiesFor($commander);
+        $strategyId = $this->resolveStrategy($options['strategy'] ?? null, $supported);
 
-        $candidates = [];
-        $gameChangersInStock = [];
-        foreach ($this->inventoryItems->findRecommendationCandidates($store, $identity) as $item) {
-            $card = $item->getCard();
-            if (!$card instanceof Card) {
-                continue;
-            }
-            if ((string) $card->getOracleId() === $commanderOracle) {
-                continue;
-            }
-            if (!$this->colorIdentity->isSubsetOf($identity, $card->getColorIdentity())) {
-                continue;
-            }
-            if (!$this->isCommanderLegal($card)) {
-                continue;
-            }
+        $intelligence = $this->intelligenceProvider->forCommander($commander, $strategyId);
+        // Basic lands are in scope here (unlike the browsing list) because the
+        // builder has to produce a real mana base.
+        $generated = $this->candidates->generate(
+            $store,
+            $commander,
+            $intelligence,
+            [],
+            $includeOutOfStock,
+            includeBasicLands: true,
+        );
+        $prepared = $this->engine->prepare(
+            $commander,
+            $strategyId,
+            $intelligence,
+            $generated['candidates'],
+            $generated['stockByOracle'],
+        );
 
-            $isGameChanger = $card->isGameChanger();
-            if ($isGameChanger) {
-                $oracleKey = (string) $card->getOracleId();
-                if (!isset($gameChangersInStock[$oracleKey])) {
-                    $gameChangersInStock[$oracleKey] = [
-                        'name' => $card->getName(),
-                        'oracleId' => $oracleKey,
-                        'priceCents' => $item->getPriceCents(),
-                    ];
-                }
-            }
-
-            $tags = $this->tokenizer->tokenize($card);
-            $overlap = $this->tokenizer->overlap($commanderTags, $tags);
-            $oracleKey = (string) $card->getOracleId();
-            $edge = $edgeWeights[$oracleKey]['weight'] ?? 0.0;
-            $score = (0.55 * $overlap['score']) + (0.35 * $edge) + (0.10 * min(1.0, $item->getQuantity() / 4));
-
-            $candidates[] = [
-                'item' => $item,
-                'card' => $card,
-                'tags' => $tags,
-                'score' => $score,
-                'oracle' => $oracleKey,
-                'isLand' => $this->isLand($card),
-                'isBasicLand' => $this->isBasicLand($card),
-                'isGameChanger' => $isGameChanger,
-                'priceCents' => $item->getPriceCents(),
-            ];
-        }
-
-        usort($candidates, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
-
-        $gcStockCount = count($gameChangersInStock);
+        $gameChangersInStock = $this->gameChangersInStock($prepared);
         $requestedBracket = CommanderBracket::clamp(isset($options['bracket']) ? (int) $options['bracket'] : null);
-        $appliedBracket = $requestedBracket ?? CommanderBracket::suggestFromGameChangerCount($gcStockCount);
+        $appliedBracket = $requestedBracket ?? CommanderBracket::suggestFromGameChangerCount(count($gameChangersInStock));
         $maxGameChangers = CommanderBracket::maxGameChangers($appliedBracket);
 
-        $picked = [];
-        $slots = [
-            'commander' => 1,
-            'land' => 0,
-            'ramp' => 0,
-            'draw' => 0,
-            'removal' => 0,
-            'combo' => 0,
-            'synergy' => 0,
-            'game_changer' => 0,
-        ];
-        $spentCents = 0;
-        $includedGameChangers = [];
-
+        $structure = $this->taxonomy->structure($strategyId);
         $targetNonCommander = self::DECK_SIZE - 1;
+        $landTarget = max(0, (int) ($structure[DeckContextAnalyzer::ROLE_LANDS] ?? 36));
 
-        $pick = function (array $row, string $slot) use (
-            &$picked,
-            &$slots,
-            &$spentCents,
+        /** @var array<string, ScoredCard> $picked */
+        $picked = [];
+        /** @var array<string, int> $quantities oracle id => copies in the deck */
+        $quantities = [];
+        $includedGameChangers = [];
+        $spentCents = 0;
+        $landCount = 0;
+        $totalCards = 0;
+
+        $nonLandBudget = max(0, $targetNonCommander - $landTarget);
+        $nonLandCount = 0;
+
+        $canPick = function (PreparedCandidate $candidate) use (
+            &$quantities,
             &$includedGameChangers,
+            &$spentCents,
+            &$landCount,
+            &$nonLandCount,
+            $commander,
             $budgetCents,
             $maxCardCents,
             $maxGameChangers,
+            $landTarget,
+            $nonLandBudget,
         ): bool {
-            $oracle = $row['oracle'];
-            if ('' === $oracle || isset($picked[$oracle])) {
+            $profile = $candidate->profile;
+
+            // Legality first, always. Singleton is checked against what we have
+            // already taken, which is why it cannot live in candidate generation.
+            // Basic lands are the format's one exception and may repeat.
+            if (!$this->legality->isLegal($commander, $profile->card, $quantities)) {
                 return false;
             }
-            $price = (int) $row['priceCents'];
-            $isBasic = (bool) $row['isBasicLand'];
-            if (null !== $maxCardCents && !$isBasic && $price > $maxCardCents) {
+
+            // The land count is a hard structural constraint in both directions,
+            // not a scoring preference. Scoring alone will always prefer another
+            // synergy piece to another land, so a purely score-driven build
+            // finishes at 99 cards with an unplayable mana base. Reserving the
+            // slots lets scoring decide *which* lands without letting it decide
+            // whether to have any.
+            if ($profile->isLand) {
+                if ($landCount >= $landTarget) {
+                    return false;
+                }
+            } elseif ($nonLandCount >= $nonLandBudget) {
+                return false;
+            }
+
+            $price = $candidate->priceCents ?? 0;
+            if (null !== $maxCardCents && !$profile->isBasicLand && $price > $maxCardCents) {
                 return false;
             }
             if (null !== $budgetCents && ($spentCents + $price) > $budgetCents) {
                 return false;
             }
-            $isGc = (bool) $row['isGameChanger'];
-            if ($isGc && count($includedGameChangers) >= $maxGameChangers) {
+            if ($profile->isGameChanger && count($includedGameChangers) >= $maxGameChangers) {
                 return false;
-            }
-
-            $picked[$oracle] = [
-                'slot' => $slot,
-                'score' => round((float) $row['score'], 4),
-                'gameChanger' => $isGc,
-                'priceCents' => $price,
-                'inventoryItem' => $this->sectionSerializer->serializeInventoryItem($row['item']),
-            ];
-            ++$slots[$slot];
-            $spentCents += $price;
-            if ($isGc) {
-                ++$slots['game_changer'];
-                $includedGameChangers[] = [
-                    'name' => $row['card']->getName(),
-                    'oracleId' => $oracle,
-                    'slot' => $slot,
-                    'priceCents' => $price,
-                ];
             }
 
             return true;
         };
 
-        foreach ($candidates as $row) {
-            if ($slots['land'] >= self::LANDS) {
+        // Greedy construction with re-scoring: each round scores every remaining
+        // candidate against the deck built so far, so role need, package gaps,
+        // curve, and card-to-card synergy all shift as the deck fills.
+        $remaining = $prepared;
+        for ($round = 0; $round < self::MAX_ROUNDS; ++$round) {
+            if ($totalCards >= $targetNonCommander || [] === $remaining) {
                 break;
             }
-            if ($row['isLand']) {
-                $pick($row, 'land');
-            }
-        }
 
-        foreach ($candidates as $row) {
-            if ($slots['ramp'] >= self::RAMP) {
-                break;
-            }
-            if (!$row['isLand'] && $this->hasAnyTag($row['tags'], ['ramp', 'dork'])) {
-                $pick($row, 'ramp');
-            }
-        }
+            $deckContext = $this->deckAnalyzer->analyze($this->flatten($quantities), $strategyId);
+            $ranked = $this->engine->rescore($commander, $strategyId, $intelligence, $deckContext, $remaining);
 
-        foreach ($candidates as $row) {
-            if ($slots['draw'] >= self::DRAW) {
-                break;
-            }
-            if (!$row['isLand'] && $this->hasAnyTag($row['tags'], ['draw'])) {
-                $pick($row, 'draw');
-            }
-        }
+            $takenThisRound = 0;
+            $stillRemaining = [];
+            $byOracle = $this->indexPrepared($remaining);
 
-        foreach ($candidates as $row) {
-            if ($slots['removal'] >= self::REMOVAL) {
-                break;
-            }
-            if (!$row['isLand'] && $this->hasAnyTag($row['tags'], ['removal', 'board_wipe'])) {
-                $pick($row, 'removal');
-            }
-        }
+            foreach ($ranked as $scored) {
+                $oracleId = $scored->oracleId();
+                $candidate = $byOracle[$oracleId] ?? null;
+                if (null === $candidate) {
+                    continue;
+                }
 
-        $comboAnalysis = $this->comboAnalyzer->analyzeForCommander($store, $commander, limit: 16);
-        $comboNamesPreferred = [];
-        foreach ($comboAnalysis['combos'] as $combo) {
-            if (($combo['inStockCount'] ?? 0) < 2) {
-                continue;
-            }
-            foreach ($combo['cards'] as $piece) {
-                if (!empty($piece['inStock'])) {
-                    $comboNamesPreferred[strtolower((string) $piece['name'])] = true;
+                if ($totalCards >= $targetNonCommander || $takenThisRound >= self::RESCORE_BATCH) {
+                    $stillRemaining[] = $candidate;
+                    continue;
+                }
+
+                if (!$canPick($candidate)) {
+                    // Budget and bracket rejections are not permanent — a
+                    // cheaper deck state later might allow them — but keeping
+                    // them in the pool risks spinning, so drop them and let the
+                    // gap report surface the shortfall.
+                    continue;
+                }
+
+                $picked[$oracleId] = $scored;
+                $quantities[$oracleId] = ($quantities[$oracleId] ?? 0) + 1;
+                ++$totalCards;
+                $spentCents += $scored->priceCents ?? 0;
+                if ($scored->profile->isLand) {
+                    ++$landCount;
+                } else {
+                    ++$nonLandCount;
+                }
+                if ($scored->profile->isGameChanger) {
+                    $includedGameChangers[] = [
+                        'name' => $scored->profile->name,
+                        'oracleId' => $oracleId,
+                        'priceCents' => $scored->priceCents,
+                    ];
+                }
+                ++$takenThisRound;
+
+                // A basic land can legally repeat, so keep it available for the
+                // remaining land slots instead of retiring it after one copy.
+                if ($scored->profile->isBasicLand) {
+                    $stillRemaining[] = $candidate;
                 }
             }
-        }
 
-        foreach ($candidates as $row) {
-            if (count($picked) >= $targetNonCommander) {
+            $remaining = $stillRemaining;
+            if (0 === $takenThisRound) {
+                // Nothing legal or affordable left; further rounds cannot help.
                 break;
             }
-            $nameKey = strtolower($this->frontFace($row['card']->getName()));
-            if (isset($comboNamesPreferred[$nameKey]) && !$row['isLand']) {
-                $pick($row, 'combo');
-            }
         }
 
-        foreach ($candidates as $row) {
-            if (count($picked) >= $targetNonCommander) {
-                break;
-            }
-            if ($row['isLand']) {
-                continue;
-            }
-            if ($row['score'] < 0.04 && count($candidates) > 40) {
-                continue;
-            }
-            $pick($row, 'synergy');
-        }
+        $finalContext = $this->deckAnalyzer->analyze($this->flatten($quantities), $strategyId);
+        $cards = $this->serializeDeck($picked, $quantities);
 
-        // Top up lands if we still have room and land stock remains.
-        if (count($picked) < $targetNonCommander) {
-            foreach ($candidates as $row) {
-                if (count($picked) >= $targetNonCommander) {
-                    break;
-                }
-                if ($row['isLand']) {
-                    $pick($row, 'land');
-                }
-            }
-        }
-
-        $cards = array_values($picked);
-        usort($cards, static function (array $a, array $b): int {
-            $order = ['land' => 0, 'ramp' => 1, 'draw' => 2, 'removal' => 3, 'combo' => 4, 'synergy' => 5];
-
-            return ($order[$a['slot']] ?? 9) <=> ($order[$b['slot']] ?? 9)
-                ?: ($b['score'] <=> $a['score']);
-        });
-
-        $deckNames = array_map(
-            static fn (array $row): string => (string) ($row['inventoryItem']['card']['name'] ?? ''),
-            $cards,
+        $combos = $this->comboAnalyzer->analyzeForCommander(
+            $store,
+            $commander,
+            array_map(static fn (ScoredCard $c): string => $c->profile->name, array_values($picked)),
+            12,
         );
-        $combos = $this->comboAnalyzer->analyzeForCommander($store, $commander, $deckNames, 12);
-
-        $gaps = [];
-        if ($slots['land'] < self::LANDS) {
-            $gaps[] = sprintf('Need %d more lands in stock', self::LANDS - $slots['land']);
-        }
-        if ($slots['ramp'] < self::RAMP) {
-            $gaps[] = sprintf('Need %d more ramp pieces in stock', self::RAMP - $slots['ramp']);
-        }
-        if ($slots['draw'] < self::DRAW) {
-            $gaps[] = sprintf('Need %d more draw pieces in stock', self::DRAW - $slots['draw']);
-        }
-        if (count($cards) < $targetNonCommander) {
-            $gaps[] = sprintf('Deck short %d cards from store stock', $targetNonCommander - count($cards));
-        }
-        if (null !== $budgetCents && $spentCents > $budgetCents) {
-            $gaps[] = 'Deck exceeds the requested budget';
-        }
 
         return [
             'commander' => [
                 'id' => (string) $commander->getId(),
-                'oracleId' => $commanderOracle,
+                'oracleId' => (string) $commander->getOracleId(),
                 'name' => $commander->getName(),
                 'typeLine' => $commander->getTypeLine(),
                 'manaCost' => $commander->getManaCost(),
                 'cmc' => $commander->getCmc(),
-                'colorIdentity' => $identity,
+                'colorIdentity' => $commander->getColorIdentity() ?? [],
                 'imageUrl' => $commander->getImageUrl(),
-                'themes' => $commanderTags,
+                'themes' => $this->tokenizer->tokenize($commander),
             ],
-            'identityCode' => $this->colorIdentity->identityCode($identity),
+            'identityCode' => $this->colorIdentity->identityCode($commander->getColorIdentity()),
+            'strategies' => $supported,
+            'strategy' => [
+                'id' => $strategyId,
+                'label' => $this->taxonomy->label($strategyId),
+                'description' => $this->taxonomy->description($strategyId),
+            ],
+            'intelligence' => $intelligence->toArray(),
             'targetSize' => self::DECK_SIZE,
-            'filledSize' => count($cards) + 1,
-            'slots' => $slots,
-            'gaps' => $gaps,
+            // Copies, not distinct names: a deck with 30 Plains is 30 cards.
+            'filledSize' => $totalCards + 1,
+            'distinctCards' => count($picked) + 1,
+            'slots' => $this->slotSummary($picked, $quantities, $landCount, count($includedGameChangers)),
+            'structure' => [
+                'targets' => $finalContext->roleTargets,
+                'actual' => $finalContext->roleCounts,
+                'packageTargets' => $finalContext->packageTargets,
+                'packageActual' => $finalContext->packageCounts,
+            ],
+            'curve' => $finalContext->curve,
+            'averageManaValue' => round($finalContext->averageManaValue, 2),
+            'gaps' => $this->gaps($finalContext, $totalCards, $targetNonCommander, $budgetCents, $spentCents, $strategyId),
             'cards' => $cards,
             'combos' => $combos['combos'],
             'budget' => [
@@ -322,17 +298,218 @@ final class CommanderDeckAssembler
                 'applied' => $appliedBracket,
                 'label' => CommanderBracket::label($appliedBracket),
                 'auto' => null === $requestedBracket,
-                'maxGameChangers' => $maxGameChangers === \PHP_INT_MAX ? null : $maxGameChangers,
+                'maxGameChangers' => \PHP_INT_MAX === $maxGameChangers ? null : $maxGameChangers,
                 'gameChangersInStock' => array_values($gameChangersInStock),
                 'gameChangersIncluded' => $includedGameChangers,
-                'accommodated' => $gcStockCount >= min(3, $maxGameChangers === \PHP_INT_MAX ? 4 : $maxGameChangers)
+                'accommodated' => count($gameChangersInStock) >= min(3, \PHP_INT_MAX === $maxGameChangers ? 4 : $maxGameChangers)
                     || 0 === CommanderBracket::maxGameChangers($appliedBracket),
             ],
             'inventoryIds' => array_values(array_filter(array_map(
-                static fn (array $row): ?int => isset($row['inventoryItem']['id']) ? (int) $row['inventoryItem']['id'] : null,
-                $cards,
+                static fn (ScoredCard $c): ?int => $c->inventoryItem?->getId(),
+                array_values($picked),
             ))),
         ];
+    }
+
+    /**
+     * @param list<array{id: string}> $supported
+     */
+    private function resolveStrategy(mixed $requested, array $supported): string
+    {
+        $ids = array_column($supported, 'id');
+
+        if (!is_string($requested) || '' === trim($requested)) {
+            return $ids[0] ?? StrategyTaxonomy::FALLBACK_ID;
+        }
+
+        $normalized = $this->taxonomy->normalizeTag($requested) ?? $requested;
+        if (!$this->taxonomy->has($normalized)) {
+            throw new \InvalidArgumentException(sprintf('Unknown strategy "%s".', $requested));
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param list<PreparedCandidate> $prepared
+     *
+     * @return array<string, PreparedCandidate>
+     */
+    private function indexPrepared(array $prepared): array
+    {
+        $out = [];
+        foreach ($prepared as $candidate) {
+            $out[$candidate->oracleId()] = $candidate;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<PreparedCandidate> $prepared
+     *
+     * @return array<string, array{name: string, oracleId: string, priceCents: ?int}>
+     */
+    private function gameChangersInStock(array $prepared): array
+    {
+        $out = [];
+        foreach ($prepared as $candidate) {
+            if (!$candidate->profile->isGameChanger || !$candidate->isInStock()) {
+                continue;
+            }
+            $out[$candidate->oracleId()] = [
+                'name' => $candidate->profile->name,
+                'oracleId' => $candidate->oracleId(),
+                'priceCents' => $candidate->priceCents,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Expand a quantity map into a flat list, so the deck context sees the real
+     * card count rather than the number of distinct names.
+     *
+     * @param array<string, int> $quantities
+     *
+     * @return list<string>
+     */
+    private function flatten(array $quantities): array
+    {
+        $out = [];
+        foreach ($quantities as $oracleId => $count) {
+            for ($i = 0; $i < $count; ++$i) {
+                $out[] = (string) $oracleId;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, ScoredCard> $picked
+     * @param array<string, int>        $quantities
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function serializeDeck(array $picked, array $quantities): array
+    {
+        $rows = [];
+        foreach ($picked as $oracleId => $card) {
+            $rows[] = [
+                'slot' => $card->primaryRole,
+                'quantity' => $quantities[$oracleId] ?? 1,
+                'role' => $card->strategyRole,
+                'deckRoles' => $card->roles,
+                'packageComponents' => $card->packageComponents,
+                'score' => $card->score,
+                'confidence' => round($card->confidence, 3),
+                'reasons' => $card->reasons,
+                'signals' => $card->signals,
+                'scoreBreakdown' => $card->components,
+                'gameChanger' => $card->profile->isGameChanger,
+                'inStock' => $card->isInStock(),
+                'stockQuantity' => $card->stockQuantity,
+                'priceCents' => $card->priceCents,
+                'card' => [
+                    'id' => (string) $card->profile->card->getId(),
+                    'oracleId' => $card->oracleId(),
+                    'name' => $card->profile->name,
+                    'typeLine' => $card->profile->card->getTypeLine(),
+                    'manaCost' => $card->profile->card->getManaCost(),
+                    'cmc' => $card->profile->cmc,
+                    'imageUrl' => $card->profile->card->getImageUrl(),
+                    'edhrecRank' => $card->profile->edhrecRank,
+                ],
+                'inventoryItem' => null !== $card->inventoryItem
+                    ? $this->sectionSerializer->serializeInventoryItem($card->inventoryItem)
+                    : null,
+            ];
+        }
+
+        // Lands last so the list reads like a decklist rather than a mana base
+        // followed by the interesting cards.
+        usort($rows, static function (array $a, array $b): int {
+            $aLand = DeckContextAnalyzer::ROLE_LANDS === $a['slot'] ? 1 : 0;
+            $bLand = DeckContextAnalyzer::ROLE_LANDS === $b['slot'] ? 1 : 0;
+
+            return ($aLand <=> $bLand)
+                ?: ($b['score'] <=> $a['score'])
+                ?: strcmp((string) $a['card']['name'], (string) $b['card']['name']);
+        });
+
+        return $rows;
+    }
+
+    /**
+     * @param array<string, ScoredCard> $picked
+     * @param array<string, int>        $quantities
+     *
+     * @return array<string, int>
+     */
+    private function slotSummary(array $picked, array $quantities, int $landCount, int $gameChangerCount): array
+    {
+        $slots = ['commander' => 1, DeckContextAnalyzer::ROLE_LANDS => $landCount];
+        foreach ($picked as $oracleId => $card) {
+            if ($card->profile->isLand) {
+                continue;
+            }
+            $slots[$card->primaryRole] = ($slots[$card->primaryRole] ?? 0) + ($quantities[$oracleId] ?? 1);
+        }
+        $slots['game_changer'] = $gameChangerCount;
+
+        return $slots;
+    }
+
+    /**
+     * Actionable shortfalls, phrased in terms of what to buy or stock rather
+     * than internal counters.
+     *
+     * @return list<string>
+     */
+    private function gaps(
+        \App\Service\Recommend\Intelligence\DeckContext $context,
+        int $pickedCount,
+        int $target,
+        ?int $budgetCents,
+        int $spentCents,
+        string $strategyId,
+    ): array {
+        $gaps = [];
+
+        foreach ($context->roleTargets as $role => $roleTarget) {
+            $have = $context->roleCounts[$role] ?? 0;
+            if ($roleTarget > 0 && $have < $roleTarget) {
+                $gaps[] = sprintf(
+                    'Short %d %s (%d of %d)',
+                    $roleTarget - $have,
+                    str_replace('_', ' ', (string) $role),
+                    $have,
+                    $roleTarget,
+                );
+            }
+        }
+
+        $package = $this->taxonomy->package($strategyId);
+        foreach ($context->incompleteComponents() as $component) {
+            $label = $package[$component]['label'] ?? $component;
+            $gaps[] = sprintf(
+                'Wants more %s (%d of %d)',
+                strtolower((string) $label),
+                $context->packageCounts[$component] ?? 0,
+                $context->packageTargets[$component] ?? 0,
+            );
+        }
+
+        if ($pickedCount < $target) {
+            $gaps[] = sprintf('Deck short %d cards from available candidates', $target - $pickedCount);
+        }
+        if (null !== $budgetCents && $spentCents > $budgetCents) {
+            $gaps[] = 'Deck exceeds the requested budget';
+        }
+
+        return $gaps;
     }
 
     private function positiveCents(mixed $value): ?int
@@ -343,51 +520,5 @@ final class CommanderDeckAssembler
         $cents = (int) $value;
 
         return $cents > 0 ? $cents : null;
-    }
-
-    private function isLand(Card $card): bool
-    {
-        $type = strtolower($card->getTypeLine() ?? '');
-
-        return str_contains($type, 'land');
-    }
-
-    private function isBasicLand(Card $card): bool
-    {
-        $type = strtolower($card->getTypeLine() ?? '');
-
-        return str_contains($type, 'basic') && str_contains($type, 'land');
-    }
-
-    /** @param list<string> $tags @param list<string> $needles */
-    private function hasAnyTag(array $tags, array $needles): bool
-    {
-        foreach ($needles as $needle) {
-            if (in_array($needle, $tags, true)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function isCommanderLegal(Card $card): bool
-    {
-        $legalities = $card->getLegalities();
-        if (!is_array($legalities) || !isset($legalities['commander'])) {
-            return true;
-        }
-
-        return in_array((string) $legalities['commander'], ['legal', 'restricted'], true);
-    }
-
-    private function frontFace(string $name): string
-    {
-        $name = trim($name);
-        if (str_contains($name, ' // ')) {
-            return trim(explode(' // ', $name, 2)[0]);
-        }
-
-        return $name;
     }
 }

@@ -15,6 +15,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Store-scoped commander deck builder.
@@ -106,6 +107,52 @@ final class CommanderRecommendController extends AbstractController
                 $commanderCard,
                 '' === $strategy ? null : $strategy,
                 $limit,
+                $this->deckOracleIds($request),
+                $request->query->getBoolean('includeOutOfStock', true),
+            ));
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Same recommendations, but told what is already in the deck so the ranking
+     * reflects it.
+     *
+     * POST because a 99-card list does not belong in a query string, and because
+     * this is the endpoint the builder calls after every add or remove.
+     *
+     * Body: `{ "deck": ["<oracleId>", ...], "strategy": "tokens", "limit": 40 }`
+     */
+    #[Route('/commander/{cardId}/next-cards', name: 'api_store_recommend_next_cards', methods: ['POST'])]
+    public function nextCards(string $slug, string $cardId, Request $request): JsonResponse
+    {
+        $store = $this->requireStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $commanderCard = $this->resolveListedCommander($cardId);
+        if ($commanderCard instanceof JsonResponse) {
+            return $commanderCard;
+        }
+
+        $payload = json_decode($request->getContent() ?: '[]', true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $strategy = trim((string) ($payload['strategy'] ?? $request->query->get('strategy', '')));
+        $limit = (int) ($payload['limit'] ?? $request->query->get('limit', 40));
+
+        try {
+            return $this->json($this->recommender->recommendForStore(
+                $store,
+                $commanderCard,
+                '' === $strategy ? null : $strategy,
+                $limit,
+                $this->deckOracleIdsFromPayload($payload),
+                (bool) ($payload['includeOutOfStock'] ?? true),
             ));
         } catch (\InvalidArgumentException $e) {
             return $this->json(['detail' => $e->getMessage()], 422);
@@ -149,10 +196,10 @@ final class CommanderRecommendController extends AbstractController
     }
 
     /**
-     * Assemble a ~100-card list from store stock + synergy + Spellbook packages.
+     * Assemble a 100-card list for a commander and a chosen strategy.
      *
-     * Query: budgetCents, maxCardCents, bracket (1–5). Omit bracket to auto-pick
-     * from in-stock Scryfall Game Changers in this commander's identity.
+     * Query: strategy, budgetCents, maxCardCents, bracket (1–5), includeOutOfStock.
+     * Omit bracket to auto-pick from in-stock Game Changers in this identity.
      */
     #[Route('/commander/{cardId}/deck', name: 'api_store_recommend_deck', methods: ['GET'])]
     public function assembleDeck(string $slug, string $cardId, Request $request): JsonResponse
@@ -168,14 +215,21 @@ final class CommanderRecommendController extends AbstractController
         }
 
         $bracketRaw = trim((string) $request->query->get('bracket', ''));
+        $strategy = trim((string) $request->query->get('strategy', ''));
 
-        return $this->json($this->deckAssembler->assemble($store, $commanderCard, [
-            'budgetCents' => $this->optionalPositiveInt($request->query->get('budgetCents')),
-            'maxCardCents' => $this->optionalPositiveInt($request->query->get('maxCardCents')),
-            'bracket' => '' === $bracketRaw || 'auto' === strtolower($bracketRaw)
-                ? null
-                : (int) $bracketRaw,
-        ]));
+        try {
+            return $this->json($this->deckAssembler->assemble($store, $commanderCard, [
+                'strategy' => '' === $strategy ? null : $strategy,
+                'budgetCents' => $this->optionalPositiveInt($request->query->get('budgetCents')),
+                'maxCardCents' => $this->optionalPositiveInt($request->query->get('maxCardCents')),
+                'bracket' => '' === $bracketRaw || 'auto' === strtolower($bracketRaw)
+                    ? null
+                    : (int) $bracketRaw,
+                'includeOutOfStock' => $request->query->getBoolean('includeOutOfStock', true),
+            ]));
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
     }
 
     private function optionalPositiveInt(mixed $value): ?int
@@ -186,6 +240,51 @@ final class CommanderRecommendController extends AbstractController
         $n = (int) $value;
 
         return $n > 0 ? $n : null;
+    }
+
+    /**
+     * Oracle ids of cards already in the deck, from a repeated `deck[]` query
+     * parameter. Kept small on purpose — the POST endpoint exists for full lists.
+     *
+     * @return list<string>
+     */
+    private function deckOracleIds(Request $request): array
+    {
+        return $this->normalizeOracleIds((array) $request->query->all('deck'));
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return list<string>
+     */
+    private function deckOracleIdsFromPayload(array $payload): array
+    {
+        return $this->normalizeOracleIds(is_array($payload['deck'] ?? null) ? $payload['deck'] : []);
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     *
+     * @return list<string>
+     */
+    private function normalizeOracleIds(array $values): array
+    {
+        $out = [];
+        foreach ($values as $value) {
+            if (!is_string($value)) {
+                continue;
+            }
+            $trimmed = strtolower(trim($value));
+            // Validated as a UUID here so a malformed id becomes a no-op rather
+            // than a database error deeper in the pipeline.
+            if ('' === $trimmed || isset($out[$trimmed]) || !Uuid::isValid($trimmed)) {
+                continue;
+            }
+            $out[$trimmed] = true;
+        }
+
+        return array_keys($out);
     }
 
     private function resolveListedCommander(string $cardId): Card|JsonResponse

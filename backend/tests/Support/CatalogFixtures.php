@@ -49,6 +49,16 @@ final class CatalogFixtures
     }
 
     /**
+     * The deterministic oracle id for a seed, so a test can reference a card's
+     * oracle identity (for reference decks, synergy edges, deck state) without
+     * having to build the Card first.
+     */
+    public static function oracleIdFor(int $seed): string
+    {
+        return self::scryfallPayload($seed)['oracle_id'];
+    }
+
+    /**
      * Find-or-create a Card by its deterministic seed id, so the same card can
      * be referenced across stores/orders within a test without a duplicate-key
      * clash (cards are a shared global catalog).
@@ -79,6 +89,9 @@ final class CatalogFixtures
         $card->setColorIdentity($data['color_identity'] ?? null);
         $card->setKeywords($data['keywords'] ?? null);
         $card->setLegalities($data['legalities'] ?? null);
+        // Popularity is a real ranking input, so tests need to be able to set it
+        // on the column rather than only inside the raw Scryfall blob.
+        $card->setEdhrecRank(isset($data['edhrec_rank']) ? (int) $data['edhrec_rank'] : null);
         $card->setArtist(isset($data['artist']) ? (string) $data['artist'] : null);
         $card->setScryfallData($data);
         $this->em->persist($card);

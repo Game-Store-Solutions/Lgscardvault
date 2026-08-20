@@ -31,6 +31,7 @@ Two backend styles coexist:
 | **Payments & billing** | Platform subscriptions (owner → marketplace), store checkout (shopper → store), renewals/dunning, admin billing dashboard | [payments-and-billing.md](payments-and-billing.md) |
 | **Catalog & inventory** | Card catalog search, inventory browse, inventory CRUD, Scryfall bulk sync, card details, spotlight | [catalog-and-inventory.md](catalog-and-inventory.md) |
 | **Case cards** | Owner-curated storefront sections filled manually or auto-pulled by price/rarity from inventory | [case-cards.md](case-cards.md) |
+| **Commander deck builder** | Reference-deck harvesting, strategy classification, card relationships, contextual scoring, and 100-card construction | [commander-deck-builder.md](commander-deck-builder.md) |
 | **CSV import** | Async bulk import lifecycle, failed-row recovery, card resolution, inventory writes, and live polling | [csv-import.md](csv-import.md) |
 | **Customers & orders** | Per-store customer profiles, favorites, want lists, cart, test checkout, order workflow, notifications, and reports | [customers-and-orders.md](customers-and-orders.md) |
 
@@ -55,7 +56,9 @@ flowchart LR
 
     subgraph ext["External systems"]
         scry["Scryfall API"]
-        mtg["MTGJSON"]
+        mtg["MTGJSON<br/>card metadata + precon decks"]
+        decks["Community deck source<br/>Archidekt, behind a flag"]
+        spell["Commander Spellbook<br/>combo graph"]
         mail["Mailpit SMTP, dev"]
         square["Square<br/>platform billing + OAuth"]
     end
@@ -67,7 +70,9 @@ flowchart LR
     api -- "enqueue CSV job" --> pg
     worker -- "resolve cards" --> scry
     worker -- "resolve cards" --> mtg
+    worker -- "harvest reference decks" --> decks
     api -- "catalog search / sync" --> scry
+    api -- "combo lookup" --> spell
     api -- "fulfilled order email" --> mail
     api -- "subscriptions + store checkout" --> square
 ```
@@ -77,6 +82,8 @@ flowchart LR
 - **Multi-tenancy** - `TenantSubscriber` reads `{slug}` from `/api/stores/{slug}/*`, resolves the `Store`, and enables a Doctrine SQL filter that scopes `InventoryItem` and `Order` queries by `store_id`. `/api/admin/*` routes disable the filter so super-admins see everything.
 - **Create-on-write** - customer profile, favorites, and want-list reads never create rows. The `StoreCustomer` row is created lazily on the first write.
 - **Card resolution cascade** - local DB -> Scryfall -> MTGJSON, used by catalog search, CSV import, and failed-row recovery.
+- **Precompute, then score** - the commander deck builder harvests and aggregates reference decks in a Messenger worker, so a recommendation request only does indexed reads plus in-memory scoring of the user's own deck. See [commander-deck-builder.md](commander-deck-builder.md).
+- **Provider abstraction for external data** - community decklists sit behind `DeckDataProviderInterface`, so swapping or disabling a source never touches scoring or deck construction.
 - **Batched async import** - the CSV worker claims rows with `SELECT ... FOR UPDATE SKIP LOCKED`, processes 25 at a time, and self-dispatches the next batch.
 - **Persisted notifications** - customer notifications are stored in `customer_notifications`; Mailpit email is a delivery side effect. The frontend currently polls every 15 seconds.
 - **Two Square money paths** - the platform bills store owners with its own access token; each store charges shoppers through a connected OAuth account. See [payments-and-billing.md](payments-and-billing.md).

@@ -25,6 +25,81 @@ services:
     App\Service\Spellbook\SpellbookClientInterface: '@App\Service\Spellbook\SpellbookClient'
     App\Service\Pricing\MarketPriceSource: '@App\Service\Pricing\MarketPriceResolver'
 
+    # ---------------------------------------------------------------------
+    # Commander Intelligence & Synergy Engine
+    # Tunables live in config/packages/commander_intelligence.yaml.
+    # ---------------------------------------------------------------------
+
+    App\Service\Recommend\Intelligence\RecommendationWeights:
+        arguments:
+            $weights: '%commander_intelligence.weights%'
+            $stockBonus: '%commander_intelligence.stock_bonus%'
+
+    App\Service\Recommend\Intelligence\CommanderIntelligenceProvider:
+        arguments:
+            $maxAgeDays: '%commander_intelligence.max_age_days%'
+
+    App\Service\Recommend\Intelligence\CommanderIntelligenceRefresher:
+        arguments:
+            $deckProvider: '@App\Service\Recommend\Provider\CompositeDeckDataProvider'
+            $harvestDepth: '%commander_intelligence.harvest_depth%'
+            $decksPerStrategy: '%commander_intelligence.decks_per_strategy%'
+
+    App\MessageHandler\RefreshStaleCommanderIntelligenceMessageHandler:
+        arguments:
+            $maxAgeDays: '%commander_intelligence.max_age_days%'
+
+    App\Service\Recommend\Intelligence\ReferenceDeckPruner:
+        arguments:
+            $pruneAgeDays: '%commander_intelligence.prune_age_days%'
+            $batchSize: '%commander_intelligence.prune_batch_size%'
+            $deleteDeckHeaders: '%commander_intelligence.prune_delete_decks%'
+
+    # Reference deck providers. Listed explicitly rather than via a tag so the
+    # composite cannot end up inside its own provider list.
+    App\Service\Recommend\Provider\CompositeDeckDataProvider:
+        arguments:
+            $providers:
+                - '@App\Service\Recommend\Provider\Archidekt\ArchidektDeckDataProvider'
+                - '@App\Service\Recommend\Provider\MtgJsonPreconDeckProvider'
+                - '@App\Service\Recommend\Provider\LocalDeckDataProvider'
+    App\Service\Recommend\Provider\DeckDataProviderInterface: '@App\Service\Recommend\Provider\CompositeDeckDataProvider'
+
+    App\Service\Recommend\Provider\Archidekt\ArchidektClientInterface: '@App\Service\Recommend\Provider\Archidekt\ArchidektClient'
+
+    App\Service\Recommend\Provider\Archidekt\ArchidektClient:
+        arguments:
+            $cacheTtl: '%commander_intelligence.archidekt.cache_ttl%'
+
+    App\Service\Recommend\Provider\Archidekt\ArchidektDeckDataProvider:
+        arguments:
+            $enabled: '%commander_intelligence.archidekt.enabled%'
+            $harvestDepth: '%commander_intelligence.harvest_depth%'
+
+    App\Service\Recommend\Provider\MtgJsonPreconDeckProvider:
+        arguments:
+            $enabled: '%commander_intelligence.mtgjson_precon.enabled%'
+            $cacheTtl: '%commander_intelligence.mtgjson_precon.cache_ttl%'
+
+    App\Service\Recommend\Provider\LocalDeckDataProvider:
+        arguments:
+            $enabled: '%commander_intelligence.local_decks.enabled%'
+
+    # Shared 1 req/s Archidekt budget across web and worker processes. The lock
+    # lives in var/ (app-owned) for the same reason as the Scryfall throttle:
+    # systemd PrivateTmp would otherwise give each unit its own file and
+    # silently break the "one global budget" guarantee.
+    App\Service\Recommend\Provider\Archidekt\ArchidektRateLimiter:
+        arguments:
+            $lockFilePath: '%kernel.project_dir%/var/archidekt_rate.lock'
+            $minIntervalMicroseconds: '%commander_intelligence.archidekt.min_interval_us%'
+
+    App\Service\Recommend\Provider\Archidekt\ArchidektCircuitBreaker:
+        arguments:
+            $stateFilePath: '%kernel.project_dir%/var/archidekt_circuit.json'
+            $failureThreshold: '%commander_intelligence.archidekt.circuit_failure_threshold%'
+            $cooldownSeconds: '%commander_intelligence.archidekt.circuit_cooldown_seconds%'
+
     # Return HTTP 429 for login-throttling failures; delegate all other auth
     # failures to Lexik's JWT handler (see App\Security\AuthenticationFailureHandler).
     App\Security\AuthenticationFailureHandler:
@@ -81,6 +156,59 @@ when@test:
         App\Service\Spellbook\SpellbookClientInterface:
             alias: App\Tests\Support\FakeSpellbookClient
             public: true
+
+        # Reference decks come from a fixture provider in tests: no Archidekt
+        # traffic, and deterministic co-occurrence data so synergy assertions
+        # are stable.
+        App\Tests\Support\FakeArchidektClient:
+            autowire: true
+            public: true
+        App\Service\Recommend\Provider\Archidekt\ArchidektClientInterface:
+            alias: App\Tests\Support\FakeArchidektClient
+            public: true
+
+        # MTGJSON precon indexing would fetch ~190 files; keep it out of tests.
+        # These definitions replace the ones above, so autowire has to be
+        # restated — the test block has no _defaults of its own.
+        App\Service\Recommend\Provider\MtgJsonPreconDeckProvider:
+            autowire: true
+            arguments:
+                $enabled: false
+
+        App\Service\Recommend\Provider\Archidekt\ArchidektDeckDataProvider:
+            autowire: true
+            arguments:
+                $enabled: true
+                $harvestDepth: '%commander_intelligence.harvest_depth%'
+
+        App\Service\Recommend\Intelligence\CommanderIntelligenceRefresher:
+            autowire: true
+            public: true
+            arguments:
+                $deckProvider: '@App\Service\Recommend\Provider\CompositeDeckDataProvider'
+                $harvestDepth: '%commander_intelligence.harvest_depth%'
+                $decksPerStrategy: '%commander_intelligence.decks_per_strategy%'
+
+        # Tests drive the recommender and its collaborators directly.
+        App\Service\Recommend\Intelligence\CommanderIntelligenceProvider:
+            autowire: true
+            public: true
+            arguments:
+                $maxAgeDays: '%commander_intelligence.max_age_days%'
+        App\Service\Recommend\Intelligence\CardProfileIndex:
+            autowire: true
+            public: true
+        App\Service\Recommend\CommanderRecommender:
+            autowire: true
+            public: true
+        App\Service\Recommend\CommanderDeckAssembler:
+            autowire: true
+            public: true
+        App\Service\Recommend\Intelligence\RecommendationWeights:
+            public: true
+            arguments:
+                $weights: '%commander_intelligence.weights%'
+                $stockBonus: '%commander_intelligence.stock_bonus%'
 
         # Same idea for card checkout: exercise the money paths (capture,
         # decline, rollback) without reaching Square.

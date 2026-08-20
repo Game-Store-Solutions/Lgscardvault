@@ -328,6 +328,59 @@ class CardRepository extends ServiceEntityRepository
      *
      * @return list<Card>
      */
+    /**
+     * One representative printing per oracle identity, keyed by lowercased
+     * oracle id.
+     *
+     * Reference decks arrive as a few hundred oracle ids at a time; fetching
+     * them individually would be a textbook N+1. Oracle-level fields (text,
+     * types, legalities, EDHREC rank) are identical across printings, so any
+     * printing is a valid representative.
+     *
+     * @param list<string> $oracleIds
+     *
+     * @return array<string, Card>
+     */
+    public function mapOneCardPerOracleId(array $oracleIds): array
+    {
+        $uuids = [];
+        foreach ($oracleIds as $oracleId) {
+            $trimmed = strtolower(trim((string) $oracleId));
+            if ('' === $trimmed || isset($uuids[$trimmed])) {
+                continue;
+            }
+            try {
+                $uuids[$trimmed] = Uuid::fromString($trimmed);
+            } catch (\InvalidArgumentException) {
+                continue;
+            }
+        }
+        if ([] === $uuids) {
+            return [];
+        }
+
+        $out = [];
+        // Chunked so a large reference sample never builds an unbounded IN list.
+        foreach (array_chunk(array_values($uuids), 400) as $chunk) {
+            $cards = $this->createQueryBuilder('c')
+                ->andWhere('c.oracleId IN (:oracles)')
+                ->setParameter('oracles', $chunk)
+                ->orderBy('c.releasedAt', 'ASC')
+                ->addOrderBy('c.id', 'ASC')
+                ->getQuery()
+                ->getResult();
+
+            foreach ($cards as $card) {
+                $key = strtolower((string) $card->getOracleId());
+                if (!isset($out[$key])) {
+                    $out[$key] = $card;
+                }
+            }
+        }
+
+        return $out;
+    }
+
     public function findPrintingsByOracleId(Uuid $oracleId, int $limit = 60): array
     {
         return $this->magicScoped()

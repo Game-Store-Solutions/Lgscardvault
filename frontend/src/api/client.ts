@@ -69,11 +69,16 @@ export function unwrapCollection<T>(data: T[] | { member?: T[]; 'hydra:member'?:
   return []
 }
 
+// `imageUrl` is nullable because the API returns JSON null for cards with no
+// art rather than omitting the key; `??` treats both the same way.
 export function cardImage(
   card: {
-    imageUrl?: string
-    imageUris?: { png?: string; large?: string; normal?: string; small?: string }
-    cardFaces?: { imageUrl?: string; imageUris?: { png?: string; large?: string; normal?: string; small?: string } }[]
+    imageUrl?: string | null
+    imageUris?: { png?: string; large?: string; normal?: string; small?: string } | null
+    cardFaces?: {
+      imageUrl?: string | null
+      imageUris?: { png?: string; large?: string; normal?: string; small?: string } | null
+    }[]
   },
   opts?: { quality?: 'display' | 'full' },
 ): string | undefined {
@@ -83,12 +88,13 @@ export function cardImage(
     pickImageUri(card.imageUris, hq) ??
     card.imageUrl ??
     pickImageUri(front?.imageUris, hq) ??
-    front?.imageUrl
+    front?.imageUrl ??
+    undefined
   )
 }
 
 function pickImageUri(
-  uris: { png?: string; large?: string; normal?: string; small?: string } | undefined,
+  uris: { png?: string; large?: string; normal?: string; small?: string } | null | undefined,
   hq: boolean,
 ): string | undefined {
   if (!uris) {

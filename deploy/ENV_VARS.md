@@ -99,6 +99,26 @@ Each **store** still completes **Connect Square** in admin (per-merchant OAuth);
 | `SSO_OIDC_REDIRECT_URI` | Optional override. Must match Google Console exactly, e.g. `https://your-domain/api/auth/sso/callback`. Defaults to `APP_FRONTEND_URL` + that path. |
 | `SSO_PROVIDER_NAME` | ↑ UI label (e.g. `Google`) |
 | `MAPBOX_ACCESS_TOKEN` | Address autocomplete in store onboarding (mock if empty) |
+| `ARCHIDEKT_ENABLED` | Harvest community reference decklists for the Commander deck builder (`1`/`0`). See the caution below. |
+
+### `ARCHIDEKT_ENABLED`
+
+Archidekt is the richest source of reference decks — card rows carry Scryfall
+oracle ids and decks carry builder-authored strategy tags — but it publishes no
+API documentation, and its terms of service grant a license for "personal,
+noncommercial use" while prohibiting automated queries. Review that before
+enabling it for commercial traffic; written permission from Archidekt is the
+clean path.
+
+With it off, reference data comes from MTGJSON commander precons and decks your
+own users have saved. The deck builder keeps working — it just has less data to
+learn from, and says so via the `intelligence.confidence` field on every
+response.
+
+Requests are throttled to one per second host-wide and cached for a week, since a
+commander only needs harvesting once. After consecutive failures a host-wide
+circuit breaker opens for an hour so a blocked Archidekt endpoint cannot stall
+the messenger worker; MTGJSON precons and local decks keep feeding the engine.
 
 ---
 

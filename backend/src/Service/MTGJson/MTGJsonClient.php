@@ -4,9 +4,21 @@ namespace App\Service\MTGJson;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+/**
+ * MTGJSON is our normalized card-metadata source and the source of Wizards'
+ * preconstructed decklists.
+ *
+ * It is explicitly *not* a source of community deck popularity: `DeckList.json`
+ * contains only published products (about 190 of ~3,000 entries are Commander
+ * precons) with no view counts, rankings, or archetype tags. Community
+ * reference decks come from DeckDataProviderInterface implementations instead.
+ */
 class MTGJsonClient
 {
     private const SET_URL = 'https://mtgjson.com/api/v5/';
+    private const DECK_LIST_URL = 'https://mtgjson.com/api/v5/DeckList.json';
+    private const DECK_URL = 'https://mtgjson.com/api/v5/decks/';
+    public const DECK_TYPE_COMMANDER = 'Commander Deck';
     private const MAX_CACHED_SETS = 4;
     private const MAX_SET_RESPONSE_BYTES = 8 * 1024 * 1024;
 
@@ -90,5 +102,93 @@ class MTGJsonClient
         unset($payload, $cards);
 
         return $this->setCache[$normalizedSet];
+    }
+
+    /**
+     * Published deck products, optionally narrowed to one deck type.
+     *
+     * @return list<array{code: string, fileName: string, name: string, releaseDate: string, type: string}>
+     */
+    public function getDeckList(?string $type = null): array
+    {
+        $payload = $this->fetchJson(self::DECK_LIST_URL);
+        $decks = $payload['data'] ?? null;
+        if (!is_array($decks)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($decks as $deck) {
+            if (!is_array($deck)) {
+                continue;
+            }
+            $deckType = (string) ($deck['type'] ?? '');
+            if (null !== $type && $deckType !== $type) {
+                continue;
+            }
+            $fileName = (string) ($deck['fileName'] ?? '');
+            if ('' === $fileName) {
+                continue;
+            }
+            $out[] = [
+                'code' => (string) ($deck['code'] ?? ''),
+                'fileName' => $fileName,
+                'name' => (string) ($deck['name'] ?? $fileName),
+                'releaseDate' => (string) ($deck['releaseDate'] ?? ''),
+                'type' => $deckType,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * One deck product. `commander` and `mainBoard` rows carry
+     * `identifiers.scryfallOracleId`, so decks join to our catalog on oracle id
+     * without any name matching.
+     *
+     * @return ?array{name: string, type: string, code: string, releaseDate: string, commander: list<array<string, mixed>>, mainBoard: list<array<string, mixed>>}
+     */
+    public function getDeck(string $fileName): ?array
+    {
+        $name = trim($fileName);
+        if ('' === $name) {
+            return null;
+        }
+
+        $payload = $this->fetchJson(self::DECK_URL.$name.'.json');
+        $data = $payload['data'] ?? null;
+        if (!is_array($data)) {
+            return null;
+        }
+
+        return [
+            'name' => (string) ($data['name'] ?? $name),
+            'type' => (string) ($data['type'] ?? ''),
+            'code' => (string) ($data['code'] ?? ''),
+            'releaseDate' => (string) ($data['releaseDate'] ?? ''),
+            'commander' => array_values(array_filter((array) ($data['commander'] ?? []), 'is_array')),
+            'mainBoard' => array_values(array_filter((array) ($data['mainBoard'] ?? []), 'is_array')),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function fetchJson(string $url): array
+    {
+        try {
+            $response = $this->httpClient->request('GET', $url, [
+                'headers' => ['User-Agent' => 'MTGStore/1.0', 'Accept' => 'application/json'],
+                'timeout' => 30,
+            ]);
+            if (200 !== $response->getStatusCode()) {
+                return [];
+            }
+
+            $payload = $response->toArray(false);
+
+            return is_array($payload) ? $payload : [];
+        } catch (\Throwable) {
+            return [];
+        }
     }
 }
