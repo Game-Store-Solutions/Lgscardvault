@@ -8,11 +8,12 @@ function scrollWindowToTop() {
 }
 
 /**
- * Every route change starts at the top of the document. Hash links
+ * Every pathname / hash change starts at the top of the document. Query-string
+ * updates (storefront filters) must not jump the scroll. Hash links
  * (e.g. /s/:slug#store-search) still jump to that element once it exists.
  */
 export function ScrollToTop() {
-  const { pathname, search, hash } = useLocation()
+  const { pathname, hash } = useLocation()
 
   useEffect(() => {
     const id = hash.startsWith('#') ? decodeURIComponent(hash.slice(1)) : ''
@@ -40,7 +41,7 @@ export function ScrollToTop() {
     }, 50)
 
     return () => window.clearInterval(timer)
-  }, [pathname, search, hash])
+  }, [pathname, hash])
 
   return null
 }

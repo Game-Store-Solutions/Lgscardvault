@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useInventoryItemLink } from '../../hooks/useInventoryItemLink'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { rarityAccent } from '../../lib/mtg'
@@ -18,9 +19,10 @@ export interface SpotlightCardProps {
  */
 export function SpotlightCard({ item, slug, ribbon }: SpotlightCardProps) {
   const price = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
+  const link = useInventoryItemLink(slug)
 
   return (
-    <Link to={`/s/${slug}/cards/${item.id}`} className="group relative w-40 flex-shrink-0 snap-start sm:w-52">
+    <Link to={link.to(item.id)} state={link.state} className="group relative w-40 flex-shrink-0 snap-start sm:w-52">
       {ribbon && (
         <span className="absolute right-2 top-2 z-20 rounded-full bg-brand-500 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-white shadow">
           {ribbon}

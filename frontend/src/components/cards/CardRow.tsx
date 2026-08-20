@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useInventoryItemLink } from '../../hooks/useInventoryItemLink'
 import { Sparkles } from 'lucide-react'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
@@ -21,10 +22,12 @@ export function CardRow({ item, slug }: CardRowProps) {
   const image = cardImage(item.card)
   const accent = rarityAccent(item.card.rarity)
   const price = formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')
+  const link = useInventoryItemLink(slug)
 
   return (
     <Link
-      to={`/s/${slug}/cards/${item.id}`}
+      to={link.to(item.id)}
+      state={link.state}
       className={cx(
         'group flex items-center gap-3 rounded-card border border-border bg-surface p-2.5 shadow-card dark:glass-card ui-lift hover:border-brand-500/25 sm:gap-4 sm:p-3',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
