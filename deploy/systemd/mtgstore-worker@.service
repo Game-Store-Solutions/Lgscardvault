@@ -1,5 +1,8 @@
-# systemd template unit for the Symfony Messenger worker (CSV import + catalog
-# sync). Start N workers with:  systemctl enable --now mtgstore-worker@1 mtgstore-worker@2
+# systemd template unit for the async Messenger worker (Archidekt / catalog
+# sync). Start with:  systemctl enable --now mtgstore-worker@1
+#
+# Store CSV uploads use mtgstore-worker-import@.service so harvest and imports
+# do not share one queue.
 #
 # Long-lived PHP workers accumulate memory, so each is bounded by --time-limit
 # and --memory-limit and exits cleanly; systemd restarts it. --limit is omitted
@@ -9,7 +12,7 @@
 # then `systemctl daemon-reload`.
 
 [Unit]
-Description=MTG Store messenger worker %i
+Description=MTG Store async messenger worker %i
 After=network.target postgresql.service
 
 [Service]

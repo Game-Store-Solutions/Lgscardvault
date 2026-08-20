@@ -28,7 +28,8 @@ server (`lexik:jwt:generate-keypair`); see [`LAUNCH.md`](LAUNCH.md).
 | `JWT_PASSPHRASE` | Passphrase for the JWT `.pem` keypair. |
 | `CORS_ALLOW_ORIGIN` | Regex for allowed browser origins (your public site URL). |
 | `MAILER_DSN` | Resend: `resend+api://YOUR_API_KEY@default` (URL-encode special characters in the key). |
-| `MESSENGER_TRANSPORT_DSN` | Async queue (default: Doctrine `csv_import`). |
+| `MESSENGER_TRANSPORT_DSN` | Async / Archidekt / catalog queue (default: Doctrine `csv_import` — historical queue name). |
+| `MESSENGER_CSV_TRANSPORT_DSN` | Store CSV import queue (default: Doctrine `store_import`). |
 | `MESSENGER_FAILED_TRANSPORT_DSN` | Dead-letter queue (default: Doctrine `failed`). |
 | `APP_FRONTEND_URL` | Public SPA URL (emails, SSO return, owner redirects). |
 | `DEFAULT_URI` | Base URL for Symfony link generation (usually same as frontend). |

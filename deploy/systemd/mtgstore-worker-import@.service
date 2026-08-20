@@ -1,0 +1,34 @@
+# systemd template unit for the CSV import Messenger worker.
+# Start with:  systemctl enable --now mtgstore-worker-import@1
+#
+# Separate from mtgstore-worker@ so store uploads keep processing while the
+# async worker drains Archidekt / catalog jobs.
+#
+# Install: copy to /etc/systemd/system/, edit User/WorkingDirectory/Environment,
+# then `systemctl daemon-reload`.
+
+[Unit]
+Description=MTG Store CSV import messenger worker %i
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/mtgstore/backend
+EnvironmentFile=/etc/mtgstore/worker.env
+Environment=APP_ENV=prod
+
+ExecStart=/usr/bin/php bin/console messenger:consume csv failed \
+    --time-limit=3600 \
+    --memory-limit=256M \
+    --failure-limit=10 \
+    -v
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

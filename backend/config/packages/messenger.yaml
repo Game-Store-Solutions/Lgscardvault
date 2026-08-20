@@ -8,6 +8,18 @@ framework:
         failure_transport: failed
 
         transports:
+            # Store CSV uploads — dedicated so a long Archidekt / catalog job
+            # cannot starve imports. Consume with: messenger:consume csv
+            csv:
+                dsn: '%env(MESSENGER_CSV_TRANSPORT_DSN)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 0
+
+            # Catalog syncs, commander intelligence (Archidekt harvest), prune.
+            # Consume with: messenger:consume async
             async:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 retry_strategy:
@@ -24,7 +36,7 @@ framework:
                 dsn: '%env(MESSENGER_FAILED_TRANSPORT_DSN)%'
 
         routing:
-            App\Message\ProcessCsvImportMessage: async
+            App\Message\ProcessCsvImportMessage: csv
             App\Message\SyncScryfallCatalogMessage: async
             App\Message\SyncGameCatalogMessage: async
             App\Message\SyncCommanderCatalogMessage: async

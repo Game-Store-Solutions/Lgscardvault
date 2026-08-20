@@ -10,8 +10,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Runs a Scryfall bulk sync in the worker and updates the matching
  * {@see \App\Entity\ScryfallSyncRun} for the Sync Jobs UI.
  *
- * Shares the `async` transport with CSV imports — a long default_cards sync
- * occupies one worker for its duration.
+ * Uses the `async` transport (separate from store CSV imports on `csv`).
  */
 #[AsMessageHandler]
 final readonly class SyncScryfallCatalogMessageHandler

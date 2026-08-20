@@ -70,10 +70,13 @@ Harvest depth / provider toggles live in `backend/config/packages/commander_inte
 
 Workers must be running for async work (CSV import, catalog sync jobs, commander harvest, billing tickers).
 
+CSV uploads and Archidekt/catalog work use **separate transports** so one long harvest cannot starve store imports.
+
 | Command | What it does |
 |---------|----------------|
-| `messenger:consume async -vv` | Main work queue (CSV import, catalog sync jobs, commander intelligence, etc.). |
-| `messenger:consume async failed …` | Same plus dead-letter retry surface (prod worker default). |
+| `messenger:consume csv -vv` | Store CSV import queue only. |
+| `messenger:consume async -vv` | Catalog sync + commander intelligence (Archidekt harvest, prune, etc.). |
+| `messenger:consume csv failed …` / `async failed …` | Same plus dead-letter retry surface (prod defaults). |
 | `messenger:consume scheduler_catalog` | Ticks the daily TCGCSV catalog schedule. |
 | `messenger:consume scheduler_billing` | Ticks nightly subscription charges. |
 | `messenger:consume scheduler_commanders` | Ticks commander catalog sync, intelligence sweep, prune. |
@@ -83,7 +86,17 @@ Workers must be running for async work (CSV import, catalog sync jobs, commander
 | `messenger:failed:retry <id>` | Requeue after fixing the cause. |
 | `messenger:failed:remove <id>` | Drop a failed message. |
 
-**Prod note:** while Archidekt harvest is draining, keep a single worker (`--scale worker=1`) so the shared throttle is not contested.
+**Prod (Compose) while Archidekt is draining:**
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env up -d \
+  --scale worker=1 --scale worker_import=1
+```
+
+- `worker` → Archidekt / catalog (`async`)
+- `worker_import` → store CSV uploads (`csv`)
+
+Add `MESSENGER_CSV_TRANSPORT_DSN=doctrine://default?queue_name=store_import&auto_setup=1` to `/etc/mtgstore/prod.env` if it is not there yet.
 
 ---
 
@@ -93,10 +106,11 @@ From the repo root on the VPS:
 
 | Command | What it does |
 |---------|----------------|
-| `./deploy/scripts/deploy.sh` | Fetch `main`, build images, migrate, recreate backend/worker/scheduler/frontend, smoke-check. |
-| `docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env up -d --scale worker=1` | Pin one async worker (use during Archidekt harvest). |
+| `./deploy/scripts/deploy.sh` | Fetch `main`, build images, migrate, recreate backend/worker/worker_import/scheduler/frontend, smoke-check. |
+| `docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env up -d --scale worker=1 --scale worker_import=1` | One Archidekt worker + one CSV import worker. |
 | `docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env ps` | Service status. |
-| `docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env logs -f worker` | Tail worker logs. |
+| `docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env logs -f worker` | Tail Archidekt / async worker. |
+| `docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env logs -f worker_import` | Tail CSV import worker. |
 
 Local day-to-day:
 

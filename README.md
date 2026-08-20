@@ -34,7 +34,7 @@ php bin/console lexik:jwt:generate-keypair --skip-if-exists
 php bin/console doctrine:migrations:migrate --no-interaction
 php bin/console app:seed
 php -S 127.0.0.1:8000 -t public   # terminal 1
-php bin/console messenger:consume async -vv   # terminal 2
+php bin/console messenger:consume csv -vv   # terminal 2 (store CSV uploads)
 cd ../frontend && npm install && npm run dev  # terminal 3
 ```
 

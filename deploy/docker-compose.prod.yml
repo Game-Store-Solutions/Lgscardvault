@@ -43,9 +43,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Messenger worker. Same image as backend, different command. `restart` +
-  # the --time-limit/--memory-limit flags give the supervision the systemd/
-  # supervisor configs provide when not using compose.
+  # Async / Archidekt / catalog worker. Keep at 1 while bulk-harvesting
+  # Archidekt so the shared throttle is not contested. CSV imports use
+  # worker_import below and do not share this queue.
   worker:
     build:
       context: ../backend
@@ -58,14 +58,29 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Run two workers; scale with `docker compose up --scale worker=N`.
-    # Keep at 1 while bulk-harvesting Archidekt — even with a shared lock,
-    # two consumers still serialize on the same 2s budget and finish slower.
     deploy:
-      replicas: 2
+      replicas: 1
     restart: unless-stopped
-    # Inherit the backend image HEALTHCHECK (HTTP :8000/health). Workers do not
-    # serve HTTP, so that probe would stay unhealthy after the start period.
+    healthcheck:
+      disable: true
+
+  # Store CSV import worker. Separate transport so uploads keep processing
+  # while Archidekt harvest occupies `worker`.
+  worker_import:
+    build:
+      context: ../backend
+    command: php bin/console messenger:consume csv failed --time-limit=3600 --memory-limit=256M --failure-limit=10 -v
+    env_file: [/etc/mtgstore/prod.env]
+    environment:
+      APP_ENV: prod
+    volumes:
+      - archidekt_throttle:/app/var/archidekt
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      replicas: 1
+    restart: unless-stopped
     healthcheck:
       disable: true
 
