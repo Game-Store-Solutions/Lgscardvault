@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
 
 function scrollWindowToTop() {
@@ -8,19 +8,31 @@ function scrollWindowToTop() {
 }
 
 /**
- * Every pathname / hash change starts at the top of the document. Query-string
- * updates (storefront filters) must not jump the scroll. Hash links
- * (e.g. /s/:slug#store-search) still jump to that element once it exists.
+ * Pathname changes start at the top of the document. Hash links
+ * (e.g. /s/:slug#store-search when returning from a card) jump to that
+ * element once it exists.
+ *
+ * Query-string updates on the same page (storefront color / set filters)
+ * must not move the viewport — including when React Router drops or keeps
+ * `#store-search` while rewriting `?colors=`.
  */
 export function ScrollToTop() {
   const { pathname, hash } = useLocation()
+  const previousPathname = useRef<string | null>(null)
 
   useEffect(() => {
+    const pathChanged = previousPathname.current !== pathname
+    const firstLoad = previousPathname.current === null
+    previousPathname.current = pathname
+
     const id = hash.startsWith('#') ? decodeURIComponent(hash.slice(1)) : ''
     if (!id) {
-      scrollWindowToTop()
+      if (pathChanged || firstLoad) scrollWindowToTop()
       return
     }
+
+    // Same-page search-param rewrites can keep this hash; don't re-scroll.
+    if (!pathChanged && !firstLoad) return
 
     const jump = () => {
       const target = document.getElementById(id)
