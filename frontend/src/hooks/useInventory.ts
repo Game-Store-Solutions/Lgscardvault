@@ -201,8 +201,9 @@ export function useInventoryCatalog(slug: string, filters: InventoryPageFilters)
 }
 
 /**
- * Full-catalog walk for tools that still need every row (mass search, case
- * cards). Storefront and admin grids should use useInventoryPage instead.
+ * Full-catalog walk for tools that still need every row (case cards).
+ * Storefront grids should use useInventoryPage; mass search posts names
+ * to /inventory/mass-search instead of downloading the shelf.
  */
 export function useInventory(slug: string, opts?: InventoryQueryOptions) {
   const inStockOnly = Boolean(opts?.inStockOnly)
@@ -236,6 +237,26 @@ export function useInventory(slug: string, opts?: InventoryQueryOptions) {
       return sortInventory([...seen.values()])
     },
   })
+}
+
+/** Cap shared with the mass-search API so a pasted cube cannot overflow the request. */
+export const MASS_SEARCH_MAX_NAMES = 400
+
+/**
+ * In-stock listings matching the given card names (exact + DFC front face).
+ * One round trip — do not use useInventory() to pre-load the catalog for this.
+ */
+export async function searchInventoryByNames(slug: string, names: string[]): Promise<InventoryItem[]> {
+  const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))]
+  if (!slug || unique.length === 0) {
+    return []
+  }
+
+  const { data } = await api.post(`/stores/${slug}/inventory/mass-search`, {
+    names: unique.slice(0, MASS_SEARCH_MAX_NAMES),
+  })
+
+  return unwrapCollection<InventoryItem>(data)
 }
 
 export default useInventory
