@@ -447,11 +447,29 @@ body {
   /*
    * Foil sheen — soft light catching across the art.
    *
-   * Soft-light keeps hues blended. White specular stays quiet; the spectral
-   * film covers the full card face (clipped only by border-radius).
+   * Tune on `.foil-card` (or a parent) without rewriting gradients:
+   *   --foil-holo-opacity   idle base opacity of the rainbow film
+   *   --foil-hover-boost    added when --op → 1 (pointer hover)
+   *   --foil-glare          white specular strength
+   *   --foil-white          scales glare/specular whites (1 = current)
+   *   --foil-rainbow-sat    non-purple hue saturation (1 = full)
+   *   --foil-purple-sat     purple/magenta/violet saturation (0.7 ≈ 30% down)
+   *   --foil-grid           micro-grid strength on hover
+   *   --foil-holo-duration  spectral film loop
+   *   --foil-orbit-duration FlipCard idle orbit loop
+   *   --foil-idle-op        resting --op for CSS orbit helpers
    */
   .foil-card {
     --foil-holo-opacity: 0.45;
+    --foil-hover-boost: 0.68;
+    --foil-glare: 0.42;
+    --foil-white: 1;
+    --foil-rainbow-sat: 1;
+    --foil-purple-sat: 0.7;
+    --foil-grid: 0.3;
+    --foil-holo-duration: 9s;
+    --foil-orbit-duration: 11s;
+    --foil-idle-op: 0.5;
   }
   .tilt-card {
     isolation: isolate;
@@ -462,14 +480,14 @@ body {
     overflow: hidden;
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.18) 0%,
-      hsla(0, 0%, 100%, 0.06) 26%,
-      hsla(0, 0%, 100%, 0.02) 48%,
+      hsla(0, 0%, 100%, calc(0.18 * var(--foil-white, 1))) 0%,
+      hsla(0, 0%, 100%, calc(0.06 * var(--foil-white, 1))) 26%,
+      hsla(0, 0%, 100%, calc(0.02 * var(--foil-white, 1))) 48%,
       transparent 74%
     );
     mix-blend-mode: soft-light;
     /* Driven by spring --op; CSS opacity transitions lagged the pointer. */
-    opacity: calc(var(--op, 0) * 0.42);
+    opacity: calc(var(--op, 0) * var(--foil-glare, 0.42));
   }
   .tilt-holo,
   .foil-shimmer {
@@ -478,30 +496,28 @@ body {
     background-image:
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        hsla(0, 0%, 100%, 0.1) 0%,
-        hsla(195, 72%, 62%, 0.44) 18%,
-        /* Magenta/purple fringe ~30% quieter */
-        hsla(310, 48%, 60%, 0.22) 38%,
-        hsla(42, 65%, 58%, 0.18) 58%,
-        hsla(155, 60%, 52%, 0.1) 78%,
+        hsla(0, 0%, 100%, calc(0.1 * var(--foil-white, 1))) 0%,
+        hsl(195 calc(72% * var(--foil-rainbow-sat, 1)) 62% / 0.44) 18%,
+        hsl(310 calc(72% * var(--foil-purple-sat, 0.7)) 60% / 0.22) 38%,
+        hsl(42 calc(65% * var(--foil-rainbow-sat, 1)) 58% / 0.18) 58%,
+        hsl(155 calc(60% * var(--foil-rainbow-sat, 1)) 52% / 0.1) 78%,
         transparent 100%
       ),
       linear-gradient(
         122deg,
-        /* Purple family dialed down ~30%; other hues unchanged */
-        hsl(300, 50%, 56%),
-        hsl(330, 49%, 58%),
-        hsl(12, 75%, 54%),
-        hsl(42, 72%, 56%),
-        hsl(155, 68%, 46%),
-        hsl(192, 74%, 48%),
-        hsl(245, 49%, 54%),
-        hsl(285, 48%, 54%),
-        hsl(300, 50%, 56%),
-        hsl(330, 49%, 58%),
-        hsl(12, 75%, 54%),
-        hsl(155, 68%, 46%),
-        hsl(245, 49%, 54%)
+        hsl(300 calc(72% * var(--foil-purple-sat, 0.7)) 56%),
+        hsl(330 calc(70% * var(--foil-purple-sat, 0.7)) 58%),
+        hsl(12 calc(75% * var(--foil-rainbow-sat, 1)) 54%),
+        hsl(42 calc(72% * var(--foil-rainbow-sat, 1)) 56%),
+        hsl(155 calc(68% * var(--foil-rainbow-sat, 1)) 46%),
+        hsl(192 calc(74% * var(--foil-rainbow-sat, 1)) 48%),
+        hsl(245 calc(70% * var(--foil-purple-sat, 0.7)) 54%),
+        hsl(285 calc(68% * var(--foil-purple-sat, 0.7)) 54%),
+        hsl(300 calc(72% * var(--foil-purple-sat, 0.7)) 56%),
+        hsl(330 calc(70% * var(--foil-purple-sat, 0.7)) 58%),
+        hsl(12 calc(75% * var(--foil-rainbow-sat, 1)) 54%),
+        hsl(155 calc(68% * var(--foil-rainbow-sat, 1)) 46%),
+        hsl(245 calc(70% * var(--foil-purple-sat, 0.7)) 54%)
       );
     background-size:
       100% 100%,
@@ -511,10 +527,9 @@ body {
       20% 45%;
     background-blend-mode: soft-light, soft-light;
     mix-blend-mode: soft-light;
-    /* Idle stays gentle; hover (--op → 1) opens the sheen clearly. */
-    opacity: calc(var(--foil-holo-opacity, 0.45) + var(--op, 0) * 0.68);
-    animation: holo-gradient 9s linear infinite;
-    animation-delay: calc(var(--foil-seed, 0.4) * -9s);
+    opacity: calc(var(--foil-holo-opacity, 0.45) + var(--op, 0) * var(--foil-hover-boost, 0.68));
+    animation: holo-gradient var(--foil-holo-duration, 9s) linear infinite;
+    animation-delay: calc(var(--foil-seed, 0.4) * -1 * var(--foil-holo-duration, 9s));
   }
   /* While hovering, pause the film drift so the pointer owns the sheen. */
   .tilt-card:hover .tilt-holo,
@@ -541,14 +556,14 @@ body {
         rgb(255 255 255 / 0.01) 3px,
         rgb(255 255 255 / 0.01) 6px
       );
-    opacity: calc(var(--op, 0) * 0.3);
+    opacity: calc(var(--op, 0) * var(--foil-grid, 0.3));
     pointer-events: none;
   }
   .foil-idle-orbit {
     --mx: 50%;
     --my: 50%;
-    --op: 0.625;
-    animation: foil-idle-orbit 11s linear infinite;
+    --op: var(--foil-idle-op, 0.5);
+    animation: foil-idle-orbit var(--foil-orbit-duration, 11s) linear infinite;
   }
   .foil-idle-orbit:hover {
     animation-play-state: paused;

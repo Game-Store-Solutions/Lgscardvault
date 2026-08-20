@@ -4,8 +4,9 @@ import type { CSSProperties } from 'react'
 /**
  * Shared holographic layers for card art.
  *
- * Soft sheen + optional grid, clipped to the card radius. `--foil-seed`
- * desyncs the idle film so a grid of foils does not drift in lockstep.
+ * Soft sheen + optional grid, clipped to the card radius. Intensity knobs live
+ * on `.foil-card` in `index.css` (`--foil-rainbow-sat`, `--foil-purple-sat`, …).
+ * `--foil-seed` desyncs the idle film so a grid of foils does not drift in lockstep.
  */
 export function FoilOverlays({ foil = false, glare = true }: { foil?: boolean; glare?: boolean }) {
   const seed = useRef(0.12 + Math.random() * 0.76)
