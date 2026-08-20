@@ -604,6 +604,19 @@ class Card
         $this->artistCredits = [] === $credits ? null : $credits;
     }
 
+    /**
+     * Commander Game Changer flag from the stored Scryfall payload
+     * (`game_changer` on the card object / bulk files).
+     */
+    #[Groups(['card:read', 'inventory:read'])]
+    public function isGameChanger(): bool
+    {
+        $data = $this->scryfallData ?? [];
+        $flag = $data['game_changer'] ?? $data['gameChanger'] ?? false;
+
+        return true === $flag || 1 === $flag || '1' === $flag || 'true' === $flag;
+    }
+
     public function getScryfallUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->scryfallUpdatedAt;

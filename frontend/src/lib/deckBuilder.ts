@@ -16,6 +16,9 @@ export interface DeckBuilderSession {
   strategyId: string | null
   panel: DeckBuilderPanel
   view: DeckBuilderView
+  budgetDollars?: string
+  maxCardDollars?: string
+  bracket?: string
 }
 
 export function parseDeckBuilderPanel(value: string | null): DeckBuilderPanel {
@@ -26,6 +29,19 @@ export function parseDeckBuilderView(value: string | null): DeckBuilderView {
   return value === 'types' ? 'types' : 'roles'
 }
 
+export function parseDeckBuilderBracket(value: string | null): string {
+  if (value === '1' || value === '2' || value === '3' || value === '4' || value === '5') return value
+  return 'auto'
+}
+
+/** Dollars typed by the shopper → integer cents, or null when unset/invalid. */
+export function dollarsToCents(raw: string | null | undefined): number | null {
+  if (!raw) return null
+  const n = Number.parseFloat(String(raw).replace(/[^0-9.]/g, ''))
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.round(n * 100)
+}
+
 /** Storefront URL that reopens a commander package. */
 export function deckBuilderPath(
   slug: string,
@@ -34,6 +50,9 @@ export function deckBuilderPath(
     strategy?: string | null
     panel?: DeckBuilderPanel
     view?: DeckBuilderView
+    budgetDollars?: string | null
+    maxCardDollars?: string | null
+    bracket?: string | null
   },
 ): string {
   const params = new URLSearchParams()
@@ -41,6 +60,9 @@ export function deckBuilderPath(
   if (opts?.commanderId && opts.strategy) params.set('strategy', opts.strategy)
   if (opts?.commanderId && opts.panel && opts.panel !== 'synergy') params.set('panel', opts.panel)
   if (opts?.commanderId && opts.view && opts.view !== 'roles') params.set('view', opts.view)
+  if (opts?.commanderId && opts.budgetDollars) params.set('budget', opts.budgetDollars)
+  if (opts?.commanderId && opts.maxCardDollars) params.set('maxCard', opts.maxCardDollars)
+  if (opts?.commanderId && opts.bracket && opts.bracket !== 'auto') params.set('bracket', opts.bracket)
   const query = params.toString()
   return query ? `/s/${slug}/deck-builder?${query}` : `/s/${slug}/deck-builder`
 }

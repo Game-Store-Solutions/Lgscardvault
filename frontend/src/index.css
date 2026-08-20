@@ -7,20 +7,6 @@
 
 html {
   scroll-behavior: smooth;
-  scrollbar-gutter: stable;
-}
-
-/*
- * Geist is font-display: swap. Pair it with a metric-matched Arial stand-in so
- * the fallback → webfont swap does not reflow headlines and body copy (CLS).
- */
-@font-face {
-  font-family: "Geist Fallback";
-  src: local("Arial");
-  ascent-override: 90%;
-  descent-override: 22%;
-  line-gap-override: 0%;
-  size-adjust: 104%;
 }
 
 /*
@@ -58,10 +44,22 @@ html {
   initial-value: 0;
 }
 
-@property --foil-seed {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.4;
+@property --holo-a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 210deg;
+}
+
+@property --holo-x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 32%;
+}
+
+@property --holo-y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 28%;
 }
 
 @theme {
@@ -89,7 +87,7 @@ html {
    * Light neutrals — soft grey field (not cream), white panels.
    */
   --color-fg: #0a0a0b;
-  --color-fg-muted: #3f3f46;
+  --color-fg-muted: #6b7280;
   --color-bg: #f3f4f6;
   --color-surface: #ffffff;
   --color-surface-elevated: #fafafa;
@@ -113,8 +111,8 @@ html {
   --shadow-card: 0 1px 2px rgb(10 10 11 / 0.04), 0 8px 24px rgb(10 10 11 / 0.06);
 
   /* Fonts */
-  --font-sans: "Geist Variable", "Geist Fallback", "Geist", "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
-  --font-display: "Geist Variable", "Geist Fallback", "Geist", "Plus Jakarta Sans Variable", system-ui, sans-serif;
+  --font-sans: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
+  --font-display: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, sans-serif;
 
   /*
    * Editorial display scale. Headline sizes get progressively tighter tracking —
@@ -459,117 +457,103 @@ body {
 
 @layer components {
   /*
-   * Pokemon-style holo (effect-labs rainbow + grid), scoped to the light.
-   *
-   * Full-card color-dodge reads as a neon wash — mask both layers to the
-   * hotspot and keep idle quiet. Pointer/hover opens it up toward 0.55.
+   * Idle foil is a Framer-style holographic film, not a linear sheen sweep.
+   * Light splits into cyan / lime / gold / magenta as the field warps.
+   * --foil-holo-opacity: rest brightness. Pointer --op brightens on hover.
+   * --foil-shimmer-duration: how fast the film flows.
    */
   .foil-card {
-    --foil-color-intensity: 1.82;
-    --foil-holo-opacity: 0.36;
+    --foil-holo-opacity: 0.42;
+    --foil-shimmer-duration: 10s;
   }
   .tilt-card {
-    isolation: isolate;
+    transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
     transform-style: preserve-3d;
+    /* Smooth, springy glide toward the pointer and back to rest. */
+    transition: transform 0.45s cubic-bezier(0.32, 0.61, 0.36, 1);
+    will-change: transform;
   }
   .tilt-glare {
     background: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.5) 4%,
-      hsla(0, 0%, 100%, 0.18) 14%,
-      hsla(0, 0%, 100%, 0.05) 28%,
-      transparent 46%
+      circle at var(--mx, 50%) var(--my, 50%),
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0) 45%
     );
-    mix-blend-mode: overlay;
-    opacity: calc(var(--op, 0) * 0.56);
-    transition: opacity 0.3s ease;
+    mix-blend-mode: soft-light;
+    opacity: var(--op, 0);
+    /* Fade opacity slowly; let the highlight glide (not snap) with the pointer. */
+    transition: opacity 0.5s ease, background-position 0.2s ease-out;
   }
   .tilt-holo,
   .foil-shimmer {
-    background: linear-gradient(
-      125deg,
-      #ff0078,
-      #ff6800,
-      #00e0cc,
-      #6040ff,
-      #ff0078,
-      #ff6800,
-      #00e0cc,
-      #6040ff,
-      #ff0078,
-      #ff6800,
-      #00e0cc
-    );
-    background-size: 200% 200%;
-    mix-blend-mode: color-dodge;
-    filter: brightness(0.49) contrast(1.56) saturate(0.98);
-    opacity: calc(var(--foil-holo-opacity, 0.36) + var(--op, 0) * 0.95);
-    transition: opacity 0.3s ease;
-    animation: holo-gradient 5s ease infinite;
-    animation-delay: calc(var(--foil-seed, 0.4) * -5s);
-    mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 27%,
-      rgb(0 0 0 / 0.4) 52%,
-      transparent 78%
-    );
-    -webkit-mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 27%,
-      rgb(0 0 0 / 0.4) 52%,
-      transparent 78%
-    );
-  }
-  .tilt-grid {
+    --foil-origin-x: calc(var(--mx) - 50% + var(--holo-x));
+    --foil-origin-y: calc(var(--my) - 50% + var(--holo-y));
     background-image:
-      repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgb(255 255 255 / 0.034) 2px,
-        rgb(255 255 255 / 0.034) 4px
+      radial-gradient(
+        120% 90% at var(--foil-origin-x) var(--foil-origin-y),
+        rgba(0, 245, 212, 0.72) 0%,
+        transparent 42%
       ),
-      repeating-linear-gradient(
-        90deg,
-        transparent,
-        transparent 2px,
-        rgb(255 255 255 / 0.034) 2px,
-        rgb(255 255 255 / 0.034) 4px
+      radial-gradient(
+        90% 110% at calc(100% - var(--foil-origin-x)) calc(100% - var(--foil-origin-y)),
+        rgba(255, 74, 205, 0.62) 0%,
+        transparent 46%
+      ),
+      radial-gradient(
+        80% 70% at 42% 22%,
+        rgba(255, 225, 74, 0.55) 0%,
+        transparent 44%
+      ),
+      radial-gradient(
+        100% 80% at 12% 88%,
+        rgba(126, 200, 255, 0.5) 0%,
+        transparent 48%
+      ),
+      repeating-conic-gradient(
+        from var(--holo-a) at var(--foil-origin-x) var(--foil-origin-y),
+        rgba(0, 240, 255, 0.55) 0deg,
+        rgba(107, 255, 122, 0.5) 42deg,
+        rgba(255, 225, 74, 0.48) 84deg,
+        rgba(255, 106, 213, 0.52) 126deg,
+        rgba(124, 92, 255, 0.5) 168deg,
+        rgba(0, 240, 255, 0.55) 210deg
+      ),
+      radial-gradient(
+        circle at var(--foil-origin-x) var(--foil-origin-y),
+        rgba(255, 255, 255, 0.42) 0%,
+        rgba(255, 255, 255, 0) 36%
       );
-    opacity: calc(var(--op, 0) * 0.56);
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-    mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 20%,
-      rgb(0 0 0 / 0.35) 44%,
-      transparent 68%
-    );
-    -webkit-mask-image: radial-gradient(
-      farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      #000 0%,
-      #000 20%,
-      rgb(0 0 0 / 0.35) 44%,
-      transparent 68%
-    );
+    background-size:
+      180% 160%,
+      170% 190%,
+      150% 140%,
+      200% 160%,
+      140% 140%,
+      160% 160%;
+    background-blend-mode: screen, screen, screen, lighten, overlay, soft-light;
+    overflow: hidden;
+    mix-blend-mode: color-dodge;
+    opacity: max(var(--foil-holo-opacity, 0.42), calc(var(--op, 0) * 0.78));
+    transition: opacity 0.5s ease;
+    animation: holo-idle var(--foil-shimmer-duration, 10s) linear infinite;
   }
-  .foil-idle-orbit {
-    --mx: 50%;
-    --my: 50%;
-    --op: 0.49;
-    animation: foil-idle-orbit 14s ease-in-out infinite;
-  }
-  .foil-idle-orbit:hover {
-    animation-play-state: paused;
+  .tilt-holo::after,
+  .foil-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: -18%;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' seed='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 120px 120px;
+    mix-blend-mode: overlay;
+    opacity: 0.38;
+    animation: holo-grain 18s linear infinite;
   }
 
   @media (prefers-reduced-motion: reduce) {
     .tilt-holo,
     .foil-shimmer,
-    .foil-idle-orbit {
+    .tilt-holo::after,
+    .foil-shimmer::after {
       animation: none;
     }
   }
@@ -593,32 +577,63 @@ body {
   animation: logo-breathe 1.6s ease-in-out infinite;
 }
 
-@keyframes holo-gradient {
-  0%,
-  100% {
-    background-position: 0% 50%;
+@keyframes holo-idle {
+  0% {
+    --holo-a: 198deg;
+    --holo-x: 28%;
+    --holo-y: 24%;
+    background-position:
+      8% 42%,
+      92% 12%,
+      22% 88%,
+      78% 76%,
+      46% 54%,
+      40% 58%;
   }
-  50% {
-    background-position: 100% 50%;
+  35% {
+    --holo-a: 318deg;
+    --holo-x: 64%;
+    --holo-y: 38%;
+    background-position:
+      78% 18%,
+      12% 86%,
+      68% 32%,
+      24% 8%,
+      58% 70%,
+      62% 22%;
+  }
+  70% {
+    --holo-a: 438deg;
+    --holo-x: 42%;
+    --holo-y: 72%;
+    background-position:
+      28% 90%,
+      88% 36%,
+      8% 18%,
+      62% 96%,
+      72% 28%,
+      18% 78%;
+  }
+  100% {
+    --holo-a: 558deg;
+    --holo-x: 28%;
+    --holo-y: 24%;
+    background-position:
+      8% 42%,
+      92% 12%,
+      22% 88%,
+      78% 76%,
+      46% 54%,
+      40% 58%;
   }
 }
 
-@keyframes foil-idle-orbit {
-  0%,
+@keyframes holo-grain {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
   100% {
-    --mx: 34%;
-    --my: 42%;
-    --op: 0.43;
-  }
-  33% {
-    --mx: 66%;
-    --my: 36%;
-    --op: 0.58;
-  }
-  66% {
-    --mx: 44%;
-    --my: 64%;
-    --op: 0.49;
+    transform: translate3d(-40px, -28px, 0);
   }
 }
 
@@ -631,25 +646,9 @@ body {
 button,
 a,
 input,
+select,
 textarea {
   @apply transition;
-}
-
-/*
- * Last-resort native <select> chrome. Custom Select covers the app, but any
- * leftover system picker still gets a chevron and loses the OS blue highlight.
- */
-select:not([multiple]) {
-  appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='m4 6 4 4 4-4'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 0.7rem center;
-  background-size: 1rem;
-  padding-right: 2.25rem;
-}
-
-.dark select:not([multiple]) {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a3a3a3' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='m4 6 4 4 4-4'/></svg>");
 }
 
 /* Square Web Payments card iframe — match host dark mode. */
@@ -663,17 +662,6 @@ select:not([multiple]) {
 
 .dark .sq-card-host .sq-card-iframe-container {
   color-scheme: dark;
-}
-
-/* Square Google Pay injects a fixed-min-width iframe; clip it to the host. */
-.sq-google-pay-host,
-.sq-google-pay-host iframe,
-.sq-google-pay-host button {
-  max-width: 100%;
-}
-
-.sq-google-pay-host iframe {
-  width: 100% !important;
 }
 
 @keyframes hero-float {
@@ -702,6 +690,39 @@ select:not([multiple]) {
   }
   50% {
     translate: 0 -6px;
+  }
+}
+
+.hero-foil-shimmer {
+  position: relative;
+}
+
+.hero-foil-shimmer::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image:
+    radial-gradient(90% 70% at 28% 24%, rgba(0, 245, 212, 0.55) 0%, transparent 46%),
+    radial-gradient(80% 90% at 78% 72%, rgba(255, 74, 205, 0.45) 0%, transparent 50%),
+    repeating-conic-gradient(
+      from var(--holo-a) at 48% 42%,
+      rgba(0, 240, 255, 0.4) 0deg,
+      rgba(107, 255, 122, 0.32) 50deg,
+      rgba(255, 225, 74, 0.3) 100deg,
+      rgba(255, 106, 213, 0.36) 150deg,
+      rgba(0, 240, 255, 0.4) 210deg
+    );
+  background-size: 180% 160%, 170% 180%, 140% 140%;
+  mix-blend-mode: color-dodge;
+  opacity: 0.55;
+  animation: holo-idle 12s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-foil-shimmer::after {
+    animation: none;
   }
 }
 

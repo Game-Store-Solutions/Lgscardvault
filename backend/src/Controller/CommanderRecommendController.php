@@ -148,9 +148,14 @@ final class CommanderRecommendController extends AbstractController
         return $this->json($this->comboAnalyzer->analyzeForCommander($store, $commanderCard, $extra, $limit));
     }
 
-    /** Assemble a ~100-card list from store stock + synergy + Spellbook packages. */
+    /**
+     * Assemble a ~100-card list from store stock + synergy + Spellbook packages.
+     *
+     * Query: budgetCents, maxCardCents, bracket (1–5). Omit bracket to auto-pick
+     * from in-stock Scryfall Game Changers in this commander's identity.
+     */
     #[Route('/commander/{cardId}/deck', name: 'api_store_recommend_deck', methods: ['GET'])]
-    public function assembleDeck(string $slug, string $cardId): JsonResponse
+    public function assembleDeck(string $slug, string $cardId, Request $request): JsonResponse
     {
         $store = $this->requireStore($slug);
         if (!$store instanceof Store) {
@@ -162,7 +167,25 @@ final class CommanderRecommendController extends AbstractController
             return $commanderCard;
         }
 
-        return $this->json($this->deckAssembler->assemble($store, $commanderCard));
+        $bracketRaw = trim((string) $request->query->get('bracket', ''));
+
+        return $this->json($this->deckAssembler->assemble($store, $commanderCard, [
+            'budgetCents' => $this->optionalPositiveInt($request->query->get('budgetCents')),
+            'maxCardCents' => $this->optionalPositiveInt($request->query->get('maxCardCents')),
+            'bracket' => '' === $bracketRaw || 'auto' === strtolower($bracketRaw)
+                ? null
+                : (int) $bracketRaw,
+        ]));
+    }
+
+    private function optionalPositiveInt(mixed $value): ?int
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        $n = (int) $value;
+
+        return $n > 0 ? $n : null;
     }
 
     private function resolveListedCommander(string $cardId): Card|JsonResponse

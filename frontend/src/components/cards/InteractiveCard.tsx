@@ -1,8 +1,6 @@
 import { ImageOff } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { cx } from '../../lib/cx'
 import { useTilt } from '../../hooks'
-import { FoilOverlays } from './FoilOverlays'
 
 export interface InteractiveCardProps {
   image?: string
@@ -22,52 +20,34 @@ export interface InteractiveCardProps {
 
 /**
  * InteractiveCard — a pointer-driven holographic tilt for a card image
- * (inspired by simeydotme/pokemon-cards-css). Moving the pointer springs the
- * card in 3D, drifts a glare highlight, and — for foil cards — runs the
- * Pokemon-style rainbow holo + grid. Foils keep a visible idle animation when
- * the pointer is away. Falls back to a static image under reduced-motion.
+ * (inspired by simeydotme/pokemon-cards-css). Moving the pointer tilts the card
+ * in 3D, drifts a glare highlight, and — for foil cards — flows a warped
+ * holographic film at rest. Falls back to a static image under reduced-motion.
  */
 export function InteractiveCard({ image, alt, foil = false, accent = '#c6a035', maxTilt = 14, shadow = true, borderless = false, className }: InteractiveCardProps) {
-  const { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle } = useTilt(maxTilt, { idle: foil })
+  const { ref, onPointerMove, onPointerLeave } = useTilt(maxTilt)
 
   return (
-    <div
-      ref={ref}
-      className={cx('[perspective:1000px]', className)}
-      onPointerEnter={onPointerEnter}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-    >
-      <motion.div
+    <div ref={ref} className={cx('[perspective:1000px]', className)} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave}>
+      <div
         className={cx(
-          'tilt-card relative aspect-[5/7] overflow-hidden rounded-[4.5%/3.5%] bg-surface-elevated',
+          'tilt-card relative overflow-hidden rounded-[4.5%/3.5%]',
           !borderless && 'rounded-2xl border-2',
           foil && 'foil-card',
           shadow && 'shadow-card',
         )}
-        style={{
-          ...tiltStyle,
-          ...(borderless ? {} : { borderColor: accent }),
-        }}
+        style={borderless ? undefined : { borderColor: accent }}
       >
         {image ? (
-          <img
-            src={image}
-            alt={alt}
-            width={488}
-            height={680}
-            loading="lazy"
-            decoding="async"
-            className="block size-full select-none object-contain"
-            draggable={false}
-          />
+          <img src={image} alt={alt} loading="lazy" decoding="async" className="block w-full select-none" draggable={false} />
         ) : (
-          <div className="grid size-full place-items-center bg-surface text-fg-muted">
+          <div className="grid aspect-[5/7] place-items-center bg-surface text-fg-muted">
             <ImageOff aria-hidden className="size-8" />
           </div>
         )}
-        {image && <FoilOverlays foil={foil} />}
-      </motion.div>
+        {image && <div aria-hidden className="tilt-glare pointer-events-none absolute inset-0" />}
+        {image && foil && <div aria-hidden className="tilt-holo pointer-events-none absolute inset-0" />}
+      </div>
     </div>
   )
 }

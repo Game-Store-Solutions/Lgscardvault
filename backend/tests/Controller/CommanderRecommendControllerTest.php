@@ -259,11 +259,23 @@ final class CommanderRecommendControllerTest extends WebTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
         $payload = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame('commander-spellbook', $payload['source']);
+        self::assertSame('WUBG', $payload['identityCode']);
+        self::assertSame(['W', 'U', 'B', 'G'], $payload['colorIdentity']);
+        self::assertGreaterThanOrEqual(1, $payload['filteredOutCount']);
         self::assertNotEmpty($payload['combos']);
+
+        $ids = array_column($payload['combos'], 'id');
+        self::assertContains('test-combo-complete', $ids);
+        self::assertNotContains('test-combo-illegal', $ids, 'combos outside commander identity must be dropped');
+
         $first = $payload['combos'][0];
-        self::assertGreaterThanOrEqual(1, $first['inStockCount']);
-        self::assertContains('Missing Combo Piece', $first['missing']);
-        self::assertFalse($first['completeInStore']);
+        self::assertTrue($first['completeInStore'], 'complete in-store combos sort first');
+        self::assertSame('test-combo-complete', $first['id']);
+
+        $coverages = array_map(static fn (array $c): int => (int) $c['inStockCount'], $payload['combos']);
+        $sorted = $coverages;
+        rsort($sorted);
+        self::assertSame($sorted, $coverages, 'combos must rank by in-stock coverage descending');
     }
 
     public function testAssembleDeckReturnsSlotsAndInventoryIds(): void
@@ -318,5 +330,83 @@ final class CommanderRecommendControllerTest extends WebTestCase
         self::assertGreaterThanOrEqual(1, $payload['slots']['land']);
         self::assertNotEmpty($payload['inventoryIds']);
         self::assertArrayHasKey('combos', $payload);
+        self::assertArrayHasKey('budget', $payload);
+        self::assertArrayHasKey('bracket', $payload);
+        self::assertTrue($payload['bracket']['auto']);
+        self::assertContains($payload['bracket']['applied'], [2, 3, 4, 5]);
+    }
+
+    public function testAssembleDeckHonorsBudgetMaxCardAndGameChangerBracket(): void
+    {
+        $store = $this->fixtures->store('deck-budget-store');
+        $commander = $this->fixtures->card(780, [
+            'name' => 'Atraxa Test',
+            'type_line' => 'Legendary Creature — Phyrexian Angel Horror',
+            'oracle_text' => 'At the beginning of your end step, proliferate.',
+            'keywords' => ['Proliferate'],
+            'color_identity' => ['W', 'U', 'B', 'G'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+
+        for ($i = 0; $i < 8; ++$i) {
+            $card = $this->fixtures->card(790 + $i, [
+                'name' => 'Forest Budget '.$i,
+                'type_line' => 'Basic Land — Forest',
+                'oracle_text' => '{T}: Add {G}.',
+                'color_identity' => ['G'],
+                'legalities' => ['commander' => 'legal'],
+            ]);
+            $this->fixtures->inventoryItem($store, $card, quantity: 8, priceCents: 10);
+        }
+
+        $cheap = $this->fixtures->card(810, [
+            'name' => 'Cheap Draw',
+            'type_line' => 'Instant',
+            'oracle_text' => 'Draw a card.',
+            'color_identity' => ['U'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $this->fixtures->inventoryItem($store, $cheap, quantity: 4, priceCents: 200);
+
+        $pricey = $this->fixtures->card(811, [
+            'name' => 'Expensive Draw',
+            'type_line' => 'Instant',
+            'oracle_text' => 'Draw three cards.',
+            'color_identity' => ['U'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $this->fixtures->inventoryItem($store, $pricey, quantity: 2, priceCents: 8000);
+
+        $gc = $this->fixtures->card(812, [
+            'name' => 'Rhystic Study Stand-in',
+            'type_line' => 'Enchantment',
+            'oracle_text' => 'Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.',
+            'color_identity' => ['U'],
+            'legalities' => ['commander' => 'legal'],
+            'game_changer' => true,
+        ]);
+        $this->fixtures->inventoryItem($store, $gc, quantity: 1, priceCents: 1500);
+        $this->em->flush();
+
+        $this->client->request('GET', sprintf(
+            '/api/stores/%s/recommend/commander/%s/deck?budgetCents=2500&maxCardCents=500&bracket=2',
+            $store->getSlug(),
+            $commander->getId(),
+        ));
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+
+        $names = array_map(
+            static fn (array $row): string => $row['inventoryItem']['card']['name'],
+            $payload['cards'],
+        );
+        self::assertContains('Cheap Draw', $names);
+        self::assertNotContains('Expensive Draw', $names, 'per-card cap must drop cards above maxCardCents');
+        self::assertNotContains('Rhystic Study Stand-in', $names, 'bracket 2 cannot include game changers');
+        self::assertSame(2, $payload['bracket']['applied']);
+        self::assertLessThanOrEqual(2500, $payload['budget']['spentCents']);
+        self::assertSame(2500, $payload['budget']['limitCents']);
+        self::assertSame(500, $payload['budget']['maxCardCents']);
+        self::assertNotEmpty($payload['bracket']['gameChangersInStock']);
     }
 }
