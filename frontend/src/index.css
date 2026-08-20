@@ -448,7 +448,7 @@ body {
    * Foil sheen — soft light catching across the art.
    *
    * Soft-light keeps hues blended. White specular stays quiet; the spectral
-   * film carries most of the rainbow so foil reads colorful without flash.
+   * film covers the full card face (clipped only by border-radius).
    */
   .foil-card {
     --foil-holo-opacity: 0.58;
@@ -463,26 +463,13 @@ body {
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
       hsla(0, 0%, 100%, 0.18) 0%,
-      hsla(0, 0%, 100%, 0.06) 22%,
-      hsla(0, 0%, 100%, 0.02) 42%,
-      transparent 62%
+      hsla(0, 0%, 100%, 0.06) 28%,
+      hsla(0, 0%, 100%, 0.02) 52%,
+      transparent 78%
     );
     mix-blend-mode: soft-light;
     opacity: calc(var(--op, 0) * 0.32);
     transition: opacity 0.45s ease;
-    /* Keep glare off the rounded rim so edges stay clean. */
-    -webkit-mask-image: radial-gradient(
-      farthest-side ellipse at 50% 50%,
-      #000 0%,
-      #000 72%,
-      transparent 100%
-    );
-    mask-image: radial-gradient(
-      farthest-side ellipse at 50% 50%,
-      #000 0%,
-      #000 72%,
-      transparent 100%
-    );
   }
   .tilt-holo,
   .foil-shimmer {
@@ -492,11 +479,11 @@ body {
       radial-gradient(
         farthest-corner circle at var(--mx, 50%) var(--my, 50%),
         hsla(0, 0%, 100%, 0.12) 0%,
-        hsla(195, 72%, 62%, 0.52) 14%,
-        hsla(310, 68%, 60%, 0.42) 30%,
-        hsla(42, 65%, 58%, 0.28) 46%,
-        hsla(155, 60%, 52%, 0.16) 58%,
-        transparent 72%
+        hsla(195, 72%, 62%, 0.52) 18%,
+        hsla(310, 68%, 60%, 0.38) 38%,
+        hsla(42, 65%, 58%, 0.22) 58%,
+        hsla(155, 60%, 52%, 0.12) 78%,
+        transparent 100%
       ),
       linear-gradient(
         122deg,
@@ -526,42 +513,6 @@ body {
     transition: opacity 0.45s ease;
     animation: holo-gradient 9s linear infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -9s);
-    /*
-     * Hotspot follow ∩ card vignette: the sheen never paints the rim, so
-     * rounded corners and letterboxed edges stay free of fringe.
-     */
-    -webkit-mask-image:
-      radial-gradient(
-        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        #000 0%,
-        #000 28%,
-        rgb(0 0 0 / 0.55) 52%,
-        transparent 78%
-      ),
-      radial-gradient(
-        farthest-side ellipse at 50% 50%,
-        #000 0%,
-        #000 68%,
-        rgb(0 0 0 / 0.45) 84%,
-        transparent 100%
-      );
-    mask-image:
-      radial-gradient(
-        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        #000 0%,
-        #000 28%,
-        rgb(0 0 0 / 0.55) 52%,
-        transparent 78%
-      ),
-      radial-gradient(
-        farthest-side ellipse at 50% 50%,
-        #000 0%,
-        #000 68%,
-        rgb(0 0 0 / 0.45) 84%,
-        transparent 100%
-      );
-    -webkit-mask-composite: source-in;
-    mask-composite: intersect;
   }
   .tilt-grid {
     border-radius: inherit;
@@ -584,36 +535,6 @@ body {
     opacity: calc(var(--op, 0) * 0.281);
     transition: opacity 0.45s ease;
     pointer-events: none;
-    -webkit-mask-image:
-      radial-gradient(
-        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        #000 0%,
-        #000 22%,
-        rgb(0 0 0 / 0.3) 48%,
-        transparent 70%
-      ),
-      radial-gradient(
-        farthest-side ellipse at 50% 50%,
-        #000 0%,
-        #000 65%,
-        transparent 92%
-      );
-    mask-image:
-      radial-gradient(
-        farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-        #000 0%,
-        #000 22%,
-        rgb(0 0 0 / 0.3) 48%,
-        transparent 70%
-      ),
-      radial-gradient(
-        farthest-side ellipse at 50% 50%,
-        #000 0%,
-        #000 65%,
-        transparent 92%
-      );
-    -webkit-mask-composite: source-in;
-    mask-composite: intersect;
   }
   .foil-idle-orbit {
     --mx: 50%;
