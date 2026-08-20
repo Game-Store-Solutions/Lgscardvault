@@ -759,7 +759,7 @@ export default function CommanderSynergyPage() {
           </div>
         ) : (
           <>
-            <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:max-h-[calc(100vh-7rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain">
+            <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:max-h-[calc(100vh-7rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
                 <div className="flex gap-3.5 p-4">
                   <div className="relative aspect-5/7 w-28 shrink-0 overflow-hidden rounded-md bg-bg shadow-sm sm:w-32">
@@ -943,7 +943,7 @@ export default function CommanderSynergyPage() {
                       transition={{ duration: 0.28, ease: EASE_PREMIUM }}
                       className="overflow-hidden border-t border-border"
                     >
-                      <div className="max-h-[min(22rem,50dvh)] overflow-y-auto overscroll-contain p-3 xl:max-h-[min(32rem,calc(100vh-18rem))]">
+                      <div className="max-h-[min(22rem,50dvh)] overflow-y-auto overscroll-contain p-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:max-h-[min(32rem,calc(100vh-18rem))]">
                         {strategiesQuery.isLoading && (
                           <div className="space-y-2">
                             <Skeleton className="h-20 w-full" />
