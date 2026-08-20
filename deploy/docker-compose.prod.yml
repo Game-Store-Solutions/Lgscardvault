@@ -57,6 +57,10 @@ services:
     deploy:
       replicas: 2
     restart: unless-stopped
+    # Inherit the backend image HEALTHCHECK (HTTP :8000/health). Workers do not
+    # serve HTTP, so that probe would stay unhealthy after the start period.
+    healthcheck:
+      disable: true
 
   # Schedule ticker: turns the recurring definitions in src/Scheduler/ into
   # queued messages (nightly catalog syncs and subscription renewals). It only
@@ -78,6 +82,8 @@ services:
     deploy:
       replicas: 1
     restart: unless-stopped
+    healthcheck:
+      disable: true
 
   frontend:
     build:
