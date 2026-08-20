@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ImageOff } from 'lucide-react'
 import { cx } from '../../lib/cx'
 
@@ -13,6 +13,10 @@ export interface CardImageProps {
   /** Hide the caption on thumbnails too small to read it. */
   showLabel?: boolean
   label?: string
+  /** Load immediately instead of waiting for the browser's lazy heuristic. */
+  priority?: boolean
+  onLoad?: () => void
+  onError?: () => void
 }
 
 /**
@@ -32,17 +36,34 @@ export function CardImage({
   fit = 'cover',
   showLabel = true,
   label = 'No image',
+  priority = false,
+  onLoad,
+  onError,
 }: CardImageProps) {
   const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
 
   if (src && !failed) {
     return (
       <img
         src={src}
         alt={alt}
-        loading="lazy"
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         decoding="async"
-        onError={() => setFailed(true)}
+        ref={(node) => {
+          if (node?.complete && node.naturalWidth > 0) {
+            onLoad?.()
+          }
+        }}
+        onLoad={onLoad}
+        onError={() => {
+          setFailed(true)
+          onError?.()
+        }}
         className={cx('block', 'cover' === fit ? 'object-cover' : 'object-contain', className)}
       />
     )
