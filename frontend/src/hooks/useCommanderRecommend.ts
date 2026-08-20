@@ -21,6 +21,7 @@ export interface SpellbookComboCard {
   quantity: number
   inStock: boolean
   isCommander?: boolean
+  stockQuantity?: number
   colorIdentity?: string[]
   recommendedColors?: string[]
   inventoryItem: InventoryItem | null

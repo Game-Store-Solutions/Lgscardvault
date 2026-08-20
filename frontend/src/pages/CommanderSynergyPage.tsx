@@ -1047,8 +1047,9 @@ function CombosPanel({
           <span className="ml-2 inline-flex align-middle">{colorPips(colorIdentity)}</span>
         </p>
         <p className="mt-1 text-xs text-fg-muted">
-          Colorless cards are always allowed. Combos are ranked complete-in-store first, then by
-          how many pieces this store has, down to none.
+          Only pieces this store actually has on the shelf count as in stock (any printing of the
+          same card). Colorless cards are always allowed. Combos are ranked complete-in-store first,
+          then by coverage.
           {filteredOutCount ? ` Hidden ${filteredOutCount} off-identity combo${filteredOutCount === 1 ? '' : 's'}.` : ''}
         </p>
       </div>
@@ -1058,8 +1059,8 @@ function CombosPanel({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-fg">
-                {combo.inStockCount} of {combo.cards.length} pieces in stock
-                {combo.completeInStore ? ' · complete here' : ''}
+                {combo.inStockCount} of {combo.cards.length} pieces in stock here
+                {combo.completeInStore ? ' · all available here' : ''}
               </p>
               {combo.produces.length > 0 && (
                 <p className="mt-1 text-xs text-fg-muted">{combo.produces.slice(0, 3).join(' · ')}</p>
@@ -1078,8 +1079,12 @@ function CombosPanel({
               >
                 <span className={piece.inStock ? 'font-medium text-fg' : 'text-fg-muted'}>
                   {piece.name}
-                  {piece.isCommander ? ' · commander' : ''}
-                  {!piece.inStock && !piece.isCommander && ' · missing'}
+                  {piece.isCommander && !piece.inStock ? ' · commander (not in stock here)' : ''}
+                  {piece.isCommander && piece.inStock ? ' · commander' : ''}
+                  {!piece.inStock && !piece.isCommander && ' · missing here'}
+                  {piece.inStock && piece.stockQuantity != null && piece.stockQuantity > piece.quantity
+                    ? ` · ${piece.stockQuantity} available`
+                    : ''}
                 </span>
                 {piece.inventoryItem && (
                   <div className="flex items-center gap-2">

@@ -248,6 +248,7 @@ final class CommanderRecommendControllerTest extends WebTestCase
             'color_identity' => ['U'],
             'legalities' => ['commander' => 'legal'],
         ]);
+        $this->fixtures->inventoryItem($store, $commander, quantity: 1, priceCents: 4000);
         $this->fixtures->inventoryItem($store, $buddy, quantity: 2, priceCents: 300);
         $this->em->flush();
 
@@ -271,6 +272,11 @@ final class CommanderRecommendControllerTest extends WebTestCase
         $first = $payload['combos'][0];
         self::assertTrue($first['completeInStore'], 'complete in-store combos sort first');
         self::assertSame('test-combo-complete', $first['id']);
+        foreach ($first['cards'] as $piece) {
+            self::assertTrue($piece['inStock'], 'complete combos must only mark pieces the store actually stocks');
+            self::assertNotNull($piece['inventoryItem'], 'in-stock combo pieces must link to inventory rows');
+            self::assertGreaterThanOrEqual($piece['quantity'], $piece['stockQuantity']);
+        }
 
         $coverages = array_map(static fn (array $c): int => (int) $c['inStockCount'], $payload['combos']);
         $sorted = $coverages;

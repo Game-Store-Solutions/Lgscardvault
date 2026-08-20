@@ -694,6 +694,62 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Oracle ids keyed by lowercase exact / front-face name for catalog cards.
+     *
+     * @param list<string> $lowerNames
+     * @return array<string, string> lowercase name → oracle id
+     */
+    public function mapOracleIdByLowerNames(array $lowerNames): array
+    {
+        $names = [];
+        foreach ($lowerNames as $name) {
+            $trimmed = mb_strtolower(trim((string) $name));
+            if ('' !== $trimmed) {
+                $names[$trimmed] = $trimmed;
+            }
+        }
+        if ([] === $names) {
+            return [];
+        }
+
+        $qb = $this->magicScoped();
+        $or = $qb->expr()->orX('LOWER(c.name) IN (:names)');
+        $i = 0;
+        foreach (array_values($names) as $name) {
+            $or->add('LOWER(c.name) LIKE :front'.$i);
+            $qb->setParameter('front'.$i, $name.' //%');
+            ++$i;
+            if ($i >= 40) {
+                break;
+            }
+        }
+        $cards = $qb
+            ->andWhere($or)
+            ->setParameter('names', array_values($names))
+            ->setMaxResults(200)
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($cards as $card) {
+            if (!$card instanceof Card) {
+                continue;
+            }
+            $oracle = strtolower((string) $card->getOracleId());
+            $full = mb_strtolower($card->getName());
+            $front = str_contains($full, ' // ') ? trim(explode(' // ', $full, 2)[0]) : $full;
+            if (!isset($map[$full])) {
+                $map[$full] = $oracle;
+            }
+            if (!isset($map[$front])) {
+                $map[$front] = $oracle;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * Color identity keyed by lowercase exact name (front face of a DFC
      * matches the name before " // "). First printing wins.
      *
