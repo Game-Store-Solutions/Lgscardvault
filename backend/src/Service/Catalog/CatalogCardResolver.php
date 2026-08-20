@@ -178,6 +178,76 @@ final readonly class CatalogCardResolver
     }
 
     /**
+     * Storefront / admin case tiles only need identity, finish, and art URLs.
+     * The full serializeCard payload (oracle text, legalities, raw faces JSON)
+     * is what made GET /cases stall on a filled display case.
+     *
+     * @return array<string, mixed>
+     */
+    public function serializeCardPreview(Card $card): array
+    {
+        $imageUris = self::previewImageUris($card->getImageUris());
+        $faces = [];
+        // Double-faced printings have no top-level image_uris; pull a slim
+        // face list so the tile can still render without hydrating legality.
+        if (null === $imageUris) {
+            foreach ($card->getCardFaces() as $face) {
+                $faceUris = isset($face['imageUris']) && is_array($face['imageUris'])
+                    ? self::previewImageUris($face['imageUris'])
+                    : null;
+                $faces[] = [
+                    'name' => $face['name'] ?? null,
+                    'artist' => $face['artist'] ?? null,
+                    'imageUris' => $faceUris,
+                    'imageUrl' => $face['imageUrl'] ?? null,
+                ];
+            }
+        }
+
+        return [
+            'id' => (string) $card->getId(),
+            'oracleId' => (string) $card->getOracleId(),
+            'game' => $card->resolvedGameCode(),
+            'gameCode' => $card->resolvedGameCode(),
+            'name' => $card->getName(),
+            'setCode' => $card->getSetCode(),
+            'setName' => $card->getSetName(),
+            'collectorNumber' => $card->getCollectorNumber(),
+            'rarity' => $card->getRarity(),
+            'imageUrl' => $card->getImageUrl(),
+            'imageUris' => $imageUris,
+            'cardFaces' => $faces,
+            'finishes' => $card->getFinishes(),
+            'artist' => $card->getArtist(),
+            'layout' => $card->getLayout(),
+        ];
+    }
+
+    /**
+     * Keep the renditions the storefront actually displays. Scryfall also
+     * ships art_crop / border_crop which only inflate the case-cards JSON.
+     *
+     * @param array<string, mixed>|null $uris
+     *
+     * @return array<string, string>|null
+     */
+    private static function previewImageUris(?array $uris): ?array
+    {
+        if (null === $uris) {
+            return null;
+        }
+
+        $out = [];
+        foreach (['png', 'large', 'normal', 'small'] as $key) {
+            if (isset($uris[$key]) && is_string($uris[$key]) && '' !== $uris[$key]) {
+                $out[$key] = $uris[$key];
+            }
+        }
+
+        return [] === $out ? null : $out;
+    }
+
+    /**
      * Shared catalog filter predicate. Both the search controller and the
      * resolver use this so the matching rules stay in one place. Filter values
      * are compared case-insensitively, so callers may pass them raw or lowercased.

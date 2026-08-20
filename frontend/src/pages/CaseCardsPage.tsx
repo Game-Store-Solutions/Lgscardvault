@@ -142,13 +142,14 @@ function caseCardCount(sections: { cards: RenderableCard[] }[]): number {
 }
 
 /**
- * One case card: full-quality art, holographic foil overlay on foils, and a
- * subtle hover lift. Links to the listing's details.
+ * One case card: large (tile-sharp) art, holographic foil overlay on foils,
+ * and a subtle hover lift. Lossless PNG is reserved for the details page —
+ * a full case of PNGs is tens of megabytes on a cold cache.
  */
 function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) {
   const { inventoryItem } = entry
   const card = inventoryItem.card
-  const image = cardImage(card, { quality: 'full' })
+  const image = cardImage(card)
   const lastOne = entry.remaining === 1
   const { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle } = useTilt(9, {
     idle: inventoryItem.isFoil,

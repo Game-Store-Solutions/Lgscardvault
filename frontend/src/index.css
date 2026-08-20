@@ -651,6 +651,17 @@ select:not([multiple]) {
   color-scheme: dark;
 }
 
+/* Square Google Pay injects a fixed-min-width iframe; clip it to the host. */
+.sq-google-pay-host,
+.sq-google-pay-host iframe,
+.sq-google-pay-host button {
+  max-width: 100%;
+}
+
+.sq-google-pay-host iframe {
+  width: 100% !important;
+}
+
 @keyframes hero-float {
   0%,
   100% {

@@ -361,6 +361,11 @@ final class StoreSectionControllerTest extends WebTestCase
         self::assertSame('Public Case', $body[0]['name']);
         self::assertSame('Featured', $body[0]['sections'][0]['title']);
         self::assertCount(1, $body[0]['sections'][0]['cards']);
+        $card = $body[0]['sections'][0]['cards'][0]['inventoryItem']['card'];
+        self::assertSame('Test Card 501', $card['name']);
+        self::assertArrayNotHasKey('legalities', $card);
+        self::assertArrayNotHasKey('oracleText', $card);
+        self::assertArrayNotHasKey('prices', $card);
     }
 
     public function testNonOwnerCannotMutate(): void

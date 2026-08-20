@@ -14,7 +14,7 @@ import {
 
 /**
  * Store checkout: Apple Pay / Google Pay when Square is connected, plus pay in
- * store for pickup (with a Square QR when the store can take online payments).
+ * store for pickup.
  */
 export function CheckoutPanel({
   slug,
@@ -110,9 +110,7 @@ export function CheckoutPanel({
   const payInStoreBlock = pickupAvailable ? (
     <div className="space-y-3">
       <p className="text-sm text-fg-muted">
-        {squareEnabled
-          ? 'We\'ll hold your items. Pay at the counter, or scan the Square QR after you reserve.'
-          : 'We\'ll hold your items. Pay at the counter when you pick up. No card needed online.'}
+        We'll hold your items. Pay at the counter when you pick up.
       </p>
       {!paymentReady ? (
         <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{paymentBlockedMessage}</p>
@@ -177,7 +175,7 @@ export function CheckoutPanel({
   }
 
   return (
-    <div className="mt-5 pt-5">
+    <div className="mt-5 min-w-0 pt-5">
       <p className="text-sm font-semibold text-fg">Payment</p>
 
       {fullyCovered ? (
@@ -191,7 +189,7 @@ export function CheckoutPanel({
           Place order with store credit
         </Button>
       ) : (
-        <div className="mt-3 space-y-1">
+        <div className="mt-3 min-w-0 space-y-1">
           <SquarePaymentPanel
             applicationId={config.applicationId}
             locationId={config.locationId}
@@ -229,7 +227,7 @@ export function CheckoutPanel({
 
       <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-muted">
         <ShieldCheck aria-hidden className="size-3.5 shrink-0 text-success-700" />
-        Wallets and QR payments are processed by Square.
+        Wallet payments are processed by Square.
       </p>
     </div>
   )

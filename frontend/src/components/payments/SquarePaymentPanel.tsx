@@ -173,7 +173,12 @@ export function SquarePaymentPanel({
       .then(async (created) => {
         google = created
         if (cancelled || !googlePayRef.current) return
-        await created.attach(googlePayRef.current)
+        await created.attach(
+          googlePayRef.current,
+          // Default Google Pay is a fixed-width "Buy with G Pay" chip. On a
+          // phone cart that overflows the summary card; fill the host instead.
+          { buttonColor: 'black', buttonType: 'long', buttonSizeMode: 'fill' } as never,
+        )
         if (!cancelled) setGooglePay(created)
       })
       .catch(() => undefined)
@@ -289,22 +294,32 @@ export function SquarePaymentPanel({
   const walletCount = Number(Boolean(applePay)) + Number(Boolean(googlePay))
   const expressCheckout =
     walletsEnabled && layout === 'checkout' ? (
-      <div className="mt-2 space-y-3 rounded-xl bg-bg/90 px-4 py-4 dark:bg-bg/50">
+      <div className="mt-2 min-w-0 space-y-3 overflow-hidden rounded-xl bg-bg/90 px-3 py-4 sm:px-4 dark:bg-bg/50">
         <p className="text-sm font-bold text-fg">Express checkout</p>
-        <div className={walletCount > 1 ? 'grid grid-cols-2 items-stretch gap-2.5' : 'flex flex-col gap-2.5'}>
+        <div
+          className={
+            walletCount > 1
+              ? 'grid min-w-0 grid-cols-1 items-stretch gap-2.5 sm:grid-cols-2'
+              : 'flex min-w-0 flex-col gap-2.5'
+          }
+        >
           {applePay && (
             <button
               type="button"
               disabled={busy}
               onClick={() => void submit(() => applePay.tokenize(), 'apple_pay')}
-              className="flex h-12 w-full items-center justify-center rounded-btn bg-black px-4 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="flex h-12 w-full min-w-0 items-center justify-center rounded-btn bg-black px-4 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               Apple&nbsp;Pay
             </button>
           )}
           <div
             ref={googlePayRef}
-            className={googlePay ? 'flex min-h-12 w-full items-stretch [&>button]:!h-12 [&>button]:!w-full' : 'hidden'}
+            className={
+              googlePay
+                ? 'sq-google-pay-host flex min-h-12 w-full min-w-0 max-w-full items-stretch overflow-hidden'
+                : 'sq-google-pay-host hidden'
+            }
             onClick={() => {
               if (googlePay && !busy) void submit(() => googlePay.tokenize(), 'google_pay')
             }}
@@ -314,7 +329,7 @@ export function SquarePaymentPanel({
           <p className="text-xs leading-5 text-fg-muted">
             {showCardForm
               ? 'Wallets aren\'t available in this browser. Use your card below.'
-              : 'Apple Pay and Google Pay aren\'t available in this browser. Reserve and pay in store, or scan the Square QR after checkout.'}
+              : 'Apple Pay and Google Pay aren\'t available in this browser. Reserve and pay in store.'}
           </p>
         )}
       </div>

@@ -33,6 +33,7 @@ class StoreCaseRepository extends ServiceEntityRepository
             ->leftJoin('s.cards', 'sc')->addSelect('sc')
             ->leftJoin('sc.inventoryItem', 'ii')->addSelect('ii')
             ->leftJoin('ii.card', 'c')->addSelect('c')
+            ->leftJoin('c.game', 'g')->addSelect('g')
             ->orderBy('k.position', 'ASC')
             ->addOrderBy('k.id', 'ASC')
             ->addOrderBy('s.position', 'ASC')
