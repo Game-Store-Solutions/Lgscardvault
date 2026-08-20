@@ -65,6 +65,7 @@ export default function StorePage() {
   const skipGameFilterReset = useRef(true)
   const railRef = useRef<HTMLDivElement>(null)
   const searchSectionRef = useRef<HTMLDivElement>(null)
+  const singlesSectionRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const snap = parseStoreSearch(searchParams)
@@ -264,6 +265,15 @@ export default function StorePage() {
   function scrollToSearchSection() {
     searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     window.setTimeout(focusVisibleSearchInput, 350)
+  }
+
+  function scrollToSinglesSection() {
+    singlesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function goToResultsPage(next: number) {
+    setPage(next)
+    scrollToSinglesSection()
   }
 
   const chips: { label: string; onClear: () => void }[] = []
@@ -573,9 +583,9 @@ export default function StorePage() {
       {/* Sealed spotlight. Scoped to the same game as everything else */}
       <SealedSpotlightRow slug={slug} gameCode={gameFilter} />
 
-      <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-20 rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
+          <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
@@ -591,7 +601,7 @@ export default function StorePage() {
           </div>
         </aside>
 
-        <main className="min-w-0 space-y-5">
+        <main ref={singlesSectionRef} id="store-singles" className="min-w-0 scroll-mt-24 space-y-5">
           <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:border-b lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
             <div className="lg:hidden">{renderSearchField('store-search-mobile', false)}</div>
             <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center sm:justify-between lg:border-b lg:border-border lg:pb-4">
@@ -687,7 +697,7 @@ export default function StorePage() {
             </div>
           ) : (
             <div className={cx('space-y-6', listingsRefreshing && 'opacity-70')}>
-              <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={setPage} totalItems={resultTotal} />
+              <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={goToResultsPage} totalItems={resultTotal} />
               {cardDisplayStyle === 'marketplace' ? (
                 <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
                   {visibleResults.map((item) => (
@@ -714,7 +724,7 @@ export default function StorePage() {
                   ))}
                 </div>
               )}
-              <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={setPage} totalItems={resultTotal} />
+              <Pagination page={currentResultsPage} pageCount={resultsPageCount} onPageChange={goToResultsPage} totalItems={resultTotal} />
             </div>
           )}
         </main>
