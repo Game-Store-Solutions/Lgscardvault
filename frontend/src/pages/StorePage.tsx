@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import {
   Calendar,
   ChevronLeft,
@@ -42,25 +42,48 @@ import {
     type ViewMode,
     type SortKey
  } from './utils/actionsUtil.tsx'
+import { hasActiveStoreSearch, parseStoreSearch, serializeStoreSearch } from '../lib/storeSearch'
 
 export default function StorePage() {
   const { slug = '' } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialSearch = parseStoreSearch(searchParams)
   const canManage = useCanManageStore(slug)
   const { user } = useAuth()
-  const [search, setSearch] = useState('')
-  const [setFilter, setSetFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState('')
-  const [finishFilter, setFinishFilter] = useState<FinishFilter>('all')
-  const [selectedColors, setSelectedColors] = useState<string[]>([])
-  const [minPrice, setMinPrice] = useState('')
-  const [maxPrice, setMaxPrice] = useState('')
-  const [sort, setSort] = useState<SortKey>('featured')
-  const [view, setView] = useState<ViewMode>('grid')
+  const [search, setSearch] = useState(initialSearch.q)
+  const [setFilter, setSetFilter] = useState(initialSearch.set)
+  const [typeFilter, setTypeFilter] = useState(initialSearch.type)
+  const [finishFilter, setFinishFilter] = useState<FinishFilter>(initialSearch.finish)
+  const [selectedColors, setSelectedColors] = useState<string[]>(initialSearch.colors)
+  const [minPrice, setMinPrice] = useState(initialSearch.min)
+  const [maxPrice, setMaxPrice] = useState(initialSearch.max)
+  const [sort, setSort] = useState<SortKey>(initialSearch.sort)
+  const [view, setView] = useState<ViewMode>(initialSearch.view)
   const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [page, setPage] = useState(1)
-  const [gameFilter, setGameFilter] = useState('')
+  const [page, setPage] = useState(initialSearch.page)
+  const [gameFilter, setGameFilter] = useState(initialSearch.game)
+  const skipGameFilterReset = useRef(true)
   const railRef = useRef<HTMLDivElement>(null)
   const searchSectionRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const snap = parseStoreSearch(searchParams)
+    setSearch(snap.q)
+    setSetFilter(snap.set)
+    setTypeFilter(snap.type)
+    setFinishFilter(snap.finish)
+    setSelectedColors(snap.colors)
+    setMinPrice(snap.min)
+    setMaxPrice(snap.max)
+    setSort(snap.sort)
+    setView(snap.view)
+    setPage(snap.page)
+    setGameFilter(snap.game)
+    skipGameFilterReset.current = true
+    // Hydrate from this store's URL when the slug changes; ignore searchParams
+    // updates from our own serialize effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
 
   const { data: store, isLoading: storeLoading } = useStore(slug)
   useStoreTheme(store)
@@ -133,9 +156,56 @@ export default function StorePage() {
     setPage(1)
   }, [debouncedSearch, setFilter, typeFilter, finishFilter, selectedColors, minPrice, maxPrice, sort, gameFilter])
 
+  // Keep singles filters in the URL so back-from-card restores the same search.
+  useEffect(() => {
+    const next = serializeStoreSearch({
+      q: search,
+      game: gameFilter,
+      set: setFilter,
+      type: typeFilter,
+      finish: finishFilter,
+      colors: selectedColors,
+      min: minPrice,
+      max: maxPrice,
+      sort,
+      view,
+      page,
+    })
+    if (next.toString() === searchParams.toString()) return
+    setSearchParams(next, { replace: true })
+  }, [
+    search,
+    gameFilter,
+    setFilter,
+    typeFilter,
+    finishFilter,
+    selectedColors,
+    minPrice,
+    maxPrice,
+    sort,
+    view,
+    page,
+    searchParams,
+    setSearchParams,
+  ])
+
+  useEffect(() => {
+    if (!hasActiveStoreSearch(searchParams)) return
+    const timer = window.setTimeout(() => {
+      searchSectionRef.current?.scrollIntoView({ block: 'start' })
+    }, 80)
+    return () => window.clearTimeout(timer)
+    // Restore once when returning from a card, not on every filter keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
+
   // Filters describe one game's cards (sets, colors, types), so switching
   // games clears them rather than silently returning nothing.
   useEffect(() => {
+    if (skipGameFilterReset.current) {
+      skipGameFilterReset.current = false
+      return
+    }
     setSetFilter('')
     setTypeFilter('')
     setSelectedColors([])
