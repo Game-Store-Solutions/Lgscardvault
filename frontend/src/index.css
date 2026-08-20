@@ -451,7 +451,7 @@ body {
    * film covers the full card face (clipped only by border-radius).
    */
   .foil-card {
-    --foil-holo-opacity: 0.58;
+    --foil-holo-opacity: 0.42;
   }
   .tilt-card {
     isolation: isolate;
@@ -462,14 +462,14 @@ body {
     overflow: hidden;
     background: radial-gradient(
       farthest-corner circle at var(--mx, 50%) var(--my, 50%),
-      hsla(0, 0%, 100%, 0.18) 0%,
-      hsla(0, 0%, 100%, 0.06) 28%,
-      hsla(0, 0%, 100%, 0.02) 52%,
-      transparent 78%
+      hsla(0, 0%, 100%, 0.22) 0%,
+      hsla(0, 0%, 100%, 0.08) 26%,
+      hsla(0, 0%, 100%, 0.025) 48%,
+      transparent 74%
     );
     mix-blend-mode: soft-light;
-    opacity: calc(var(--op, 0) * 0.32);
-    transition: opacity 0.45s ease;
+    /* Driven by spring --op; CSS opacity transitions lagged the pointer. */
+    opacity: calc(var(--op, 0) * 0.48);
   }
   .tilt-holo,
   .foil-shimmer {
@@ -509,10 +509,17 @@ body {
       20% 45%;
     background-blend-mode: soft-light, soft-light;
     mix-blend-mode: soft-light;
-    opacity: calc(var(--foil-holo-opacity, 0.58) + var(--op, 0) * 0.62);
-    transition: opacity 0.45s ease;
+    /* Idle stays gentle; hover (--op → 1) opens the sheen clearly. */
+    opacity: calc(var(--foil-holo-opacity, 0.42) + var(--op, 0) * 0.72);
     animation: holo-gradient 9s linear infinite;
     animation-delay: calc(var(--foil-seed, 0.4) * -9s);
+  }
+  /* While hovering, pause the film drift so the pointer owns the sheen. */
+  .tilt-card:hover .tilt-holo,
+  .tilt-card:hover .foil-shimmer,
+  .tilt-card:active .tilt-holo,
+  .tilt-card:active .foil-shimmer {
+    animation-play-state: paused;
   }
   .tilt-grid {
     border-radius: inherit;
@@ -522,18 +529,17 @@ body {
         0deg,
         transparent,
         transparent 3px,
-        rgb(255 255 255 / 0.012) 3px,
-        rgb(255 255 255 / 0.012) 6px
+        rgb(255 255 255 / 0.014) 3px,
+        rgb(255 255 255 / 0.014) 6px
       ),
       repeating-linear-gradient(
         90deg,
         transparent,
         transparent 3px,
-        rgb(255 255 255 / 0.012) 3px,
-        rgb(255 255 255 / 0.012) 6px
+        rgb(255 255 255 / 0.014) 3px,
+        rgb(255 255 255 / 0.014) 6px
       );
-    opacity: calc(var(--op, 0) * 0.281);
-    transition: opacity 0.45s ease;
+    opacity: calc(var(--op, 0) * 0.36);
     pointer-events: none;
   }
   .foil-idle-orbit {
