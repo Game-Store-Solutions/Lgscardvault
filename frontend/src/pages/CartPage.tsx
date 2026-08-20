@@ -21,7 +21,6 @@ import { customerKeys } from '../hooks/useCustomer'
 import { guestCartKey, guestCartLines, resetGuestCart } from '../hooks/useGuestCart'
 import { BackButton, Badge, Button, buttonVariants, EmptyState, Input } from '../components/ui'
 import { CheckoutPanel } from '../components/payments/CheckoutPanel'
-import { PaymentQr } from '../components/payments/PaymentQr'
 import { CardImage, SpotlightCard } from '../components/cards'
 import { FoilOverlays } from '../components/cards/FoilOverlays'
 import { cx } from '../lib/cx'
@@ -502,15 +501,11 @@ function OrderPlacedConfirmation({
       </div>
       {payInStore ? (
         <p className="text-sm leading-6 text-fg-muted">
-          {storeName} will hold your items. Pay at the counter when you pick up
-          {order.paymentUrl ? ', or scan the Square QR below to pay now' : ''}.
+          {storeName} will hold your items. Pay at the counter when you pick up.
         </p>
       ) : (
         <p className="text-sm leading-6 text-fg-muted">Thanks — your payment went through. We&apos;ll have it ready.</p>
       )}
-      {order.paymentUrl ? (
-        <PaymentQr url={order.paymentUrl} caption="Scan to pay this order with Square" />
-      ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
         <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'primary', size: 'md' })}>
           Back to store

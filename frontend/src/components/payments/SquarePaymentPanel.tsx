@@ -329,7 +329,7 @@ export function SquarePaymentPanel({
           <p className="text-xs leading-5 text-fg-muted">
             {showCardForm
               ? 'Wallets aren\'t available in this browser. Use your card below.'
-              : 'Apple Pay and Google Pay aren\'t available in this browser. Reserve and pay in store, or scan the Square QR after checkout.'}
+              : 'Apple Pay and Google Pay aren\'t available in this browser. Reserve and pay in store.'}
           </p>
         )}
       </div>
