@@ -1,17 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { Layers, Search, Sparkles } from 'lucide-react'
-import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
-import { useInventoryCatalog, useStore, useStoreTheme } from '../hooks'
-import { BackButton, Badge, EmptyState, Input, Select } from '../components/ui'
-import { CardImage } from '../components/cards'
+import { useBrowseQuery, useInventoryCatalog, useStore, useStoreTheme } from '../hooks'
+import { BackButton, Badge, Button, EmptyState, Select } from '../components/ui'
+import { BrowsePrintingTile } from '../components/cards'
+import { BrowseSearchField } from '../components/store/BrowseSearchField'
 import { StorePageLoader } from '../components/store/StorePageLoader'
-import { finishName } from '../lib/finishes'
-import { rarityAccent, rarityLabel } from '../lib/mtg'
 import { formatDate } from '../lib/format'
-import { cx } from '../lib/cx'
 import { normalizeSetCode } from '../lib/setBrowse'
+import { printingMatchesBrowseQuery } from '../lib/browseSearch'
 
 type SortMode = 'collector' | 'name' | 'price-asc' | 'price-desc'
 
@@ -41,9 +39,8 @@ function groupByPrinting(items: InventoryItem[]) {
 
   return Array.from(map.values()).map((listings) => {
     const sorted = [...listings].sort((a, b) => a.priceCents - b.priceCents)
-    const representative = sorted[0]
     return {
-      representative,
+      representative: sorted[0],
       listingCount: listings.length,
       totalQty: listings.reduce((sum, row) => sum + row.quantity, 0),
       fromPriceCents: sorted[0].priceCents,
@@ -66,7 +63,7 @@ export default function SetBrowsePage() {
     enabled: Boolean(setCodeNorm),
   })
 
-  const [search, setSearch] = useState('')
+  const { draft, setDraft, query } = useBrowseQuery()
   const [sort, setSort] = useState<SortMode>('collector')
 
   const inSet = useMemo(() => {
@@ -94,21 +91,15 @@ export default function SetBrowsePage() {
               ? 'Riftbound'
               : 'Singles'
 
+  const groupedAll = useMemo(() => groupByPrinting(inSet), [inSet])
+
   const grouped = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    let rows = groupByPrinting(inSet)
-    if (term) {
-      rows = rows.filter(({ representative }) => {
-        const card = representative.card
-        return (
-          card.name.toLowerCase().includes(term) ||
-          (card.collectorNumber ?? '').toLowerCase().includes(term) ||
-          (card.typeLine ?? '').toLowerCase().includes(term)
-        )
-      })
+    let rows = groupedAll
+    if (query) {
+      rows = rows.filter(({ representative }) => printingMatchesBrowseQuery(representative, query))
     }
 
-    rows.sort((a, b) => {
+    rows = [...rows].sort((a, b) => {
       const ca = a.representative.card
       const cb = b.representative.card
       switch (sort) {
@@ -127,9 +118,9 @@ export default function SetBrowsePage() {
       }
     })
     return rows
-  }, [inSet, search, sort])
+  }, [groupedAll, query, sort])
 
-  const uniqueCards = grouped.length
+  const uniqueCards = groupedAll.length
   const totalCopies = inSet.reduce((sum, item) => sum + item.quantity, 0)
   const releasedLabel = setMeta?.releasedAt ? formatDate(setMeta.releasedAt) : null
 
@@ -176,7 +167,9 @@ export default function SetBrowsePage() {
                 <Layers aria-hidden className="size-8 text-brand-600" />
                 <div className="text-sm">
                   <p className="font-bold text-fg">Set inventory</p>
-                  <p className="text-fg-muted">{inSet.length} active listing{inSet.length === 1 ? '' : 's'}</p>
+                  <p className="text-fg-muted">
+                    {inSet.length} active listing{inSet.length === 1 ? '' : 's'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -200,13 +193,14 @@ export default function SetBrowsePage() {
       ) : (
         <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <Input
+            <BrowseSearchField
               id="set-browse-search"
               label="Search this set"
-              placeholder="Search by name, number, or type…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              wrapperClassName="min-w-0 flex-1"
+              placeholder="Name, number, type, artist…"
+              value={draft}
+              onChange={setDraft}
+              resultCount={grouped.length}
+              totalCount={groupedAll.length}
             />
             <Select
               label="Sort by"
@@ -226,85 +220,32 @@ export default function SetBrowsePage() {
             <EmptyState
               icon={Search}
               title="No matches"
-              description="Try a different search term or clear the filter."
+              description="Try a card name, collector number, type, or artist."
+              action={
+                <Button variant="secondary" onClick={() => setDraft('')}>
+                  Clear search
+                </Button>
+              }
             />
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {grouped.map((entry) => (
-                <SetCardTile key={entry.representative.card.id} slug={slug} entry={entry} />
+              {grouped.map((entry, index) => (
+                <BrowsePrintingTile
+                  key={entry.representative.card.id}
+                  slug={slug}
+                  entry={entry}
+                  priority={index < 8}
+                  toState={{
+                    from: 'set',
+                    setCode: entry.representative.card.setCode,
+                    gameCode: entry.representative.card.gameCode,
+                  }}
+                />
               ))}
             </div>
           )}
         </>
       )}
     </div>
-  )
-}
-
-function SetCardTile({
-  slug,
-  entry,
-}: {
-  slug: string
-  entry: {
-    representative: InventoryItem
-    listingCount: number
-    totalQty: number
-    fromPriceCents: number
-  }
-}) {
-  const { representative, listingCount, totalQty, fromPriceCents } = entry
-  const card = representative.card
-  const image = cardImage(card)
-  const accent = rarityAccent(card.rarity)
-  const multiListing = listingCount > 1
-
-  return (
-    <Link
-      to={`/s/${slug}/cards/${representative.id}`}
-      state={{ from: 'set', setCode: card.setCode }}
-      className={cx(
-        'group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
-        'transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-500/35 dark:glass-card ui-lift',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
-      )}
-    >
-      {multiListing && (
-        <span className="absolute right-2 top-2 z-10 rounded-full bg-brand-600 px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-white shadow">
-          {listingCount} listings
-        </span>
-      )}
-      <div className="relative aspect-[5/7] overflow-hidden bg-surface-elevated dark:bg-[#18181B]">
-        <CardImage src={image} alt={card.name} fit="contain" className="size-full" />
-        {card.rarity && (
-          <span
-            className="absolute left-2 top-2 z-10 size-2.5 rounded-full ring-2 ring-white/80"
-            style={{ backgroundColor: accent }}
-            title={rarityLabel(card.rarity)}
-          />
-        )}
-        {card.collectorNumber && (
-          <span className="absolute bottom-2 left-2 z-10 rounded-md bg-black/65 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-            #{card.collectorNumber}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col p-3">
-        <h2 className="line-clamp-2 min-h-[2.5rem] font-display text-sm font-bold leading-snug text-fg group-hover:text-brand-600">
-          {card.name}
-        </h2>
-        <p className="mt-1 truncate text-xs text-fg-muted">
-          {card.rarity ? `${rarityLabel(card.rarity)} · ` : ''}
-          {finishName(card, representative.isFoil, representative.finish)}
-          {representative.condition ? ` · ${representative.condition}` : ''}
-        </p>
-        <div className="mt-auto flex items-baseline justify-between gap-2 pt-2">
-          <span className="text-lg font-bold tabular-nums text-fg">
-            {multiListing ? `From ${formatPrice(fromPriceCents)}` : formatPrice(fromPriceCents)}
-          </span>
-          <span className="text-xs font-medium text-fg-muted">{totalQty} in stock</span>
-        </div>
-      </div>
-    </Link>
   )
 }

@@ -49,10 +49,12 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   hint?: ReactNode
   /** Classes for the label + control stack (grow in toolbars with `flex-1`). */
   wrapperClassName?: string
+  leading?: ReactNode
+  trailing?: ReactNode
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, hint, className, wrapperClassName, id, required, type, ...props },
+  { label, error, hint, className, wrapperClassName, id, required, type, leading, trailing, ...props },
   ref,
 ) {
   const generatedId = useId()
@@ -61,6 +63,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const [revealed, setRevealed] = useState(false)
   const isPassword = type === 'password'
   const resolvedType = isPassword && revealed ? 'text' : type
+  const showTrailing = Boolean(trailing) || isPassword
   return (
     <div className={twMerge(cx(fieldStack, 'w-full'), wrapperClassName)}>
       {label != null && (
@@ -69,6 +72,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         </Label>
       )}
       <div className="relative">
+        {leading ? (
+          <span className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-fg-muted">
+            {leading}
+          </span>
+        ) : null}
         <input
           ref={ref}
           id={inputId}
@@ -76,10 +84,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={descId}
-          className={cx(controlBase, controlBorder(!!error), 'h-10 px-3 text-sm', isPassword && 'pr-10', className)}
+          className={cx(
+            controlBase,
+            controlBorder(!!error),
+            'h-10 px-3 text-sm',
+            leading && 'pl-9',
+            showTrailing && 'pr-10',
+            className,
+          )}
           {...props}
         />
-        {isPassword && (
+        {trailing ? <span className="absolute right-1.5 top-1/2 -translate-y-1/2">{trailing}</span> : null}
+        {isPassword && !trailing && (
           <button
             type="button"
             onClick={() => setRevealed((v) => !v)}

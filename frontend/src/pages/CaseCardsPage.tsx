@@ -1,16 +1,13 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ChevronDown, GalleryHorizontalEnd, Loader2 } from 'lucide-react'
-import { motion } from 'framer-motion'
-import { cardImage, formatPrice } from '../api/client'
-import { useStore, useStoreCases, useStoreTheme, useTilt } from '../hooks'
+import { ChevronDown, GalleryHorizontalEnd } from 'lucide-react'
+import { formatPrice } from '../api/client'
+import { useStore, useStoreCases, useStoreTheme } from '../hooks'
 import { BackButton, Card, CardBody, EmptyState } from '../components/ui'
 import type { StoreSectionCard } from '../api/types'
-import { CardImage } from '../components/cards'
-import { FoilOverlays } from '../components/cards/FoilOverlays'
+import { HqFoilCardArt } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { finishName } from '../lib/finishes'
-import { cx } from '../lib/cx'
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
 /**
@@ -157,12 +154,7 @@ function CaseCardTile({
 }) {
   const { inventoryItem } = entry
   const card = inventoryItem.card
-  const image = cardImage(card, { quality: 'full' })
-  const [artReady, setArtReady] = useState(!image)
   const lastOne = entry.remaining === 1
-  const { ref, onPointerEnter, onPointerMove, onPointerLeave, tiltStyle } = useTilt(9, {
-    idle: Boolean(inventoryItem.isFoil && artReady),
-  })
 
   return (
     <Link
@@ -170,40 +162,17 @@ function CaseCardTile({
       state={{ from: 'case-cards' }}
       className="group relative rounded-card transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
-      {lastOne && artReady && (
-        <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-accent-500 px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-white shadow">
+      {lastOne && (
+        <span className="absolute right-1.5 top-1.5 z-20 rounded-full bg-accent-500 px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-white shadow">
           Last one
         </span>
       )}
-      <div ref={ref} onPointerEnter={onPointerEnter} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} className="perspective-[900px]">
-        <motion.div
-          className={cx(
-            'tilt-card relative aspect-[5/7] overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-card',
-            inventoryItem.isFoil && artReady && 'foil-card',
-          )}
-          style={tiltStyle}
-        >
-          {!artReady && (
-            <span
-              className="absolute inset-0 z-10 grid place-items-center bg-surface-elevated"
-              aria-busy="true"
-              aria-label={`Loading ${card.name}`}
-            >
-              <Loader2 aria-hidden className="size-6 animate-spin text-brand-600" />
-            </span>
-          )}
-          <CardImage
-            src={image}
-            alt={card.name}
-            className={cx('h-full w-full', !artReady && 'opacity-0')}
-            label={card.name}
-            priority={priority}
-            onLoad={() => setArtReady(true)}
-            onError={() => setArtReady(true)}
-          />
-          {artReady && image && <FoilOverlays foil={inventoryItem.isFoil} />}
-        </motion.div>
-      </div>
+      <HqFoilCardArt
+        card={card}
+        foil={inventoryItem.isFoil}
+        priority={priority}
+        frameClassName="rounded-[4.5%/3.5%] bg-bg shadow-card"
+      />
       <div className="mt-2 px-0.5">
         <h4 className="truncate text-sm font-bold text-fg group-hover:text-brand-600">{card.name}</h4>
         <div className="mt-0.5 flex items-baseline justify-between gap-2">
@@ -217,3 +186,4 @@ function CaseCardTile({
     </Link>
   )
 }
+

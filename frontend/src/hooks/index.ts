@@ -6,6 +6,7 @@ export { useOrders, useOrdersPage, useAllStoreOrders, useOpenStoreOrderCount, us
 export type { StoreOrderQueueCounts } from './useOrders'
 export { useCanManageStore } from './useCanManageStore'
 export { useDebouncedValue } from './useDebouncedValue'
+export { useBrowseQuery } from './useBrowseQuery'
 export { useTheme } from './useTheme'
 export type { Theme } from './useTheme'
 export { useKioskMode } from './useKioskMode'

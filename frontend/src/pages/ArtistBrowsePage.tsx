@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Palette, Search } from 'lucide-react'
-import { cardImage, formatPrice } from '../api/client'
 import type { InventoryItem } from '../api/types'
-import { useInventoryCatalog, useStore, useStoreTheme } from '../hooks'
-import { BackButton, Button, EmptyState, Input, Modal } from '../components/ui'
-import { CardImage } from '../components/cards'
+import { useBrowseQuery, useInventoryCatalog, useStore, useStoreTheme } from '../hooks'
+import { BackButton, Button, EmptyState, Modal } from '../components/ui'
+import { BrowsePrintingTile } from '../components/cards'
+import { BrowseSearchField } from '../components/store/BrowseSearchField'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { inventoryByArtist } from '../lib/artistBrowse'
-import { rarityAccent, rarityLabel } from '../lib/mtg'
-import { cx } from '../lib/cx'
-import { finishName } from '../lib/finishes'
+import { printingMatchesBrowseQuery } from '../lib/browseSearch'
 
 type ArtistNavState = {
   from?: string
@@ -61,7 +59,7 @@ export default function ArtistBrowsePage() {
     enabled: Boolean(artist),
   })
 
-  const [search, setSearch] = useState('')
+  const { draft, setDraft, query } = useBrowseQuery()
   const [noStockModalOpen, setNoStockModalOpen] = useState(true)
 
   const inStore = useMemo(
@@ -72,17 +70,9 @@ export default function ArtistBrowsePage() {
   const groupedAll = useMemo(() => groupByPrinting(inStore), [inStore])
 
   const grouped = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return groupedAll
-    return groupedAll.filter(({ representative }) => {
-      const card = representative.card
-      return (
-        card.name.toLowerCase().includes(term) ||
-        (card.setName ?? '').toLowerCase().includes(term) ||
-        (card.setCode ?? '').toLowerCase().includes(term)
-      )
-    })
-  }, [groupedAll, search])
+    if (!query) return groupedAll
+    return groupedAll.filter(({ representative }) => printingMatchesBrowseQuery(representative, query))
+  }, [groupedAll, query])
 
   if (!artist) {
     return (
@@ -149,14 +139,15 @@ export default function ArtistBrowsePage() {
           </p>
         </div>
         {inStore.length > 0 && (
-          <div className="w-full min-w-0 sm:max-w-xl sm:flex-1">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter by name or set…"
-              aria-label="Filter artist printings"
-            />
-          </div>
+          <BrowseSearchField
+            id="artist-browse-search"
+            label="Search this artist"
+            placeholder="Name, set, number, type…"
+            value={draft}
+            onChange={setDraft}
+            resultCount={grouped.length}
+            totalCount={groupedAll.length}
+          />
         )}
       </header>
 
@@ -174,12 +165,28 @@ export default function ArtistBrowsePage() {
           icon={Search}
           className="mt-10"
           title="No matches"
-          description="Try a different filter."
+          description="Try a card name, set code, collector number, or type."
+          action={
+            <Button variant="secondary" onClick={() => setDraft('')}>
+              Clear search
+            </Button>
+          }
         />
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-          {grouped.map((entry) => (
-            <ArtistCardTile key={entry.representative.card.id} slug={slug} artist={artist} entry={entry} />
+          {grouped.map((entry, index) => (
+            <BrowsePrintingTile
+              key={entry.representative.card.id}
+              slug={slug}
+              entry={entry}
+              priority={index < 8}
+              toState={{
+                from: 'artist',
+                artist,
+                inventoryId: entry.representative.id,
+                gameCode: entry.representative.card.gameCode ?? 'mtg',
+              }}
+            />
           ))}
         </div>
       )}
@@ -187,77 +194,3 @@ export default function ArtistBrowsePage() {
   )
 }
 
-function ArtistCardTile({
-  slug,
-  artist,
-  entry,
-}: {
-  slug: string
-  artist: string
-  entry: {
-    representative: InventoryItem
-    listingCount: number
-    totalQty: number
-    fromPriceCents: number
-  }
-}) {
-  const { representative, listingCount, totalQty, fromPriceCents } = entry
-  const card = representative.card
-  const image = cardImage(card)
-  const accent = rarityAccent(card.rarity)
-  const multiListing = listingCount > 1
-
-  return (
-    <Link
-      to={`/s/${slug}/cards/${representative.id}`}
-      state={{
-        from: 'artist',
-        artist,
-        inventoryId: representative.id,
-        gameCode: card.gameCode ?? 'mtg',
-      }}
-      className={cx(
-        'group relative flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card',
-        'transition-transform duration-150 hover:-translate-y-0.5 hover:border-brand-500/35 dark:glass-card ui-lift',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
-      )}
-    >
-      {multiListing && (
-        <span className="absolute right-2 top-2 z-10 rounded-full bg-brand-600 px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-white shadow">
-          {listingCount} listings
-        </span>
-      )}
-      <div className="relative aspect-[5/7] overflow-hidden bg-surface-elevated dark:bg-[#18181B]">
-        <CardImage src={image} alt={card.name} fit="contain" className="size-full" />
-        {card.rarity && (
-          <span
-            className="absolute left-2 top-2 z-10 size-2.5 rounded-full ring-2 ring-white/80"
-            style={{ backgroundColor: accent }}
-            title={rarityLabel(card.rarity)}
-          />
-        )}
-        {card.collectorNumber && (
-          <span className="absolute bottom-2 left-2 z-10 rounded-md bg-black/65 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-            #{card.collectorNumber}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col p-3">
-        <h2 className="line-clamp-2 min-h-[2.5rem] font-display text-sm font-bold leading-snug text-fg group-hover:text-brand-600">
-          {card.name}
-        </h2>
-        <p className="mt-1 truncate text-xs text-fg-muted">
-          {card.rarity ? `${rarityLabel(card.rarity)} · ` : ''}
-          {finishName(card, representative.isFoil, representative.finish)}
-          {representative.condition ? ` · ${representative.condition}` : ''}
-        </p>
-        <div className="mt-auto flex items-baseline justify-between gap-2 pt-2">
-          <span className="text-lg font-bold tabular-nums text-fg">
-            {multiListing ? `From ${formatPrice(fromPriceCents)}` : formatPrice(fromPriceCents)}
-          </span>
-          <span className="text-xs font-medium text-fg-muted">{totalQty} in stock</span>
-        </div>
-      </div>
-    </Link>
-  )
-}
