@@ -21,6 +21,20 @@ const LIGHT_SPRING = { stiffness: 260, damping: 28, mass: 0.4 }
 const IDLE_A_MS = 9000
 const IDLE_B_MS = 13500
 
+const DEFAULT_IDLE_OP = 0.5
+
+/** Read `--foil-idle-op` from `.foil-card` (or the tilt root) so CSS knobs drive idle sheen. */
+function readFoilIdleOp(root: HTMLElement | null): number {
+  if (!root || typeof window === 'undefined') return DEFAULT_IDLE_OP
+  const foil =
+    (root.classList.contains('foil-card') ? root : null) ??
+    root.querySelector<HTMLElement>('.foil-card') ??
+    root
+  const raw = getComputedStyle(foil).getPropertyValue('--foil-idle-op').trim()
+  const n = Number.parseFloat(raw)
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_IDLE_OP
+}
+
 export type TiltStyle = MotionStyle & {
   '--mx': MotionValue<string>
   '--my': MotionValue<string>
@@ -49,6 +63,8 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const hovering = useRef(false)
   const phase = useRef(Math.random() * Math.PI * 2)
   const seed = useRef(0.18 + Math.random() * 0.64)
+  const idleOp = useRef(DEFAULT_IDLE_OP)
+  const idleOpReady = useRef(false)
   const reduceMotion = useReducedMotion()
   const inView = useInView(ref, { amount: 0.15, margin: '80px', once: false })
 
@@ -56,7 +72,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const ry = useMotionValue(0)
   const px = useMotionValue(50)
   const py = useMotionValue(50)
-  const op = useMotionValue(idle ? 0.5 : 0)
+  const op = useMotionValue(idle ? DEFAULT_IDLE_OP : 0)
 
   const srx = useSpring(rx, TILT_SPRING)
   const sry = useSpring(ry, TILT_SPRING)
@@ -68,12 +84,18 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
   const my = useMotionTemplate`${spy}%`
 
   useAnimationFrame((time) => {
+    if (idle && !idleOpReady.current && ref.current) {
+      idleOp.current = readFoilIdleOp(ref.current)
+      idleOpReady.current = true
+      if (!hovering.current) op.set(idleOp.current)
+    }
     if (!idle || hovering.current || reduceMotion || !inView) return
     const a = (time / IDLE_A_MS) * Math.PI * 2 + phase.current
     const b = (time / IDLE_B_MS) * Math.PI * 2 + phase.current * 0.6
+    const base = idleOp.current
     px.set(50 + Math.sin(a) * 14 + Math.sin(b * 1.15) * 6)
     py.set(50 + Math.cos(a * 0.62) * 11 + Math.sin(b) * 5)
-    op.set(0.5 + Math.sin(a * 0.9) * 0.1)
+    op.set(base + Math.sin(a * 0.9) * base * 0.2)
     rx.set(Math.sin(a * 0.55) * maxTilt * 0.08)
     ry.set(Math.cos(a * 0.48) * maxTilt * 0.1)
   })
@@ -128,7 +150,7 @@ export function useTilt(maxTilt = 12, { idle = false }: UseTiltOptions = {}) {
     ry.set(0)
     if (idle && !reduceMotion) {
       // Hand light back to the idle drift; keep a soft resting sheen.
-      op.set(0.5)
+      op.set(idleOp.current)
       return
     }
     px.set(50)
