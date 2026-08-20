@@ -761,40 +761,34 @@ export default function CommanderSynergyPage() {
           <>
             <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:self-start">
               <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
-                <div className="flex gap-4 p-4">
-                  <div className="w-24 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-28">
+                <div className="flex gap-3.5 p-4">
+                  <div className="relative aspect-5/7 w-20 shrink-0 overflow-hidden rounded-md bg-bg shadow-sm sm:w-24">
                     <CardImage
                       src={selected.imageUrl}
                       alt={selected.name}
-                      className="aspect-5/7 w-full"
+                      className="absolute inset-0 size-full"
+                      showLabel={false}
                     />
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-display text-lg font-extrabold leading-snug text-fg">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-base font-extrabold leading-snug text-fg sm:text-lg">
                       {selected.name}
                     </p>
-                    <p className="mt-1 text-xs leading-relaxed text-fg-muted">{selected.typeLine}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {colorPips(selected.colorIdentity)}
-                      {recommend.data?.identityCode && (
-                        <Badge tone="neutral">{recommend.data.identityCode}</Badge>
-                      )}
-                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-muted">
+                      {selected.typeLine}
+                    </p>
+                    <div className="mt-2.5">{colorPips(selected.colorIdentity)}</div>
                     {recommend.data?.commander.themes && recommend.data.commander.themes.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {recommend.data.commander.themes.slice(0, 4).map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full bg-brand-50 px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-brand-700"
-                          >
-                            {tag.replaceAll('_', ' ')}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="mt-2 line-clamp-1 text-[0.7rem] font-medium capitalize text-fg-muted">
+                        {recommend.data.commander.themes
+                          .slice(0, 3)
+                          .map((tag) => tag.replaceAll('_', ' '))
+                          .join(' · ')}
+                      </p>
                     )}
                     <button
                       type="button"
-                      className="mt-3 text-sm font-semibold text-brand-600 transition-colors hover:text-brand-500"
+                      className="mt-2.5 text-sm font-semibold text-brand-600 transition-colors hover:text-brand-500"
                       onClick={clearCommander}
                     >
                       Change commander
@@ -1375,7 +1369,9 @@ function DeckPanel({
     return <LoadingPanel label="Assembling a deck from store inventory…" />
   }
 
-  const slotEntries = Object.entries(deck.slots).filter(([key]) => key !== 'commander')
+  const slotEntries = Object.entries(deck.slots).filter(
+    ([key, count]) => key !== 'commander' && Number(count) > 0,
+  )
   const structure = deck.structure?.actual ?? {}
   const targets = deck.structure?.targets ?? {}
   const inStockCount = deck.cards.filter((row) => row.inventoryItem).length
@@ -1385,66 +1381,89 @@ function DeckPanel({
     if (stockFilter === 'out_of_stock') return !row.inventoryItem
     return true
   })
-  const intelLine = intelligenceSummary(deck.intelligence)
-
-  const structureLine = (['lands', 'ramp', 'draw', 'removal'] as const)
+  const intel = deck.intelligence
+  const intelLine = intelligenceSummary(intel)
+  const structureBits = (['lands', 'ramp', 'draw', 'removal'] as const)
     .map((role) => `${role} ${structure[role] ?? 0}/${targets[role] ?? 0}`)
     .join(' · ')
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="font-display text-base font-extrabold text-fg">
-            {deck.filledSize} / {deck.targetSize} cards · {deck.strategy.label}
-          </p>
-          <p className="mt-1 text-xs text-fg-muted">
-            {deck.bracket.label} (bracket {deck.bracket.applied}
-            {deck.bracket.auto ? ', auto' : ''})
-            {deck.budget.limitCents != null
-              ? ` · ${formatPrice(deck.budget.spentCents)} of ${formatPrice(deck.budget.limitCents)}`
-              : ` · ${formatPrice(deck.budget.spentCents)}`}
-            {deck.budget.maxCardCents != null ? ` · max ${formatPrice(deck.budget.maxCardCents)} / card` : ''}
-          </p>
-          <p className="mt-1 text-xs text-fg-muted">
-            {structureLine} · avg MV {deck.averageManaValue}
-            {(deck.slots.game_changer ?? 0) > 0 ? ` · Game Changers ${deck.slots.game_changer}` : ''}
-          </p>
-          <p className="mt-1 text-xs text-fg-muted">
-            {inStockCount} of {deck.cards.length} available here · built from{' '}
-            {deck.intelligence.source}
-          </p>
-          {intelLine && (
-            <p className="mt-1 text-[0.7rem] font-medium text-fg-muted">{intelLine}</p>
-          )}
-          {deck.bracket.gameChangersInStock.length > 0 && (
+      <div className="rounded-card border border-border bg-surface p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="font-display text-base font-extrabold text-fg">
+              {deck.filledSize} / {deck.targetSize} · {deck.strategy.label}
+            </p>
             <p className="mt-1 text-xs text-fg-muted">
-              Store can supply {deck.bracket.gameChangersInStock.length} Game Changer
-              {deck.bracket.gameChangersInStock.length === 1 ? '' : 's'} in this identity
-              {deck.bracket.gameChangersIncluded.length > 0
-                ? ` · included ${deck.bracket.gameChangersIncluded.map((c) => c.name).join(', ')}`
+              {deck.bracket.label}
+              {deck.bracket.auto ? ' · auto' : ''}
+              {' · '}
+              {deck.budget.limitCents != null
+                ? `${formatPrice(deck.budget.spentCents)} of ${formatPrice(deck.budget.limitCents)}`
+                : formatPrice(deck.budget.spentCents)}
+              {' · '}
+              {inStockCount}/{deck.cards.length} in stock
+            </p>
+            <p className="mt-1 text-xs text-fg-muted">
+              {structureBits} · avg MV {deck.averageManaValue}
+            </p>
+            {deck.gaps.length > 0 && (
+              <p className="mt-1.5 text-xs font-medium text-warning-700">{deck.gaps[0]}</p>
+            )}
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {!signedIn ? (
+              <Link to="/login" className={buttonVariants({ size: 'sm' })}>
+                Sign in to add deck
+              </Link>
+            ) : (
+              <Button size="sm" loading={busy} disabled={busy || deck.cards.length === 0} onClick={onAddAll}>
+                <ShoppingCart aria-hidden className="size-4" />
+                Add available
+              </Button>
+            )}
+            <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              Cart
+            </Link>
+          </div>
+        </div>
+
+        <details className="mt-3 border-t border-border pt-3">
+          <summary className="cursor-pointer text-xs font-semibold text-fg-muted transition-colors hover:text-fg">
+            Build details
+            {intel ? ` · ${Math.round(intel.confidence * 100)}% confidence` : ''}
+            {deck.combos.length > 0
+              ? ` · ${deck.combos.filter((c) => c.completeInStore).length}/${deck.combos.length} combos`
+              : ''}
+          </summary>
+          <div className="mt-2 space-y-1.5 text-xs text-fg-muted">
+            {intelLine && <p>{intelLine}</p>}
+            <p>
+              Built from {intel?.source ?? 'catalog'}
+              {deck.budget.maxCardCents != null
+                ? ` · max ${formatPrice(deck.budget.maxCardCents)} / card`
                 : ''}
             </p>
-          )}
-          {deck.gaps.length > 0 && (
-            <p className="mt-1 text-xs text-warning-700">{deck.gaps[0]}</p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {!signedIn ? (
-            <Link to="/login" className={buttonVariants({ size: 'sm' })}>
-              Sign in to add deck
-            </Link>
-          ) : (
-            <Button size="sm" loading={busy} disabled={busy || deck.cards.length === 0} onClick={onAddAll}>
-              <ShoppingCart aria-hidden className="size-4" />
-              Add available to cart
-            </Button>
-          )}
-          <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            Cart
-          </Link>
-        </div>
+            {deck.bracket.gameChangersIncluded.length > 0 && (
+              <p>
+                Game Changers: {deck.bracket.gameChangersIncluded.map((c) => c.name).join(', ')}
+              </p>
+            )}
+            {slotEntries.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {slotEntries.map(([slot, count]) => (
+                  <span
+                    key={slot}
+                    className="rounded-md bg-bg px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-fg-muted"
+                  >
+                    {slot.replaceAll('_', ' ')} {count}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1475,21 +1494,6 @@ function DeckPanel({
           Showing {visibleCards.length} of {deck.cards.length}
         </p>
       </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        {slotEntries.map(([slot, count]) => (
-          <Badge key={slot} tone="neutral">
-            {slot}: {count}
-          </Badge>
-        ))}
-      </div>
-
-      {deck.combos.length > 0 && (
-        <p className="text-xs text-fg-muted">
-          {deck.combos.filter((c) => c.completeInStore).length} complete combos in this list ·{' '}
-          {deck.combos.length} total Spellbook hits
-        </p>
-      )}
 
       {visibleCards.length === 0 ? (
         <EmptyState
@@ -1527,12 +1531,16 @@ function DeckPanel({
                 title={row.reasons?.slice(0, 3).join(' · ')}
               >
                 {detailPath ? (
-                  <Link to={detailPath} state={linkState} className="w-12 shrink-0 overflow-hidden rounded-md">
-                    <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
+                  <Link
+                    to={detailPath}
+                    state={linkState}
+                    className="relative aspect-5/7 w-12 shrink-0 overflow-hidden rounded-md bg-bg"
+                  >
+                    <CardImage src={image} alt={name} className="absolute inset-0 size-full" showLabel={false} />
                   </Link>
                 ) : (
-                  <div className="w-12 shrink-0 overflow-hidden rounded-md">
-                    <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
+                  <div className="relative aspect-5/7 w-12 shrink-0 overflow-hidden rounded-md bg-bg">
+                    <CardImage src={image} alt={name} className="absolute inset-0 size-full" showLabel={false} />
                   </div>
                 )}
                 <div className="min-w-0 self-center">
