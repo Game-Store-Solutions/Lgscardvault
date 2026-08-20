@@ -467,8 +467,8 @@ body {
     --foil-rainbow-sat: 1;
     --foil-purple-sat: 0.7;
     --foil-grid: 0.42;
-    --foil-holo-duration: 6.5s; /* ~30% faster film drift */
-    --foil-orbit-duration: 8s;
+    --foil-holo-duration: 4.5s; /* snappier film drift */
+    --foil-orbit-duration: 5.5s;
     --foil-idle-op: 0.4;
   }
   .tilt-card {
