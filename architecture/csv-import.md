@@ -2,7 +2,7 @@
 
 Bulk inventory import via CSV. Uploads are parsed, persisted as a job plus rows, then processed in the background by a Symfony Messenger worker that resolves each card and writes inventory. The frontend polls for progress.
 
-> Requires a running worker. Rows stay `queued` until `php bin/console messenger:consume async` is running. Transport: `doctrine://default?queue_name=csv_import` (see [messenger.yaml](../backend/config/packages/messenger.yaml)).
+> Requires a running CSV worker. Rows stay `queued` until `php bin/console messenger:consume csv` is running. Transport: `doctrine://default?queue_name=store_import` (see [messenger.yaml](../backend/config/packages/messenger.yaml)). Archidekt / catalog work uses the separate `async` transport so harvest cannot starve imports.
 
 All routes are under `StoreCsvImportController` at `/api/stores/{slug}/csv-imports`, gated by `ROLE_USER` and `STORE_MANAGE`.
 

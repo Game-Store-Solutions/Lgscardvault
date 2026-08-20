@@ -85,15 +85,19 @@ app containers after they complete.
 
 Imports and catalog syncs run on Symfony Messenger workers — **if no worker
 runs, uploads queue forever**. Supervise them so a crash auto-restarts and
-long-lived PHP memory growth is bounded:
+long-lived PHP memory growth is bounded.
+
+CSV imports (`csv` transport) and Archidekt/catalog work (`async`) are
+separate so a harvest cannot starve store uploads:
 
 - **systemd:** [`deploy/systemd/mtgstore-worker@.service`](systemd/mtgstore-worker@.service)
-  → `systemctl enable --now mtgstore-worker@1 mtgstore-worker@2`
+  + [`deploy/systemd/mtgstore-worker-import@.service`](systemd/mtgstore-worker-import@.service)
+  → `systemctl enable --now mtgstore-worker@1 mtgstore-worker-import@1`
 - **supervisor:** [`deploy/supervisor/mtgstore-worker.conf`](supervisor/mtgstore-worker.conf)
-- **compose:** the `worker` service (replicas: 2) in the prod compose
+- **compose:** `worker` (async) + `worker_import` (csv) in the prod compose
 
 Each worker runs with `--time-limit=3600 --memory-limit=256M`, exiting cleanly
-so the supervisor restarts it. Multiple workers are safe (rows are claimed with
+so the supervisor restarts it. Multiple import workers are safe (rows are claimed with
 `SELECT … FOR UPDATE SKIP LOCKED`).
 
 ### Dead-letter queue

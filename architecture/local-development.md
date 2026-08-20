@@ -58,7 +58,7 @@ php -S 127.0.0.1:8000 -t public          # leave running
 
 # 3. CSV import worker (separate terminal — see note below)
 cd backend
-php bin/console messenger:consume async -vv
+php bin/console messenger:consume csv -vv
 
 # 4. Frontend (separate terminal)
 cd frontend
@@ -255,13 +255,13 @@ API docs: **http://127.0.0.1:8000/api/docs**
 
 ### 7. Run the CSV import worker
 
-CSV imports are processed **asynchronously** via Symfony Messenger using the Doctrine transport (`MESSENGER_TRANSPORT_DSN=doctrine://default?queue_name=csv_import` in `.env`). Uploads will be accepted and queued, but **rows won't process until a worker is running**:
+CSV imports are processed **asynchronously** via Symfony Messenger using the Doctrine transport (`MESSENGER_CSV_TRANSPORT_DSN=doctrine://default?queue_name=store_import` in `.env`). Uploads will be accepted and queued, but **rows won't process until a CSV worker is running**:
 
 ```bash
-php bin/console messenger:consume async -vv
+php bin/console messenger:consume csv -vv
 ```
 
-Leave this running in its own terminal during development. (Skip it if you're not testing CSV import.)
+Catalog / Archidekt work uses the separate `async` transport (`messenger:consume async`). Leave the CSV worker running in its own terminal during development. (Skip it if you're not testing CSV import.)
 
 ### 8. Run the frontend
 
@@ -543,8 +543,9 @@ served by nginx with SPA fallback, long-cached fingerprinted assets, and an
 ### Workers
 
 CSV imports and catalog syncs run on Symfony Messenger workers — **if none is
-running, uploads queue forever.** Run `messenger:consume async` for the work
-itself and `messenger:consume scheduler_catalog` for the daily catalog
+running, uploads queue forever.** Run `messenger:consume csv` for store
+imports and `messenger:consume async` for catalog / Archidekt work, plus
+`messenger:consume scheduler_catalog` for the daily catalog
 schedule. Supervise them (systemd/supervisor/compose —
 see the runbook) so crashes auto-restart and memory growth is bounded
 (`--time-limit`/`--memory-limit`). Messages that exhaust their retries land in a

@@ -178,7 +178,7 @@ try {
     }
 
     Start-DevProcess 'backend-api' (Join-Path $RootDir 'backend') 'php' @('-S', '127.0.0.1:8000', '-t', 'public')
-    Start-DevProcess 'csv-worker' (Join-Path $RootDir 'backend') 'php' @('bin/console', 'messenger:consume', 'async', '-vv', '--memory-limit=512M')
+    Start-DevProcess 'csv-worker' (Join-Path $RootDir 'backend') 'php' @('bin/console', 'messenger:consume', 'csv', '-vv', '--memory-limit=512M')
     Start-DevProcess 'frontend' (Join-Path $RootDir 'frontend') 'npm' @('run', 'dev')
 
     Write-Host ''
@@ -204,7 +204,7 @@ try {
                 Start-Sleep -Seconds 2
                 $script:Processes = @($Processes | Where-Object { $_.Name -ne 'csv-worker' })
                 Start-DevProcess 'csv-worker' (Join-Path $RootDir 'backend') 'php' @(
-                    'bin/console', 'messenger:consume', 'async', '-vv', '--memory-limit=512M'
+                    'bin/console', 'messenger:consume', 'csv', '-vv', '--memory-limit=512M'
                 )
                 break
             }

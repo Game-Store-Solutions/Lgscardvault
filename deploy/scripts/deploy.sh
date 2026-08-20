@@ -51,7 +51,7 @@ echo "==> Roll app / workers / scheduler / frontend"
 # Recreate app containers even when the frontend image is unchanged. nginx
 # otherwise keeps a stale Docker DNS IP for `backend` after a backend-only
 # roll and smoke checks 502 until the next frontend bounce.
-"${COMPOSE[@]}" up -d --remove-orphans --force-recreate backend worker scheduler frontend
+"${COMPOSE[@]}" up -d --remove-orphans --force-recreate backend worker worker_import scheduler frontend
 
 echo "==> Wait for backend health"
 backend_ok=0
