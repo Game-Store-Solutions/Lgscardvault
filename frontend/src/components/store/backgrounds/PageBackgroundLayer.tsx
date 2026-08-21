@@ -61,19 +61,61 @@ type GridSpotCell = {
   scalePeak: number
 }
 
-function buildGridSpotCells(count: number, cols: number, rows: number, animated = false): GridSpotCell[] {
+function buildGridSpotCells(count: number, cols: number, rows: number): GridSpotCell[] {
   return Array.from({ length: count }, (_, id) => ({
     id,
     col: Math.floor(Math.random() * cols),
     row: Math.floor(Math.random() * rows),
-    delay: animated ? Math.random() * 7.5 : Math.random() * 5,
-    duration: animated ? 0.55 + Math.random() * 1.65 : 1.6 + Math.random() * 2.4,
-    peak: animated ? 0.52 + Math.random() * 0.42 : 0.42 + Math.random() * 0.38,
-    repeatDelay: animated ? 0.15 + Math.random() * 4.5 : 0.4 + Math.random() * 2.8,
-    secondary: Math.random() > (animated ? 0.58 : 0.68),
-    scaleFrom: animated ? 0.9 + Math.random() * 0.06 : 0.94,
-    scalePeak: animated ? 1 + Math.random() * 0.05 : 1,
+    delay: Math.random() * 5,
+    duration: 1.6 + Math.random() * 2.4,
+    peak: 0.42 + Math.random() * 0.38,
+    repeatDelay: 0.4 + Math.random() * 2.8,
+    secondary: Math.random() > 0.68,
+    scaleFrom: 0.94,
+    scalePeak: 1,
   }))
+}
+
+/** Evenly stagger animated cells so the grid stays populated instead of pulsing in bursts. */
+function buildAnimatedGridCells(
+  count: number,
+  cols: number,
+  rows: number,
+  compact = false,
+  thumbnail = false,
+): GridSpotCell[] {
+  const occupied = new Set<string>()
+  const cells: GridSpotCell[] = []
+  const maxAttempts = count * 10
+
+  for (let attempt = 0; cells.length < count && attempt < maxAttempts; attempt += 1) {
+    const col = Math.floor(Math.random() * cols)
+    const row = Math.floor(Math.random() * rows)
+    const key = `${col}:${row}`
+    if (occupied.has(key) && occupied.size < cols * rows * 0.75) continue
+    occupied.add(key)
+
+    const index = cells.length
+    const duration = 2.8 + Math.random() * 1.8
+    const wavePeriod = compact ? 8 : thumbnail ? 6 : 16
+    const stagger = (index / count) * wavePeriod
+    const jitter = (Math.random() - 0.5) * (wavePeriod / count) * 1.6
+
+    cells.push({
+      id: index,
+      col,
+      row,
+      delay: Math.max(0, stagger + jitter),
+      duration,
+      peak: 0.5 + Math.random() * 0.34,
+      repeatDelay: 0.2 + Math.random() * 0.75,
+      secondary: Math.random() > 0.56,
+      scaleFrom: 0.92 + Math.random() * 0.04,
+      scalePeak: 0.98 + Math.random() * 0.04,
+    })
+  }
+
+  return cells
 }
 
 function GridLines({ cell = GRID_CELL, opacity = 0.42 }: { cell?: number; opacity?: number }) {
@@ -104,14 +146,16 @@ function AnimatedGridCells({
   const cols = compact ? 16 : thumbnail ? 14 : 52
   const rows = compact ? 11 : thumbnail ? 8 : 34
   const count = density === 'animated'
-    ? (compact || thumbnail ? 22 : 96)
+    ? (compact || thumbnail ? 28 : 132)
     : compact || thumbnail
       ? 8
       : 32
 
   const cells = useMemo(
-    () => buildGridSpotCells(count, cols, rows, density === 'animated'),
-    [count, cols, rows, density],
+    () => (density === 'animated'
+      ? buildAnimatedGridCells(count, cols, rows, compact, thumbnail)
+      : buildGridSpotCells(count, cols, rows)),
+    [compact, count, cols, rows, density, thumbnail],
   )
 
   const colorStrength = density === 'animated'
@@ -154,13 +198,18 @@ function AnimatedGridCells({
             className="absolute rounded-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08)]"
             style={style}
             initial={{ opacity: 0, scale: scaleFrom }}
-            animate={{ opacity: [0, cell.peak, 0], scale: [scaleFrom, scalePeak, scaleFrom + 0.02] }}
+            animate={
+              density === 'animated'
+                ? { opacity: [0, cell.peak, cell.peak, 0], scale: [scaleFrom, scalePeak, scalePeak, scaleFrom] }
+                : { opacity: [0, cell.peak, 0], scale: [scaleFrom, scalePeak, scaleFrom + 0.02] }
+            }
             transition={{
               duration: cell.duration,
               repeat: Infinity,
               delay: cell.delay,
               repeatDelay: cell.repeatDelay,
-              ease: density === 'animated' ? [0.42, 0, 0.38, 1] : 'easeInOut',
+              ease: density === 'animated' ? 'easeInOut' : 'easeInOut',
+              ...(density === 'animated' ? { times: [0, 0.18, 0.72, 1] } : {}),
             }}
           />
         )
