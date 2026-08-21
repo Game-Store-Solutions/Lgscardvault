@@ -41,3 +41,22 @@ cd ../frontend && npm install && npm run dev  # terminal 3
 Or use `./start-dev.sh` / `.\start-dev.ps1` after the one-time bootstrap. Full guide: [local development](architecture/local-development.md).
 
 Open **http://localhost:5173** · API docs **http://127.0.0.1:8000/api/docs**
+
+## Production workers
+
+Messenger work is split across two Compose services (plus a scheduler):
+
+| Service | Consumes | Handles |
+|---------|----------|---------|
+| `worker` | `async` | Archidekt / commander intelligence, catalog syncs, prune |
+| `worker_import` | `csv` | Store CSV inventory uploads |
+| `scheduler` | `scheduler_*` | Ticks recurring catalog, billing, and commander jobs |
+
+Steady state (one of each worker):
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env up -d \
+  --scale worker=1 --scale worker_import=1
+```
+
+Bump `worker_import` if many stores upload at once. Command cheat sheet: [architecture/commands.md](architecture/commands.md).
