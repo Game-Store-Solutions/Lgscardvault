@@ -281,12 +281,31 @@ export default function BrandingTab({ slug }: { slug: string }) {
           />
           <CardBody className="space-y-6">
             <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Store theme library</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Light theme library</p>
               <ThemePresetPicker instanceId="light" onSelect={applyPreset} />
             </div>
             <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
               <ColorField label="Primary / button color" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
               <ColorField label="Accent color" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
+            </div>
+          </CardBody>
+          <CardBody className="space-y-6">
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Dark theme library</p>
+              <ThemePresetPicker
+                instanceId="dark"
+                categories={DARK_THEME_PRESET_CATEGORIES}
+                onSelect={applyDarkPreset}
+              />
+            </div>
+            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
+            <ColorField label="Primary / button color" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
+            <ColorField label="Accent color" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
+            <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
+            <ColorField label="Card / surface" value={form.darkColors.surfaceColor} fallback="#171b2e" onChange={(v) => setDark('surfaceColor', v)} />
+            <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
+            <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
+            <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
             </div>
           </CardBody>
         </Card>
@@ -406,25 +425,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
             title="Dark mode palette"
             subtitle="Optional: shown when shoppers use the dark theme toggle. Pick a dark library theme or fine-tune below."
           />
-          <CardBody className="space-y-6">
-            <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Dark theme library</p>
-              <ThemePresetPicker
-                instanceId="dark"
-                categories={DARK_THEME_PRESET_CATEGORIES}
-                onSelect={applyDarkPreset}
-              />
-            </div>
-            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
-            <ColorField label="Primary / button color" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
-            <ColorField label="Accent color" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
-            <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
-            <ColorField label="Card / surface" value={form.darkColors.surfaceColor} fallback="#171b2e" onChange={(v) => setDark('surfaceColor', v)} />
-            <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
-            <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
-            <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
-            </div>
-          </CardBody>
+    
         </Card>
 
         <Card>
