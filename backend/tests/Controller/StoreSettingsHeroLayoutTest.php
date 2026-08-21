@@ -95,4 +95,39 @@ final class StoreSettingsHeroLayoutTest extends WebTestCase
         self::assertSame('QA heading', $read['heroHeading']);
         self::assertSame('cinematic', $read['heroLayout']);
     }
+
+    public function testHeroImageOpacityPersistsForLightAndDark(): void
+    {
+        $patch = $this->patchSettings([
+            'heroImageOpacity' => 62,
+            'darkHeroImageOpacity' => 35,
+        ]);
+        self::assertSame(62, $patch['heroImageOpacity']);
+        self::assertSame(35, $patch['darkHeroImageOpacity']);
+
+        $read = $this->readStore();
+        self::assertSame(62, $read['heroImageOpacity']);
+        self::assertSame(35, $read['darkHeroImageOpacity']);
+    }
+
+    public function testHeroImageOpacityRejectsOutOfRange(): void
+    {
+        $this->client->request(
+            'PATCH',
+            sprintf('/api/stores/%s/settings', $this->store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer,
+            ],
+            content: json_encode(['heroImageOpacity' => 140]),
+        );
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testDarkHeroImageOpacityCanInheritLight(): void
+    {
+        $this->patchSettings(['heroImageOpacity' => 80, 'darkHeroImageOpacity' => 20]);
+        $patch = $this->patchSettings(['darkHeroImageOpacity' => null]);
+        self::assertNull($patch['darkHeroImageOpacity']);
+    }
 }

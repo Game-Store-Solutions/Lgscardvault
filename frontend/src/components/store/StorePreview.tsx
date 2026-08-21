@@ -7,6 +7,7 @@ import { GENERIC_MTG_CARDS } from './hero/heroCardPool'
 import { normalizeHeroLayout } from './hero/heroLayouts'
 import { StoreHero } from './StoreHero'
 import { inheritFrameStyles, resolveFrameStyles, storeFrameClass, storeThemeVars, type StorePalette } from '../../lib/storeTheme'
+import { resolveHeroImageOpacity } from '../../lib/heroImageOpacity'
 import {
   PAGE_BACKGROUND_LABELS,
   resolvePatternColorsForRender,
@@ -75,6 +76,8 @@ export interface StorePreviewBranding {
   darkColors?: StorePreviewDarkColors | null
   logoUrl?: string | null
   heroImageUrl?: string | null
+  heroImageOpacity?: number | null
+  darkHeroImageOpacity?: number | null
   heroHeading?: string | null
   heroSubheading?: string | null
   tagline?: string | null
@@ -294,6 +297,11 @@ export function StorePreview({
         heroHeading={branding.heroHeading}
         heroSubheading={branding.heroSubheading}
         heroImageUrl={branding.heroImageUrl}
+        heroImageOpacity={resolveHeroImageOpacity(
+          branding.heroImageOpacity,
+          branding.darkHeroImageOpacity,
+          previewMode === 'dark',
+        )}
         logoUrl={branding.logoUrl}
         primaryColor={effectivePalette.primaryColor ?? branding.primaryColor}
         accentColor={effectivePalette.accentColor ?? branding.accentColor}

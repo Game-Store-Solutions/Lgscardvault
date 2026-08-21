@@ -244,6 +244,19 @@ final readonly class StoreSettingsUpdater
         if (array_key_exists('pageBackgrounds', $payload)) {
             $store->setPageBackgrounds($this->cleanPageBackgrounds($payload['pageBackgrounds']));
         }
+
+        if (array_key_exists('heroImageOpacity', $payload)) {
+            $store->setHeroImageOpacity($this->intInRange($payload['heroImageOpacity'], 'heroImageOpacity', 0, 100));
+        }
+
+        if (array_key_exists('darkHeroImageOpacity', $payload)) {
+            $raw = $payload['darkHeroImageOpacity'];
+            if (null === $raw || '' === $raw) {
+                $store->setDarkHeroImageOpacity(null);
+            } else {
+                $store->setDarkHeroImageOpacity($this->intInRange($raw, 'darkHeroImageOpacity', 0, 100));
+            }
+        }
     }
 
     /** @return array<string, mixed> */
@@ -269,6 +282,8 @@ final readonly class StoreSettingsUpdater
             'pageBackgrounds' => $this->normalizePageBackgroundsForRead($store->getPageBackgrounds()),
             'logoUrl' => $store->getLogoUrl(),
             'heroImageUrl' => $store->getHeroImageUrl(),
+            'heroImageOpacity' => $store->getHeroImageOpacity(),
+            'darkHeroImageOpacity' => $store->getDarkHeroImageOpacity(),
             'heroHeading' => $store->getHeroHeading(),
             'heroSubheading' => $store->getHeroSubheading(),
             'tagline' => $store->getTagline(),
