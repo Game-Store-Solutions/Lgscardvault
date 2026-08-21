@@ -1,5 +1,5 @@
 export { useStore, useActiveStores, activeStoresKey } from './useStore'
-export { useInventory, inventoryKey, inventoryPageKey, useInventoryPage, useInventoryCatalog, searchInventoryByNames, MASS_SEARCH_MAX_NAMES } from './useInventory'
+export { useInventory, inventoryKey, inventoryPageKey, useInventoryPage, useInventoryCatalog, useStoreSpotlight, storeSpotlightKey, searchInventoryByNames, MASS_SEARCH_MAX_NAMES } from './useInventory'
 export { useStoreSections, useStoreCases, usePullSheet, useStockingSheet, storeSectionsKey, storeCasesKey } from './useStoreSections'
 export { usePendingSellSubmissionCount, useSellSubmissionsList, sellSubmissionsKey, pendingSellSubmissionsCountKey } from './useSellSubmissions'
 export { useOrders, useOrdersPage, useAllStoreOrders, useOpenStoreOrderCount, useStoreOrderQueueCounts, resolveOrdersListTotal, ordersKey, openStoreOrdersCountKey, ADMIN_ORDERS_PAGE_SIZE } from './useOrders'

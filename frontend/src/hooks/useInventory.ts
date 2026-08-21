@@ -126,6 +126,26 @@ export function useInventoryPage(slug: string, filters: InventoryPageFilters) {
   })
 }
 
+export const storeSpotlightKey = (slug: string, game?: string) =>
+  ['store-spotlight', slug, game || 'any-game'] as const
+
+/** Public assembled spotlight rail (pinned cards + price floor + min fill). */
+export function useStoreSpotlight(slug: string, game?: string, enabled = true) {
+  const gameCode = game?.trim() || undefined
+
+  return useQuery({
+    queryKey: storeSpotlightKey(slug, gameCode),
+    enabled: enabled && Boolean(slug),
+    staleTime: 30 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get(`/stores/${slug}/spotlight`, {
+        params: gameCode ? { game: gameCode } : {},
+      })
+      return parseInventoryPage(data, 1, 24)
+    },
+  })
+}
+
 function catalogRequestParams(filters: InventoryPageFilters, page: number, itemsPerPage: number) {
   const game = filters.game?.trim() || undefined
   const inStockOnly = Boolean(filters.inStockOnly)

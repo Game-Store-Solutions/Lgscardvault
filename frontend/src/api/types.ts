@@ -70,6 +70,9 @@ export interface Store {
   isActive?: boolean
   featured?: boolean
   spotlightMinPriceCents?: number
+  spotlightMinItems?: number
+  spotlightMaxItems?: number
+  spotlightPinnedInventoryIds?: number[]
   // Storefront branding (owner-managed via /settings)
   primaryColor?: string | null
   accentColor?: string | null
