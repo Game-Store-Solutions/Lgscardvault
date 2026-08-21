@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useMemo, useState } from 'react'
-import { Heart, ImageOff, Moon, Search, ShoppingCart, Sun } from 'lucide-react'
+import { Heart, ImageOff, Monitor, Moon, Search, ShoppingCart, Smartphone, Sun } from 'lucide-react'
 import type { CardDisplayStyle, HeroLayout, StoreCommunityEvents } from '../../api/types'
 import { Badge, Button, FilterPill } from '../ui'
 import { GENERIC_MTG_CARDS } from './hero/heroCardPool'
@@ -204,6 +204,49 @@ export function ThemeModeSwitch({
   )
 }
 
+export function PreviewDeviceSwitch({
+  device,
+  onChange,
+  label = 'Preview device',
+}: {
+  device: 'desktop' | 'phone'
+  onChange: (device: 'desktop' | 'phone') => void
+  label?: string
+}) {
+  return (
+    <div
+      className="inline-flex rounded-btn border border-border bg-surface p-0.5 text-xs font-bold"
+      role="group"
+      aria-label={label}
+    >
+      <button
+        type="button"
+        aria-pressed={device === 'desktop'}
+        className={cx(
+          'inline-flex items-center gap-1 rounded-[calc(var(--radius-btn)-2px)] px-2 py-1 transition-colors',
+          device === 'desktop' ? 'bg-brand-500 text-white' : 'text-fg-muted hover:text-fg',
+        )}
+        onClick={() => onChange('desktop')}
+      >
+        <Monitor aria-hidden className="size-3.5" />
+        Desktop
+      </button>
+      <button
+        type="button"
+        aria-pressed={device === 'phone'}
+        className={cx(
+          'inline-flex items-center gap-1 rounded-[calc(var(--radius-btn)-2px)] px-2 py-1 transition-colors',
+          device === 'phone' ? 'bg-brand-500 text-white' : 'text-fg-muted hover:text-fg',
+        )}
+        onClick={() => onChange('phone')}
+      >
+        <Smartphone aria-hidden className="size-3.5" />
+        Phone
+      </button>
+    </div>
+  )
+}
+
 /**
  * StorePreview — a scaled-down, live mock of the storefront. The in-progress
  * palette is scoped to this container by overriding the design-token CSS
@@ -218,6 +261,8 @@ export function StorePreview({
   showModeToggle = true,
   previewMode: previewModeProp,
   onPreviewModeChange,
+  previewDevice: previewDeviceProp,
+  onPreviewDeviceChange,
 }: {
   branding: StorePreviewBranding
   storeName: string
@@ -225,12 +270,21 @@ export function StorePreview({
   showModeToggle?: boolean
   previewMode?: 'light' | 'dark'
   onPreviewModeChange?: (mode: 'light' | 'dark') => void
+  previewDevice?: 'desktop' | 'phone'
+  onPreviewDeviceChange?: (device: 'desktop' | 'phone') => void
 }) {
   const [internalMode, setInternalMode] = useState<'light' | 'dark'>('light')
   const previewMode = previewModeProp ?? internalMode
   const setPreviewMode = (mode: 'light' | 'dark') => {
     onPreviewModeChange?.(mode)
     if (previewModeProp === undefined) setInternalMode(mode)
+  }
+
+  const [internalDevice, setInternalDevice] = useState<'desktop' | 'phone'>('desktop')
+  const previewDevice = previewDeviceProp ?? internalDevice
+  const setPreviewDevice = (device: 'desktop' | 'phone') => {
+    onPreviewDeviceChange?.(device)
+    if (previewDeviceProp === undefined) setInternalDevice(device)
   }
 
   const effectivePalette = useMemo(
@@ -276,7 +330,12 @@ export function StorePreview({
   return (
     <div className="space-y-3">
       {showModeToggle ? (
-        <div className="flex items-center justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <PreviewDeviceSwitch
+            device={previewDevice}
+            onChange={setPreviewDevice}
+            label="Preview device"
+          />
           <ThemeModeSwitch mode={previewMode} onChange={setPreviewMode} label="Preview color mode" />
         </div>
       ) : null}
@@ -286,6 +345,7 @@ export function StorePreview({
         className={cx(
           'relative min-h-[20rem] overflow-hidden rounded-card border border-border shadow-card sm:min-h-[26rem] xl:min-h-[32rem]',
           previewMode === 'dark' ? 'dark' : 'preview-light',
+          previewDevice === 'phone' && 'mx-auto max-w-[22.5rem]',
         )}
         data-page-background={previewBackgroundPreset}
       >
@@ -325,6 +385,7 @@ export function StorePreview({
         )}
         heroImagePositionMobileX={branding.heroImagePositionMobileX}
         heroImagePositionMobileY={branding.heroImagePositionMobileY}
+        phoneCrop={previewDevice === 'phone'}
         logoUrl={branding.logoUrl}
         primaryColor={effectivePalette.primaryColor ?? branding.primaryColor}
         accentColor={effectivePalette.accentColor ?? branding.accentColor}

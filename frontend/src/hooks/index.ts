@@ -12,6 +12,7 @@ export { useKioskMode } from './useKioskMode'
 export { usePromoCountdown } from './usePromoCountdown'
 export { useTilt } from './useTilt'
 export { useStoreTheme, useIsDarkTheme, STORE_THEME_CLASS, APP_CHROME_CLASS } from './useStoreTheme'
+export { usePhoneHeroCrop } from './usePhoneHeroCrop'
 export {
   customerKeys,
   useCustomerProfile,

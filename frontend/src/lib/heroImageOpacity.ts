@@ -80,17 +80,23 @@ export function heroImageCropVars(
   }
 }
 
-/** Combined opacity + crop for the hero `<img>`. */
+/** Combined opacity + crop for the hero `<img>`. `phoneCrop` uses the phone focal point. */
 export function heroImagePhotoStyle(
   opacity: number,
   x: number,
   y: number,
   mobileX?: number | null,
   mobileY?: number | null,
+  phoneCrop = false,
 ): Record<string, string | number> {
+  const desktopX = clampHeroImagePosition(x)
+  const desktopY = clampHeroImagePosition(y)
+  const posX = phoneCrop ? clampHeroImagePosition(mobileX, desktopX) : desktopX
+  const posY = phoneCrop ? clampHeroImagePosition(mobileY, desktopY) : desktopY
   return {
     opacity: heroImageOpacityCss(opacity),
-    ...heroImageCropVars(x, y, mobileX, mobileY),
+    objectFit: 'cover',
+    objectPosition: `${posX}% ${posY}%`,
   }
 }
 

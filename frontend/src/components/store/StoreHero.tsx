@@ -33,6 +33,8 @@ export interface StoreHeroProps {
   heroImagePositionMobileX?: number | null
   /** Phone vertical crop. Null = inherit desktop. */
   heroImagePositionMobileY?: number | null
+  /** When true, apply the phone crop in this render (preview or narrow viewport). */
+  phoneCrop?: boolean
   logoUrl?: string | null
   primaryColor?: string | null
   accentColor?: string | null

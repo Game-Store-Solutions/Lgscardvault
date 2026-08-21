@@ -29,7 +29,7 @@ function HeroShell({
   layout?: HeroLayout
 }) {
   const { primary, hasImage } = tokens
-  const { heroImageUrl, heroImageOpacity, heroImagePosition, heroImagePositionX, heroImagePositionMobileX, heroImagePositionMobileY, className: outerClass } = props
+  const { heroImageUrl, heroImageOpacity, heroImagePosition, heroImagePositionX, heroImagePositionMobileX, heroImagePositionMobileY, phoneCrop, className: outerClass } = props
   return (
     <div className={cx('rounded-card', storeFrameClass('hero'), outerClass)}>
       <div
@@ -49,6 +49,7 @@ function HeroShell({
           imagePositionY={clampHeroImagePosition(heroImagePosition)}
           imagePositionMobileX={heroImagePositionMobileX}
           imagePositionMobileY={heroImagePositionMobileY}
+          phoneCrop={phoneCrop}
         />
         <div className="relative z-[1]">{children}</div>
       </div>
@@ -105,13 +106,14 @@ function IdentityHeader({
 /** Classic full-height photo banner with gradients (original cinematic hero). */
 export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
   const { primary, accent, heading, hasImage } = tokens
-  const { heroImageUrl, heroImageOpacity, heroImagePosition, heroImagePositionX, heroImagePositionMobileX, heroImagePositionMobileY, logoUrl, tagline, heroSubheading, actions, className } = props
+  const { heroImageUrl, heroImageOpacity, heroImagePosition, heroImagePositionX, heroImagePositionMobileX, heroImagePositionMobileY, phoneCrop, logoUrl, tagline, heroSubheading, actions, className } = props
   const photoStyle = heroImagePhotoStyle(
     clampHeroImageOpacity(heroImageOpacity),
     clampHeroImagePosition(heroImagePositionX),
     clampHeroImagePosition(heroImagePosition),
     heroImagePositionMobileX,
     heroImagePositionMobileY,
+    phoneCrop,
   )
 
   return (
@@ -130,7 +132,7 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
           decoding="async"
           fetchPriority="high"
           sizes="100vw"
-          className={cx('absolute inset-0 -z-20 size-full', HERO_BANNER_PHOTO_CLASS)}
+          className={cx('absolute inset-0 -z-20 size-full object-cover', HERO_BANNER_PHOTO_CLASS)}
           style={photoStyle as CSSProperties}
         />
       ) : null}

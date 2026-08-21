@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Image, LayoutGrid, Layers, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
 import { HeroLayoutPicker } from '../../components/store/hero/HeroLayoutPicker'
@@ -7,7 +7,7 @@ import api, { extractErrorMessage, httpStatus } from '../../api/client'
 import type { ApiError, CardDisplayStyle, HeroLayout, Store } from '../../api/types'
 import { useStore } from '../../hooks'
 import { Button, Card, CardBody, CardHeader, Input, TabPanel, Tabs, Textarea } from '../../components/ui'
-import { StorePreview, ThemeModeSwitch } from '../../components/store'
+import { StorePreview, ThemeModeSwitch, PreviewDeviceSwitch } from '../../components/store'
 import { ImageUploadField } from '../../components/ImageUploadField'
 import {
   ColorField,
@@ -34,12 +34,15 @@ import {
   type FrameStyles,
 } from '../../lib/storeTheme'
 import {
+  HERO_BANNER_PHOTO_CLASS,
   HERO_IMAGE_OPACITY_DEFAULT,
   HERO_IMAGE_OPACITY_RANGE,
   HERO_IMAGE_POSITION_DEFAULT,
   HERO_IMAGE_POSITION_RANGE,
   clampHeroImageOpacity,
   clampHeroImagePosition,
+  heroImagePhotoStyle,
+  resolveHeroImageUrl,
 } from '../../lib/heroImageOpacity'
 import { BackgroundPresetPicker } from '../../components/store/backgrounds'
 import {
@@ -234,9 +237,11 @@ export default function BrandingTab({ slug }: { slug: string }) {
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null)
   const [formDirty, setFormDirty] = useState(false)
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light')
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'phone'>('desktop')
   const [section, setSection] = useState<BrandingSection>('colors')
   const formRef = useRef(form)
   formRef.current = form
+  const heroSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (isLoading || !store?.slug) return
@@ -245,6 +250,13 @@ export default function BrandingTab({ slug }: { slug: string }) {
     setLoadedSlug(store.slug)
     setFormDirty(false)
   }, [isLoading, loadedSlug, store])
+
+  useEffect(
+    () => () => {
+      if (heroSaveTimer.current) clearTimeout(heroSaveTimer.current)
+    },
+    [],
+  )
 
   const set = <K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) => {
     setFormDirty(true)
@@ -379,8 +391,27 @@ export default function BrandingTab({ slug }: { slug: string }) {
   })
 
   function saveHeroBranding(overrides?: Partial<BrandingForm>) {
+    if (heroSaveTimer.current) {
+      clearTimeout(heroSaveTimer.current)
+      heroSaveTimer.current = null
+    }
     const snapshot = { ...formRef.current, ...overrides }
     heroBrandingMutation.mutate(pickHeroBrandingPayload(snapshot))
+  }
+
+  function queueHeroSave() {
+    if (heroSaveTimer.current) clearTimeout(heroSaveTimer.current)
+    heroSaveTimer.current = setTimeout(() => {
+      heroSaveTimer.current = null
+      saveHeroBranding()
+    }, 400)
+  }
+
+  function setHeroField<K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) {
+    setFormDirty(true)
+    const next = { ...formRef.current, [key]: value }
+    formRef.current = next
+    setForm(next)
   }
 
   function onHeroImageChange(value: string) {
@@ -393,6 +424,37 @@ export default function BrandingTab({ slug }: { slug: string }) {
 
   function onLogoChange(value: string) {
     set('logoUrl', value)
+  }
+
+  const previewIsPhone = previewDevice === 'phone'
+  const previewIsDark = previewMode === 'dark'
+  const activeCropX = previewIsPhone
+    ? form.heroImagePositionMobileX
+    : previewIsDark
+      ? form.darkHeroImagePositionX
+      : form.heroImagePositionX
+  const activeCropY = previewIsPhone
+    ? form.heroImagePositionMobileY
+    : previewIsDark
+      ? form.darkHeroImagePosition
+      : form.heroImagePosition
+  const activeOpacity = previewIsDark ? form.darkHeroImageOpacity : form.heroImageOpacity
+  const activeHeroUrl = resolveHeroImageUrl(form.heroImageUrl, form.darkHeroImageUrl, previewIsDark)
+
+  function setActiveOpacity(value: number) {
+    setHeroField(previewIsDark ? 'darkHeroImageOpacity' : 'heroImageOpacity', value)
+  }
+
+  function setActiveCropX(value: number) {
+    if (previewIsPhone) setHeroField('heroImagePositionMobileX', value)
+    else if (previewIsDark) setHeroField('darkHeroImagePositionX', value)
+    else setHeroField('heroImagePositionX', value)
+  }
+
+  function setActiveCropY(value: number) {
+    if (previewIsPhone) setHeroField('heroImagePositionMobileY', value)
+    else if (previewIsDark) setHeroField('darkHeroImagePosition', value)
+    else setHeroField('heroImagePosition', value)
   }
 
   const displayMutation = useMutation({
@@ -730,9 +792,14 @@ export default function BrandingTab({ slug }: { slug: string }) {
           <Card>
             <CardHeader
               title="Hero banner"
-              subtitle="Layout, images, headline copy, and photo strength. Layout and uploads save automatically."
+              subtitle="Pick Light or Dark, then Desktop or Phone. The live preview shows the crop you are editing, including up and down. Image settings save when you release a slider."
               actions={
                 <div className="flex flex-wrap items-center justify-end gap-3">
+                  <PreviewDeviceSwitch
+                    device={previewDevice}
+                    onChange={setPreviewDevice}
+                    label="Hero preview device"
+                  />
                   <ThemeModeSwitch
                     mode={previewMode}
                     onChange={setPreviewMode}
@@ -765,103 +832,89 @@ export default function BrandingTab({ slug }: { slug: string }) {
                   onUploadComplete={(url) => saveHeroBranding({ logoUrl: url })}
                   hint="Upload an image or paste a URL. Also used by the loading screen."
                 />
-                <ImageUploadField
-                  label="Light hero image"
-                  placeholder="https://…/banner.jpg"
-                  value={form.heroImageUrl}
-                  onChange={onHeroImageChange}
-                  onUploadComplete={(url) => saveHeroBranding({ heroImageUrl: url })}
-                  hint="Shown in light mode. Used in dark mode too if no dark image is set."
-                />
-                <ImageUploadField
-                  label="Dark hero image"
-                  placeholder="https://…/banner-dark.jpg"
-                  value={form.darkHeroImageUrl}
-                  onChange={onDarkHeroImageChange}
-                  onUploadComplete={(url) => saveHeroBranding({ darkHeroImageUrl: url })}
-                  hint="Optional. Leave blank to reuse the light photo when shoppers switch to dark."
+                {previewIsDark ? (
+                  <ImageUploadField
+                    label="Dark hero image"
+                    placeholder="https://…/banner-dark.jpg"
+                    value={form.darkHeroImageUrl}
+                    onChange={onDarkHeroImageChange}
+                    onUploadComplete={(url) => saveHeroBranding({ darkHeroImageUrl: url })}
+                    hint="Optional. Leave blank to reuse the light photo in dark mode."
+                  />
+                ) : (
+                  <ImageUploadField
+                    label="Light hero image"
+                    placeholder="https://…/banner.jpg"
+                    value={form.heroImageUrl}
+                    onChange={onHeroImageChange}
+                    onUploadComplete={(url) => saveHeroBranding({ heroImageUrl: url })}
+                    hint="Shown in light mode. Used in dark mode too if no dark image is set."
+                  />
+                )}
+                <p className="text-sm font-semibold text-fg">
+                  Editing {previewIsDark ? 'dark' : 'light'} · {previewIsPhone ? 'phone' : 'desktop'} crop
+                </p>
+                <p className="text-xs text-fg-muted">
+                  {previewIsPhone
+                    ? 'Phone crop is shared in light and dark. The banner box stays the same size — only the photo moves inside it.'
+                    : 'Move the photo inside the banner. Up / down and left / right both show in the crop preview below.'}
+                </p>
+                {activeHeroUrl ? (
+                  <div className="overflow-hidden rounded-card border border-border bg-bg">
+                    <div className="relative aspect-[2.5/1] overflow-hidden">
+                      <img
+                        src={activeHeroUrl}
+                        alt=""
+                        className={`absolute inset-0 size-full object-cover ${HERO_BANNER_PHOTO_CLASS}`}
+                        style={
+                          heroImagePhotoStyle(activeOpacity, activeCropX, activeCropY) as CSSProperties
+                        }
+                      />
+                    </div>
+                    <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
+                      Crop preview — this window is shorter than the photo so up / down is easy to see. The live store preview uses the same crop.
+                    </p>
+                  </div>
+                ) : null}
+                <RangeField
+                  label={`${previewIsDark ? 'Dark' : 'Light'} image opacity`}
+                  value={activeOpacity}
+                  min={HERO_IMAGE_OPACITY_RANGE.min}
+                  max={HERO_IMAGE_OPACITY_RANGE.max}
+                  unit="%"
+                  hint="How visible the banner photo is in this color mode."
+                  onChange={(v) => {
+                    setActiveOpacity(v)
+                    queueHeroSave()
+                  }}
+                  onChangeEnd={() => saveHeroBranding()}
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <RangeField
-                    label="Light image opacity"
-                    value={form.heroImageOpacity}
-                    min={HERO_IMAGE_OPACITY_RANGE.min}
-                    max={HERO_IMAGE_OPACITY_RANGE.max}
-                    unit="%"
-                    hint="How visible the banner photo is in light mode."
-                    onChange={(v) => set('heroImageOpacity', v)}
-                  />
-                  <RangeField
-                    label="Dark image opacity"
-                    value={form.darkHeroImageOpacity}
-                    min={HERO_IMAGE_OPACITY_RANGE.min}
-                    max={HERO_IMAGE_OPACITY_RANGE.max}
-                    unit="%"
-                    hint="How visible the banner photo is in dark mode."
-                    onChange={(v) => set('darkHeroImageOpacity', v)}
-                  />
-                </div>
-                <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Desktop crop</p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <RangeField
-                    label="Light left / right"
-                    value={form.heroImagePositionX}
+                    label="Left / right"
+                    value={activeCropX}
                     min={HERO_IMAGE_POSITION_RANGE.min}
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
                     hint="0 is the left of the photo, 100 is the right."
-                    onChange={(v) => set('heroImagePositionX', v)}
+                    onChange={(v) => {
+                      setActiveCropX(v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                   <RangeField
-                    label="Light up / down"
-                    value={form.heroImagePosition}
+                    label="Up / down"
+                    value={activeCropY}
                     min={HERO_IMAGE_POSITION_RANGE.min}
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
-                    hint="0 is the top of the photo, 100 is the bottom."
-                    onChange={(v) => set('heroImagePosition', v)}
-                  />
-                  <RangeField
-                    label="Dark left / right"
-                    value={form.darkHeroImagePositionX}
-                    min={HERO_IMAGE_POSITION_RANGE.min}
-                    max={HERO_IMAGE_POSITION_RANGE.max}
-                    unit="%"
-                    hint="Shift the dark photo left or right."
-                    onChange={(v) => set('darkHeroImagePositionX', v)}
-                  />
-                  <RangeField
-                    label="Dark up / down"
-                    value={form.darkHeroImagePosition}
-                    min={HERO_IMAGE_POSITION_RANGE.min}
-                    max={HERO_IMAGE_POSITION_RANGE.max}
-                    unit="%"
-                    hint="Shift the dark photo up or down."
-                    onChange={(v) => set('darkHeroImagePosition', v)}
-                  />
-                </div>
-                <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Phone crop</p>
-                <p className="text-xs text-fg-muted">
-                  Fine-tune how the photo is cropped inside the same banner on phones. The hero box does not change size.
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <RangeField
-                    label="Phone left / right"
-                    value={form.heroImagePositionMobileX}
-                    min={HERO_IMAGE_POSITION_RANGE.min}
-                    max={HERO_IMAGE_POSITION_RANGE.max}
-                    unit="%"
-                    hint="0 is left, 100 is right. Applies on phones in light and dark."
-                    onChange={(v) => set('heroImagePositionMobileX', v)}
-                  />
-                  <RangeField
-                    label="Phone up / down"
-                    value={form.heroImagePositionMobileY}
-                    min={HERO_IMAGE_POSITION_RANGE.min}
-                    max={HERO_IMAGE_POSITION_RANGE.max}
-                    unit="%"
-                    hint="0 is top, 100 is bottom. Applies on phones in light and dark."
-                    onChange={(v) => set('heroImagePositionMobileY', v)}
+                    hint="0 is the top of the photo, 100 is the bottom. Watch the live preview as you drag."
+                    onChange={(v) => {
+                      setActiveCropY(v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                 </div>
               </div>
@@ -878,7 +931,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     loading={heroBrandingMutation.isPending}
                     disabled={isLoading}
                   >
-                    Save hero copy
+                    Save hero
                   </Button>
                   {heroBrandingMutation.isError ? (
                     <span role="alert" className="text-sm font-medium text-danger-700">
@@ -980,10 +1033,12 @@ export default function BrandingTab({ slug }: { slug: string }) {
           storeName={store?.name ?? slug}
           previewMode={previewMode}
           onPreviewModeChange={setPreviewMode}
+          previewDevice={previewDevice}
+          onPreviewDeviceChange={setPreviewDevice}
         />
         </div>
         <p className="mt-3 text-xs text-fg-muted">
-          The Light/Dark switch updates the live preview only. Admin panels stay on your workspace theme.
+          Light/Dark and Desktop/Phone update the live preview and the sliders you are editing. Admin panels stay on your workspace theme.
         </p>
       </div>
     </div>

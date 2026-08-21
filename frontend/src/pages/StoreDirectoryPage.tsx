@@ -7,7 +7,7 @@ import { StoreHero, StoreCard, StoreCardSkeleton } from '../components/store'
 import { BrandLogo } from '../components/BrandLogo'
 import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
 import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../lib/heroImageOpacity'
-import { useActiveStores, useDebouncedValue, useIsDarkTheme } from '../hooks'
+import { useActiveStores, useDebouncedValue, useIsDarkTheme, usePhoneHeroCrop } from '../hooks'
 import { useAuth } from '../context/AuthContext'
 
 type SortKey = 'featured' | 'newest' | 'name'
@@ -45,6 +45,7 @@ export default function StoreDirectoryPage() {
   const { user } = useAuth()
   const { data: stores = [], isLoading, error, refetch } = useActiveStores()
   const isDark = useIsDarkTheme()
+  const phoneCrop = usePhoneHeroCrop()
 
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('featured')
@@ -163,6 +164,7 @@ export default function StoreDirectoryPage() {
             )}
             heroImagePositionMobileX={featured.heroImagePositionMobileX}
             heroImagePositionMobileY={featured.heroImagePositionMobileY}
+            phoneCrop={phoneCrop}
             logoUrl={featured.logoUrl}
             primaryColor={featured.primaryColor}
             accentColor={featured.accentColor}

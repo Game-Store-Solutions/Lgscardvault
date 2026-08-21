@@ -21,6 +21,7 @@ export function HeroPhotoBackgroundLayer({
   imagePositionY = HERO_IMAGE_POSITION_DEFAULT,
   imagePositionMobileX,
   imagePositionMobileY,
+  phoneCrop = false,
   blur = false,
 }: {
   heroImageUrl?: string | null
@@ -32,6 +33,7 @@ export function HeroPhotoBackgroundLayer({
   imagePositionY?: number
   imagePositionMobileX?: number | null
   imagePositionMobileY?: number | null
+  phoneCrop?: boolean
   blur?: boolean
 }) {
   if (!hasImage || !heroImageUrl?.trim()) {
@@ -49,7 +51,7 @@ export function HeroPhotoBackgroundLayer({
         fetchPriority="high"
         sizes="100vw"
         className={cx(
-          'absolute inset-0 -z-20 size-full',
+          'absolute inset-0 -z-20 size-full object-cover',
           HERO_BANNER_PHOTO_CLASS,
           blur && 'scale-105 blur-md',
           imageClassName,
@@ -61,6 +63,7 @@ export function HeroPhotoBackgroundLayer({
             clampHeroImagePosition(imagePositionY),
             imagePositionMobileX,
             imagePositionMobileY,
+            phoneCrop,
           ) as CSSProperties
         }
       />
@@ -79,6 +82,7 @@ export function HeroOptionalPhoto({
   imagePositionY = HERO_IMAGE_POSITION_DEFAULT,
   imagePositionMobileX,
   imagePositionMobileY,
+  phoneCrop = false,
 }: {
   layout?: import('../../../api/types').HeroLayout | null
   heroImageUrl?: string | null
@@ -89,6 +93,7 @@ export function HeroOptionalPhoto({
   imagePositionY?: number
   imagePositionMobileX?: number | null
   imagePositionMobileY?: number | null
+  phoneCrop?: boolean
 }) {
   if (!layoutUsesHeroPhotoBackground(layout)) return null
   return (
@@ -101,6 +106,7 @@ export function HeroOptionalPhoto({
       imagePositionY={imagePositionY}
       imagePositionMobileX={imagePositionMobileX}
       imagePositionMobileY={imagePositionMobileY}
+      phoneCrop={phoneCrop}
     />
   )
 }
