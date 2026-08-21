@@ -7,7 +7,7 @@ export interface HeroCardImage {
   isFoil?: boolean
 }
 
-/** Staple singles when inventory has no card art yet. */
+/** Staple singles when inventory has no card art yet (or a URL 404s). */
 export const GENERIC_MTG_CARDS: HeroCardImage[] = [
   { name: 'Sol Ring', imageUrl: 'https://cards.scryfall.io/normal/front/9/1/91fdb56b-54d5-4272-8319-505ff987fe9b.jpg' },
   { name: 'Lightning Bolt', imageUrl: 'https://cards.scryfall.io/normal/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg' },
@@ -43,12 +43,11 @@ export function buildHeroCardPool(inventory: InventoryItem[], count = 20): HeroC
   while (pool.length < count) {
     const generic = GENERIC_MTG_CARDS[genericIndex % GENERIC_MTG_CARDS.length]!
     genericIndex += 1
-    if (seen.has(generic.imageUrl) && genericIndex > GENERIC_MTG_CARDS.length * 3) {
-      pool.push({ ...generic, imageUrl: `${generic.imageUrl}#${pool.length}` })
-    } else {
-      seen.add(generic.imageUrl)
-      pool.push(generic)
-    }
+    const uniqueUrl = seen.has(generic.imageUrl)
+      ? `${generic.imageUrl}#pad-${pool.length}`
+      : generic.imageUrl
+    seen.add(generic.imageUrl)
+    pool.push({ ...generic, imageUrl: uniqueUrl })
   }
 
   return pool.slice(0, count)
