@@ -57,18 +57,22 @@ type GridSpotCell = {
   peak: number
   repeatDelay: number
   secondary: boolean
+  scaleFrom: number
+  scalePeak: number
 }
 
-function buildGridSpotCells(count: number, cols: number, rows: number): GridSpotCell[] {
+function buildGridSpotCells(count: number, cols: number, rows: number, animated = false): GridSpotCell[] {
   return Array.from({ length: count }, (_, id) => ({
     id,
     col: Math.floor(Math.random() * cols),
     row: Math.floor(Math.random() * rows),
-    delay: Math.random() * 5,
-    duration: 1.6 + Math.random() * 2.4,
-    peak: 0.42 + Math.random() * 0.38,
-    repeatDelay: 0.4 + Math.random() * 2.8,
-    secondary: Math.random() > 0.68,
+    delay: animated ? Math.random() * 7.5 : Math.random() * 5,
+    duration: animated ? 0.55 + Math.random() * 1.65 : 1.6 + Math.random() * 2.4,
+    peak: animated ? 0.52 + Math.random() * 0.42 : 0.42 + Math.random() * 0.38,
+    repeatDelay: animated ? 0.15 + Math.random() * 4.5 : 0.4 + Math.random() * 2.8,
+    secondary: Math.random() > (animated ? 0.58 : 0.68),
+    scaleFrom: animated ? 0.9 + Math.random() * 0.06 : 0.94,
+    scalePeak: animated ? 1 + Math.random() * 0.05 : 1,
   }))
 }
 
@@ -100,12 +104,23 @@ function AnimatedGridCells({
   const cols = compact ? 16 : thumbnail ? 14 : 52
   const rows = compact ? 11 : thumbnail ? 8 : 34
   const count = density === 'animated'
-    ? (compact || thumbnail ? 18 : 88)
+    ? (compact || thumbnail ? 22 : 96)
     : compact || thumbnail
       ? 8
       : 32
 
-  const cells = useMemo(() => buildGridSpotCells(count, cols, rows), [count, cols, rows])
+  const cells = useMemo(
+    () => buildGridSpotCells(count, cols, rows, density === 'animated'),
+    [count, cols, rows, density],
+  )
+
+  const colorStrength = density === 'animated'
+    ? thumbnail
+      ? '92'
+      : '84'
+    : thumbnail
+      ? '88'
+      : '72'
 
   return (
     <>
@@ -116,8 +131,8 @@ function AnimatedGridCells({
           left: cell.col * GRID_CELL + 1,
           top: cell.row * GRID_CELL + 1,
           backgroundColor: cell.secondary
-            ? `color-mix(in srgb, var(--page-bg-pattern-secondary, var(--color-accent-500)) ${thumbnail ? '88' : '72'}%, transparent)`
-            : `color-mix(in srgb, var(--page-bg-pattern-primary, var(--color-brand-500)) ${thumbnail ? '88' : '72'}%, transparent)`,
+            ? `color-mix(in srgb, var(--page-bg-pattern-secondary, var(--color-accent-500)) ${colorStrength}%, transparent)`
+            : `color-mix(in srgb, var(--page-bg-pattern-primary, var(--color-brand-500)) ${colorStrength}%, transparent)`,
         } as const
 
         if (staticPreview) {
@@ -130,19 +145,22 @@ function AnimatedGridCells({
           )
         }
 
+        const scaleFrom = cell.scaleFrom
+        const scalePeak = cell.scalePeak
+
         return (
           <motion.div
             key={cell.id}
             className="absolute rounded-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08)]"
             style={style}
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: [0, cell.peak, 0], scale: [0.94, 1, 0.96] }}
+            initial={{ opacity: 0, scale: scaleFrom }}
+            animate={{ opacity: [0, cell.peak, 0], scale: [scaleFrom, scalePeak, scaleFrom + 0.02] }}
             transition={{
               duration: cell.duration,
               repeat: Infinity,
               delay: cell.delay,
               repeatDelay: cell.repeatDelay,
-              ease: 'easeInOut',
+              ease: density === 'animated' ? [0.42, 0, 0.38, 1] : 'easeInOut',
             }}
           />
         )
