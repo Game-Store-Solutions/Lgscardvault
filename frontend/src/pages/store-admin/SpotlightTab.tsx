@@ -1,14 +1,26 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronUp, Pin, Search, Sparkles, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pin, Search, Sparkles, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
-import { useDebouncedValue, useInventoryPage, useStore } from '../../hooks'
-import { Card, CardHeader, CardBody, Field, Input, Button, EmptyState, PageHeader } from '../../components/ui'
-import { CardImage } from '../../components/cards'
+import { useDebouncedValue, useInventoryPage, useStore, useStoreGames, useStoreSpotlight } from '../../hooks'
+import { GameSelector } from '../../components/catalog'
+import {
+  Card,
+  CardHeader,
+  CardBody,
+  Field,
+  Input,
+  Button,
+  EmptyState,
+  PageHeader,
+  SpotlightRailSkeleton,
+} from '../../components/ui'
+import { CardImage, SpotlightCard } from '../../components/cards'
 import { cx } from '../../lib/cx'
 import { finishName } from '../../lib/finishes'
 import {
+  DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,
   SPOTLIGHT_ITEMS_CAP,
   SPOTLIGHT_MAX_ITEMS,
   SPOTLIGHT_MIN_ITEMS_DEFAULT,
@@ -24,7 +36,43 @@ export default function SpotlightTab({ slug }: { slug: string }) {
   const [pinnedIds, setPinnedIds] = useState<number[]>([])
   const [itemCache, setItemCache] = useState<Record<number, InventoryItem>>({})
   const [pickerQuery, setPickerQuery] = useState('')
+  const [previewGame, setPreviewGame] = useState('')
   const debouncedPicker = useDebouncedValue(pickerQuery, 250)
+  const railRef = useRef<HTMLDivElement>(null)
+  const { data: storeGames = [] } = useStoreGames(slug)
+  const gameOptions = useMemo(
+    () => storeGames.map((game) => ({ code: game.code, name: game.name })),
+    [storeGames],
+  )
+
+  useEffect(() => {
+    if (!previewGame && gameOptions.length > 0) {
+      setPreviewGame(gameOptions[0].code)
+    }
+  }, [gameOptions, previewGame])
+
+  const liveSpotlight = useStoreSpotlight(
+    slug,
+    previewGame || undefined,
+    Boolean(slug) && (gameOptions.length === 0 || Boolean(previewGame)),
+  )
+  const liveItems = liveSpotlight.data?.items ?? []
+  const liveLoading = liveSpotlight.isPending && !liveSpotlight.data
+
+  useEffect(() => {
+    if (liveItems.length === 0) return
+    setItemCache((current) => {
+      const next = { ...current }
+      let changed = false
+      for (const item of liveItems) {
+        if (!next[item.id]) {
+          next[item.id] = item
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [liveItems])
 
   useEffect(() => {
     if (!store) return
@@ -125,7 +173,12 @@ export default function SpotlightTab({ slug }: { slug: string }) {
     },
   })
 
-  const currentCents = store?.spotlightMinPriceCents ?? 1000
+  function scrollRail(direction: 1 | -1) {
+    const el = railRef.current
+    if (el) el.scrollBy({ left: direction * el.clientWidth * 0.85, behavior: 'smooth' })
+  }
+
+  const currentCents = store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS
   const parsedMax = Math.min(SPOTLIGHT_ITEMS_CAP, Math.max(1, Number.parseInt(maxItems, 10) || SPOTLIGHT_MAX_ITEMS))
   const parsedMin = Math.min(parsedMax, Math.max(0, Number.parseInt(minItems, 10) || 0))
 
@@ -163,6 +216,98 @@ export default function SpotlightTab({ slug }: { slug: string }) {
           />
         </div>
       </div>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              Live storefront rail
+              {previewGame ? (
+                <span className="text-fg-muted">
+                  · {gameOptions.find((game) => game.code === previewGame)?.name ?? previewGame}
+                </span>
+              ) : null}
+            </span>
+          }
+          subtitle={
+            liveItems.length > 0
+              ? `This is the same carousel shoppers see — ${liveItems.length} ${liveItems.length === 1 ? 'card' : 'cards'} at or above ${formatPrice(store?.spotlightMinPriceCents ?? currentCents)}. Pin any of them to lock them at the front.`
+              : `Shoppers currently see no spotlight for this game. Cards at or above ${formatPrice(store?.spotlightMinPriceCents ?? currentCents)} appear automatically after you save.`
+          }
+          actions={
+            gameOptions.length > 1 ? (
+              <GameSelector
+                games={gameOptions}
+                value={previewGame}
+                onChange={setPreviewGame}
+                label="Preview game"
+              />
+            ) : null
+          }
+        />
+        <CardBody className="pt-2">
+          {liveLoading ? (
+            <SpotlightRailSkeleton />
+          ) : liveSpotlight.isError ? (
+            <p className="px-1 py-6 text-sm font-medium text-danger-700" role="alert">
+              {extractErrorMessage(liveSpotlight.error, 'Could not load the storefront spotlight.')}
+            </p>
+          ) : liveItems.length === 0 ? (
+            <EmptyState
+              icon={Sparkles}
+              title="No spotlight cards yet"
+              description="Raise the minimum count, lower the price floor, or pin singles below. The storefront rail stays hidden until there is something to show."
+              className="py-10 sm:py-12"
+            />
+          ) : (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => scrollRail(-1)}
+                aria-label="Scroll spotlight left"
+                className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface text-fg-muted shadow-md transition-colors hover:text-brand-600 sm:grid"
+              >
+                <ChevronLeft aria-hidden className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollRail(1)}
+                aria-label="Scroll spotlight right"
+                className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface text-fg-muted shadow-md transition-colors hover:text-brand-600 sm:grid"
+              >
+                <ChevronRight aria-hidden className="size-5" />
+              </button>
+              <div
+                ref={railRef}
+                className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
+              >
+                {liveItems.map((item, index) => {
+                  const pinned = pinnedIds.includes(item.id)
+                  return (
+                    <div key={item.id} className="flex w-40 shrink-0 flex-col sm:w-52">
+                      <SpotlightCard
+                        item={item}
+                        slug={slug}
+                        ribbon={pinned ? 'Pinned' : index === 0 ? 'Featured' : 'Auto'}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={pinned ? 'secondary' : 'primary'}
+                        className="mt-2"
+                        onClick={() => (pinned ? unpinItem(item.id) : pinItem(item))}
+                      >
+                        <Pin aria-hidden className="size-3.5" />
+                        {pinned ? 'Unpin' : 'Pin this'}
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <SettingCard
@@ -271,8 +416,9 @@ export default function SpotlightTab({ slug }: { slug: string }) {
           ) : (
             <EmptyState
               icon={Pin}
-              title="No featured singles yet"
-              description="Search below to pin specific cards. Everything else in the rail still comes from the price floor."
+              title="No pinned singles yet"
+              description="The live rail above already shows your automatic spotlight. Pin any of those cards — or search below — to lock them at the front."
+              className="py-8 sm:py-10"
             />
           )}
 
