@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { BadgeCheck, Box, Dices, Sparkles } from 'lucide-react'
 import { cx } from '../../../lib/cx'
+import { clampHeroImageOpacity, heroImageOpacityCss } from '../../../lib/heroImageOpacity'
 import { isDarkHex, storeFrameClass } from '../../../lib/storeTheme'
 import type { StoreHeroProps } from '../StoreHero'
 import { HeroLogo, HeroTagline, useHeroTokens } from '../StoreHero'
@@ -30,7 +31,7 @@ function HeroShell({
   layout?: HeroLayout
 }) {
   const { primary, hasImage } = tokens
-  const { heroImageUrl, className: outerClass } = props
+  const { heroImageUrl, heroImageOpacity, className: outerClass } = props
   return (
     <div className={cx('rounded-card', storeFrameClass('hero'), outerClass)}>
       <div
@@ -46,6 +47,7 @@ function HeroShell({
           hasImage={hasImage}
           primary={primary}
           scrim={photoScrim}
+          imageOpacity={clampHeroImageOpacity(heroImageOpacity)}
         />
         <div className="relative z-[1]">{children}</div>
       </div>
@@ -102,7 +104,8 @@ function IdentityHeader({
 /** Classic full-height photo banner with gradients (original cinematic hero). */
 export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
   const { primary, accent, heading, hasImage } = tokens
-  const { heroImageUrl, logoUrl, tagline, heroSubheading, actions, className } = props
+  const { heroImageUrl, heroImageOpacity, logoUrl, tagline, heroSubheading, actions, className } = props
+  const photoOpacity = heroImageOpacityCss(clampHeroImageOpacity(heroImageOpacity))
 
   return (
     <div className={cx('rounded-card', storeFrameClass('hero'), className)}>
@@ -111,11 +114,16 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
         'relative isolate flex min-h-64 items-end overflow-hidden rounded-[inherit] sm:min-h-80 lg:min-h-95',
       )}
     >
+      <div aria-hidden className="absolute inset-0 -z-[21] bg-bg" style={{ backgroundColor: primary }} />
       {hasImage ? (
-        <img src={heroImageUrl as string} alt="" aria-hidden className="absolute inset-0 -z-20 size-full object-cover" />
-      ) : (
-        <div aria-hidden className="absolute inset-0 -z-20" style={{ backgroundColor: primary }} />
-      )}
+        <img
+          src={heroImageUrl as string}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 -z-20 size-full object-cover"
+          style={{ opacity: photoOpacity }}
+        />
+      ) : null}
       <div
         aria-hidden
         className="absolute inset-0 -z-10"

@@ -1,4 +1,5 @@
 import { cx } from '../../../lib/cx'
+import { heroImageOpacityCss } from '../../../lib/heroImageOpacity'
 import { layoutUsesHeroPhotoBackground } from './heroLayouts'
 
 export { layoutUsesHeroPhotoBackground } from './heroLayouts'
@@ -9,7 +10,7 @@ export function HeroPhotoBackgroundLayer({
   primary,
   scrim = 'dark',
   imageClassName,
-  imageOpacity = 1,
+  imageOpacity = 100,
   blur = false,
 }: {
   heroImageUrl?: string | null
@@ -17,6 +18,7 @@ export function HeroPhotoBackgroundLayer({
   primary: string
   scrim?: 'dark' | 'token' | 'light' | 'none'
   imageClassName?: string
+  /** Photo strength 0–100. */
   imageOpacity?: number
   blur?: boolean
 }) {
@@ -26,6 +28,7 @@ export function HeroPhotoBackgroundLayer({
 
   return (
     <>
+      <div aria-hidden className="absolute inset-0 -z-[21] bg-bg" />
       <img
         src={heroImageUrl}
         alt=""
@@ -35,7 +38,7 @@ export function HeroPhotoBackgroundLayer({
           blur && 'scale-105 blur-md',
           imageClassName,
         )}
-        style={{ opacity: imageOpacity }}
+        style={{ opacity: heroImageOpacityCss(imageOpacity) }}
       />
       {scrim === 'none' ? null : scrim === 'token' ? (
         <div
@@ -61,12 +64,14 @@ export function HeroOptionalPhoto({
   hasImage,
   primary,
   scrim = 'dark',
+  imageOpacity = 100,
 }: {
   layout?: import('../../../api/types').HeroLayout | null
   heroImageUrl?: string | null
   hasImage: boolean
   primary: string
   scrim?: 'dark' | 'token' | 'light' | 'none'
+  imageOpacity?: number
 }) {
   if (!layoutUsesHeroPhotoBackground(layout)) return null
   return (
@@ -75,6 +80,7 @@ export function HeroOptionalPhoto({
       hasImage={hasImage}
       primary={primary}
       scrim={scrim}
+      imageOpacity={imageOpacity}
     />
   )
 }

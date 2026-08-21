@@ -16,13 +16,14 @@ import {
 } from 'lucide-react'
 import { formatPrice, parsePriceInput } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { useCanManageStore, useDebouncedValue, useInventoryPage, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
+import { useCanManageStore, useDebouncedValue, useInventoryPage, useIsDarkTheme, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
 import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, SpotlightRailSkeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
 import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
 import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
 import { StoreHero } from '../components/store/StoreHero'
+import { resolveHeroImageOpacity } from '../lib/heroImageOpacity'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { SealedSpotlightRow } from '../components/store/SealedSpotlightRow'
@@ -88,6 +89,7 @@ export default function StorePage() {
 
   const { data: store, isLoading: storeLoading } = useStore(slug)
   useStoreTheme(store)
+  const storefrontIsDark = useIsDarkTheme()
   const cardDisplayStyle = store?.cardDisplayStyle ?? 'gallery'
 
   const { data: storeGames = [], isLoading: gamesLoading } = useStoreGames(slug)
@@ -448,6 +450,11 @@ export default function StorePage() {
           'Browse available Magic singles and compare printings, condition, colors, and prices.'
         }
         heroImageUrl={store?.heroImageUrl}
+        heroImageOpacity={resolveHeroImageOpacity(
+          store?.heroImageOpacity,
+          store?.darkHeroImageOpacity,
+          storefrontIsDark,
+        )}
         logoUrl={store?.logoUrl}
         primaryColor={store?.primaryColor}
         accentColor={store?.accentColor}

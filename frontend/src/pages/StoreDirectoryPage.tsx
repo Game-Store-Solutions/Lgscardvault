@@ -6,7 +6,8 @@ import { BackButton, EmptyState, ErrorState, PageHeader, Select } from '../compo
 import { StoreHero, StoreCard, StoreCardSkeleton } from '../components/store'
 import { BrandLogo } from '../components/BrandLogo'
 import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
-import { useActiveStores, useDebouncedValue } from '../hooks'
+import { resolveHeroImageOpacity } from '../lib/heroImageOpacity'
+import { useActiveStores, useDebouncedValue, useIsDarkTheme } from '../hooks'
 import { useAuth } from '../context/AuthContext'
 
 type SortKey = 'featured' | 'newest' | 'name'
@@ -43,6 +44,7 @@ function sortStores(list: StoreType[], sort: SortKey): StoreType[] {
 export default function StoreDirectoryPage() {
   const { user } = useAuth()
   const { data: stores = [], isLoading, error, refetch } = useActiveStores()
+  const isDark = useIsDarkTheme()
 
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('featured')
@@ -141,6 +143,11 @@ export default function StoreDirectoryPage() {
             heroHeading={featured.heroHeading}
             heroSubheading={featured.heroSubheading ?? 'Browse singles, compare inventory, and shop this storefront.'}
             heroImageUrl={featured.heroImageUrl?.trim() || '/stock/featured-tabletop.jpg'}
+            heroImageOpacity={resolveHeroImageOpacity(
+              featured.heroImageOpacity,
+              featured.darkHeroImageOpacity,
+              isDark,
+            )}
             logoUrl={featured.logoUrl}
             primaryColor={featured.primaryColor}
             accentColor={featured.accentColor}

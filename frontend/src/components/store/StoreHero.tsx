@@ -23,6 +23,8 @@ export interface StoreHeroProps {
   heroHeading?: string | null
   heroSubheading?: string | null
   heroImageUrl?: string | null
+  /** Banner photo opacity 0–100 for the current color mode. */
+  heroImageOpacity?: number | null
   logoUrl?: string | null
   primaryColor?: string | null
   accentColor?: string | null

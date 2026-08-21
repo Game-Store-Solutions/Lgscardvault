@@ -33,6 +33,11 @@ import {
   type FrameStyle,
   type FrameStyles,
 } from '../../lib/storeTheme'
+import {
+  HERO_IMAGE_OPACITY_DEFAULT,
+  HERO_IMAGE_OPACITY_RANGE,
+  clampHeroImageOpacity,
+} from '../../lib/heroImageOpacity'
 import { BackgroundPresetPicker } from '../../components/store/backgrounds'
 import {
   PAGE_BACKGROUND_DEFAULTS,
@@ -59,6 +64,8 @@ interface BrandingForm {
   darkFrameStyles: FrameStyles | null
   logoUrl: string
   heroImageUrl: string
+  heroImageOpacity: number
+  darkHeroImageOpacity: number
   heroHeading: string
   heroSubheading: string
   tagline: string
@@ -121,6 +128,8 @@ const EMPTY: BrandingForm = {
   darkFrameStyles: null,
   logoUrl: '',
   heroImageUrl: '',
+  heroImageOpacity: HERO_IMAGE_OPACITY_DEFAULT,
+  darkHeroImageOpacity: HERO_IMAGE_OPACITY_DEFAULT,
   heroHeading: '',
   heroSubheading: '',
   tagline: '',
@@ -160,6 +169,11 @@ function fromStore(store: Store): BrandingForm {
       : null,
     logoUrl: store.logoUrl ?? '',
     heroImageUrl: store.heroImageUrl ?? '',
+    heroImageOpacity: clampHeroImageOpacity(store.heroImageOpacity),
+    darkHeroImageOpacity: clampHeroImageOpacity(
+      store.darkHeroImageOpacity,
+      clampHeroImageOpacity(store.heroImageOpacity),
+    ),
     heroHeading: store.heroHeading ?? '',
     heroSubheading: store.heroSubheading ?? '',
     tagline: store.tagline ?? '',
@@ -676,13 +690,20 @@ export default function BrandingTab({ slug }: { slug: string }) {
           <Card>
             <CardHeader
               title="Hero banner"
-              subtitle="Layout, images, and headline copy. Layout and uploads save automatically."
+              subtitle="Layout, images, headline copy, and photo strength. Layout and uploads save automatically."
               actions={
-                <DisplaySaveStatus
-                  saving={heroLayoutMutation.isPending || heroBrandingMutation.isPending}
-                  saved={heroLayoutMutation.isSuccess || heroBrandingMutation.isSuccess}
-                  error={heroLayoutMutation.isError || heroBrandingMutation.isError}
-                />
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <ThemeModeSwitch
+                    mode={previewMode}
+                    onChange={setPreviewMode}
+                    label="Hero color mode"
+                  />
+                  <DisplaySaveStatus
+                    saving={heroLayoutMutation.isPending || heroBrandingMutation.isPending}
+                    saved={heroLayoutMutation.isSuccess || heroBrandingMutation.isSuccess}
+                    error={heroLayoutMutation.isError || heroBrandingMutation.isError}
+                  />
+                </div>
               }
             />
             <CardBody className="space-y-8">
@@ -712,6 +733,26 @@ export default function BrandingTab({ slug }: { slug: string }) {
                   onUploadComplete={(url) => saveHeroBranding({ heroImageUrl: url })}
                   hint="Background on most layouts (not cinematic classic). Upload shop photos or art."
                 />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <RangeField
+                    label="Light image opacity"
+                    value={form.heroImageOpacity}
+                    min={HERO_IMAGE_OPACITY_RANGE.min}
+                    max={HERO_IMAGE_OPACITY_RANGE.max}
+                    unit="%"
+                    hint="How visible the banner photo is in light mode. Lower values let the page color show through."
+                    onChange={(v) => set('heroImageOpacity', v)}
+                  />
+                  <RangeField
+                    label="Dark image opacity"
+                    value={form.darkHeroImageOpacity}
+                    min={HERO_IMAGE_OPACITY_RANGE.min}
+                    max={HERO_IMAGE_OPACITY_RANGE.max}
+                    unit="%"
+                    hint="How visible the banner photo is in dark mode. Switch the preview to Dark to check."
+                    onChange={(v) => set('darkHeroImageOpacity', v)}
+                  />
+                </div>
               </div>
               <div className="space-y-4 border-t border-border pt-6">
                 <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Messaging</p>

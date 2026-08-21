@@ -87,6 +87,10 @@ export interface Store {
   pageBackgrounds?: StorePageBackgrounds | null
   logoUrl?: string | null
   heroImageUrl?: string | null
+  /** Hero banner photo opacity in light mode (0–100). */
+  heroImageOpacity?: number | null
+  /** Hero banner photo opacity in dark mode. Null = inherit light. */
+  darkHeroImageOpacity?: number | null
   heroHeading?: string | null
   heroSubheading?: string | null
   tagline?: string | null

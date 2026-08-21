@@ -4,6 +4,7 @@ import { HEX } from './branding'
 import type { StorePageBackgrounds } from '../../lib/pageBackgrounds'
 import { resolvePageBackgrounds } from '../../lib/pageBackgrounds'
 import { inheritFrameStyles, resolveFrameStyles, type FrameStyles } from '../../lib/storeTheme'
+import { clampHeroImageOpacity } from '../../lib/heroImageOpacity'
 
 function sanitizePageBackgrounds(input?: StorePageBackgrounds | null): StorePageBackgrounds {
   const resolved = resolvePageBackgrounds(input)
@@ -66,6 +67,8 @@ export interface BrandingPayloadInput {
   contactEmail: string
   logoUrl?: string
   heroImageUrl?: string
+  heroImageOpacity?: number
+  darkHeroImageOpacity?: number | null
   websiteUrl?: string
   facebookUrl?: string
   instagramUrl?: string
@@ -76,6 +79,8 @@ export interface BrandingPayloadInput {
 export interface HeroBrandingPayload {
   logoUrl: string
   heroImageUrl: string
+  heroImageOpacity: number
+  darkHeroImageOpacity: number | null
   heroHeading: string
   heroSubheading: string
   tagline: string
@@ -111,6 +116,8 @@ export function sanitizeBrandingPayload<T extends BrandingPayloadInput>(form: T)
   }
 
   next.pageBackgrounds = sanitizePageBackgrounds(form.pageBackgrounds)
+  next.heroImageOpacity = clampHeroImageOpacity(form.heroImageOpacity)
+  next.darkHeroImageOpacity = clampHeroImageOpacity(form.darkHeroImageOpacity)
 
   const email = form.contactEmail.trim()
   next.contactEmail = email && EMAIL.test(email) ? email : ''
@@ -129,6 +136,10 @@ export function pickHeroBrandingPayload(form: HeroBrandingPayload): HeroBranding
   return {
     logoUrl: normalizeUrl(form.logoUrl),
     heroImageUrl: normalizeUrl(form.heroImageUrl),
+    heroImageOpacity: clampHeroImageOpacity(form.heroImageOpacity),
+    darkHeroImageOpacity: form.darkHeroImageOpacity == null
+      ? null
+      : clampHeroImageOpacity(form.darkHeroImageOpacity),
     heroHeading: form.heroHeading.trim(),
     heroSubheading: form.heroSubheading.trim(),
     tagline: form.tagline.trim(),

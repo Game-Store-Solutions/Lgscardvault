@@ -193,6 +193,18 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private ?string $heroImageUrl = null;
 
+    /** Hero banner photo opacity in light mode (0–100). */
+    #[ORM\Column(type: 'smallint', options: ['default' => 100])]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private int $heroImageOpacity = 100;
+
+    /** Hero banner photo opacity in dark mode. Null = inherit light. */
+    #[ORM\Column(type: 'smallint', nullable: true)]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?int $darkHeroImageOpacity = null;
+
     #[ORM\Column(length: 160, nullable: true)]
     #[Groups(['store:read', 'store:admin'])]
     private ?string $heroHeading = null;
@@ -697,6 +709,30 @@ class Store
     public function setHeroImageUrl(?string $heroImageUrl): static
     {
         $this->heroImageUrl = $heroImageUrl;
+
+        return $this;
+    }
+
+    public function getHeroImageOpacity(): int
+    {
+        return $this->heroImageOpacity;
+    }
+
+    public function setHeroImageOpacity(int $heroImageOpacity): static
+    {
+        $this->heroImageOpacity = $heroImageOpacity;
+
+        return $this;
+    }
+
+    public function getDarkHeroImageOpacity(): ?int
+    {
+        return $this->darkHeroImageOpacity;
+    }
+
+    public function setDarkHeroImageOpacity(?int $darkHeroImageOpacity): static
+    {
+        $this->darkHeroImageOpacity = $darkHeroImageOpacity;
 
         return $this;
     }
