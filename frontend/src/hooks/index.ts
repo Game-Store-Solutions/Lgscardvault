@@ -78,6 +78,7 @@ export {
   useSealedSpotlight,
   useCatalogSyncRuns,
   useScryfallSyncRuns,
+  useCardPrintings,
   catalogGamesKey,
   catalogGamesShowcaseKey,
   catalogShowcaseCardsKey,

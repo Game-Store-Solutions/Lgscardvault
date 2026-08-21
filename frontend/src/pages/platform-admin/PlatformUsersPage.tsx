@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Pencil, Shield, Trash2, UserRound, XCircle } from 'lucide-react'
+import { CheckCircle2, Pencil, Shield, Trash2, Upload, UserRound, XCircle } from 'lucide-react'
 import api, { extractErrorMessage, unwrapCollection } from '../../api/client'
 import type { AdminUser } from '../../api/types'
 import {
@@ -23,6 +23,7 @@ import {
   TR,
 } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
+import UserImportModal from './UserImportModal'
 
 type EditableUser = Pick<AdminUser, 'displayName' | 'email' | 'roles' | 'emailVerified'> & {
   plainPassword: string
@@ -42,6 +43,7 @@ export default function PlatformUsersPage() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<AdminUser | null>(null)
   const [deleting, setDeleting] = useState<AdminUser | null>(null)
+  const [importing, setImporting] = useState(false)
   const [form, setForm] = useState<EditableUser>(emptyForm)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
 
@@ -120,6 +122,12 @@ export default function PlatformUsersPage() {
       <PageHeader
         title="Users"
         subtitle="Manage identities, access, verification, and account removal across the platform."
+        actions={
+          <Button variant="secondary" onClick={() => setImporting(true)}>
+            <Upload aria-hidden className="size-4" />
+            Import users
+          </Button>
+        }
       />
 
       <Card>
@@ -214,6 +222,14 @@ export default function PlatformUsersPage() {
           </Table>
         )}
       </Card>
+
+      <UserImportModal
+        open={importing}
+        onClose={() => setImporting(false)}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+        }}
+      />
 
       <Modal
         open={Boolean(editing)}

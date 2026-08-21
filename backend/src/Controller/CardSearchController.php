@@ -6,9 +6,11 @@ use App\Entity\Card;
 use App\Entity\Game;
 use App\Repository\CardRepository;
 use App\Security\ApiRateLimit;
+use App\Service\Catalog\CardPrintingsFinder;
 use App\Service\Catalog\CatalogCardResolver;
 use App\Service\Catalog\PaperPrinting;
 use App\Service\Scryfall\ScryfallClient;
+use Symfony\Component\Uid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -39,6 +41,7 @@ class CardSearchController extends AbstractController
         private readonly \App\Repository\GameRepository $gameRepository,
         private readonly ScryfallClient $scryfallClient,
         private readonly CatalogCardResolver $catalogCardResolver,
+        private readonly CardPrintingsFinder $cardPrintingsFinder,
         #[Autowire(service: 'limiter.catalog_search')]
         private readonly RateLimiterFactoryInterface $catalogSearchLimiter,
     ) {
@@ -205,6 +208,37 @@ class CardSearchController extends AbstractController
             'offset' => $offset,
             'limit' => $limit,
             'items' => array_map($this->catalogCardResolver->serializeCard(...), $cards),
+        ]);
+    }
+
+    /**
+     * Every paper printing of this exact card (oracle id for Magic, exact
+     * name for other games). Inventory edit uses this instead of name search
+     * so "Abrade" does not collapse to a single unique-card hit.
+     */
+    #[Route('/cards/{id}/printings', name: 'api_catalog_card_printings', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function printings(Request $request, string $id): JsonResponse
+    {
+        if (null !== $response = ApiRateLimit::enforce($this->catalogSearchLimiter, $this->rateLimitKey($request))) {
+            return $response;
+        }
+
+        try {
+            $card = $this->cardRepository->find(Uuid::fromString($id));
+        } catch (\InvalidArgumentException) {
+            return $this->json(['detail' => 'Card id is invalid.'], 422);
+        }
+
+        if (!$card instanceof Card) {
+            return $this->json(['detail' => 'Card not found.'], 404);
+        }
+
+        return $this->json([
+            'items' => array_map(
+                $this->catalogCardResolver->serializeCard(...),
+                $this->cardPrintingsFinder->find($card),
+            ),
         ]);
     }
 

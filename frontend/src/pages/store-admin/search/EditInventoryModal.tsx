@@ -1,13 +1,15 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { AlertTriangle, Search, TrendingUp } from 'lucide-react'
-import api, { cardImage, formatPrice, formatScryfallPrice, parsePriceInput, scryfallPriceCents } from '../../../api/client'
+import { cardImage, formatPrice, parsePriceInput, scryfallPriceCents } from '../../../api/client'
 import type { CardSummary, InventoryItem } from '../../../api/types'
-import { Badge, Button, Input, Modal } from '../../../components/ui'
+import { Button, Field, Input, Modal, Skeleton } from '../../../components/ui'
 import { InteractiveCard } from '../../../components/cards'
+import { Stagger, StaggerItem } from '../../../components/motion'
 import { CONDITION_LABELS, ConditionSegmented, FinishPicker, QuantityStepper, type Condition } from '../../../components/inventory'
 import { rarityAccent } from '../../../lib/mtg'
-import { defaultFinishFor, finishChoices, finishOptions, isFoilFinish } from '../../../lib/finishes'
+import { defaultFinishFor, finishOptions, isFoilFinish } from '../../../lib/finishes'
+import { useCardPrintings } from '../../../hooks'
+import { PrintingGrid } from '../recovery/PrintingGrid'
 
 /** Payload emitted when saving an inventory edit (shared with the update mutation). */
 export interface InventoryEditPayload {
@@ -37,13 +39,12 @@ export function EditInventoryModal({ item, ...rest }: EditInventoryModalProps) {
 }
 
 function EditInventoryModalBody({
-  slug,
   item,
   inventory,
   pending,
   onClose,
   onSave,
-}: Omit<EditInventoryModalProps, 'item'> & { item: InventoryItem }) {
+}: Omit<EditInventoryModalProps, 'item' | 'slug'> & { item: InventoryItem }) {
   const [editSelectedCard, setEditSelectedCard] = useState<CardSummary>(item.card)
   const [editQuantity, setEditQuantity] = useState(item.quantity)
   const [editPriceText, setEditPriceText] = useState(formatPrice(item.priceCents))
@@ -52,43 +53,38 @@ function EditInventoryModalBody({
   )
   const [editCondition, setEditCondition] = useState<Condition>(item.condition)
   const [editFinish, setEditFinish] = useState(item.finish || defaultFinishFor(item.card))
-  const [variantSearchActive, setVariantSearchActive] = useState(false)
+  const [variantQuery, setVariantQuery] = useState('')
 
-  // The printing's own treatments, so a Pokemon listing can be moved between
-  // Holofoil and Reverse Holofoil instead of one shared "foil".
+  const printingsQuery = useCardPrintings(item.card.id)
+  const printings = printingsQuery.data ?? []
+  const otherPrintings = printings.filter((card) => card.id !== item.card.id)
+
+  const visiblePrintings = useMemo(() => {
+    const needle = variantQuery.trim().toLowerCase()
+    if (!needle) return printings
+    return printings.filter((card) =>
+      [card.setCode, card.setName, card.collectorNumber, card.lang, card.name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle)),
+    )
+  }, [printings, variantQuery])
+
   const finishes = finishOptions(editSelectedCard)
   const editIsFoil = isFoilFinish(editFinish)
   const marketCents = scryfallPriceCents(editSelectedCard, editIsFoil ? 'foil' : 'nonfoil')
   const priceCents = parsePriceInput(editPriceText)
   const priceInvalid = priceCents === null || priceCents <= 0
 
-  // Warn when the chosen printing + condition + finish already exists on another
-  // listing — saving will MERGE (sum quantities) rather than create a duplicate.
   const mergeTarget = inventory.find(
-    (it) =>
-      it.id !== item.id &&
-      it.card.id === editSelectedCard.id &&
-      it.condition === editCondition &&
-      it.finish === editFinish,
+    (listing) =>
+      listing.id !== item.id &&
+      listing.card.id === editSelectedCard.id &&
+      listing.condition === editCondition &&
+      listing.finish === editFinish,
   )
-
-  const { data: variantResults = [], isFetching: variantsLoading } = useQuery({
-    queryKey: ['card-variants', slug, item.card.id, item.card.name],
-    queryFn: async () => {
-      const { data } = await api.get<CardSummary[]>('/catalog/search', {
-        // Other printings of this card mean other printings in ITS game —
-        // an unscoped search would answer with Magic for every game.
-        params: { q: item.card.name, game: item.card.gameCode ?? 'mtg' },
-      })
-      return data.filter((card) => card.id !== item.card.id).slice(0, 12)
-    },
-    enabled: variantSearchActive,
-  })
 
   function selectVariant(card: CardSummary) {
     setEditSelectedCard(card)
-    // Keep the treatment when the new printing also sells it; otherwise fall
-    // back to whatever that printing leads with.
     const available = finishOptions(card)
     const nextFinish = available.some((option) => option.value === editFinish)
       ? editFinish
@@ -106,7 +102,7 @@ function EditInventoryModalBody({
       open
       onClose={onClose}
       title={`Edit ${item.card.name}`}
-      className="max-w-[calc(100vw-2rem)] 2xl:max-w-[92rem]"
+      className="max-w-[calc(100vw-2rem)] xl:max-w-6xl"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -132,10 +128,9 @@ function EditInventoryModalBody({
         </>
       }
     >
-      <div>
-        <div className="grid gap-8 xl:grid-cols-[24rem_minmax(0,1fr)]">
-          {/* Left: interactive holographic card + facts */}
-          <div className="space-y-4">
+      <div className="space-y-6">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+          <div className="rounded-3xl bg-bg/70 p-4 ring-1 ring-black/[0.04] dark:ring-white/10 sm:p-5">
             <InteractiveCard
               image={cardImage(editSelectedCard)}
               alt={editSelectedCard.name}
@@ -143,158 +138,157 @@ function EditInventoryModalBody({
               accent={rarityAccent(editSelectedCard.rarity)}
               maxTilt={12}
             />
-            <div>
-              <p className="font-display font-bold leading-snug text-fg">{editSelectedCard.name}</p>
-              <p className="text-xs uppercase tracking-wide text-fg-muted">
-                {editSelectedCard.setCode?.toUpperCase() ?? '-'} · #{editSelectedCard.collectorNumber ?? '-'}
+            <div className="mt-4 space-y-1">
+              <p className="font-display text-lg font-bold leading-snug tracking-tight text-fg">
+                {editSelectedCard.name}
+              </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted">
+                {editSelectedCard.setCode?.toUpperCase() ?? '—'} · #{editSelectedCard.collectorNumber ?? '—'}
+                {editSelectedCard.lang && editSelectedCard.lang !== 'en'
+                  ? ` · ${editSelectedCard.lang.toUpperCase()}`
+                  : ''}
               </p>
             </div>
-            <dl className="space-y-2 border-t border-border pt-3 text-sm">
+            <dl className="mt-4 space-y-2.5 border-t border-border/70 pt-4 text-sm">
               <Row label="Stored price" value={formatPrice(item.priceCents)} />
               <Row label="Market price" value={marketCents !== null ? formatPrice(marketCents) : 'Unavailable'} />
               <Row label="In stock" value={String(item.quantity)} />
             </dl>
           </div>
 
-          {/* Right: interactive editable fields */}
-          <div className="space-y-5">
-            <div>
-              <p className="mb-1.5 text-sm font-bold text-fg">Quantity</p>
-              <QuantityStepper value={editQuantity} onChange={setEditQuantity} />
-            </div>
-
-            <div>
-              <p className="mb-1.5 text-sm font-bold text-fg">Condition</p>
-              <ConditionSegmented value={editCondition} onChange={setEditCondition} />
-              <p className="mt-1 text-xs text-fg-muted">{CONDITION_LABELS[editCondition]}</p>
-            </div>
-
-            <div>
-              <p className="mb-1.5 text-sm font-bold text-fg">Finish</p>
-              <FinishPicker value={editFinish} options={finishes} onChange={setEditFinish} />
-            </div>
-
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <p className="text-sm font-bold text-fg">Price</p>
-                <button
-                  type="button"
-                  onClick={useMarketPrice}
-                  disabled={marketCents === null}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-fg-muted disabled:no-underline"
-                >
-                  <TrendingUp aria-hidden className="size-3.5" />
-                  Use market {marketCents !== null ? `(${formatPrice(marketCents)})` : '(n/a)'}
-                </button>
-              </div>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted">$</span>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={editPriceText}
-                  onChange={(e) => setEditPriceText(e.target.value)}
-                  aria-invalid={priceInvalid || undefined}
-                  className="pl-7"
-                />
-              </div>
-              {priceInvalid && (
-                <p className="mt-1 text-xs font-medium text-danger-700">
-                  Enter a sell price above $0.00.
-                </p>
-              )}
-            </div>
-
-            <div>
+          <Stagger immediate gap={0.05} className="space-y-5 rounded-3xl bg-bg/70 p-4 ring-1 ring-black/[0.04] dark:ring-white/10 sm:p-6">
+            <StaggerItem>
+              <Field label="Quantity">
+                <QuantityStepper value={editQuantity} onChange={setEditQuantity} />
+              </Field>
+            </StaggerItem>
+            <StaggerItem>
+              <Field label="Condition" hint={CONDITION_LABELS[editCondition]}>
+                <ConditionSegmented value={editCondition} onChange={setEditCondition} />
+              </Field>
+            </StaggerItem>
+            <StaggerItem>
+              <Field label="Finish">
+                <FinishPicker value={editFinish} options={finishes} onChange={setEditFinish} />
+              </Field>
+            </StaggerItem>
+            <StaggerItem>
+              <Field
+                label="Price"
+                error={priceInvalid ? 'Enter a sell price above $0.00.' : undefined}
+                hint={
+                  <button
+                    type="button"
+                    onClick={useMarketPrice}
+                    disabled={marketCents === null}
+                    className="inline-flex items-center gap-1 font-bold text-brand-600 hover:underline disabled:cursor-not-allowed disabled:font-normal disabled:text-fg-muted disabled:no-underline"
+                  >
+                    <TrendingUp aria-hidden className="size-3.5" />
+                    Use market {marketCents !== null ? `(${formatPrice(marketCents)})` : '(n/a)'}
+                  </button>
+                }
+              >
+                {({ id, describedBy }) => (
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted">$</span>
+                    <Input
+                      id={id}
+                      aria-describedby={describedBy}
+                      type="text"
+                      inputMode="decimal"
+                      value={editPriceText}
+                      onChange={(event) => setEditPriceText(event.target.value)}
+                      aria-invalid={priceInvalid || undefined}
+                      className="pl-7"
+                    />
+                  </div>
+                )}
+              </Field>
+            </StaggerItem>
+            <StaggerItem>
               <Input
                 label="Your cost per copy ($, optional)"
                 value={editCostText}
-                onChange={(e) => setEditCostText(e.target.value)}
+                onChange={(event) => setEditCostText(event.target.value)}
                 inputMode="decimal"
                 placeholder="What you paid. Powers profit reports"
               />
-            </div>
-
+            </StaggerItem>
             {mergeTarget && (
-              <div className="flex gap-2 rounded-card border border-warning-500/40 bg-warning-50 p-3 text-sm text-warning-700">
-                <AlertTriangle aria-hidden className="mt-0.5 size-4 flex-shrink-0" />
-                <p>
-                  A listing for this printing ({editCondition}, {editFinish}) already exists with{' '}
-                  <span className="font-bold">{mergeTarget.quantity}</span> in stock. Saving will <span className="font-bold">merge</span>{' '}
-                  them into one listing of <span className="font-bold">{mergeTarget.quantity + editQuantity}</span>.
-                </p>
-              </div>
-            )}
-
-            {/* Variants. Placed beside the card so it fills the column instead
-                of leaving a bare gap under the price field. */}
-            <div className="border-t border-border pt-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-display text-base font-bold text-fg">Variants</h3>
-                  <p className="text-xs text-fg-muted">
-                    {variantSearchActive ? 'Other printings matching this name.' : 'Find other printings of this card.'}
+              <StaggerItem>
+                <div className="flex gap-2 rounded-2xl border border-warning-500/40 bg-warning-50 p-3 text-sm text-warning-700">
+                  <AlertTriangle aria-hidden className="mt-0.5 size-4 flex-shrink-0" />
+                  <p>
+                    A listing for this printing ({editCondition}, {editFinish}) already exists with{' '}
+                    <span className="font-bold">{mergeTarget.quantity}</span> in stock. Saving will{' '}
+                    <span className="font-bold">merge</span> them into one listing of{' '}
+                    <span className="font-bold">{mergeTarget.quantity + editQuantity}</span>.
                   </p>
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => setVariantSearchActive(true)} loading={variantsLoading}>
-                  <Search className="size-4" aria-hidden />
-                  Find variants
-                </Button>
-              </div>
-
-              {variantSearchActive && (
-                <div className="mt-4">
-                  {variantResults.length > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-                      {variantResults.map((card) => {
-                        const selectedVariant = editSelectedCard.id === card.id
-                        const variantChoices = finishChoices(card)
-                        const previewFinish =
-                          variantChoices.hasFoil && !variantChoices.hasPlain ? 'foil' : 'nonfoil'
-                        return (
-                          <button
-                            key={card.id}
-                            type="button"
-                            onClick={() => selectVariant(card)}
-                            className={`flex min-h-40 items-start gap-4 rounded-card border p-4 text-left transition-colors ${
-                              selectedVariant
-                                ? 'border-brand-500 bg-brand-50'
-                                : 'border-border bg-surface hover:border-brand-300'
-                            }`}
-                          >
-                            <div className="h-32 w-[5.75rem] flex-shrink-0 overflow-hidden rounded-btn border border-border bg-bg">
-                              {cardImage(card) ? (
-                                <img src={cardImage(card)} alt={card.name} className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="grid h-full place-items-center text-[0.7rem] text-fg-muted">No image</div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-display text-base font-bold leading-snug text-fg [overflow-wrap:anywhere]">{card.name}</p>
-                              <p className="mt-0.5 text-xs uppercase text-fg-muted">
-                                {card.setCode?.toUpperCase() ?? '-'} · #{card.collectorNumber ?? '-'}
-                              </p>
-                              <p className="mt-1 text-sm font-bold text-brand-600">{formatScryfallPrice(card, previewFinish)}</p>
-                              {card.setName && <p className="mt-1 line-clamp-2 text-xs text-fg-muted">{card.setName}</p>}
-                              {card.rarity && <Badge className="mt-2 capitalize">{card.rarity}</Badge>}
-                              {selectedVariant && (
-                                <p className="mt-1 text-[0.7rem] font-semibold uppercase tracking-wide text-brand-600">
-                                  Selected
-                                </p>
-                              )}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    !variantsLoading && <p className="text-sm text-fg-muted">No additional variants found.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+              </StaggerItem>
+            )}
+          </Stagger>
         </div>
+
+        <section className="rounded-3xl bg-bg/70 p-4 ring-1 ring-black/[0.04] dark:ring-white/10 sm:p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="font-display text-base font-bold tracking-tight text-fg">Printings</h3>
+              <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+                {printingsQuery.isFetching && printings.length === 0
+                  ? 'Loading every paper printing of this card…'
+                  : otherPrintings.length > 0
+                    ? `${otherPrintings.length} other ${otherPrintings.length === 1 ? 'printing' : 'printings'} of ${item.card.name}. Click one to switch this listing.`
+                    : 'This is the only paper printing we have for this card.'}
+              </p>
+            </div>
+            {printings.length > 6 && (
+              <div className="relative w-full sm:w-64">
+                <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" />
+                <Input
+                  value={variantQuery}
+                  onChange={(event) => setVariantQuery(event.target.value)}
+                  placeholder="Filter set, #, or language…"
+                  className="pl-9"
+                  aria-label="Filter printings"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4">
+            {printingsQuery.isFetching && printings.length === 0 ? (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3" aria-busy="true" aria-label="Loading printings">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <div key={index} className="overflow-hidden rounded-2xl ring-1 ring-border">
+                    <Skeleton className="aspect-[5/7] w-full rounded-none" />
+                    <div className="space-y-1.5 p-2">
+                      <Skeleton className="h-3 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : printingsQuery.isError ? (
+              <p role="alert" className="text-sm font-medium text-danger-700">
+                Could not load printings.{' '}
+                <button type="button" className="font-bold underline" onClick={() => void printingsQuery.refetch()}>
+                  Try again
+                </button>
+              </p>
+            ) : visiblePrintings.length === 0 ? (
+              <p className="text-sm text-fg-muted">No printings match that filter.</p>
+            ) : (
+              <PrintingGrid
+                items={visiblePrintings}
+                selectedId={editSelectedCard.id}
+                finish={editIsFoil ? 'foil' : 'nonfoil'}
+                onSelect={selectVariant}
+                showIndex={false}
+              />
+            )}
+          </div>
+        </section>
       </div>
     </Modal>
   )
