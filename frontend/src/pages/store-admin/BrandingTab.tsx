@@ -436,7 +436,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                 />
               }
             />
-            <CardBody className={previewMode === 'dark' ? 'dark' : 'preview-light'}>
+            <CardBody>
               {previewMode === 'dark' ? (
                 <ThemePresetPicker
                   instanceId="dark"
@@ -455,7 +455,10 @@ export default function BrandingTab({ slug }: { slug: string }) {
                 <CardBody className="space-y-5">
                   <BrandingPreviewIsland
                     mode="light"
-                    themeVars={storeThemeVars(form)}
+                    themeVars={{
+                      '--color-brand-500': form.primaryColor || DEFAULTS.primaryColor,
+                      '--color-accent-500': form.accentColor || DEFAULTS.accentColor,
+                    }}
                     className="flex flex-wrap gap-2 p-4"
                   >
                     {[form.primaryColor || DEFAULTS.primaryColor, form.accentColor || DEFAULTS.accentColor].map((color) => (
@@ -476,7 +479,16 @@ export default function BrandingTab({ slug }: { slug: string }) {
               <Card>
                 <CardHeader title="Page & text" subtitle="Background, cards, and readable type — not borders." />
                 <CardBody className="space-y-5">
-                  <BrandingPreviewIsland mode="light" themeVars={storeThemeVars(form)} className="space-y-2 p-4">
+                  <BrandingPreviewIsland
+                    mode="light"
+                    themeVars={{
+                      '--color-bg': form.backgroundColor || DEFAULTS.backgroundColor,
+                      '--color-surface': form.surfaceColor || DEFAULTS.surfaceColor,
+                      '--color-fg': form.textColor || DEFAULTS.textColor,
+                      '--color-fg-muted': form.mutedColor || DEFAULTS.mutedColor,
+                    }}
+                    className="space-y-2 p-4"
+                  >
                     <div className="grid grid-cols-2 gap-2">
                       <div className="h-12 rounded-btn border border-border bg-bg" />
                       <div className="h-12 rounded-btn border border-border bg-surface" />
@@ -498,19 +510,14 @@ export default function BrandingTab({ slug }: { slug: string }) {
               <CardBody className="space-y-5">
                 <BrandingPreviewIsland
                   mode="dark"
-                  themeVars={storeThemeVars(
-                    {
-                      ...form.darkColors,
-                      backgroundColor: form.darkColors.backgroundColor || '#0f1220',
-                      surfaceColor: form.darkColors.surfaceColor || '#171b2e',
-                      textColor: form.darkColors.textColor || '#f5f6fb',
-                      mutedColor: form.darkColors.mutedColor || '#aab0cb',
-                      borderColor: form.darkColors.borderColor || '#2a2f47',
-                      primaryColor: form.darkColors.primaryColor || form.primaryColor || DEFAULTS.primaryColor,
-                      accentColor: form.darkColors.accentColor || form.accentColor || DEFAULTS.accentColor,
-                    },
-                    true,
-                  )}
+                  themeVars={{
+                    '--color-bg': form.darkColors.backgroundColor || '#0f1220',
+                    '--color-surface': form.darkColors.surfaceColor || '#171b2e',
+                    '--color-brand-500': form.darkColors.primaryColor || form.primaryColor || DEFAULTS.primaryColor,
+                    '--color-accent-500': form.darkColors.accentColor || form.accentColor || DEFAULTS.accentColor,
+                    '--color-fg': form.darkColors.textColor || '#f5f6fb',
+                    '--color-fg-muted': form.darkColors.mutedColor || '#aab0cb',
+                  }}
                   className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4"
                 >
                   {[
@@ -824,7 +831,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         />
         </div>
         <p className="mt-3 text-xs text-fg-muted">
-          Animated backgrounds stay fixed on screen and drift with scroll on your live storefront (preview shows motion in place). Toggle Light or Dark to check each theme.
+          The Light/Dark switch updates the live preview only. Admin panels stay on your workspace theme.
         </p>
       </div>
     </div>

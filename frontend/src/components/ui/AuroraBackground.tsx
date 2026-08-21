@@ -147,6 +147,7 @@ export function AuroraBackground({
       canvas.style.width = `${width}px`
       canvas.style.height = `${height}px`
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      if (reducedMotion) render()
     }
 
     const observer = parallax ? null : new ResizeObserver(resize)
@@ -182,7 +183,7 @@ export function AuroraBackground({
         ctx.fillRect(0, 0, width, height)
       }
 
-      const time = thumbnail ? 2.4 : reducedMotion ? 0 : frame * TIME_STEP
+      const time = reducedMotion ? (thumbnail ? 2.4 : 0) : frame * TIME_STEP
       const scrollShift = parallax ? scrollRef.current * SCROLL_DRIFT : 0
 
       blobs.forEach((blob, index) => {
@@ -191,7 +192,7 @@ export function AuroraBackground({
       })
 
       frame += 1
-      if (!reducedMotion && !compact && !thumbnail) raf = requestAnimationFrame(render)
+      if (!reducedMotion) raf = requestAnimationFrame(render)
     }
 
     render()
@@ -202,7 +203,7 @@ export function AuroraBackground({
       cancelAnimationFrame(raf)
       if (scrollAttached) window.removeEventListener('scroll', onScroll)
     }
-  }, [blobs, compact, live, mobile, parallax, thumbnail])
+  }, [blobs, compact, live, mobile, parallax, preview, thumbnail])
 
   return (
     <div ref={hostRef} className={cx('absolute inset-0 overflow-hidden', className)} aria-hidden>
