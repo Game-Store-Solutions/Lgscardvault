@@ -87,10 +87,24 @@ export interface Store {
   pageBackgrounds?: StorePageBackgrounds | null
   logoUrl?: string | null
   heroImageUrl?: string | null
+  /** Optional dark-mode hero photo. Null = reuse heroImageUrl. */
+  darkHeroImageUrl?: string | null
   /** Hero banner photo opacity in light mode (0–100). */
   heroImageOpacity?: number | null
   /** Hero banner photo opacity in dark mode. Null = inherit light. */
   darkHeroImageOpacity?: number | null
+  /** Vertical crop 0–100 (0 = top, 50 = center, 100 = bottom). */
+  heroImagePosition?: number | null
+  /** Horizontal crop 0–100 (0 = left, 50 = center, 100 = right). */
+  heroImagePositionX?: number | null
+  /** Dark-mode vertical crop. Null = inherit light. */
+  darkHeroImagePosition?: number | null
+  /** Dark-mode horizontal crop. Null = inherit light. */
+  darkHeroImagePositionX?: number | null
+  /** Phone horizontal crop. Null = inherit desktop. */
+  heroImagePositionMobileX?: number | null
+  /** Phone vertical crop. Null = inherit desktop. */
+  heroImagePositionMobileY?: number | null
   heroHeading?: string | null
   heroSubheading?: string | null
   tagline?: string | null

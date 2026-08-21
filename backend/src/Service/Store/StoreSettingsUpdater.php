@@ -75,6 +75,7 @@ final readonly class StoreSettingsUpdater
     private const URL_FIELDS = [
         'logoUrl' => 'setLogoUrl',
         'heroImageUrl' => 'setHeroImageUrl',
+        'darkHeroImageUrl' => 'setDarkHeroImageUrl',
         'websiteUrl' => 'setWebsiteUrl',
         'facebookUrl' => 'setFacebookUrl',
         'instagramUrl' => 'setInstagramUrl',
@@ -257,6 +258,50 @@ final readonly class StoreSettingsUpdater
                 $store->setDarkHeroImageOpacity($this->intInRange($raw, 'darkHeroImageOpacity', 0, 100));
             }
         }
+
+        if (array_key_exists('heroImagePosition', $payload)) {
+            $store->setHeroImagePosition($this->intInRange($payload['heroImagePosition'], 'heroImagePosition', 0, 100));
+        }
+
+        if (array_key_exists('darkHeroImagePosition', $payload)) {
+            $raw = $payload['darkHeroImagePosition'];
+            if (null === $raw || '' === $raw) {
+                $store->setDarkHeroImagePosition(null);
+            } else {
+                $store->setDarkHeroImagePosition($this->intInRange($raw, 'darkHeroImagePosition', 0, 100));
+            }
+        }
+
+        if (array_key_exists('heroImagePositionX', $payload)) {
+            $store->setHeroImagePositionX($this->intInRange($payload['heroImagePositionX'], 'heroImagePositionX', 0, 100));
+        }
+
+        if (array_key_exists('darkHeroImagePositionX', $payload)) {
+            $raw = $payload['darkHeroImagePositionX'];
+            if (null === $raw || '' === $raw) {
+                $store->setDarkHeroImagePositionX(null);
+            } else {
+                $store->setDarkHeroImagePositionX($this->intInRange($raw, 'darkHeroImagePositionX', 0, 100));
+            }
+        }
+
+        if (array_key_exists('heroImagePositionMobileX', $payload)) {
+            $raw = $payload['heroImagePositionMobileX'];
+            if (null === $raw || '' === $raw) {
+                $store->setHeroImagePositionMobileX(null);
+            } else {
+                $store->setHeroImagePositionMobileX($this->intInRange($raw, 'heroImagePositionMobileX', 0, 100));
+            }
+        }
+
+        if (array_key_exists('heroImagePositionMobileY', $payload)) {
+            $raw = $payload['heroImagePositionMobileY'];
+            if (null === $raw || '' === $raw) {
+                $store->setHeroImagePositionMobileY(null);
+            } else {
+                $store->setHeroImagePositionMobileY($this->intInRange($raw, 'heroImagePositionMobileY', 0, 100));
+            }
+        }
     }
 
     /** @return array<string, mixed> */
@@ -282,8 +327,15 @@ final readonly class StoreSettingsUpdater
             'pageBackgrounds' => $this->normalizePageBackgroundsForRead($store->getPageBackgrounds()),
             'logoUrl' => $store->getLogoUrl(),
             'heroImageUrl' => $store->getHeroImageUrl(),
+            'darkHeroImageUrl' => $store->getDarkHeroImageUrl(),
             'heroImageOpacity' => $store->getHeroImageOpacity(),
             'darkHeroImageOpacity' => $store->getDarkHeroImageOpacity(),
+            'heroImagePosition' => $store->getHeroImagePosition(),
+            'heroImagePositionX' => $store->getHeroImagePositionX(),
+            'darkHeroImagePosition' => $store->getDarkHeroImagePosition(),
+            'darkHeroImagePositionX' => $store->getDarkHeroImagePositionX(),
+            'heroImagePositionMobileX' => $store->getHeroImagePositionMobileX(),
+            'heroImagePositionMobileY' => $store->getHeroImagePositionMobileY(),
             'heroHeading' => $store->getHeroHeading(),
             'heroSubheading' => $store->getHeroSubheading(),
             'tagline' => $store->getTagline(),
