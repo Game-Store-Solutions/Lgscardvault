@@ -13,7 +13,7 @@ export const HERO_LAYOUT_OPTIONS: HeroLayoutOption[] = [
   {
     id: 'cinematic',
     title: 'Cinematic (classic)',
-    description: 'Full-height photo banner with gradients and bottom-left copy. The original hero style.',
+    description: 'Full-height photo banner with bottom-left copy. The original hero style.',
     featured: true,
     emoji: '🎬',
   },
