@@ -1,6 +1,7 @@
 import type { HeroLayout } from '../../api/types'
 import type { PaletteKey } from './brandingTypes'
 import { HEX } from './branding'
+import { clampBorderThickness, clampSurfaceBlur } from '../../lib/storeTheme'
 
 const PALETTE_KEYS: PaletteKey[] = [
   'primaryColor',
@@ -47,6 +48,8 @@ export interface BrandingPayloadInput {
   textColor: string
   mutedColor: string
   borderColor: string
+  borderThickness?: number
+  surfaceBlur?: number
   darkColors: Record<PaletteKey, string>
   contactEmail: string
   logoUrl?: string
@@ -80,6 +83,9 @@ export function sanitizeBrandingPayload<T extends BrandingPayloadInput>(form: T)
     dark[key] = normalizeHex(dark[key] ?? '')
   }
   next.darkColors = dark
+
+  next.borderThickness = clampBorderThickness(form.borderThickness)
+  next.surfaceBlur = clampSurfaceBlur(form.surfaceBlur)
 
   const email = form.contactEmail.trim()
   next.contactEmail = email && EMAIL.test(email) ? email : ''

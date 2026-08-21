@@ -76,6 +76,8 @@ export interface Store {
   textColor?: string | null
   mutedColor?: string | null
   borderColor?: string | null
+  borderThickness?: number | null
+  surfaceBlur?: number | null
   logoUrl?: string | null
   heroImageUrl?: string | null
   heroHeading?: string | null
