@@ -273,7 +273,7 @@ export function StorePreview({
       <div
         style={themeStyle}
         className={cx(
-          'relative min-h-[32rem] overflow-hidden rounded-card border border-border shadow-card',
+          'relative min-h-[20rem] overflow-hidden rounded-card border border-border shadow-card sm:min-h-[26rem] xl:min-h-[32rem]',
           previewMode === 'dark' ? 'dark' : 'preview-light',
         )}
         data-page-background={previewBackgroundPreset}

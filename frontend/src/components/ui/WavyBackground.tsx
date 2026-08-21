@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { cssColorToRgba, readCssVar } from '../../lib/canvasThemeColors'
+import { cssColorToRgba, readPatternColors } from '../../lib/canvasThemeColors'
 import { cx } from '../../lib/cx'
 
 /** How far wave crests drift down per pixel scrolled. */
@@ -41,7 +41,14 @@ type WaveSpec = {
   secondary: boolean
 }
 
-function waveLayout(height: number, mode: 'compact' | 'hero'): WaveSpec[] {
+function waveLayout(height: number, mode: 'compact' | 'hero' | 'thumbnail'): WaveSpec[] {
+  if (mode === 'thumbnail') {
+    return [
+      { amp: 20, freq: 0.0085, y: height * 0.34, speed: 1, alpha: 0.58, secondary: false },
+      { amp: 14, freq: 0.011, y: height * 0.48, speed: 1.2, alpha: 0.42, secondary: true },
+      { amp: 10, freq: 0.014, y: height * 0.58, speed: 0.9, alpha: 0.3, secondary: false },
+    ]
+  }
   if (mode === 'compact') {
     return [
       { amp: 14, freq: 0.0075, y: height * 0.36, speed: 1, alpha: 0.22, secondary: false },
@@ -82,17 +89,19 @@ function storefrontWaves(viewportHeight: number, scrollY: number): WaveSpec[] {
 export function WavyBackground({
   className,
   compact = false,
+  thumbnail = false,
   /** Storefront: ambient top waves that drift down while scrolling. */
   parallax = false,
 }: {
   className?: string
   compact?: boolean
+  thumbnail?: boolean
   parallax?: boolean
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollRef = useRef(0)
-  const layoutMode = compact ? 'compact' : 'hero'
+  const layoutMode = thumbnail ? 'thumbnail' : compact ? 'compact' : 'hero'
 
   useEffect(() => {
     const host = hostRef.current
@@ -143,9 +152,7 @@ export function WavyBackground({
       const { width, height } = measure()
       if (width <= 0 || height <= 0) return
 
-      const primary = readCssVar(host, '--page-bg-pattern-primary', readCssVar(host, '--color-brand-500', '#6d5efc'))
-      const secondary = readCssVar(host, '--page-bg-pattern-secondary', readCssVar(host, '--color-accent-500', '#ff7a59'))
-      const base = readCssVar(host, '--page-bg-pattern-base', '')
+      const { primary, secondary, base } = readPatternColors(host)
 
       ctx.clearRect(0, 0, width, height)
 
@@ -154,20 +161,21 @@ export function WavyBackground({
         ctx.fillRect(0, 0, width, height)
       }
 
-      const time = reducedMotion ? 0 : frame * 0.014
+      const time = thumbnail ? 1.6 : reducedMotion ? 0 : frame * 0.014
       const scrollY = parallax ? scrollRef.current : 0
       const waves = parallax ? storefrontWaves(height, scrollY) : waveLayout(height, layoutMode)
 
       for (const wave of waves) {
+        const alphaBoost = thumbnail ? 0 : compact ? 0.06 : 0
         const color = cssColorToRgba(
           wave.secondary ? secondary : primary,
-          compact ? wave.alpha + 0.06 : wave.alpha,
+          wave.alpha + alphaBoost,
         )
         drawWave(ctx, width, height, time * wave.speed, wave.amp, wave.freq, wave.y, color)
       }
 
       frame += 1
-      if (!reducedMotion && !compact) raf = requestAnimationFrame(render)
+      if (!reducedMotion && !compact && !thumbnail) raf = requestAnimationFrame(render)
     }
 
     render()
@@ -178,20 +186,20 @@ export function WavyBackground({
       cancelAnimationFrame(raf)
       if (scrollAttached) window.removeEventListener('scroll', onScroll)
     }
-  }, [compact, layoutMode, parallax])
+  }, [compact, layoutMode, parallax, thumbnail])
+
+  const live = parallax && !compact && !thumbnail
 
   return (
     <div
       ref={hostRef}
-      className={cx(
-        parallax
-          ? 'pointer-events-none fixed inset-0 z-0 mix-blend-soft-light dark:mix-blend-screen'
-          : 'absolute inset-0 overflow-hidden',
-        className,
-      )}
+      className={cx('absolute inset-0 overflow-hidden', live && 'opacity-90 dark:opacity-100', className)}
       aria-hidden
     >
-      <canvas ref={canvasRef} className="absolute inset-0 size-full" />
+      <canvas
+        ref={canvasRef}
+        className={cx('absolute inset-0 size-full', live && 'dark:mix-blend-screen')}
+      />
     </div>
   )
 }

@@ -30,7 +30,6 @@ export function StorefrontBackground({ slug }: { slug?: string }) {
           preset={preset}
           opacity={settings.opacity ?? 72}
           patternColors={patternColors}
-          className="absolute inset-0"
         />
       ) : null}
     </div>

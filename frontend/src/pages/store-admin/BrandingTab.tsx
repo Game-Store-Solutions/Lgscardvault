@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Image, LayoutGrid, Layers, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
 import { HeroLayoutPicker } from '../../components/store/hero/HeroLayoutPicker'
@@ -18,6 +17,7 @@ import {
   mergeDarkThemePreset,
   mergeThemePreset,
   ThemePresetPicker,
+  BrandingPreviewIsland,
   pickHeroBrandingPayload,
   sanitizeBrandingPayload,
   type ThemePreset,
@@ -43,7 +43,6 @@ import {
   type PageBackgroundThemeColors,
   type StorePageBackgrounds,
 } from '../../lib/pageBackgrounds'
-import { cx } from '../../lib/cx'
 
 interface BrandingForm {
   primaryColor: string
@@ -411,8 +410,8 @@ export default function BrandingTab({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)]">
-      <div className="space-y-6">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)]">
+      <div className="min-w-0 space-y-6">
         <Tabs
           aria-label="Branding sections"
           value={section}
@@ -437,7 +436,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                 />
               }
             />
-            <CardBody>
+            <CardBody className={previewMode === 'dark' ? 'dark' : 'preview-light'}>
               {previewMode === 'dark' ? (
                 <ThemePresetPicker
                   instanceId="dark"
@@ -453,25 +452,82 @@ export default function BrandingTab({ slug }: { slug: string }) {
             <>
               <Card>
                 <CardHeader title="Brand colors" subtitle="Buttons, links, and accents shoppers see first." />
-                <CardBody className="grid gap-5 sm:grid-cols-2">
-                  <ColorField label="Primary / buttons" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
-                  <ColorField label="Accent" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
+                <CardBody className="space-y-5">
+                  <BrandingPreviewIsland
+                    mode="light"
+                    themeVars={storeThemeVars(form)}
+                    className="flex flex-wrap gap-2 p-4"
+                  >
+                    {[form.primaryColor || DEFAULTS.primaryColor, form.accentColor || DEFAULTS.accentColor].map((color) => (
+                      <span
+                        key={color}
+                        className="h-10 min-w-[4.5rem] flex-1 rounded-btn border border-border"
+                        style={{ backgroundColor: color }}
+                        aria-hidden
+                      />
+                    ))}
+                  </BrandingPreviewIsland>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <ColorField label="Primary / buttons" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
+                    <ColorField label="Accent" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
+                  </div>
                 </CardBody>
               </Card>
               <Card>
                 <CardHeader title="Page & text" subtitle="Background, cards, and readable type — not borders." />
-                <CardBody className="grid gap-5 sm:grid-cols-2">
-                  <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
-                  <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
-                  <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
-                  <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
+                <CardBody className="space-y-5">
+                  <BrandingPreviewIsland mode="light" themeVars={storeThemeVars(form)} className="space-y-2 p-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-12 rounded-btn border border-border bg-bg" />
+                      <div className="h-12 rounded-btn border border-border bg-surface" />
+                    </div>
+                    <p className="text-[11px] text-fg-muted">Page background · Card surface</p>
+                  </BrandingPreviewIsland>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
+                    <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
+                    <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
+                    <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
+                  </div>
                 </CardBody>
               </Card>
             </>
           ) : (
             <Card>
               <CardHeader title="Dark colors" subtitle="Leave a field blank to inherit from the light theme." />
-              <CardBody className="grid gap-5 sm:grid-cols-2">
+              <CardBody className="space-y-5">
+                <BrandingPreviewIsland
+                  mode="dark"
+                  themeVars={storeThemeVars(
+                    {
+                      ...form.darkColors,
+                      backgroundColor: form.darkColors.backgroundColor || '#0f1220',
+                      surfaceColor: form.darkColors.surfaceColor || '#171b2e',
+                      textColor: form.darkColors.textColor || '#f5f6fb',
+                      mutedColor: form.darkColors.mutedColor || '#aab0cb',
+                      borderColor: form.darkColors.borderColor || '#2a2f47',
+                      primaryColor: form.darkColors.primaryColor || form.primaryColor || DEFAULTS.primaryColor,
+                      accentColor: form.darkColors.accentColor || form.accentColor || DEFAULTS.accentColor,
+                    },
+                    true,
+                  )}
+                  className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4"
+                >
+                  {[
+                    form.darkColors.backgroundColor || '#0f1220',
+                    form.darkColors.surfaceColor || '#171b2e',
+                    form.darkColors.primaryColor || form.primaryColor || DEFAULTS.primaryColor,
+                    form.darkColors.accentColor || form.accentColor || DEFAULTS.accentColor,
+                  ].map((color) => (
+                    <span
+                      key={color}
+                      className="h-10 rounded-btn border border-border"
+                      style={{ backgroundColor: color }}
+                      aria-hidden
+                    />
+                  ))}
+                </BrandingPreviewIsland>
+                <div className="grid gap-5 sm:grid-cols-2">
                 <ColorField label="Primary / buttons" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
                 <ColorField label="Accent" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
                 <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
@@ -479,6 +535,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                 <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
                 <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
                 <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
+                </div>
               </CardBody>
             </Card>
           )}
@@ -490,8 +547,8 @@ export default function BrandingTab({ slug }: { slug: string }) {
               title="Page backgrounds"
               subtitle={
                 previewMode === 'dark'
-                  ? 'Pattern behind your storefront in dark mode. Unset dark uses the light pattern.'
-                  : 'Decorative layer on top of your page color. Pick a different look for dark mode with the switch.'
+                  ? 'Pattern behind your storefront in dark mode. Animated presets drift as shoppers scroll.'
+                  : 'Decorative layer on your page color. Waves, aurora, and grids follow scroll on the live store.'
               }
               actions={
                 <ThemeModeSwitch
@@ -513,6 +570,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     base: form.backgroundColor || DEFAULTS.backgroundColor,
                   }}
                   onChange={(key, value) => setBackgroundPatternColor('light', key, value)}
+                  mode="light"
                 />
               ) : (
                 <BackgroundPatternColorGroup
@@ -525,6 +583,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     base: form.darkColors.backgroundColor || form.backgroundColor || DEFAULTS.backgroundColor,
                   }}
                   onChange={(key, value) => setBackgroundPatternColor('dark', key, value)}
+                  mode="dark"
                 />
               )}
               <RangeField
@@ -754,16 +813,18 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </div>
       </div>
 
-      <div className="xl:sticky xl:top-8 xl:self-start">
+      <div className="min-w-0 xl:sticky xl:top-8 xl:self-start">
         <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Live store preview</p>
-        <StorePreview
+        <div className="max-w-full overflow-hidden">
+          <StorePreview
           branding={form}
           storeName={store?.name ?? slug}
           previewMode={previewMode}
           onPreviewModeChange={setPreviewMode}
         />
+        </div>
         <p className="mt-3 text-xs text-fg-muted">
-          Pick a pattern on Backgrounds — it fills the preview behind the hero and cards. Toggle Light or Dark to preview each theme.
+          Animated backgrounds stay fixed on screen and drift with scroll on your live storefront (preview shows motion in place). Toggle Light or Dark to check each theme.
         </p>
       </div>
     </div>
@@ -776,20 +837,48 @@ function BackgroundPatternColorGroup({
   colors,
   fallbacks,
   onChange,
+  mode,
 }: {
   title: string
   hint: string
   colors: PageBackgroundThemeColors
   fallbacks: { primary: string; secondary: string; base: string }
   onChange: (key: keyof PageBackgroundThemeColors, value: string) => void
+  mode: 'light' | 'dark'
 }) {
+  const previewVars = {
+    '--page-bg-pattern-primary': colors.primary || fallbacks.primary,
+    '--page-bg-pattern-secondary': colors.secondary || fallbacks.secondary,
+    '--page-bg-pattern-base': colors.base || fallbacks.base,
+  } as Record<string, string>
+
   return (
-    <div className="space-y-4 rounded-card border border-border bg-bg/40 p-4">
+    <div className="space-y-4 rounded-card border border-border bg-surface/60 p-4">
       <div>
         <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{title}</p>
         <p className="mt-1 text-xs text-fg-muted">{hint}</p>
       </div>
-      <div className="grid gap-4">
+      <BrandingPreviewIsland mode={mode} themeVars={previewVars} className="p-4">
+        <div className="grid h-16 grid-cols-3 gap-2">
+          <div
+            className="rounded-btn border border-border"
+            style={{ background: `color-mix(in srgb, ${previewVars['--page-bg-pattern-primary']} 55%, transparent)` }}
+            aria-hidden
+          />
+          <div
+            className="rounded-btn border border-border"
+            style={{ background: `color-mix(in srgb, ${previewVars['--page-bg-pattern-secondary']} 55%, transparent)` }}
+            aria-hidden
+          />
+          <div
+            className="rounded-btn border border-border"
+            style={{ background: previewVars['--page-bg-pattern-base'] }}
+            aria-hidden
+          />
+        </div>
+        <p className="mt-2 text-[11px] text-fg-muted">Primary · Secondary · Base wash</p>
+      </BrandingPreviewIsland>
+      <div className="grid gap-4 border-t border-border pt-4">
         <ColorField
           label="Primary tint"
           value={colors.primary ?? ''}
@@ -831,54 +920,59 @@ function FrameEditors({
   ]
 
   return (
-    <div
-      style={{ ...themeVars, colorScheme: mode } as CSSProperties}
-      className={cx('grid gap-4 sm:grid-cols-3', mode === 'dark' ? 'dark' : 'preview-light')}
-    >
+    <div className="grid gap-4 sm:grid-cols-3">
       {pieces.map((piece) => {
         const style = frames[piece.key]
         return (
-          <div key={piece.key} className="space-y-3 rounded-card bg-bg p-3">
-            {piece.key === 'hero' ? (
-              <div className={`rounded-card bg-surface p-3 ${storeFrameClass('hero')}`}>
-                <p className="text-xs font-bold text-fg">{piece.title}</p>
-                <p className="mt-1 text-[11px] text-fg-muted">{piece.hint}</p>
-              </div>
-            ) : piece.key === 'tile' ? (
-              <div className={`flex flex-col items-center justify-center gap-2 rounded-card bg-surface px-2 py-4 ${storeFrameClass('tile')}`}>
-                <span className="grid size-8 place-items-center rounded-xl bg-brand-500/12 text-brand-600">
-                  <Square aria-hidden className="size-4" />
-                </span>
-                <span className="text-center text-[11px] font-bold">{piece.title}</span>
-              </div>
-            ) : (
-              <div className={`rounded-card bg-surface p-2 ${storeFrameClass('card')}`}>
-                <div className="mb-2 h-16 rounded-btn bg-bg" />
-                <p className="truncate text-xs font-bold text-fg">{piece.title}</p>
-                <p className="text-[11px] text-fg-muted">$1.53</p>
-              </div>
-            )}
-            <RangeField
-              label="Thickness"
-              value={style.borderThickness}
-              min={SURFACE_STYLE_RANGES.borderThickness.min}
-              max={SURFACE_STYLE_RANGES.borderThickness.max}
-              onChange={(v) => onChange(piece.key, { borderThickness: v })}
-            />
-            <RangeField
-              label="Glow"
-              value={style.borderGlow}
-              min={SURFACE_STYLE_RANGES.borderGlow.min}
-              max={SURFACE_STYLE_RANGES.borderGlow.max}
-              onChange={(v) => onChange(piece.key, { borderGlow: v })}
-            />
-            <RangeField
-              label="Blur"
-              value={style.surfaceBlur}
-              min={SURFACE_STYLE_RANGES.surfaceBlur.min}
-              max={SURFACE_STYLE_RANGES.surfaceBlur.max}
-              onChange={(v) => onChange(piece.key, { surfaceBlur: v })}
-            />
+          <div
+            key={piece.key}
+            className="space-y-3 rounded-card border border-border bg-surface/60 p-3"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-wide text-fg-muted">Preview</p>
+            <BrandingPreviewIsland mode={mode} themeVars={themeVars} className="min-h-[6.5rem] p-3">
+              {piece.key === 'hero' ? (
+                <div className={`rounded-card bg-surface p-3 ${storeFrameClass('hero')}`}>
+                  <p className="text-xs font-bold text-fg">{piece.title}</p>
+                  <p className="mt-1 text-[11px] text-fg-muted">{piece.hint}</p>
+                </div>
+              ) : piece.key === 'tile' ? (
+                <div className={`flex flex-col items-center justify-center gap-2 rounded-card bg-surface px-2 py-4 ${storeFrameClass('tile')}`}>
+                  <span className="grid size-8 place-items-center rounded-xl bg-brand-500/12 text-brand-600">
+                    <Square aria-hidden className="size-4" />
+                  </span>
+                  <span className="text-center text-[11px] font-bold text-fg">{piece.title}</span>
+                </div>
+              ) : (
+                <div className={`rounded-card bg-surface p-2 ${storeFrameClass('card')}`}>
+                  <div className="mb-2 h-16 rounded-btn bg-bg" />
+                  <p className="truncate text-xs font-bold text-fg">{piece.title}</p>
+                  <p className="text-[11px] text-fg-muted">$1.53</p>
+                </div>
+              )}
+            </BrandingPreviewIsland>
+            <div className="space-y-3 border-t border-border pt-3">
+              <RangeField
+                label="Thickness"
+                value={style.borderThickness}
+                min={SURFACE_STYLE_RANGES.borderThickness.min}
+                max={SURFACE_STYLE_RANGES.borderThickness.max}
+                onChange={(v) => onChange(piece.key, { borderThickness: v })}
+              />
+              <RangeField
+                label="Glow"
+                value={style.borderGlow}
+                min={SURFACE_STYLE_RANGES.borderGlow.min}
+                max={SURFACE_STYLE_RANGES.borderGlow.max}
+                onChange={(v) => onChange(piece.key, { borderGlow: v })}
+              />
+              <RangeField
+                label="Blur"
+                value={style.surfaceBlur}
+                min={SURFACE_STYLE_RANGES.surfaceBlur.min}
+                max={SURFACE_STYLE_RANGES.surfaceBlur.max}
+                onChange={(v) => onChange(piece.key, { surfaceBlur: v })}
+              />
+            </div>
           </div>
         )
       })}

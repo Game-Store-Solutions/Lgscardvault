@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import type { CSSProperties } from 'react'
 import { ChevronDown, Star } from 'lucide-react'
 import { cx } from '../../lib/cx'
@@ -242,4 +242,30 @@ export function mergeThemePreset<T extends Palette & { darkColors?: Partial<Pale
         }
       : {}),
   }
+}
+
+/** Isolated storefront mock — theme vars apply here only, not admin chrome. */
+export function BrandingPreviewIsland({
+  mode,
+  themeVars,
+  className,
+  children,
+}: {
+  mode: 'light' | 'dark'
+  themeVars?: Record<string, string>
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <div
+      className={cx(
+        'overflow-hidden rounded-card border border-border bg-bg shadow-card ring-1 ring-black/[0.04]',
+        mode === 'dark' ? 'dark' : 'preview-light',
+        className,
+      )}
+      style={{ ...(themeVars ?? {}), colorScheme: mode } as CSSProperties}
+    >
+      {children}
+    </div>
+  )
 }
