@@ -706,6 +706,22 @@ export interface AdminUser {
   emailVerified: boolean
 }
 
+export interface AdminUserImportIssue {
+  row: number
+  email: string | null
+  message: string
+}
+
+export interface AdminUserImportResult {
+  created: number
+  skipped: number
+  resetEmailsSent: number
+  resetEmailsOmitted: number
+  dryRun: boolean
+  errors: AdminUserImportIssue[]
+  warnings: AdminUserImportIssue[]
+}
+
 export interface ScryfallSyncResult {
   /** 'queued' — the sync now runs asynchronously on the messenger worker. */
   status: string
