@@ -54,6 +54,7 @@ export function RangeField({
   unit = 'px',
   hint,
   onChange,
+  onChangeEnd,
 }: {
   label: string
   value: number
@@ -63,6 +64,8 @@ export function RangeField({
   unit?: string
   hint?: string
   onChange: (value: number) => void
+  /** Fires when the user releases the slider — use for save. */
+  onChangeEnd?: (value: number) => void
 }) {
   const pct = max === min ? 0 : ((value - min) / (max - min)) * 100
 
@@ -83,6 +86,8 @@ export function RangeField({
             aria-valuetext={`${value}${unit}`}
             aria-describedby={describedBy}
             onChange={(e) => onChange(Number(e.target.value))}
+            onPointerUp={(e) => onChangeEnd?.(Number((e.currentTarget as HTMLInputElement).value))}
+            onKeyUp={(e) => onChangeEnd?.(Number((e.currentTarget as HTMLInputElement).value))}
             className="brand-slider min-w-0 flex-1"
             style={{ '--slider-pct': `${pct}%` } as CSSProperties}
           />

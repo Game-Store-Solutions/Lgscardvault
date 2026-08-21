@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { formatPrice, parsePriceInput } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { useCanManageStore, useDebouncedValue, useInventoryPage, useIsDarkTheme, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
+import { useCanManageStore, useDebouncedValue, useInventoryPage, useIsDarkTheme, usePhoneHeroCrop, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
 import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, SpotlightRailSkeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
@@ -90,6 +90,7 @@ export default function StorePage() {
   const { data: store, isLoading: storeLoading } = useStore(slug)
   useStoreTheme(store)
   const storefrontIsDark = useIsDarkTheme()
+  const phoneCrop = usePhoneHeroCrop()
   const cardDisplayStyle = store?.cardDisplayStyle ?? 'gallery'
 
   const { data: storeGames = [], isLoading: gamesLoading } = useStoreGames(slug)
@@ -467,6 +468,7 @@ export default function StorePage() {
         )}
         heroImagePositionMobileX={store?.heroImagePositionMobileX}
         heroImagePositionMobileY={store?.heroImagePositionMobileY}
+        phoneCrop={phoneCrop}
         logoUrl={store?.logoUrl}
         primaryColor={store?.primaryColor}
         accentColor={store?.accentColor}
