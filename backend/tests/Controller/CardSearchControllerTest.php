@@ -157,10 +157,43 @@ final class CardSearchControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
 
         $payload = json_decode($this->client->getResponse()->getContent(), true);
-
+        self::assertIsArray($payload);
         self::assertIsList($payload);
+        self::assertArrayHasKey(0, $payload);
+        self::assertSame('Counterspell', $payload[0]['name']);
         self::assertArrayHasKey('id', $payload[0]);
         self::assertArrayNotHasKey('items', $payload);
         self::assertArrayNotHasKey('relaxed', $payload);
+    }
+
+    public function testPrintingsReturnsOtherSetsOfTheSameCard(): void
+    {
+        $oracle = CatalogFixtures::oracleIdFor(80);
+        $current = $this->fixtures->card(80, [
+            'name' => 'Abrade',
+            'set' => 'soa',
+            'collector_number' => '102',
+            'oracle_id' => $oracle,
+            'lang' => 'ja',
+        ]);
+        $this->fixtures->card(81, [
+            'name' => 'Abrade',
+            'set' => 'xln',
+            'collector_number' => '134',
+            'oracle_id' => $oracle,
+        ]);
+
+        $this->client->request('GET', '/api/catalog/cards/'.$current->getId().'/printings');
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $sets = array_column($payload['items'] ?? [], 'setCode');
+        sort($sets);
+        self::assertSame(['soa', 'xln'], $sets);
+    }
+
+    public function testPrintingsRejectsAnInvalidCardId(): void
+    {
+        $this->client->request('GET', '/api/catalog/cards/not-a-uuid/printings');
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
     }
 }

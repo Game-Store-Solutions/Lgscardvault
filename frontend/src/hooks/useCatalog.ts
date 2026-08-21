@@ -14,6 +14,7 @@ import type {
   StoreGameStats,
   StoreGameShelf,
   ScryfallSyncRun,
+  CardSummary,
 } from '../api/types'
 
 /* Multi-game catalog hooks: supported games, their sets, the shared sealed
@@ -35,6 +36,7 @@ export const storeGameStatsKey = (slug: string, game: string) => ['store-game-st
 export const storeGameShelfKey = (slug: string, game: string) => ['store-game-shelf', slug, game] as const
 export const catalogByArtistKey = (artist: string, game: string, offset: number, limit: number) =>
   ['catalog', 'by-artist', artist, game, offset, limit] as const
+export const catalogPrintingsKey = (cardId: string) => ['catalog', 'printings', cardId] as const
 
 export interface SealedSearchParams {
   game?: string
@@ -248,6 +250,19 @@ export function useScryfallSyncRuns() {
     queryFn: async () => {
       const { data } = await api.get<ScryfallSyncRun[]>('/admin/scryfall/sync-runs')
       return data
+    },
+  })
+}
+
+/** Other paper printings of one catalog card (same oracle / exact name). */
+export function useCardPrintings(cardId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: catalogPrintingsKey(cardId ?? ''),
+    enabled: enabled && Boolean(cardId),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<{ items: CardSummary[] }>(`/catalog/cards/${cardId}/printings`)
+      return data.items
     },
   })
 }
