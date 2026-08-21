@@ -101,6 +101,25 @@ class Store
     #[Groups(['store:read', 'store:admin', 'store:admin_write'])]
     private int $spotlightMinPriceCents = 1000;
 
+    #[ORM\Column(options: ['default' => 4])]
+    #[Assert\Range(min: 0, max: 24)]
+    #[Groups(['store:read', 'store:admin', 'store:admin_write'])]
+    private int $spotlightMinItems = 4;
+
+    #[ORM\Column(options: ['default' => 12])]
+    #[Assert\Range(min: 1, max: 24)]
+    #[Groups(['store:read', 'store:admin', 'store:admin_write'])]
+    private int $spotlightMaxItems = 12;
+
+    /**
+     * Inventory item ids always shown first in the storefront spotlight.
+     *
+     * @var list<int>
+     */
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    #[Groups(['store:read', 'store:admin', 'store:admin_write'])]
+    private array $spotlightPinnedInventoryIds = [];
+
     // --- Storefront branding (managed by the owner via /settings) ---
 
     #[ORM\Column(length: 7, nullable: true)]
@@ -564,6 +583,51 @@ class Store
     public function setSpotlightMinPriceCents(int $spotlightMinPriceCents): static
     {
         $this->spotlightMinPriceCents = $spotlightMinPriceCents;
+
+        return $this;
+    }
+
+    public function getSpotlightMinItems(): int
+    {
+        return $this->spotlightMinItems;
+    }
+
+    public function setSpotlightMinItems(int $spotlightMinItems): static
+    {
+        $this->spotlightMinItems = $spotlightMinItems;
+
+        return $this;
+    }
+
+    public function getSpotlightMaxItems(): int
+    {
+        return $this->spotlightMaxItems;
+    }
+
+    public function setSpotlightMaxItems(int $spotlightMaxItems): static
+    {
+        $this->spotlightMaxItems = $spotlightMaxItems;
+
+        return $this;
+    }
+
+    /** @return list<int> */
+    public function getSpotlightPinnedInventoryIds(): array
+    {
+        return array_values(array_map(intval(...), $this->spotlightPinnedInventoryIds ?? []));
+    }
+
+    /** @param list<int|string> $spotlightPinnedInventoryIds */
+    public function setSpotlightPinnedInventoryIds(array $spotlightPinnedInventoryIds): static
+    {
+        $ids = [];
+        foreach ($spotlightPinnedInventoryIds as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $ids[] = $n;
+            }
+        }
+        $this->spotlightPinnedInventoryIds = array_values(array_unique($ids));
 
         return $this;
     }

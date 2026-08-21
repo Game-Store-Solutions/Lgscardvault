@@ -741,4 +741,88 @@ class InventoryItemRepository extends ServiceEntityRepository
 
         return $qb;
     }
+
+    /**
+     * Load listings by id, preserving the given order. Missing / other-store
+     * ids are dropped.
+     *
+     * @param list<int> $ids
+     *
+     * @return list<InventoryItem>
+     */
+    public function findByStoreAndIds(Store $store, array $ids, bool $inStockOnly = false, ?string $gameCode = null): array
+    {
+        $normalized = [];
+        foreach ($ids as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $normalized[$n] = $n;
+            }
+        }
+        $ids = array_values($normalized);
+        if ([] === $ids) {
+            return [];
+        }
+
+        $items = $this->listingQuery($store, $inStockOnly, $gameCode)
+            ->andWhere('i.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
+
+        $byId = [];
+        foreach ($items as $item) {
+            $byId[$item->getId()] = $item;
+        }
+
+        $ordered = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id])) {
+                $ordered[] = $byId[$id];
+            }
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * In-stock listings ranked by store price, optionally gated on a floor.
+     *
+     * @param list<int> $excludeIds
+     *
+     * @return list<InventoryItem>
+     */
+    public function findInStockByPriceDesc(
+        Store $store,
+        ?string $gameCode,
+        array $excludeIds,
+        int $limit,
+        ?int $minPriceCents = null,
+    ): array {
+        if ($limit <= 0) {
+            return [];
+        }
+
+        $qb = $this->listingQuery($store, true, $gameCode)
+            ->orderBy('i.priceCents', 'DESC')
+            ->addOrderBy('i.id', 'DESC')
+            ->setMaxResults($limit);
+
+        if (null !== $minPriceCents) {
+            $qb->andWhere('i.priceCents >= :minPrice')->setParameter('minPrice', $minPriceCents);
+        }
+
+        $exclude = [];
+        foreach ($excludeIds as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $exclude[$n] = $n;
+            }
+        }
+        if ([] !== $exclude) {
+            $qb->andWhere('i.id NOT IN (:exclude)')->setParameter('exclude', array_values($exclude));
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

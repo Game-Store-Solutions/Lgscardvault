@@ -5,7 +5,9 @@ type SortKey = 'featured' | 'price-desc' | 'price-asc' | 'name' | 'newest'
 type ViewMode = 'grid' | 'list'
 
 const DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS = 1000
+const SPOTLIGHT_MIN_ITEMS_DEFAULT = 4
 const SPOTLIGHT_MAX_ITEMS = 12
+const SPOTLIGHT_ITEMS_CAP = 24
 const RESULTS_PAGE_SIZE = 24
 
 const COLORS = [
@@ -60,5 +62,5 @@ const QUICK_ACTIONS: QuickAction[] = [
     { label: 'Sell/Trade', icon: WalletCards, path: 'sell' },
 ]
 
-export {QUICK_ACTIONS, SORTS, CARD_TYPES, FINISH_OPTIONS, COLORS, DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,SPOTLIGHT_MAX_ITEMS, RESULTS_PAGE_SIZE};
+export {QUICK_ACTIONS, SORTS, CARD_TYPES, FINISH_OPTIONS, COLORS, DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS, SPOTLIGHT_MIN_ITEMS_DEFAULT, SPOTLIGHT_MAX_ITEMS, SPOTLIGHT_ITEMS_CAP, RESULTS_PAGE_SIZE};
 export type { ViewMode,SortKey,FinishFilter };

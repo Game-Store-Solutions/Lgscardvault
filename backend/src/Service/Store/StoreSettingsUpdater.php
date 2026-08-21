@@ -2,6 +2,7 @@
 
 namespace App\Service\Store;
 
+use App\Entity\InventoryItem;
 use App\Entity\Store;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -17,6 +18,7 @@ final readonly class StoreSettingsUpdater
     private const HEX = '/^#[0-9a-fA-F]{6}$/';
     private const URL = '#^(https?://|/)#';
     private const CARD_DISPLAY_STYLES = ['gallery', 'marketplace'];
+    public const SPOTLIGHT_ITEMS_CAP = 24;
     private const HERO_LAYOUTS = [
         'cinematic', 'living-inventory', 'trading-table', 'event-board', 'floating-cards',
         'floating-collection', 'store-story-hero', 'collectors-shelf', 'open-binder',
@@ -108,6 +110,26 @@ final readonly class StoreSettingsUpdater
     {
         if (array_key_exists('spotlightMinPriceCents', $payload)) {
             $store->setSpotlightMinPriceCents(max(0, (int) $payload['spotlightMinPriceCents']));
+        }
+
+        if (array_key_exists('spotlightMinItems', $payload) || array_key_exists('spotlightMaxItems', $payload)) {
+            $minItems = $store->getSpotlightMinItems();
+            $maxItems = $store->getSpotlightMaxItems();
+            if (array_key_exists('spotlightMinItems', $payload)) {
+                $minItems = $this->intInRange($payload['spotlightMinItems'], 'spotlightMinItems', 0, self::SPOTLIGHT_ITEMS_CAP);
+            }
+            if (array_key_exists('spotlightMaxItems', $payload)) {
+                $maxItems = $this->intInRange($payload['spotlightMaxItems'], 'spotlightMaxItems', 1, self::SPOTLIGHT_ITEMS_CAP);
+            }
+            if ($minItems > $maxItems) {
+                $minItems = $maxItems;
+            }
+            $store->setSpotlightMinItems($minItems);
+            $store->setSpotlightMaxItems($maxItems);
+        }
+
+        if (array_key_exists('spotlightPinnedInventoryIds', $payload)) {
+            $store->setSpotlightPinnedInventoryIds($this->normalizePinnedInventoryIds($store, $payload['spotlightPinnedInventoryIds']));
         }
 
         $this->applyBranding($store, $payload);
@@ -312,6 +334,9 @@ final readonly class StoreSettingsUpdater
             'name' => $store->getName(),
             'slug' => $store->getSlug(),
             'spotlightMinPriceCents' => $store->getSpotlightMinPriceCents(),
+            'spotlightMinItems' => $store->getSpotlightMinItems(),
+            'spotlightMaxItems' => $store->getSpotlightMaxItems(),
+            'spotlightPinnedInventoryIds' => $store->getSpotlightPinnedInventoryIds(),
             'primaryColor' => $store->getPrimaryColor(),
             'accentColor' => $store->getAccentColor(),
             'backgroundColor' => $store->getBackgroundColor(),
@@ -681,6 +706,46 @@ final readonly class StoreSettingsUpdater
     private function stringValue(mixed $value): string
     {
         return is_string($value) ? trim($value) : '';
+    }
+
+    /**
+     * Keep pin order, drop duplicates / ids that are not this store's listings.
+     *
+     * @return list<int>
+     */
+    private function normalizePinnedInventoryIds(Store $store, mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            throw new \InvalidArgumentException('spotlightPinnedInventoryIds must be a list of inventory ids.');
+        }
+
+        $ids = [];
+        foreach ($raw as $value) {
+            if (is_int($value) || (is_string($value) && is_numeric(trim($value)))) {
+                $n = (int) $value;
+                if ($n > 0) {
+                    $ids[] = $n;
+                }
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        if (count($ids) > self::SPOTLIGHT_ITEMS_CAP) {
+            throw new \InvalidArgumentException(sprintf('You can pin at most %d spotlight cards.', self::SPOTLIGHT_ITEMS_CAP));
+        }
+        if ([] === $ids) {
+            return [];
+        }
+
+        $owned = $this->entityManager->getRepository(InventoryItem::class)->findByStoreAndIds($store, $ids);
+        $ownedIds = [];
+        foreach ($owned as $item) {
+            $id = $item->getId();
+            if (null !== $id) {
+                $ownedIds[] = $id;
+            }
+        }
+
+        return $ownedIds;
     }
 
     private function intInRange(mixed $value, string $key, int $min, int $max): int

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { formatPrice, parsePriceInput } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { useCanManageStore, useDebouncedValue, useInventoryPage, useIsDarkTheme, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreTheme } from '../hooks'
+import { useCanManageStore, useDebouncedValue, useInventoryPage, useIsDarkTheme, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreSpotlight, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
 import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, SpotlightRailSkeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
@@ -37,7 +37,6 @@ import {
     FINISH_OPTIONS,
     COLORS,
     DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,
-    SPOTLIGHT_MAX_ITEMS,
     RESULTS_PAGE_SIZE,
     type FinishFilter,
     type ViewMode,
@@ -123,15 +122,7 @@ export default function StorePage() {
     itemsPerPage: RESULTS_PAGE_SIZE,
     enabled: catalogEnabled,
   })
-  const spotlight = useInventoryPage(slug, {
-    inStockOnly: true,
-    game: gameFilter || undefined,
-    sort: 'price-desc',
-    minPriceCents: store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,
-    page: 1,
-    itemsPerPage: SPOTLIGHT_MAX_ITEMS,
-    enabled: catalogEnabled,
-  })
+  const spotlight = useStoreSpotlight(slug, gameFilter || undefined, catalogEnabled)
   // Broader in-stock pool to fill hero slots after spotlight (no min-price gate).
   const heroStock = useInventoryPage(slug, {
     inStockOnly: true,
@@ -573,7 +564,9 @@ export default function StorePage() {
                 Spotlight{gameFilter ? ` · ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''}` : ''}
               </h2>
               <p className="mt-1 text-sm text-fg-muted">
-                Premium singles over {formatPrice(store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS)} market
+                {(store?.spotlightPinnedInventoryIds?.length ?? 0) > 0
+                  ? `Featured picks plus singles at or above ${formatPrice(store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS)}`
+                  : `Premium singles over ${formatPrice(store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS)} market`}
               </p>
             </div>
           </div>
@@ -602,7 +595,18 @@ export default function StorePage() {
                 className="store-rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
               >
                 {spotlightItems.map((item, i) => (
-                  <SpotlightCard key={item.id} item={item} slug={slug} ribbon={i === 0 ? 'Featured' : undefined} />
+                  <SpotlightCard
+                    key={item.id}
+                    item={item}
+                    slug={slug}
+                    ribbon={
+                      store?.spotlightPinnedInventoryIds?.includes(item.id)
+                        ? 'Picked'
+                        : i === 0
+                          ? 'Featured'
+                          : undefined
+                    }
+                  />
                 ))}
               </div>
             </div>
