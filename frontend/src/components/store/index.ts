@@ -4,5 +4,6 @@ export type { StoreHeroProps, HeroLayout } from './StoreHero'
 export { StoreCard, StoreCardSkeleton } from './StoreCard'
 export type { StoreCardProps } from './StoreCard'
 
-export { StorePreview } from './StorePreview'
+export { StorePreview, ThemeModeSwitch } from './StorePreview'
 export type { StorePreviewBranding } from './StorePreview'
+export { BackgroundPresetPicker, StorefrontBackground } from './backgrounds'

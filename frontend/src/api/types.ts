@@ -1,3 +1,5 @@
+import type { StorePageBackgrounds } from '../lib/pageBackgrounds'
+
 export interface ApiError {
   response?: {
     status?: number
@@ -80,6 +82,9 @@ export interface Store {
   surfaceBlur?: number | null
   borderGlow?: number | null
   frameStyles?: Partial<Record<'hero' | 'tile' | 'card', Partial<{ borderThickness: number; borderGlow: number; surfaceBlur: number }>>> | null
+  /** Dark-mode frames; omitted pieces inherit the light frameStyles. */
+  darkFrameStyles?: Partial<Record<'hero' | 'tile' | 'card', Partial<{ borderThickness: number; borderGlow: number; surfaceBlur: number }>>> | null
+  pageBackgrounds?: StorePageBackgrounds | null
   logoUrl?: string | null
   heroImageUrl?: string | null
   heroHeading?: string | null

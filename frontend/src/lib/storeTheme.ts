@@ -91,6 +91,24 @@ export function storeFrameClass(key: FrameKey): string {
   return `store-frame store-frame-${key}`
 }
 
+/** Dark frames inherit each light piece until the owner customizes them. */
+export function inheritFrameStyles(
+  overlay: Partial<Record<FrameKey, Partial<FrameStyle> | null>> | null | undefined,
+  base: FrameStyles,
+): FrameStyles {
+  return {
+    hero: defaultFrameStyle({ ...base.hero, ...(overlay?.hero ?? {}) }),
+    tile: defaultFrameStyle({ ...base.tile, ...(overlay?.tile ?? {}) }),
+    card: defaultFrameStyle({ ...base.card, ...(overlay?.card ?? {}) }),
+  }
+}
+
+/** How solid the glass fill is. 0 blur = opaque; higher blur lets the backdrop show. */
+export function frameGlassPercent(blur: number): number {
+  if (blur <= 0) return 100
+  return Math.max(48, 100 - Math.round(blur * 1.35))
+}
+
 function norm(value?: string | null): string | undefined {
   const trimmed = value?.trim()
   return trimmed && HEX.test(trimmed) ? trimmed : undefined
@@ -208,10 +226,12 @@ export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<str
   vars['--store-blur'] = `${frames.hero.surfaceBlur}px`
   vars['--store-blur-strong'] = `${Math.round(frames.hero.surfaceBlur * 4 / 3)}px`
   vars['--store-border-glow'] = `${frames.hero.borderGlow}px`
+  vars['--store-glass'] = `${frameGlassPercent(frames.hero.surfaceBlur)}%`
   for (const key of FRAME_KEYS) {
     vars[`--store-${key}-border-width`] = `${frames[key].borderThickness}px`
     vars[`--store-${key}-border-glow`] = `${frames[key].borderGlow}px`
     vars[`--store-${key}-blur`] = `${frames[key].surfaceBlur}px`
+    vars[`--store-${key}-glass`] = `${frameGlassPercent(frames[key].surfaceBlur)}%`
   }
 
   return vars

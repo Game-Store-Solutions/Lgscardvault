@@ -2,8 +2,16 @@
 @import "@fontsource-variable/geist/wght.css";
 @import "@fontsource-variable/plus-jakarta-sans/wght.css";
 
-/* Class-based dark mode: toggled by adding `.dark` on <html>. */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Class-based dark mode: `.dark` on <html> or a local root (store preview).
+ * `.preview-light` opts a subtree out so the branding mockup can show light
+ * while the admin chrome stays dark. */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    &:not(:where(.preview-light, .preview-light *)) {
+      @slot;
+    }
+  }
+}
 
 html {
   scroll-behavior: smooth;
@@ -686,6 +694,17 @@ textarea {
   color-scheme: dark;
 }
 
+@keyframes ripple {
+  0% {
+    transform: scale(0.65);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
 @keyframes hero-float {
   0%,
   100% {
@@ -741,18 +760,49 @@ textarea {
   --store-card-border-glow: 0px;
   --store-blur: 12px;
   --store-blur-strong: 16px;
+  --store-pattern-glass-cap: 68%;
+  --store-glass: 100%;
+  --store-hero-blur: 12px;
+  --store-tile-blur: 12px;
+  --store-card-blur: 12px;
   --frame-border-width: 1px;
   --frame-border-glow: 0px;
+  --frame-blur: 0px;
+  --frame-glass: 100%;
 }
 
 .store-theme .border {
   border-width: var(--store-border-width, 1px);
 }
 
+.store-theme[data-page-background]:not([data-page-background='none']) {
+  background-color: transparent;
+}
+
+.store-theme[data-page-background]:not([data-page-background='none']) .store-frame,
+[data-page-background]:not([data-page-background='none']) .store-frame {
+  --frame-glass: min(var(--frame-glass, var(--store-glass, 100%)), var(--store-pattern-glass-cap, 68%));
+}
+
+.store-rail-scroll {
+  mask-image: linear-gradient(to right, transparent, black 2.5rem, black calc(100% - 2.5rem), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 2.5rem, black calc(100% - 2.5rem), transparent);
+}
+
+@media (min-width: 640px) {
+  .store-rail-scroll {
+    mask-image: linear-gradient(to right, transparent, black 3.5rem, black calc(100% - 3.5rem), transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 3.5rem, black calc(100% - 3.5rem), transparent);
+  }
+}
+
 .store-frame {
   border-width: var(--frame-border-width, var(--store-border-width, 1px));
   border-style: solid;
   border-color: var(--color-border);
+  background-color: color-mix(in srgb, var(--color-surface) var(--frame-glass, var(--store-glass, 100%)), transparent);
+  backdrop-filter: blur(var(--frame-blur, var(--store-blur, 0px)));
+  -webkit-backdrop-filter: blur(var(--frame-blur, var(--store-blur, 0px)));
   box-shadow:
     var(--shadow-card),
     0 0 calc(var(--frame-border-glow, var(--store-border-glow, 0px)) * 0.35) color-mix(in srgb, var(--color-border) 88%, transparent),
@@ -762,16 +812,25 @@ textarea {
 .store-frame-hero {
   --frame-border-width: var(--store-hero-border-width, var(--store-border-width, 1px));
   --frame-border-glow: var(--store-hero-border-glow, var(--store-border-glow, 0px));
+  --frame-blur: var(--store-hero-blur, var(--store-blur, 12px));
+  --frame-glass: var(--store-hero-glass, var(--store-glass, 100%));
+  --store-blur: var(--store-hero-blur, 12px);
 }
 
 .store-frame-tile {
   --frame-border-width: var(--store-tile-border-width, var(--store-border-width, 1px));
   --frame-border-glow: var(--store-tile-border-glow, var(--store-border-glow, 0px));
+  --frame-blur: var(--store-tile-blur, var(--store-blur, 12px));
+  --frame-glass: var(--store-tile-glass, var(--store-glass, 100%));
+  --store-blur: var(--store-tile-blur, 12px);
 }
 
 .store-frame-card {
   --frame-border-width: var(--store-card-border-width, var(--store-border-width, 1px));
   --frame-border-glow: var(--store-card-border-glow, var(--store-border-glow, 0px));
+  --frame-blur: var(--store-card-blur, var(--store-blur, 12px));
+  --frame-glass: var(--store-card-glass, var(--store-glass, 100%));
+  --store-blur: var(--store-card-blur, 12px);
 }
 
 .store-theme .backdrop-blur {

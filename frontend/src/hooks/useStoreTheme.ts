@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Store } from '../api/types'
-import { storeThemeVars } from '../lib/storeTheme'
+import { inheritFrameStyles, resolveFrameStyles, storeThemeVars } from '../lib/storeTheme'
 
 /** Content that may inherit a store's branding. Platform chrome stays outside this. */
 export const STORE_THEME_CLASS = 'store-theme'
@@ -9,7 +9,7 @@ export const STORE_THEME_CLASS = 'store-theme'
 export const APP_CHROME_CLASS = 'app-chrome'
 
 /** Tracks the shopper's light/dark toggle by observing the `.dark` class on <html>. */
-function useIsDarkTheme(): boolean {
+export function useIsDarkTheme(): boolean {
   const [isDark, setIsDark] = useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
   )
@@ -56,6 +56,7 @@ export function useStoreTheme(store?: Store) {
         store.surfaceBlur,
         store.borderGlow,
         JSON.stringify(store.frameStyles ?? null),
+        JSON.stringify(store.darkFrameStyles ?? null),
         isDark ? JSON.stringify(store.darkColors ?? null) : '',
         isDark ? 'dark' : 'light',
       ].join('|')
@@ -64,9 +65,17 @@ export function useStoreTheme(store?: Store) {
   useEffect(() => {
     if (!store) return
     const dark = store.darkColors ?? {}
+    const lightFrames = resolveFrameStyles(store.frameStyles, {
+      borderThickness: store.borderThickness ?? undefined,
+      surfaceBlur: store.surfaceBlur ?? undefined,
+      borderGlow: store.borderGlow ?? undefined,
+    })
+    const frameStyles = isDark
+      ? inheritFrameStyles(store.darkFrameStyles, lightFrames)
+      : store.frameStyles
     let vars: Record<string, string>
     if (isDark && Object.keys(dark).length > 0) {
-      vars = storeThemeVars({ ...store, ...dark })
+      vars = storeThemeVars({ ...store, ...dark, frameStyles })
     } else if (isDark) {
       // Dark toggle without an owner dark palette: apply only the brand
       // colors (ramp flipped for dark) and let the app's default dark
@@ -79,7 +88,7 @@ export function useStoreTheme(store?: Store) {
         borderThickness: store.borderThickness,
         surfaceBlur: store.surfaceBlur,
         borderGlow: store.borderGlow,
-        frameStyles: store.frameStyles,
+        frameStyles,
       }, true)
     } else {
       vars = storeThemeVars(store)

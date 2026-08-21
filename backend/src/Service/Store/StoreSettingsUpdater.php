@@ -236,6 +236,14 @@ final readonly class StoreSettingsUpdater
         if (array_key_exists('frameStyles', $payload)) {
             $store->setFrameStyles($this->cleanFrameStyles($payload['frameStyles']));
         }
+
+        if (array_key_exists('darkFrameStyles', $payload)) {
+            $store->setDarkFrameStyles($this->cleanFrameStyles($payload['darkFrameStyles']));
+        }
+
+        if (array_key_exists('pageBackgrounds', $payload)) {
+            $store->setPageBackgrounds($this->cleanPageBackgrounds($payload['pageBackgrounds']));
+        }
     }
 
     /** @return array<string, mixed> */
@@ -257,6 +265,8 @@ final readonly class StoreSettingsUpdater
             'surfaceBlur' => $store->getSurfaceBlur(),
             'borderGlow' => $store->getBorderGlow(),
             'frameStyles' => $store->getFrameStyles(),
+            'darkFrameStyles' => $store->getDarkFrameStyles(),
+            'pageBackgrounds' => $this->normalizePageBackgroundsForRead($store->getPageBackgrounds()),
             'logoUrl' => $store->getLogoUrl(),
             'heroImageUrl' => $store->getHeroImageUrl(),
             'heroHeading' => $store->getHeroHeading(),
@@ -456,6 +466,149 @@ final readonly class StoreSettingsUpdater
         }
 
         return [] === $clean ? null : $clean;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function cleanPageBackgrounds(mixed $raw): ?array
+    {
+        if (null === $raw || [] === $raw) {
+            return null;
+        }
+        if (!is_array($raw)) {
+            throw new \InvalidArgumentException('pageBackgrounds must be an object.');
+        }
+
+        $presets = [
+            // Keep in sync with frontend PAGE_BACKGROUND_PRESETS in pageBackgrounds.ts
+            'none', 'noise', 'waves', 'aurora', 'grid', 'animated-grid',
+            'interactive-grid',
+        ];
+
+        $light = $this->stringValue($raw['light'] ?? 'none');
+        if (!in_array($light, $presets, true)) {
+            throw new \InvalidArgumentException('pageBackgrounds.light is not a supported background preset.');
+        }
+
+        $clean = ['light' => $light];
+
+        if (array_key_exists('dark', $raw)) {
+            $darkRaw = $raw['dark'];
+            if (null === $darkRaw || '' === $this->stringValue($darkRaw)) {
+                $clean['dark'] = null;
+            } else {
+                $dark = $this->stringValue($darkRaw);
+                if (!in_array($dark, $presets, true)) {
+                    throw new \InvalidArgumentException('pageBackgrounds.dark is not a supported background preset.');
+                }
+                $clean['dark'] = $dark;
+            }
+        }
+
+        if (array_key_exists('opacity', $raw)) {
+            $clean['opacity'] = $this->intInRange($raw['opacity'], 'pageBackgrounds.opacity', 0, 100);
+        }
+
+        if (array_key_exists('colors', $raw)) {
+            $colors = $this->cleanPageBackgroundColors($raw['colors']);
+            if (null !== $colors) {
+                $clean['colors'] = $colors;
+            }
+        }
+
+        return $clean;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function normalizePageBackgroundsForRead(?array $raw): ?array
+    {
+        if (null === $raw) {
+            return null;
+        }
+
+        $deprecated = ['dot', 'light-rays', 'striped', 'ripple', 'hexagon'];
+        $normalizePreset = static function (mixed $value) use ($deprecated): string {
+            $preset = is_string($value) ? trim($value) : 'none';
+            if (in_array($preset, $deprecated, true)) {
+                return 'none';
+            }
+
+            return $preset;
+        };
+
+        $light = $normalizePreset($raw['light'] ?? 'none');
+        $clean = ['light' => $light];
+
+        if (array_key_exists('dark', $raw)) {
+            $darkRaw = $raw['dark'];
+            if (null === $darkRaw || '' === $this->stringValue($darkRaw)) {
+                $clean['dark'] = null;
+            } else {
+                $clean['dark'] = $normalizePreset($darkRaw);
+            }
+        }
+
+        if (array_key_exists('opacity', $raw)) {
+            $clean['opacity'] = $this->intInRange($raw['opacity'], 'pageBackgrounds.opacity', 0, 100);
+        }
+
+        if (array_key_exists('colors', $raw) && is_array($raw['colors'])) {
+            $clean['colors'] = $raw['colors'];
+        }
+
+        return $clean;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function cleanPageBackgroundColors(mixed $raw): ?array
+    {
+        if (null === $raw || [] === $raw) {
+            return null;
+        }
+        if (!is_array($raw)) {
+            throw new \InvalidArgumentException('pageBackgrounds.colors must be an object.');
+        }
+
+        $clean = [];
+        foreach (['light', 'dark'] as $theme) {
+            if (!array_key_exists($theme, $raw)) {
+                continue;
+            }
+            $themeRaw = $raw[$theme];
+            if (null === $themeRaw || [] === $themeRaw) {
+                continue;
+            }
+            if (!is_array($themeRaw)) {
+                throw new \InvalidArgumentException('pageBackgrounds.colors.'.$theme.' must be an object.');
+            }
+            $themeClean = [];
+            foreach (['primary', 'secondary', 'base'] as $key) {
+                if (!array_key_exists($key, $themeRaw)) {
+                    continue;
+                }
+                $hex = $this->normalizeHexColor($themeRaw[$key], 'pageBackgrounds.colors.'.$theme.'.'.$key);
+                if ('' !== $hex) {
+                    $themeClean[$key] = $hex;
+                }
+            }
+            if ([] !== $themeClean) {
+                $clean[$theme] = $themeClean;
+            }
+        }
+
+        return [] === $clean ? null : $clean;
+    }
+
+    private function normalizeHexColor(mixed $value, string $key): string
+    {
+        $hex = $this->stringValue($value);
+        if ('' === $hex) {
+            return '';
+        }
+        if (!preg_match('/^#[0-9a-fA-F]{6}$/', $hex)) {
+            throw new \InvalidArgumentException($key.' must be a 6-digit hex color.');
+        }
+
+        return strtolower($hex);
     }
 
     private function stringValue(mixed $value): string

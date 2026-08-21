@@ -1,7 +1,15 @@
 import type { HeroLayout } from '../../api/types'
 import type { PaletteKey } from './brandingTypes'
 import { HEX } from './branding'
-import { resolveFrameStyles, type FrameStyles } from '../../lib/storeTheme'
+import type { StorePageBackgrounds } from '../../lib/pageBackgrounds'
+import { resolvePageBackgrounds } from '../../lib/pageBackgrounds'
+import { inheritFrameStyles, resolveFrameStyles, type FrameStyles } from '../../lib/storeTheme'
+
+function sanitizePageBackgrounds(input?: StorePageBackgrounds | null): StorePageBackgrounds {
+  const resolved = resolvePageBackgrounds(input)
+  if (!resolved.colors) delete (resolved as Partial<StorePageBackgrounds>).colors
+  return resolved
+}
 
 const PALETTE_KEYS: PaletteKey[] = [
   'primaryColor',
@@ -52,6 +60,8 @@ export interface BrandingPayloadInput {
   surfaceBlur?: number
   borderGlow?: number
   frameStyles?: FrameStyles
+  darkFrameStyles?: FrameStyles | null
+  pageBackgrounds?: StorePageBackgrounds
   darkColors: Record<PaletteKey, string>
   contactEmail: string
   logoUrl?: string
@@ -94,6 +104,13 @@ export function sanitizeBrandingPayload<T extends BrandingPayloadInput>(form: T)
   next.borderThickness = next.frameStyles.hero.borderThickness
   next.surfaceBlur = next.frameStyles.hero.surfaceBlur
   next.borderGlow = next.frameStyles.hero.borderGlow
+  if (form.darkFrameStyles) {
+    next.darkFrameStyles = inheritFrameStyles(form.darkFrameStyles, next.frameStyles)
+  } else {
+    delete (next as Partial<BrandingPayloadInput>).darkFrameStyles
+  }
+
+  next.pageBackgrounds = sanitizePageBackgrounds(form.pageBackgrounds)
 
   const email = form.contactEmail.trim()
   next.contactEmail = email && EMAIL.test(email) ? email : ''

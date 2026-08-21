@@ -27,8 +27,8 @@ export function SealedProductCard({
     <article className={cx('group relative w-full', className)}>
       <div
         className={cx(
-          'relative flex aspect-[5/7] w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-surface/80 p-3',
-          'transition-colors group-hover:border-brand-300',
+          'relative flex aspect-[5/7] w-full items-center justify-center overflow-hidden rounded-xl store-frame store-frame-tile p-3',
+          'transition-colors group-hover:border-brand-500/40',
         )}
       >
         <CardImage src={product.imageUrl} alt={product.name} fit="contain" className="max-h-full max-w-full" />
