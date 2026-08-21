@@ -93,6 +93,31 @@ export function cardImage(
   )
 }
 
+/**
+ * Fast first paint + sharp display: use `normal` as `src` (1x), and offer
+ * `large` as the 2x candidate so retina tiles look sharp without forcing PNG
+ * or a large download on every 1x thumbnail.
+ */
+export function cardArtDelivery(imageUrl: string): { src: string; srcSet?: string } {
+  const base = imageUrl.split('#')[0] ?? imageUrl
+  if (!base.includes('cards.scryfall.io')) {
+    return { src: base }
+  }
+  const normal = scryfallSize(base, 'normal')
+  const large = scryfallSize(base, 'large')
+  if (normal === large) {
+    return { src: normal }
+  }
+  return {
+    src: normal,
+    srcSet: `${normal} 1x, ${large} 2x`,
+  }
+}
+
+function scryfallSize(url: string, size: 'small' | 'normal' | 'large'): string {
+  return url.replace(/cards\.scryfall\.io\/(?:small|normal|large|png)\//, `cards.scryfall.io/${size}/`)
+}
+
 function pickImageUri(
   uris: { png?: string; large?: string; normal?: string; small?: string } | null | undefined,
   hq: boolean,
@@ -103,6 +128,8 @@ function pickImageUri(
   if (hq) {
     return uris.png ?? uris.large ?? uris.normal ?? uris.small
   }
+  // Prefer large for callers that only pass a single URL; progressive
+  // `cardArtDelivery` downgrades the <img src> to normal + srcSet.
   return uris.large ?? uris.normal ?? uris.small ?? uris.png
 }
 

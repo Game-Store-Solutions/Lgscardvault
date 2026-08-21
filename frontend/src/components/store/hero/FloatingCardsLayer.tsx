@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react'
+import { cardArtDelivery } from '../../../api/client'
 import { cx } from '../../../lib/cx'
 import { GENERIC_MTG_CARDS, type HeroCardImage } from './heroCardPool'
 import { FoilOverlays } from '../../cards/FoilOverlays'
@@ -48,6 +49,7 @@ function HeroCardImg({
     ? GENERIC_MTG_CARDS[0]!.imageUrl
     : candidates[Math.min(candidateIndex, Math.max(candidates.length - 1, 0))]
   const showFoil = !exhausted && (phase === 'primary' ? Boolean(card.isFoil) : Boolean(fallback.isFoil))
+  const delivery = useMemo(() => (activeUrl ? cardArtDelivery(activeUrl) : null), [activeUrl])
 
   const onError = () => {
     if (exhausted) return
@@ -73,14 +75,18 @@ function HeroCardImg({
       style={style}
       aria-hidden
     >
-      <img
-        key={`${phase}-${activeUrl}`}
-        src={activeUrl}
-        alt=""
-        draggable={false}
-        className="size-full rounded-md object-cover"
-        onError={onError}
-      />
+      {delivery ? (
+        <img
+          key={`${phase}-${delivery.src}`}
+          src={delivery.src}
+          srcSet={delivery.srcSet}
+          alt=""
+          draggable={false}
+          decoding="async"
+          className="size-full rounded-md object-cover"
+          onError={onError}
+        />
+      ) : null}
       {showFoil && <FoilOverlays foil glare={false} />}
     </span>
   )

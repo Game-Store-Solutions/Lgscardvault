@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ImageOff } from 'lucide-react'
+import { cardArtDelivery } from '../../api/client'
 import { cx } from '../../lib/cx'
 
 export interface CardImageProps {
@@ -13,6 +14,8 @@ export interface CardImageProps {
   /** Hide the caption on thumbnails too small to read it. */
   showLabel?: boolean
   label?: string
+  /** Override lazy loading (e.g. above-the-fold hero). */
+  loading?: 'lazy' | 'eager'
 }
 
 /**
@@ -24,6 +27,9 @@ export interface CardImageProps {
  * should be) and the layout jumps. This falls back to a blank-card
  * placeholder that keeps the frame's size and reads as "no art", so a grid
  * of results stays aligned whatever the source does.
+ *
+ * Scryfall URLs paint with `normal` (1x) and advertise `large` (2x) so retina
+ * screens get sharper art without forcing every 1x thumbnail to download it.
  */
 export function CardImage({
   src,
@@ -32,17 +38,20 @@ export function CardImage({
   fit = 'cover',
   showLabel = true,
   label = 'No image',
+  loading = 'lazy',
 }: CardImageProps) {
   const [failed, setFailed] = useState(false)
+  const delivery = useMemo(() => (src ? cardArtDelivery(src) : null), [src])
 
-  if (src && !failed) {
+  if (delivery && !failed) {
     return (
       <img
-        src={src}
+        src={delivery.src}
+        srcSet={delivery.srcSet}
         alt={alt}
         width={488}
         height={680}
-        loading="lazy"
+        loading={loading}
         decoding="async"
         onError={() => setFailed(true)}
         className={cx('block', 'cover' === fit ? 'object-cover' : 'object-contain', className)}
