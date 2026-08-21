@@ -462,8 +462,8 @@ body {
   .foil-card {
     --foil-holo-opacity: 0.36; /* was 0.45; ~20% quieter film */
     --foil-hover-boost: 0.9; /* big shine on pointer hover */
-    --foil-glare: 0.82;
-    --foil-white: 1.7;
+    --foil-glare: 0; /* no white specular — washes out on light surfaces */
+    --foil-white: 0;
     --foil-rainbow-sat: 1;
     --foil-purple-sat: 0.7;
     --foil-grid: 0.42;
