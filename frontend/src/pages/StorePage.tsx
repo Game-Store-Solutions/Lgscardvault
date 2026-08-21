@@ -615,7 +615,7 @@ export default function StorePage() {
         </aside>
 
         <main ref={singlesSectionRef} id="store-singles" className="min-w-0 scroll-mt-24 space-y-5">
-          <div className="sticky top-16 z-20 -mx-4 space-y-3 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:border-b lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none">
+          <div className="store-listing-chrome sticky top-16 z-20 -mx-4 space-y-3 border-b border-border/70 bg-bg/55 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:space-y-0 lg:bg-bg/45 lg:px-0 lg:py-0 lg:backdrop-blur-sm">
             <div className="lg:hidden">{renderSearchField('store-search-mobile', false)}</div>
             <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-center sm:justify-between lg:border-b lg:border-border lg:pb-4">
               <div className="min-w-0">

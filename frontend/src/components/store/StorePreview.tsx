@@ -272,6 +272,7 @@ export function StorePreview({
       ) : null}
       <div
         style={themeStyle}
+        data-branding-preview
         className={cx(
           'relative min-h-[20rem] overflow-hidden rounded-card border border-border shadow-card sm:min-h-[26rem] xl:min-h-[32rem]',
           previewMode === 'dark' ? 'dark' : 'preview-light',

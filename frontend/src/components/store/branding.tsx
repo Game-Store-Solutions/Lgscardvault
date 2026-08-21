@@ -112,7 +112,7 @@ export function ThemePresetButton({
     <button
       type="button"
       onClick={onSelect}
-      className="group rounded-card border border-border p-3 text-left transition-colors hover:border-brand-500 hover:bg-bg/50"
+      className="group rounded-card border border-border bg-surface p-3 text-left shadow-sm transition-colors hover:border-brand-500 hover:bg-bg/40"
     >
       <span className="flex h-10 overflow-hidden rounded-btn border border-border">
         {SWATCH_KEYS.map((key) => (
@@ -141,7 +141,7 @@ function ThemePresetAccordion({
   const panelId = useId()
 
   return (
-    <div className="rounded-xl border border-border bg-bg/40">
+    <div className="rounded-xl border border-border bg-surface shadow-sm ring-1 ring-black/[0.04]">
       <button
         type="button"
         aria-expanded={open}
@@ -259,7 +259,7 @@ export function BrandingPreviewIsland({
   return (
     <div
       className={cx(
-        'overflow-hidden rounded-card border border-border bg-bg shadow-card ring-1 ring-black/[0.04]',
+        'branding-preview-island overflow-hidden rounded-card border border-border bg-bg shadow-card ring-1 ring-black/[0.04]',
         mode === 'dark' ? 'dark' : 'preview-light',
         className,
       )}

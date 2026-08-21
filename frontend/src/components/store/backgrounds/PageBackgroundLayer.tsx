@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import type { PageBackgroundPreset, PageBackgroundThemeColors } from '../../../lib/pageBackgrounds'
 import { patternColorStyle } from '../../../lib/pageBackgrounds'
@@ -180,12 +180,15 @@ function SkewedGridLayer({
   lineOpacity,
   children,
   parallax = false,
+  flat = false,
 }: {
   mask: string
   className?: string
   lineOpacity?: number
   children?: ReactNode
   parallax?: boolean
+  /** No perspective skew — used for live scroll and static admin previews. */
+  flat?: boolean
 }) {
   const drift = useScrollDrift(parallax)
   const gridRepeat = GRID_CELL * 20
@@ -197,18 +200,18 @@ function SkewedGridLayer({
       className={cx(
         'pointer-events-none overflow-hidden',
         'absolute inset-0',
-        !parallax && mask,
+        mask,
         className,
       )}
     >
       <div
         className={cx(
           'absolute inset-x-0',
-          parallax ? 'inset-y-[-55%] h-[260%]' : 'inset-y-[-30%] h-[200%]',
+          parallax ? 'inset-y-[-40%] h-[220%]' : 'inset-y-[-30%] h-[200%]',
         )}
         style={{ transform: `translate3d(0, ${-wrappedDrift}px, 0)` }}
       >
-        <div className="absolute inset-0 skew-y-12">
+        <div className={cx('absolute inset-0', flat ? '' : 'skew-y-12')}>
           <GridLines opacity={lineOpacity} />
           {children}
         </div>
@@ -223,19 +226,31 @@ function GridPattern({
   compact,
   thumbnail,
   parallax = false,
+  flat = false,
+  staticPreview = false,
+  lineOpacity,
 }: {
   className?: string
   mask: string
   compact?: boolean
   thumbnail?: boolean
   parallax?: boolean
+  flat?: boolean
+  staticPreview?: boolean
+  lineOpacity?: number
 }) {
   return (
-    <SkewedGridLayer mask={mask} className={className} lineOpacity={thumbnail ? 0.62 : 0.48} parallax={parallax}>
+    <SkewedGridLayer
+      mask={mask}
+      className={className}
+      lineOpacity={lineOpacity ?? (thumbnail ? 0.62 : 0.48)}
+      parallax={parallax}
+      flat={flat}
+    >
       <AnimatedGridCells
         compact={compact}
         density="spot"
-        staticPreview={compact || thumbnail}
+        staticPreview={staticPreview}
         thumbnail={thumbnail}
       />
     </SkewedGridLayer>
@@ -247,20 +262,32 @@ function AnimatedGridPattern({
   compact,
   mask,
   parallax = false,
+  flat = false,
+  staticPreview = false,
   thumbnail,
+  lineOpacity,
 }: {
   className?: string
   compact?: boolean
   mask: string
   parallax?: boolean
+  flat?: boolean
+  staticPreview?: boolean
   thumbnail?: boolean
+  lineOpacity?: number
 }) {
   return (
-    <SkewedGridLayer mask={mask} className={className} lineOpacity={thumbnail ? 0.52 : 0.36} parallax={parallax}>
+    <SkewedGridLayer
+      mask={mask}
+      className={className}
+      lineOpacity={lineOpacity ?? (thumbnail ? 0.52 : 0.36)}
+      parallax={parallax}
+      flat={flat}
+    >
       <AnimatedGridCells
         compact={compact}
         density="animated"
-        staticPreview={compact || thumbnail}
+        staticPreview={staticPreview}
         thumbnail={thumbnail}
       />
     </SkewedGridLayer>
@@ -270,55 +297,80 @@ function AnimatedGridPattern({
 function InteractiveGridPattern({
   className,
   mask,
-  compact,
   thumbnail,
   parallax = false,
+  flat = false,
+  staticPreview = false,
+  preview = false,
 }: {
   className?: string
   mask: string
   compact?: boolean
   thumbnail?: boolean
   parallax?: boolean
+  flat?: boolean
+  staticPreview?: boolean
+  preview?: boolean
 }) {
+  const hostRef = useRef<HTMLDivElement>(null)
   const [xy, setXy] = useState({ x: 50, y: 40 })
   const drift = useScrollDrift(parallax)
   const gridRepeat = 36 * 20
   const wrappedDrift = parallax ? drift % gridRepeat : drift
 
   useEffect(() => {
-    if (compact || thumbnail) return
+    if (staticPreview) return
+
+    const root = preview
+      ? hostRef.current?.closest('[data-branding-preview]')
+      : null
+
     const onMove = (event: MouseEvent | TouchEvent) => {
       const point = 'touches' in event ? event.touches[0] : event
       if (!point) return
+
+      if (root instanceof HTMLElement) {
+        const rect = root.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return
+        setXy({
+          x: ((point.clientX - rect.left) / rect.width) * 100,
+          y: ((point.clientY - rect.top) / rect.height) * 100,
+        })
+        return
+      }
+
       const w = window.innerWidth || 1
       const h = window.innerHeight || 1
       setXy({ x: (point.clientX / w) * 100, y: (point.clientY / h) * 100 })
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('touchmove', onMove, { passive: true })
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('touchmove', onMove)
-    }
-  }, [compact, thumbnail])
 
-  const glowX = thumbnail ? 42 : xy.x
-  const glowY = thumbnail ? 48 : xy.y
+    const target = preview && root instanceof HTMLElement ? root : window
+    target.addEventListener('mousemove', onMove as EventListener)
+    target.addEventListener('touchmove', onMove as EventListener, { passive: true })
+    return () => {
+      target.removeEventListener('mousemove', onMove as EventListener)
+      target.removeEventListener('touchmove', onMove as EventListener)
+    }
+  }, [preview, staticPreview])
+
+  const glowX = staticPreview || thumbnail ? 42 : xy.x
+  const glowY = staticPreview || thumbnail ? 48 : xy.y
 
   return (
-    <div aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>
+    <div ref={hostRef} aria-hidden className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}>
       <div
         className={cx(
           'absolute inset-x-0',
-          parallax ? 'inset-y-[-55%] h-[260%]' : 'inset-y-[-30%] h-[200%]',
+          parallax ? 'inset-y-[-40%] h-[220%]' : 'inset-y-[-30%] h-[200%]',
         )}
-        style={{ transform: `translate3d(0, ${-wrappedDrift}px, 0)` }}
+        style={{ transform: parallax ? `translate3d(0, ${-wrappedDrift}px, 0)` : undefined }}
       >
         <div
           className={cx(
-            'absolute inset-0 skew-y-12',
+            'absolute inset-0',
+            flat ? '' : 'skew-y-12',
             thumbnail ? 'opacity-60' : 'opacity-45',
-            !parallax && mask,
+            mask,
           )}
           style={{
             backgroundImage:
@@ -351,7 +403,11 @@ export function PageBackgroundLayer({
   if (preset === 'none') return null
 
   const live = !compact && !preview && !thumbnail
+  const staticPreview = compact || thumbnail
+  const flatGrid = live || preview
   const mask = edgeMask(preview, compact, thumbnail)
+  const gridPreset = preset === 'grid' || preset === 'animated-grid' || preset === 'interactive-grid'
+  const liveGridLineOpacity = live && gridPreset ? 0.28 : undefined
   const visibleOpacity = thumbnail
     ? 1
     : preview
@@ -364,7 +420,8 @@ export function PageBackgroundLayer({
     <div
       className={cx(
         'pointer-events-none',
-        live ? 'fixed inset-0 z-0' : 'absolute inset-0 overflow-hidden',
+        live ? 'absolute inset-0' : 'absolute inset-0 overflow-hidden',
+        live && gridPreset && STOREFRONT_MASK,
         className,
       )}
       style={{ opacity: visibleOpacity, ...patternColorStyle(patternColors ?? {}) }}
@@ -372,7 +429,11 @@ export function PageBackgroundLayer({
     >
       {preset === 'noise' && <NoiseTexture strong={preview || thumbnail} />}
       {preset === 'waves' && (
-        <WavyBackground thumbnail={thumbnail} compact={compact && !thumbnail} parallax={live} />
+        <WavyBackground
+          thumbnail={thumbnail}
+          compact={compact && !thumbnail}
+          parallax={live}
+        />
       )}
       {preset === 'aurora' && (
         <AuroraBackground
@@ -388,6 +449,9 @@ export function PageBackgroundLayer({
           thumbnail={thumbnail}
           mask={mask}
           parallax={live}
+          flat={flatGrid}
+          staticPreview={staticPreview}
+          lineOpacity={liveGridLineOpacity ?? (thumbnail ? 0.62 : 0.48)}
         />
       )}
       {preset === 'animated-grid' && (
@@ -396,6 +460,9 @@ export function PageBackgroundLayer({
           thumbnail={thumbnail}
           mask={mask}
           parallax={live}
+          flat={flatGrid}
+          staticPreview={staticPreview}
+          lineOpacity={liveGridLineOpacity ?? (thumbnail ? 0.52 : 0.36)}
         />
       )}
       {preset === 'interactive-grid' && (
@@ -404,6 +471,9 @@ export function PageBackgroundLayer({
           thumbnail={thumbnail}
           mask={mask}
           parallax={live}
+          flat={flatGrid}
+          staticPreview={staticPreview}
+          preview={preview}
         />
       )}
     </div>

@@ -126,6 +126,7 @@ export function WavyBackground({
       canvas.style.width = `${width}px`
       canvas.style.height = `${height}px`
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      if (reducedMotion) render()
     }
 
     const observer = parallax ? null : new ResizeObserver(resize)
@@ -161,7 +162,7 @@ export function WavyBackground({
         ctx.fillRect(0, 0, width, height)
       }
 
-      const time = thumbnail ? 1.6 : reducedMotion ? 0 : frame * 0.014
+      const time = reducedMotion ? (thumbnail ? 1.6 : 0) : frame * 0.014
       const scrollY = parallax ? scrollRef.current : 0
       const waves = parallax ? storefrontWaves(height, scrollY) : waveLayout(height, layoutMode)
 
@@ -175,7 +176,7 @@ export function WavyBackground({
       }
 
       frame += 1
-      if (!reducedMotion && !compact && !thumbnail) raf = requestAnimationFrame(render)
+      if (!reducedMotion) raf = requestAnimationFrame(render)
     }
 
     render()
