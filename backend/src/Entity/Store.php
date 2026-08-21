@@ -193,6 +193,11 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private ?string $heroImageUrl = null;
 
+    /** Optional dark-mode hero photo. Null = reuse heroImageUrl. */
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?string $darkHeroImageUrl = null;
+
     /** Hero banner photo opacity in light mode (0–100). */
     #[ORM\Column(type: 'smallint', options: ['default' => 100])]
     #[Assert\Range(min: 0, max: 100)]
@@ -204,6 +209,42 @@ class Store
     #[Assert\Range(min: 0, max: 100)]
     #[Groups(['store:read', 'store:admin'])]
     private ?int $darkHeroImageOpacity = null;
+
+    /** Vertical crop of the hero photo in light mode (0 = top, 50 = center, 100 = bottom). */
+    #[ORM\Column(type: 'smallint', options: ['default' => 50])]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private int $heroImagePosition = 50;
+
+    /** Horizontal crop in light mode (0 = left, 50 = center, 100 = right). */
+    #[ORM\Column(type: 'smallint', options: ['default' => 50])]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private int $heroImagePositionX = 50;
+
+    /** Vertical crop in dark mode. Null = inherit light. */
+    #[ORM\Column(type: 'smallint', nullable: true)]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?int $darkHeroImagePosition = null;
+
+    /** Horizontal crop in dark mode. Null = inherit light. */
+    #[ORM\Column(type: 'smallint', nullable: true)]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?int $darkHeroImagePositionX = null;
+
+    /** Phone horizontal crop. Null = inherit the active theme crop. */
+    #[ORM\Column(type: 'smallint', nullable: true)]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?int $heroImagePositionMobileX = null;
+
+    /** Phone vertical crop. Null = inherit the active theme crop. */
+    #[ORM\Column(type: 'smallint', nullable: true)]
+    #[Assert\Range(min: 0, max: 100)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?int $heroImagePositionMobileY = null;
 
     #[ORM\Column(length: 160, nullable: true)]
     #[Groups(['store:read', 'store:admin'])]
@@ -713,6 +754,18 @@ class Store
         return $this;
     }
 
+    public function getDarkHeroImageUrl(): ?string
+    {
+        return $this->darkHeroImageUrl;
+    }
+
+    public function setDarkHeroImageUrl(?string $darkHeroImageUrl): static
+    {
+        $this->darkHeroImageUrl = $darkHeroImageUrl;
+
+        return $this;
+    }
+
     public function getHeroImageOpacity(): int
     {
         return $this->heroImageOpacity;
@@ -733,6 +786,78 @@ class Store
     public function setDarkHeroImageOpacity(?int $darkHeroImageOpacity): static
     {
         $this->darkHeroImageOpacity = $darkHeroImageOpacity;
+
+        return $this;
+    }
+
+    public function getHeroImagePosition(): int
+    {
+        return $this->heroImagePosition;
+    }
+
+    public function setHeroImagePosition(int $heroImagePosition): static
+    {
+        $this->heroImagePosition = $heroImagePosition;
+
+        return $this;
+    }
+
+    public function getDarkHeroImagePosition(): ?int
+    {
+        return $this->darkHeroImagePosition;
+    }
+
+    public function setDarkHeroImagePosition(?int $darkHeroImagePosition): static
+    {
+        $this->darkHeroImagePosition = $darkHeroImagePosition;
+
+        return $this;
+    }
+
+    public function getHeroImagePositionX(): int
+    {
+        return $this->heroImagePositionX;
+    }
+
+    public function setHeroImagePositionX(int $heroImagePositionX): static
+    {
+        $this->heroImagePositionX = $heroImagePositionX;
+
+        return $this;
+    }
+
+    public function getDarkHeroImagePositionX(): ?int
+    {
+        return $this->darkHeroImagePositionX;
+    }
+
+    public function setDarkHeroImagePositionX(?int $darkHeroImagePositionX): static
+    {
+        $this->darkHeroImagePositionX = $darkHeroImagePositionX;
+
+        return $this;
+    }
+
+    public function getHeroImagePositionMobileX(): ?int
+    {
+        return $this->heroImagePositionMobileX;
+    }
+
+    public function setHeroImagePositionMobileX(?int $heroImagePositionMobileX): static
+    {
+        $this->heroImagePositionMobileX = $heroImagePositionMobileX;
+
+        return $this;
+    }
+
+    public function getHeroImagePositionMobileY(): ?int
+    {
+        return $this->heroImagePositionMobileY;
+    }
+
+    public function setHeroImagePositionMobileY(?int $heroImagePositionMobileY): static
+    {
+        $this->heroImagePositionMobileY = $heroImagePositionMobileY;
 
         return $this;
     }

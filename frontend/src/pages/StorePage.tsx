@@ -23,7 +23,7 @@ import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components
 import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
 import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
 import { StoreHero } from '../components/store/StoreHero'
-import { resolveHeroImageOpacity } from '../lib/heroImageOpacity'
+import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../lib/heroImageOpacity'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { SealedSpotlightRow } from '../components/store/SealedSpotlightRow'
@@ -449,12 +449,24 @@ export default function StorePage() {
           store?.heroSubheading ||
           'Browse available Magic singles and compare printings, condition, colors, and prices.'
         }
-        heroImageUrl={store?.heroImageUrl}
+        heroImageUrl={resolveHeroImageUrl(store?.heroImageUrl, store?.darkHeroImageUrl, storefrontIsDark)}
         heroImageOpacity={resolveHeroImageOpacity(
           store?.heroImageOpacity,
           store?.darkHeroImageOpacity,
           storefrontIsDark,
         )}
+        heroImagePosition={resolveHeroImagePosition(
+          store?.heroImagePosition,
+          store?.darkHeroImagePosition,
+          storefrontIsDark,
+        )}
+        heroImagePositionX={resolveHeroImagePosition(
+          store?.heroImagePositionX,
+          store?.darkHeroImagePositionX,
+          storefrontIsDark,
+        )}
+        heroImagePositionMobileX={store?.heroImagePositionMobileX}
+        heroImagePositionMobileY={store?.heroImagePositionMobileY}
         logoUrl={store?.logoUrl}
         primaryColor={store?.primaryColor}
         accentColor={store?.accentColor}

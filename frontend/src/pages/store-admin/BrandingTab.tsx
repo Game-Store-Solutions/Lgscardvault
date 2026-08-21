@@ -36,7 +36,10 @@ import {
 import {
   HERO_IMAGE_OPACITY_DEFAULT,
   HERO_IMAGE_OPACITY_RANGE,
+  HERO_IMAGE_POSITION_DEFAULT,
+  HERO_IMAGE_POSITION_RANGE,
   clampHeroImageOpacity,
+  clampHeroImagePosition,
 } from '../../lib/heroImageOpacity'
 import { BackgroundPresetPicker } from '../../components/store/backgrounds'
 import {
@@ -64,8 +67,15 @@ interface BrandingForm {
   darkFrameStyles: FrameStyles | null
   logoUrl: string
   heroImageUrl: string
+  darkHeroImageUrl: string
   heroImageOpacity: number
   darkHeroImageOpacity: number
+  heroImagePosition: number
+  heroImagePositionX: number
+  darkHeroImagePosition: number
+  darkHeroImagePositionX: number
+  heroImagePositionMobileX: number
+  heroImagePositionMobileY: number
   heroHeading: string
   heroSubheading: string
   tagline: string
@@ -128,8 +138,15 @@ const EMPTY: BrandingForm = {
   darkFrameStyles: null,
   logoUrl: '',
   heroImageUrl: '',
+  darkHeroImageUrl: '',
   heroImageOpacity: HERO_IMAGE_OPACITY_DEFAULT,
   darkHeroImageOpacity: HERO_IMAGE_OPACITY_DEFAULT,
+  heroImagePosition: HERO_IMAGE_POSITION_DEFAULT,
+  heroImagePositionX: HERO_IMAGE_POSITION_DEFAULT,
+  darkHeroImagePosition: HERO_IMAGE_POSITION_DEFAULT,
+  darkHeroImagePositionX: HERO_IMAGE_POSITION_DEFAULT,
+  heroImagePositionMobileX: HERO_IMAGE_POSITION_DEFAULT,
+  heroImagePositionMobileY: HERO_IMAGE_POSITION_DEFAULT,
   heroHeading: '',
   heroSubheading: '',
   tagline: '',
@@ -169,10 +186,29 @@ function fromStore(store: Store): BrandingForm {
       : null,
     logoUrl: store.logoUrl ?? '',
     heroImageUrl: store.heroImageUrl ?? '',
+    darkHeroImageUrl: store.darkHeroImageUrl ?? '',
     heroImageOpacity: clampHeroImageOpacity(store.heroImageOpacity),
     darkHeroImageOpacity: clampHeroImageOpacity(
       store.darkHeroImageOpacity,
       clampHeroImageOpacity(store.heroImageOpacity),
+    ),
+    heroImagePosition: clampHeroImagePosition(store.heroImagePosition),
+    heroImagePositionX: clampHeroImagePosition(store.heroImagePositionX),
+    darkHeroImagePosition: clampHeroImagePosition(
+      store.darkHeroImagePosition,
+      clampHeroImagePosition(store.heroImagePosition),
+    ),
+    darkHeroImagePositionX: clampHeroImagePosition(
+      store.darkHeroImagePositionX,
+      clampHeroImagePosition(store.heroImagePositionX),
+    ),
+    heroImagePositionMobileX: clampHeroImagePosition(
+      store.heroImagePositionMobileX,
+      clampHeroImagePosition(store.heroImagePositionX),
+    ),
+    heroImagePositionMobileY: clampHeroImagePosition(
+      store.heroImagePositionMobileY,
+      clampHeroImagePosition(store.heroImagePosition),
     ),
     heroHeading: store.heroHeading ?? '',
     heroSubheading: store.heroSubheading ?? '',
@@ -349,6 +385,10 @@ export default function BrandingTab({ slug }: { slug: string }) {
 
   function onHeroImageChange(value: string) {
     set('heroImageUrl', value)
+  }
+
+  function onDarkHeroImageChange(value: string) {
+    set('darkHeroImageUrl', value)
   }
 
   function onLogoChange(value: string) {
@@ -726,12 +766,20 @@ export default function BrandingTab({ slug }: { slug: string }) {
                   hint="Upload an image or paste a URL. Also used by the loading screen."
                 />
                 <ImageUploadField
-                  label="Hero banner image"
+                  label="Light hero image"
                   placeholder="https://…/banner.jpg"
                   value={form.heroImageUrl}
                   onChange={onHeroImageChange}
                   onUploadComplete={(url) => saveHeroBranding({ heroImageUrl: url })}
-                  hint="Background on most layouts (not cinematic classic). Upload shop photos or art."
+                  hint="Shown in light mode. Used in dark mode too if no dark image is set."
+                />
+                <ImageUploadField
+                  label="Dark hero image"
+                  placeholder="https://…/banner-dark.jpg"
+                  value={form.darkHeroImageUrl}
+                  onChange={onDarkHeroImageChange}
+                  onUploadComplete={(url) => saveHeroBranding({ darkHeroImageUrl: url })}
+                  hint="Optional. Leave blank to reuse the light photo when shoppers switch to dark."
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <RangeField
@@ -740,7 +788,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     min={HERO_IMAGE_OPACITY_RANGE.min}
                     max={HERO_IMAGE_OPACITY_RANGE.max}
                     unit="%"
-                    hint="How visible the banner photo is in light mode. Lower values let the page color show through."
+                    hint="How visible the banner photo is in light mode."
                     onChange={(v) => set('heroImageOpacity', v)}
                   />
                   <RangeField
@@ -749,8 +797,71 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     min={HERO_IMAGE_OPACITY_RANGE.min}
                     max={HERO_IMAGE_OPACITY_RANGE.max}
                     unit="%"
-                    hint="How visible the banner photo is in dark mode. Switch the preview to Dark to check."
+                    hint="How visible the banner photo is in dark mode."
                     onChange={(v) => set('darkHeroImageOpacity', v)}
+                  />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Desktop crop</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <RangeField
+                    label="Light left / right"
+                    value={form.heroImagePositionX}
+                    min={HERO_IMAGE_POSITION_RANGE.min}
+                    max={HERO_IMAGE_POSITION_RANGE.max}
+                    unit="%"
+                    hint="0 is the left of the photo, 100 is the right."
+                    onChange={(v) => set('heroImagePositionX', v)}
+                  />
+                  <RangeField
+                    label="Light up / down"
+                    value={form.heroImagePosition}
+                    min={HERO_IMAGE_POSITION_RANGE.min}
+                    max={HERO_IMAGE_POSITION_RANGE.max}
+                    unit="%"
+                    hint="0 is the top of the photo, 100 is the bottom."
+                    onChange={(v) => set('heroImagePosition', v)}
+                  />
+                  <RangeField
+                    label="Dark left / right"
+                    value={form.darkHeroImagePositionX}
+                    min={HERO_IMAGE_POSITION_RANGE.min}
+                    max={HERO_IMAGE_POSITION_RANGE.max}
+                    unit="%"
+                    hint="Shift the dark photo left or right."
+                    onChange={(v) => set('darkHeroImagePositionX', v)}
+                  />
+                  <RangeField
+                    label="Dark up / down"
+                    value={form.darkHeroImagePosition}
+                    min={HERO_IMAGE_POSITION_RANGE.min}
+                    max={HERO_IMAGE_POSITION_RANGE.max}
+                    unit="%"
+                    hint="Shift the dark photo up or down."
+                    onChange={(v) => set('darkHeroImagePosition', v)}
+                  />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Phone crop</p>
+                <p className="text-xs text-fg-muted">
+                  Fine-tune how the photo is cropped inside the same banner on phones. The hero box does not change size.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <RangeField
+                    label="Phone left / right"
+                    value={form.heroImagePositionMobileX}
+                    min={HERO_IMAGE_POSITION_RANGE.min}
+                    max={HERO_IMAGE_POSITION_RANGE.max}
+                    unit="%"
+                    hint="0 is left, 100 is right. Applies on phones in light and dark."
+                    onChange={(v) => set('heroImagePositionMobileX', v)}
+                  />
+                  <RangeField
+                    label="Phone up / down"
+                    value={form.heroImagePositionMobileY}
+                    min={HERO_IMAGE_POSITION_RANGE.min}
+                    max={HERO_IMAGE_POSITION_RANGE.max}
+                    unit="%"
+                    hint="0 is top, 100 is bottom. Applies on phones in light and dark."
+                    onChange={(v) => set('heroImagePositionMobileY', v)}
                   />
                 </div>
               </div>

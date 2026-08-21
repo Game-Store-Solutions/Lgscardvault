@@ -1,5 +1,12 @@
+import type { CSSProperties } from 'react'
 import { cx } from '../../../lib/cx'
-import { heroImageOpacityCss } from '../../../lib/heroImageOpacity'
+import {
+  HERO_BANNER_PHOTO_CLASS,
+  HERO_IMAGE_POSITION_DEFAULT,
+  clampHeroImageOpacity,
+  clampHeroImagePosition,
+  heroImagePhotoStyle,
+} from '../../../lib/heroImageOpacity'
 import { layoutUsesHeroPhotoBackground } from './heroLayouts'
 
 export { layoutUsesHeroPhotoBackground } from './heroLayouts'
@@ -10,14 +17,21 @@ export function HeroPhotoBackgroundLayer({
   primary,
   imageClassName,
   imageOpacity = 100,
+  imagePositionX = HERO_IMAGE_POSITION_DEFAULT,
+  imagePositionY = HERO_IMAGE_POSITION_DEFAULT,
+  imagePositionMobileX,
+  imagePositionMobileY,
   blur = false,
 }: {
   heroImageUrl?: string | null
   hasImage: boolean
   primary: string
   imageClassName?: string
-  /** Photo strength 0–100. */
   imageOpacity?: number
+  imagePositionX?: number
+  imagePositionY?: number
+  imagePositionMobileX?: number | null
+  imagePositionMobileY?: number | null
   blur?: boolean
 }) {
   if (!hasImage || !heroImageUrl?.trim()) {
@@ -31,12 +45,24 @@ export function HeroPhotoBackgroundLayer({
         src={heroImageUrl}
         alt=""
         aria-hidden
+        decoding="async"
+        fetchPriority="high"
+        sizes="100vw"
         className={cx(
-          'absolute inset-0 -z-20 size-full object-cover',
+          'absolute inset-0 -z-20 size-full',
+          HERO_BANNER_PHOTO_CLASS,
           blur && 'scale-105 blur-md',
           imageClassName,
         )}
-        style={{ opacity: heroImageOpacityCss(imageOpacity) }}
+        style={
+          heroImagePhotoStyle(
+            clampHeroImageOpacity(imageOpacity),
+            clampHeroImagePosition(imagePositionX),
+            clampHeroImagePosition(imagePositionY),
+            imagePositionMobileX,
+            imagePositionMobileY,
+          ) as CSSProperties
+        }
       />
     </>
   )
@@ -49,12 +75,20 @@ export function HeroOptionalPhoto({
   hasImage,
   primary,
   imageOpacity = 100,
+  imagePositionX = HERO_IMAGE_POSITION_DEFAULT,
+  imagePositionY = HERO_IMAGE_POSITION_DEFAULT,
+  imagePositionMobileX,
+  imagePositionMobileY,
 }: {
   layout?: import('../../../api/types').HeroLayout | null
   heroImageUrl?: string | null
   hasImage: boolean
   primary: string
   imageOpacity?: number
+  imagePositionX?: number
+  imagePositionY?: number
+  imagePositionMobileX?: number | null
+  imagePositionMobileY?: number | null
 }) {
   if (!layoutUsesHeroPhotoBackground(layout)) return null
   return (
@@ -63,6 +97,10 @@ export function HeroOptionalPhoto({
       hasImage={hasImage}
       primary={primary}
       imageOpacity={imageOpacity}
+      imagePositionX={imagePositionX}
+      imagePositionY={imagePositionY}
+      imagePositionMobileX={imagePositionMobileX}
+      imagePositionMobileY={imagePositionMobileY}
     />
   )
 }

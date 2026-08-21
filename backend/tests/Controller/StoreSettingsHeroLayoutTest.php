@@ -130,4 +130,49 @@ final class StoreSettingsHeroLayoutTest extends WebTestCase
         $patch = $this->patchSettings(['darkHeroImageOpacity' => null]);
         self::assertNull($patch['darkHeroImageOpacity']);
     }
+
+    public function testDarkHeroImageUrlAndPositionPersist(): void
+    {
+        $patch = $this->patchSettings([
+            'heroImageUrl' => '/uploads/hero-light.jpg',
+            'darkHeroImageUrl' => '/uploads/hero-dark.jpg',
+            'heroImagePosition' => 20,
+            'heroImagePositionX' => 15,
+            'darkHeroImagePosition' => 80,
+            'darkHeroImagePositionX' => 70,
+            'heroImagePositionMobileX' => 35,
+            'heroImagePositionMobileY' => 40,
+        ]);
+        self::assertSame('/uploads/hero-light.jpg', $patch['heroImageUrl']);
+        self::assertSame('/uploads/hero-dark.jpg', $patch['darkHeroImageUrl']);
+        self::assertSame(20, $patch['heroImagePosition']);
+        self::assertSame(15, $patch['heroImagePositionX']);
+        self::assertSame(80, $patch['darkHeroImagePosition']);
+        self::assertSame(70, $patch['darkHeroImagePositionX']);
+        self::assertSame(35, $patch['heroImagePositionMobileX']);
+        self::assertSame(40, $patch['heroImagePositionMobileY']);
+
+        $read = $this->readStore();
+        self::assertSame('/uploads/hero-dark.jpg', $read['darkHeroImageUrl']);
+        self::assertSame(20, $read['heroImagePosition']);
+        self::assertSame(15, $read['heroImagePositionX']);
+        self::assertSame(80, $read['darkHeroImagePosition']);
+        self::assertSame(70, $read['darkHeroImagePositionX']);
+        self::assertSame(35, $read['heroImagePositionMobileX']);
+        self::assertSame(40, $read['heroImagePositionMobileY']);
+    }
+
+    public function testHeroImagePositionRejectsOutOfRange(): void
+    {
+        $this->client->request(
+            'PATCH',
+            sprintf('/api/stores/%s/settings', $this->store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer,
+            ],
+            content: json_encode(['heroImagePosition' => 140]),
+        );
+        self::assertResponseStatusCodeSame(422);
+    }
 }

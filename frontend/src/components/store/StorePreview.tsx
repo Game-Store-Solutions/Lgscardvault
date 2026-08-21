@@ -7,7 +7,7 @@ import { GENERIC_MTG_CARDS } from './hero/heroCardPool'
 import { normalizeHeroLayout } from './hero/heroLayouts'
 import { StoreHero } from './StoreHero'
 import { inheritFrameStyles, resolveFrameStyles, storeFrameClass, storeThemeVars, type StorePalette } from '../../lib/storeTheme'
-import { resolveHeroImageOpacity } from '../../lib/heroImageOpacity'
+import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../../lib/heroImageOpacity'
 import {
   PAGE_BACKGROUND_LABELS,
   resolvePatternColorsForRender,
@@ -76,8 +76,15 @@ export interface StorePreviewBranding {
   darkColors?: StorePreviewDarkColors | null
   logoUrl?: string | null
   heroImageUrl?: string | null
+  darkHeroImageUrl?: string | null
   heroImageOpacity?: number | null
   darkHeroImageOpacity?: number | null
+  heroImagePosition?: number | null
+  heroImagePositionX?: number | null
+  darkHeroImagePosition?: number | null
+  darkHeroImagePositionX?: number | null
+  heroImagePositionMobileX?: number | null
+  heroImagePositionMobileY?: number | null
   heroHeading?: string | null
   heroSubheading?: string | null
   tagline?: string | null
@@ -296,12 +303,28 @@ export function StorePreview({
         tagline={branding.tagline}
         heroHeading={branding.heroHeading}
         heroSubheading={branding.heroSubheading}
-        heroImageUrl={branding.heroImageUrl}
+        heroImageUrl={resolveHeroImageUrl(
+          branding.heroImageUrl,
+          branding.darkHeroImageUrl,
+          previewMode === 'dark',
+        )}
         heroImageOpacity={resolveHeroImageOpacity(
           branding.heroImageOpacity,
           branding.darkHeroImageOpacity,
           previewMode === 'dark',
         )}
+        heroImagePosition={resolveHeroImagePosition(
+          branding.heroImagePosition,
+          branding.darkHeroImagePosition,
+          previewMode === 'dark',
+        )}
+        heroImagePositionX={resolveHeroImagePosition(
+          branding.heroImagePositionX,
+          branding.darkHeroImagePositionX,
+          previewMode === 'dark',
+        )}
+        heroImagePositionMobileX={branding.heroImagePositionMobileX}
+        heroImagePositionMobileY={branding.heroImagePositionMobileY}
         logoUrl={branding.logoUrl}
         primaryColor={effectivePalette.primaryColor ?? branding.primaryColor}
         accentColor={effectivePalette.accentColor ?? branding.accentColor}

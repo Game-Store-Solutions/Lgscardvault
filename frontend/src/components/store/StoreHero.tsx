@@ -25,6 +25,14 @@ export interface StoreHeroProps {
   heroImageUrl?: string | null
   /** Banner photo opacity 0–100 for the current color mode. */
   heroImageOpacity?: number | null
+  /** Vertical crop 0–100 for the current color mode (0 = top, 100 = bottom). */
+  heroImagePosition?: number | null
+  /** Horizontal crop 0–100 for the current color mode (0 = left, 100 = right). */
+  heroImagePositionX?: number | null
+  /** Phone horizontal crop. Null = inherit desktop. */
+  heroImagePositionMobileX?: number | null
+  /** Phone vertical crop. Null = inherit desktop. */
+  heroImagePositionMobileY?: number | null
   logoUrl?: string | null
   primaryColor?: string | null
   accentColor?: string | null

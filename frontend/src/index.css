@@ -875,6 +875,21 @@ textarea {
   --store-blur: var(--store-hero-blur, 12px);
 }
 
+/* Cover-crop the banner photo inside a fixed hero box. Phone uses the
+ * mobile focal point; the banner dimensions stay the same. */
+.hero-banner-photo {
+  object-fit: cover;
+  object-position: var(--hero-image-pos-x, 50%) var(--hero-image-pos-y, 50%);
+}
+
+@media (max-width: 639px) {
+  .hero-banner-photo {
+    object-position:
+      var(--hero-image-pos-mobile-x, var(--hero-image-pos-x, 50%))
+      var(--hero-image-pos-mobile-y, var(--hero-image-pos-y, 50%));
+  }
+}
+
 .store-frame-tile {
   --frame-border-width: var(--store-tile-border-width, var(--store-border-width, 1px));
   --frame-border-glow: var(--store-tile-border-glow, var(--store-border-glow, 0px));

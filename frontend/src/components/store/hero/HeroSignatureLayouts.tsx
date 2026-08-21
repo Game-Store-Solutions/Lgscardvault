@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { BadgeCheck, Box, Dices, Sparkles } from 'lucide-react'
 import { cx } from '../../../lib/cx'
-import { clampHeroImageOpacity, heroImageOpacityCss } from '../../../lib/heroImageOpacity'
+import { clampHeroImageOpacity, clampHeroImagePosition, heroImagePhotoStyle, HERO_BANNER_PHOTO_CLASS } from '../../../lib/heroImageOpacity'
 import { isDarkHex, storeFrameClass } from '../../../lib/storeTheme'
 import type { StoreHeroProps } from '../StoreHero'
 import { HeroLogo, HeroTagline, useHeroTokens } from '../StoreHero'
@@ -29,7 +29,7 @@ function HeroShell({
   layout?: HeroLayout
 }) {
   const { primary, hasImage } = tokens
-  const { heroImageUrl, heroImageOpacity, className: outerClass } = props
+  const { heroImageUrl, heroImageOpacity, heroImagePosition, heroImagePositionX, heroImagePositionMobileX, heroImagePositionMobileY, className: outerClass } = props
   return (
     <div className={cx('rounded-card', storeFrameClass('hero'), outerClass)}>
       <div
@@ -45,6 +45,10 @@ function HeroShell({
           hasImage={hasImage}
           primary={primary}
           imageOpacity={clampHeroImageOpacity(heroImageOpacity)}
+          imagePositionX={clampHeroImagePosition(heroImagePositionX)}
+          imagePositionY={clampHeroImagePosition(heroImagePosition)}
+          imagePositionMobileX={heroImagePositionMobileX}
+          imagePositionMobileY={heroImagePositionMobileY}
         />
         <div className="relative z-[1]">{children}</div>
       </div>
@@ -101,8 +105,14 @@ function IdentityHeader({
 /** Classic full-height photo banner with gradients (original cinematic hero). */
 export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
   const { primary, accent, heading, hasImage } = tokens
-  const { heroImageUrl, heroImageOpacity, logoUrl, tagline, heroSubheading, actions, className } = props
-  const photoOpacity = heroImageOpacityCss(clampHeroImageOpacity(heroImageOpacity))
+  const { heroImageUrl, heroImageOpacity, heroImagePosition, heroImagePositionX, heroImagePositionMobileX, heroImagePositionMobileY, logoUrl, tagline, heroSubheading, actions, className } = props
+  const photoStyle = heroImagePhotoStyle(
+    clampHeroImageOpacity(heroImageOpacity),
+    clampHeroImagePosition(heroImagePositionX),
+    clampHeroImagePosition(heroImagePosition),
+    heroImagePositionMobileX,
+    heroImagePositionMobileY,
+  )
 
   return (
     <div className={cx('rounded-card', storeFrameClass('hero'), className)}>
@@ -117,8 +127,11 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
           src={heroImageUrl as string}
           alt=""
           aria-hidden
-          className="absolute inset-0 -z-20 size-full object-cover"
-          style={{ opacity: photoOpacity }}
+          decoding="async"
+          fetchPriority="high"
+          sizes="100vw"
+          className={cx('absolute inset-0 -z-20 size-full', HERO_BANNER_PHOTO_CLASS)}
+          style={photoStyle as CSSProperties}
         />
       ) : null}
       <div

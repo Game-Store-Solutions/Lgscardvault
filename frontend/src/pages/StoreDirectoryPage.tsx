@@ -6,7 +6,7 @@ import { BackButton, EmptyState, ErrorState, PageHeader, Select } from '../compo
 import { StoreHero, StoreCard, StoreCardSkeleton } from '../components/store'
 import { BrandLogo } from '../components/BrandLogo'
 import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
-import { resolveHeroImageOpacity } from '../lib/heroImageOpacity'
+import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../lib/heroImageOpacity'
 import { useActiveStores, useDebouncedValue, useIsDarkTheme } from '../hooks'
 import { useAuth } from '../context/AuthContext'
 
@@ -142,12 +142,27 @@ export default function StoreDirectoryPage() {
             tagline={featured.tagline}
             heroHeading={featured.heroHeading}
             heroSubheading={featured.heroSubheading ?? 'Browse singles, compare inventory, and shop this storefront.'}
-            heroImageUrl={featured.heroImageUrl?.trim() || '/stock/featured-tabletop.jpg'}
+            heroImageUrl={
+              resolveHeroImageUrl(featured.heroImageUrl, featured.darkHeroImageUrl, isDark).trim()
+              || '/stock/featured-tabletop.jpg'
+            }
             heroImageOpacity={resolveHeroImageOpacity(
               featured.heroImageOpacity,
               featured.darkHeroImageOpacity,
               isDark,
             )}
+            heroImagePosition={resolveHeroImagePosition(
+              featured.heroImagePosition,
+              featured.darkHeroImagePosition,
+              isDark,
+            )}
+            heroImagePositionX={resolveHeroImagePosition(
+              featured.heroImagePositionX,
+              featured.darkHeroImagePositionX,
+              isDark,
+            )}
+            heroImagePositionMobileX={featured.heroImagePositionMobileX}
+            heroImagePositionMobileY={featured.heroImagePositionMobileY}
             logoUrl={featured.logoUrl}
             primaryColor={featured.primaryColor}
             accentColor={featured.accentColor}
