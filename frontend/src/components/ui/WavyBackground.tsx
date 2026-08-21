@@ -113,41 +113,11 @@ export function WavyBackground({
 
     let frame = 0
     let raf = 0
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     const measure = () => (parallax
       ? { width: window.innerWidth, height: window.innerHeight }
       : host.getBoundingClientRect())
-
-    const resize = () => {
-      const { width, height } = measure()
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      canvas.width = Math.max(1, Math.floor(width * dpr))
-      canvas.height = Math.max(1, Math.floor(height * dpr))
-      canvas.style.width = `${width}px`
-      canvas.style.height = `${height}px`
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      if (reducedMotion) render()
-    }
-
-    const observer = parallax ? null : new ResizeObserver(resize)
-    observer?.observe(host)
-    if (parallax) window.addEventListener('resize', resize, { passive: true })
-    resize()
-
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-    const onScroll = () => {
-      scrollRef.current = window.scrollY
-    }
-
-    let scrollAttached = false
-    if (parallax) {
-      onScroll()
-      if (!reducedMotion) {
-        window.addEventListener('scroll', onScroll, { passive: true })
-        scrollAttached = true
-      }
-    }
 
     const render = () => {
       const { width, height } = measure()
@@ -179,6 +149,34 @@ export function WavyBackground({
       if (!reducedMotion) raf = requestAnimationFrame(render)
     }
 
+    const resize = () => {
+      const { width, height } = measure()
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      canvas.width = Math.max(1, Math.floor(width * dpr))
+      canvas.height = Math.max(1, Math.floor(height * dpr))
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      if (reducedMotion) render()
+    }
+
+    const onScroll = () => {
+      scrollRef.current = window.scrollY
+    }
+
+    let scrollAttached = false
+    if (parallax) {
+      onScroll()
+      if (!reducedMotion) {
+        window.addEventListener('scroll', onScroll, { passive: true })
+        scrollAttached = true
+      }
+    }
+
+    const observer = parallax ? null : new ResizeObserver(resize)
+    observer?.observe(host)
+    if (parallax) window.addEventListener('resize', resize, { passive: true })
+    resize()
     render()
 
     return () => {
