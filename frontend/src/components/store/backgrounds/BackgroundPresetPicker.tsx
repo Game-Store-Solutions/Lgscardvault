@@ -19,7 +19,7 @@ export function BackgroundPresetPicker({
     : undefined
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {PAGE_BACKGROUND_PRESETS.map((preset) => {
         const selected = value === preset
         return (
@@ -41,7 +41,7 @@ export function BackgroundPresetPicker({
                 mode === 'dark' ? 'dark' : 'preview-light',
               )}
             >
-              <PageBackgroundLayer preset={preset} opacity={80} compact patternColors={patternColors} />
+              <PageBackgroundLayer preset={preset} opacity={100} thumbnail patternColors={patternColors} />
             </div>
             <div className="border-t border-border bg-surface px-3 py-2">
               <p className="text-sm font-bold text-fg">{PAGE_BACKGROUND_LABELS[preset]}</p>

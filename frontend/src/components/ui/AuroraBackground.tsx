@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { cssColorToRgba, readCssVar } from '../../lib/canvasThemeColors'
+import { cssColorToRgba, readPatternColors } from '../../lib/canvasThemeColors'
 import { cx } from '../../lib/cx'
 
-const SCROLL_DRIFT = 0.00035
+const SCROLL_DRIFT = 0.00055
+const TIME_STEP = 0.036
 
 type AuroraBlob = {
   anchorX: number
@@ -16,11 +17,45 @@ type AuroraBlob = {
   alpha: number
 }
 
-function blobField(compact: boolean): AuroraBlob[] {
+function blobField(
+  compact: boolean,
+  thumbnail: boolean,
+  live: boolean,
+  mobile: boolean,
+  preview: boolean,
+): AuroraBlob[] {
+  if (thumbnail) {
+    return [
+      { anchorX: 0.2, anchorY: 0.22, radius: 0.62, phase: 0, speed: 1, driftX: 0.1, driftY: 0.08, secondary: false, alpha: 0.62 },
+      { anchorX: 0.72, anchorY: 0.42, radius: 0.52, phase: 2.1, speed: 1.15, driftX: 0.1, driftY: 0.1, secondary: true, alpha: 0.48 },
+    ]
+  }
   if (compact) {
     return [
       { anchorX: 0.22, anchorY: 0.2, radius: 0.55, phase: 0, speed: 1, driftX: 0.18, driftY: 0.14, secondary: false, alpha: 0.38 },
       { anchorX: 0.72, anchorY: 0.45, radius: 0.48, phase: 2.1, speed: 1.15, driftX: 0.16, driftY: 0.18, secondary: true, alpha: 0.3 },
+    ]
+  }
+  if (live) {
+    if (mobile) {
+      return [
+        { anchorX: 0.12, anchorY: 0.08, radius: 0.72, phase: 0, speed: 1.05, driftX: 0.24, driftY: 0.18, secondary: false, alpha: 0.52 },
+        { anchorX: 0.82, anchorY: 0.22, radius: 0.58, phase: 1.6, speed: 1.18, driftX: 0.2, driftY: 0.22, secondary: true, alpha: 0.4 },
+        { anchorX: 0.48, anchorY: 0.72, radius: 0.5, phase: 3.1, speed: 0.96, driftX: 0.18, driftY: 0.16, secondary: false, alpha: 0.32 },
+      ]
+    }
+    return [
+      { anchorX: 0.14, anchorY: 0.06, radius: 0.58, phase: 0, speed: 1, driftX: 0.26, driftY: 0.2, secondary: false, alpha: 0.48 },
+      { anchorX: 0.82, anchorY: 0.2, radius: 0.5, phase: 1.4, speed: 1.14, driftX: 0.22, driftY: 0.24, secondary: true, alpha: 0.38 },
+      { anchorX: 0.38, anchorY: 0.52, radius: 0.44, phase: 2.8, speed: 0.94, driftX: 0.2, driftY: 0.18, secondary: false, alpha: 0.3 },
+      { anchorX: 0.66, anchorY: 0.78, radius: 0.4, phase: 4.2, speed: 1.08, driftX: 0.18, driftY: 0.2, secondary: true, alpha: 0.24 },
+    ]
+  }
+  if (preview) {
+    return [
+      { anchorX: 0.16, anchorY: 0.1, radius: 0.56, phase: 0, speed: 1, driftX: 0.2, driftY: 0.15, secondary: false, alpha: 0.44 },
+      { anchorX: 0.76, anchorY: 0.3, radius: 0.48, phase: 1.5, speed: 1.1, driftX: 0.18, driftY: 0.19, secondary: true, alpha: 0.34 },
+      { anchorX: 0.44, anchorY: 0.62, radius: 0.42, phase: 2.9, speed: 0.95, driftX: 0.16, driftY: 0.14, secondary: false, alpha: 0.26 },
     ]
   }
   return [
@@ -40,26 +75,25 @@ function drawBlob(
   scrollShift: number,
   primary: string,
   secondary: string,
-  compact: boolean,
+  live: boolean,
 ) {
   const minDim = Math.min(width, height)
-  const pulse = 1 + Math.sin(time * blob.speed * 0.9 + blob.phase) * 0.18
+  const pulse = 1 + Math.sin(time * blob.speed * 0.9 + blob.phase) * (live ? 0.22 : 0.18)
   const x =
     width * blob.anchorX
     + Math.sin(time * blob.speed + blob.phase) * width * blob.driftX
-    + scrollShift * width * 0.35
+    + scrollShift * width * 0.42
   const y =
     height * blob.anchorY
     + Math.cos(time * blob.speed * 0.82 + blob.phase * 1.3) * height * blob.driftY
-    + scrollShift * height * 0.55
+    + scrollShift * height * 0.62
   const radius = minDim * blob.radius * pulse
   const color = blob.secondary ? secondary : primary
-  const alpha = compact ? blob.alpha + 0.06 : blob.alpha
 
   const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
-  gradient.addColorStop(0, cssColorToRgba(color, alpha))
-  gradient.addColorStop(0.35, cssColorToRgba(color, alpha * 0.45))
-  gradient.addColorStop(0.72, cssColorToRgba(color, alpha * 0.12))
+  gradient.addColorStop(0, cssColorToRgba(color, blob.alpha))
+  gradient.addColorStop(0.32, cssColorToRgba(color, blob.alpha * 0.55))
+  gradient.addColorStop(0.68, cssColorToRgba(color, blob.alpha * 0.18))
   gradient.addColorStop(1, 'rgba(0,0,0,0)')
 
   ctx.fillStyle = gradient
@@ -71,16 +105,24 @@ function drawBlob(
 export function AuroraBackground({
   className,
   compact = false,
+  thumbnail = false,
+  preview = false,
   parallax = false,
 }: {
   className?: string
   compact?: boolean
+  thumbnail?: boolean
+  preview?: boolean
   parallax?: boolean
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollRef = useRef(0)
-  const blobs = useMemo(() => blobField(compact), [compact])
+  const live = parallax && !compact && !thumbnail
+  const [blobs, mobile] = useMemo(() => {
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+    return [blobField(compact, thumbnail, live, isMobile, preview), isMobile] as const
+  }, [compact, live, preview, thumbnail])
 
   useEffect(() => {
     const host = hostRef.current
@@ -99,7 +141,7 @@ export function AuroraBackground({
 
     const resize = () => {
       const { width, height } = measure()
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      const dpr = Math.min(window.devicePixelRatio || 1, live ? 1.75 : 2)
       canvas.width = Math.max(1, Math.floor(width * dpr))
       canvas.height = Math.max(1, Math.floor(height * dpr))
       canvas.style.width = `${width}px`
@@ -131,9 +173,7 @@ export function AuroraBackground({
       const { width, height } = measure()
       if (width <= 0 || height <= 0) return
 
-      const primary = readCssVar(host, '--page-bg-pattern-primary', readCssVar(host, '--color-brand-500', '#6d5efc'))
-      const secondary = readCssVar(host, '--page-bg-pattern-secondary', readCssVar(host, '--color-accent-500', '#ff7a59'))
-      const base = readCssVar(host, '--page-bg-pattern-base', '')
+      const { primary, secondary, base } = readPatternColors(host)
 
       ctx.clearRect(0, 0, width, height)
 
@@ -142,16 +182,16 @@ export function AuroraBackground({
         ctx.fillRect(0, 0, width, height)
       }
 
-      const time = reducedMotion ? 0 : frame * 0.024
+      const time = thumbnail ? 2.4 : reducedMotion ? 0 : frame * TIME_STEP
       const scrollShift = parallax ? scrollRef.current * SCROLL_DRIFT : 0
 
       blobs.forEach((blob, index) => {
         ctx.globalCompositeOperation = index === 0 ? 'source-over' : 'lighter'
-        drawBlob(ctx, width, height, blob, time, scrollShift, primary, secondary, compact)
+        drawBlob(ctx, width, height, blob, time, scrollShift, primary, secondary, live)
       })
 
       frame += 1
-      if (!reducedMotion && !compact) raf = requestAnimationFrame(render)
+      if (!reducedMotion && !compact && !thumbnail) raf = requestAnimationFrame(render)
     }
 
     render()
@@ -162,20 +202,23 @@ export function AuroraBackground({
       cancelAnimationFrame(raf)
       if (scrollAttached) window.removeEventListener('scroll', onScroll)
     }
-  }, [blobs, compact, parallax])
+  }, [blobs, compact, live, mobile, parallax, thumbnail])
 
   return (
-    <div
-      ref={hostRef}
-      className={cx(
-        parallax
-          ? 'pointer-events-none fixed inset-0 z-0 mix-blend-soft-light dark:mix-blend-screen'
-          : 'absolute inset-0 overflow-hidden',
-        className,
-      )}
-      aria-hidden
-    >
-      <canvas ref={canvasRef} className="absolute inset-0 size-full scale-110 blur-3xl" />
+    <div ref={hostRef} className={cx('absolute inset-0 overflow-hidden', className)} aria-hidden>
+      <canvas
+        ref={canvasRef}
+        className={cx(
+          'absolute inset-0 size-full',
+          live
+            ? 'scale-105 opacity-90 blur-xl sm:scale-110 sm:blur-2xl dark:opacity-100 dark:mix-blend-screen'
+            : preview
+              ? 'scale-105 opacity-95 blur-2xl dark:mix-blend-screen'
+              : thumbnail
+                ? 'scale-105 blur-xl'
+                : 'scale-110 blur-3xl',
+        )}
+      />
     </div>
   )
 }

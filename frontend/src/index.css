@@ -207,6 +207,38 @@ html {
   --ambient-accent: color-mix(in srgb, var(--color-accent-500) 7%, var(--color-bg));
 }
 
+/*
+ * Storefront preview islands inside dark admin — restore light semantic tokens
+ * so bg-bg / text-fg / brand sliders read correctly (Tailwind dark: opt-out alone
+ * does not reset inherited CSS variables from .dark on <html>).
+ */
+.dark .preview-light {
+  color-scheme: light;
+
+  --color-brand-50: #f3efe6;
+  --color-brand-100: #e5ecf4;
+  --color-brand-200: #c5d0de;
+  --color-brand-300: #8fa3bf;
+  --color-brand-400: #5c7494;
+  --color-brand-500: #0a1627;
+  --color-brand-600: #15233a;
+  --color-brand-700: #1c2f4a;
+  --color-brand-800: #243a58;
+  --color-brand-900: #0a1627;
+  --color-brand-950: #05080f;
+
+  --color-accent-500: #c6a035;
+
+  --color-fg: #0a0a0b;
+  --color-fg-muted: #6b7280;
+  --color-bg: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #fafafa;
+  --color-border: rgb(10 10 11 / 0.12);
+
+  --shadow-card: 0 1px 2px rgb(10 10 11 / 0.04), 0 8px 24px rgb(10 10 11 / 0.06);
+}
+
 body {
   @apply min-h-screen bg-bg text-fg font-sans text-[0.9375rem] antialiased;
   line-height: 1.6;
@@ -258,6 +290,32 @@ body {
   .dark body::after {
     animation: ambient-drift 90s ease-in-out infinite alternate;
   }
+
+  .store-theme[data-page-background='aurora']::before,
+  .store-theme[data-page-background='waves']::before {
+    animation: ambient-drift 72s ease-in-out infinite alternate;
+  }
+}
+
+.store-theme[data-page-background='aurora']::before,
+.store-theme[data-page-background='waves']::before {
+  content: '';
+  position: fixed;
+  inset: -28% -18%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 110% 85% at 88% -6%, var(--ambient-brand) 0%, transparent 58%),
+    radial-gradient(ellipse 95% 80% at 10% 105%, var(--ambient-accent) 0%, transparent 62%),
+    radial-gradient(ellipse 65% 48% at 48% 42%, color-mix(in srgb, var(--ambient-brand) 40%, transparent) 0%, transparent 68%);
+  filter: blur(calc(40px + var(--store-blur, 12px) * 1.5)) saturate(1.08);
+  opacity: 0.55;
+  transform: translateZ(0);
+}
+
+.dark .store-theme[data-page-background='aurora']::before,
+.dark .store-theme[data-page-background='waves']::before {
+  opacity: 0.72;
 }
 
 @keyframes ambient-drift {

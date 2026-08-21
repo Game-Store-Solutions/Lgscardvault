@@ -65,7 +65,9 @@ export function CardHeader({
             {title != null && <h3 className="truncate text-display-xs">{title}</h3>}
             {subtitle != null && <p className="mt-1 text-sm leading-relaxed text-fg-muted">{subtitle}</p>}
           </div>
-          {actions != null && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+          {actions != null && (
+            <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">{actions}</div>
+          )}
         </>
       ) : (
         children
