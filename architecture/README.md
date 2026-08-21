@@ -44,6 +44,23 @@ Two backend styles coexist:
 | **[Commands](commands.md)** | Every `app:*` console command, Messenger workers, deploy helpers |
 | **[Local development](local-development.md)** | Prerequisites, quick start, Square sandbox, catalog/Scryfall sync, testing, production config, troubleshooting |
 
+### Production workers
+
+| Service | Transport | What it runs |
+|---------|-----------|--------------|
+| `worker` | `async` | Archidekt / commander intelligence, catalog syncs, prune |
+| `worker_import` | `csv` | Store CSV inventory uploads |
+| `scheduler` | `scheduler_*` | Dispatches recurring catalog, billing, and commander jobs |
+
+Steady state after harvest (one async worker + one import worker):
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml --env-file /etc/mtgstore/prod.env up -d \
+  --scale worker=1 --scale worker_import=1
+```
+
+Scale `worker_import` higher when many stores upload at once. Full table: [commands.md](commands.md).
+
 ## System context
 
 ```mermaid
@@ -56,7 +73,8 @@ flowchart LR
 
     subgraph backend["Symfony API"]
         api["API Platform + custom controllers<br/>JWT firewall, TenantSubscriber"]
-        worker["Messenger worker<br/>messenger:consume async"]
+        worker["async worker<br/>messenger:consume async"]
+        workerImport["csv worker<br/>messenger:consume csv"]
     end
 
     subgraph data["Data stores"]
@@ -75,10 +93,11 @@ flowchart LR
     user --> spa
     spa -- "/api/* through Vite proxy" --> api
     api --> pg
-    worker -- "reads queue" --> pg
+    worker -- "reads async queue" --> pg
+    workerImport -- "reads csv queue" --> pg
     api -- "enqueue CSV job" --> pg
-    worker -- "resolve cards" --> scry
-    worker -- "resolve cards" --> mtg
+    workerImport -- "resolve cards" --> scry
+    workerImport -- "resolve cards" --> mtg
     worker -- "harvest reference decks" --> decks
     api -- "catalog search / sync" --> scry
     api -- "combo lookup" --> spell
