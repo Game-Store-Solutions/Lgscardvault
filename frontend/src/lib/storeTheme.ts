@@ -11,6 +11,40 @@
 
 const HEX = /^#[0-9a-fA-F]{6}$/
 
+export const SURFACE_STYLE_DEFAULTS = {
+  borderThickness: 1,
+  surfaceBlur: 12,
+} as const
+
+export const SURFACE_STYLE_RANGES = {
+  borderThickness: { min: 0, max: 8 },
+  surfaceBlur: { min: 0, max: 40 },
+} as const
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, Math.round(n)))
+}
+
+export function clampBorderThickness(value: unknown): number {
+  return clampInt(
+    value,
+    SURFACE_STYLE_RANGES.borderThickness.min,
+    SURFACE_STYLE_RANGES.borderThickness.max,
+    SURFACE_STYLE_DEFAULTS.borderThickness,
+  )
+}
+
+export function clampSurfaceBlur(value: unknown): number {
+  return clampInt(
+    value,
+    SURFACE_STYLE_RANGES.surfaceBlur.min,
+    SURFACE_STYLE_RANGES.surfaceBlur.max,
+    SURFACE_STYLE_DEFAULTS.surfaceBlur,
+  )
+}
+
 function norm(value?: string | null): string | undefined {
   const trimmed = value?.trim()
   return trimmed && HEX.test(trimmed) ? trimmed : undefined
@@ -36,6 +70,8 @@ export interface StorePalette {
   textColor?: string | null
   mutedColor?: string | null
   borderColor?: string | null
+  borderThickness?: number | null
+  surfaceBlur?: number | null
 }
 
 export function isDarkPalette(p: StorePalette): boolean {
@@ -114,6 +150,12 @@ export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<str
     const border = norm(p.borderColor)
     if (border) vars['--color-border'] = border
   }
+
+  const thickness = clampBorderThickness(p.borderThickness)
+  const blur = clampSurfaceBlur(p.surfaceBlur)
+  vars['--store-border-width'] = `${thickness}px`
+  vars['--store-blur'] = `${blur}px`
+  vars['--store-blur-strong'] = `${Math.round(blur * 4 / 3)}px`
 
   return vars
 }

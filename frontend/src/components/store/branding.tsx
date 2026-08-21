@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useId, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { ChevronDown, Star } from 'lucide-react'
 import { cx } from '../../lib/cx'
 import { Field, Input } from '../ui'
@@ -38,6 +39,57 @@ export function ColorField({
             className="size-10 flex-shrink-0 cursor-pointer rounded-btn border border-border bg-surface p-1"
           />
           <Input id={id} value={value} placeholder={fallback} onChange={(e) => onChange(e.target.value)} className="font-mono" />
+        </div>
+      )}
+    </Field>
+  )
+}
+
+export function RangeField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit = 'px',
+  hint,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  unit?: string
+  hint?: string
+  onChange: (value: number) => void
+}) {
+  const pct = max === min ? 0 : ((value - min) / (max - min)) * 100
+
+  return (
+    <Field label={label} hint={hint}>
+      {({ id, describedBy }) => (
+        <div className="flex items-center gap-3">
+          <input
+            id={id}
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            aria-valuenow={value}
+            aria-valuetext={`${value}${unit}`}
+            aria-describedby={describedBy}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="brand-slider min-w-0 flex-1"
+            style={{ '--slider-pct': `${pct}%` } as CSSProperties}
+          />
+          <span className="w-12 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-fg">
+            {value}
+            {unit}
+          </span>
         </div>
       )}
     </Field>

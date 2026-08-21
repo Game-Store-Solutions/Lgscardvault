@@ -220,6 +220,14 @@ final readonly class StoreSettingsUpdater
                 throw new \InvalidArgumentException('contactEmail must be a valid email address.');
             }
         }
+
+        if (array_key_exists('borderThickness', $payload)) {
+            $store->setBorderThickness($this->intInRange($payload['borderThickness'], 'borderThickness', 0, 8));
+        }
+
+        if (array_key_exists('surfaceBlur', $payload)) {
+            $store->setSurfaceBlur($this->intInRange($payload['surfaceBlur'], 'surfaceBlur', 0, 40));
+        }
     }
 
     /** @return array<string, mixed> */
@@ -237,6 +245,8 @@ final readonly class StoreSettingsUpdater
             'textColor' => $store->getTextColor(),
             'mutedColor' => $store->getMutedColor(),
             'borderColor' => $store->getBorderColor(),
+            'borderThickness' => $store->getBorderThickness(),
+            'surfaceBlur' => $store->getSurfaceBlur(),
             'logoUrl' => $store->getLogoUrl(),
             'heroImageUrl' => $store->getHeroImageUrl(),
             'heroHeading' => $store->getHeroHeading(),
@@ -401,5 +411,24 @@ final readonly class StoreSettingsUpdater
     private function stringValue(mixed $value): string
     {
         return is_string($value) ? trim($value) : '';
+    }
+
+    private function intInRange(mixed $value, string $key, int $min, int $max): int
+    {
+        if (is_int($value)) {
+            $n = $value;
+        } elseif (is_float($value) && $value == (int) $value) {
+            $n = (int) $value;
+        } elseif (is_string($value) && is_numeric(trim($value)) && (float) $value == (int) $value) {
+            $n = (int) $value;
+        } else {
+            throw new \InvalidArgumentException(sprintf('%s must be a whole number between %d and %d.', $key, $min, $max));
+        }
+
+        if ($n < $min || $n > $max) {
+            throw new \InvalidArgumentException(sprintf('%s must be a whole number between %d and %d.', $key, $min, $max));
+        }
+
+        return $n;
     }
 }

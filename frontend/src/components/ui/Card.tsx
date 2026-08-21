@@ -30,7 +30,7 @@ export function Card({ className, animateIn = true, ...props }: CardProps) {
   return (
     <motion.div
       className={cx(
-        'rounded-card bg-surface shadow-card ring-1 ring-black/[0.04] dark:ring-white/10',
+        'rounded-card bg-surface shadow-card ring-[length:var(--store-border-width)] ring-black/[0.04] dark:ring-white/10',
         className,
       )}
       {...entrance}

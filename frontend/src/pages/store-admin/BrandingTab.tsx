@@ -11,6 +11,7 @@ import { StorePreview } from '../../components/store'
 import { ImageUploadField } from '../../components/ImageUploadField'
 import {
   ColorField,
+  RangeField,
   PALETTE_DEFAULTS as DEFAULTS,
   DARK_THEME_PRESET_CATEGORIES,
   mergeDarkThemePreset,
@@ -20,6 +21,7 @@ import {
   sanitizeBrandingPayload,
   type ThemePreset,
 } from '../../components/store/branding'
+import { SURFACE_STYLE_DEFAULTS, SURFACE_STYLE_RANGES } from '../../lib/storeTheme'
 
 interface BrandingForm {
   primaryColor: string
@@ -29,6 +31,8 @@ interface BrandingForm {
   textColor: string
   mutedColor: string
   borderColor: string
+  borderThickness: number
+  surfaceBlur: number
   logoUrl: string
   heroImageUrl: string
   heroHeading: string
@@ -74,6 +78,8 @@ const EMPTY: BrandingForm = {
   textColor: '',
   mutedColor: '',
   borderColor: '',
+  borderThickness: SURFACE_STYLE_DEFAULTS.borderThickness,
+  surfaceBlur: SURFACE_STYLE_DEFAULTS.surfaceBlur,
   logoUrl: '',
   heroImageUrl: '',
   heroHeading: '',
@@ -100,6 +106,8 @@ function fromStore(store: Store): BrandingForm {
     textColor: store.textColor ?? '',
     mutedColor: store.mutedColor ?? '',
     borderColor: store.borderColor ?? '',
+    borderThickness: store.borderThickness ?? SURFACE_STYLE_DEFAULTS.borderThickness,
+    surfaceBlur: store.surfaceBlur ?? SURFACE_STYLE_DEFAULTS.surfaceBlur,
     logoUrl: store.logoUrl ?? '',
     heroImageUrl: store.heroImageUrl ?? '',
     heroHeading: store.heroHeading ?? '',
@@ -312,12 +320,55 @@ export default function BrandingTab({ slug }: { slug: string }) {
 
         <Card>
           <CardHeader title="Surface & text" subtitle="Theme the page background, cards, text, and borders." />
-          <CardBody className="grid gap-5 sm:grid-cols-2">
-            <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
-            <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
-            <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
-            <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
-            <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
+          <CardBody className="space-y-6">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
+              <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
+              <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
+              <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
+              <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
+            </div>
+            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
+              <RangeField
+                label="Border thickness"
+                hint="Cards, inputs, and glass panels."
+                value={form.borderThickness}
+                min={SURFACE_STYLE_RANGES.borderThickness.min}
+                max={SURFACE_STYLE_RANGES.borderThickness.max}
+                onChange={(v) => set('borderThickness', v)}
+              />
+              <RangeField
+                label="Blur"
+                hint="Frosted glass on panels and storefront chrome."
+                value={form.surfaceBlur}
+                min={SURFACE_STYLE_RANGES.surfaceBlur.min}
+                max={SURFACE_STYLE_RANGES.surfaceBlur.max}
+                onChange={(v) => set('surfaceBlur', v)}
+              />
+              <div className="relative overflow-hidden rounded-card sm:col-span-2">
+                <div
+                  aria-hidden
+                  className="absolute inset-0 opacity-45"
+                  style={{
+                    background:
+                      'repeating-linear-gradient(135deg, var(--color-brand-500) 0 10px, var(--color-accent-500) 10px 20px)',
+                  }}
+                />
+                <div
+                  className="relative m-3 rounded-card border border-solid border-border bg-surface/60 px-4 py-3 shadow-card"
+                  style={{
+                    borderWidth: `${form.borderThickness}px`,
+                    backdropFilter: `blur(${form.surfaceBlur}px)`,
+                    WebkitBackdropFilter: `blur(${form.surfaceBlur}px)`,
+                  }}
+                >
+                  <p className="text-sm font-bold text-fg">Surface sample</p>
+                  <p className="mt-0.5 text-xs text-fg-muted">
+                    {form.borderThickness}px border · {form.surfaceBlur}px blur
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardBody>
         </Card>
 

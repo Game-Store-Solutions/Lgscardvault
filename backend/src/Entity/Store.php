@@ -138,6 +138,18 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private ?string $borderColor = null;
 
+    /** Hairline width in px for cards, inputs, and glass panels (0–8). */
+    #[ORM\Column(type: 'smallint', options: ['default' => 1])]
+    #[Assert\Range(min: 0, max: 8)]
+    #[Groups(['store:read', 'store:admin'])]
+    private int $borderThickness = 1;
+
+    /** Backdrop blur in px for glass panels and chrome (0–40). */
+    #[ORM\Column(type: 'smallint', options: ['default' => 12])]
+    #[Assert\Range(min: 0, max: 40)]
+    #[Groups(['store:read', 'store:admin'])]
+    private int $surfaceBlur = 12;
+
     #[ORM\Column(length: 1024, nullable: true)]
     #[Groups(['store:read', 'store:admin'])]
     private ?string $logoUrl = null;
@@ -548,6 +560,30 @@ class Store
     public function setBorderColor(?string $borderColor): static
     {
         $this->borderColor = $borderColor;
+
+        return $this;
+    }
+
+    public function getBorderThickness(): int
+    {
+        return $this->borderThickness;
+    }
+
+    public function setBorderThickness(int $borderThickness): static
+    {
+        $this->borderThickness = $borderThickness;
+
+        return $this;
+    }
+
+    public function getSurfaceBlur(): int
+    {
+        return $this->surfaceBlur;
+    }
+
+    public function setSurfaceBlur(int $surfaceBlur): static
+    {
+        $this->surfaceBlur = $surfaceBlur;
 
         return $this;
     }

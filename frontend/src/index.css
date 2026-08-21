@@ -98,6 +98,11 @@ html {
   --radius-input: 0.75rem;
   --shadow-card: 0 1px 2px rgb(10 10 11 / 0.04), 0 8px 24px rgb(10 10 11 / 0.06);
 
+  /* Storefront surface style — owners can override from branding. */
+  --store-border-width: 1px;
+  --store-blur: 12px;
+  --store-blur-strong: 16px;
+
   /* Fonts */
   --font-sans: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
   --font-display: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, sans-serif;
@@ -180,7 +185,7 @@ html {
   --color-danger-700: #fca5a5;
 
   --shadow-card:
-    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 0 0 var(--store-border-width, 1px) rgb(255 255 255 / 0.06),
     0 0 40px -12px var(--store-glow, color-mix(in srgb, var(--color-brand-500) 14%, transparent));
   --shadow-glow:
     0 0 30px -10px var(--store-glow-strong, color-mix(in srgb, var(--color-brand-500) 30%, transparent));
@@ -234,7 +239,7 @@ body {
     radial-gradient(ellipse 120% 90% at 92% -8%, var(--ambient-brand) 0%, transparent 62%),
     radial-gradient(ellipse 100% 85% at 8% 108%, var(--ambient-accent) 0%, transparent 65%),
     radial-gradient(ellipse 70% 50% at 50% 40%, color-mix(in srgb, var(--ambient-brand) 35%, transparent) 0%, transparent 70%);
-  filter: blur(72px) saturate(1.12);
+  filter: blur(calc(48px + var(--store-blur, 12px) * 2)) saturate(1.12);
   opacity: 0.92;
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -269,10 +274,10 @@ body {
 
   /* Glass panels — premium dark storefront */
   .glass-card {
-    border: 1px solid rgb(255 255 255 / 0.08);
+    border: var(--store-border-width, 1px) solid rgb(255 255 255 / 0.08);
     background: rgb(255 255 255 / 0.03);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(var(--store-blur, 12px));
+    -webkit-backdrop-filter: blur(var(--store-blur, 12px));
   }
 
   .dark .glass-card {
@@ -286,9 +291,9 @@ body {
     background:
       linear-gradient(160deg, rgb(255 255 255 / 0.06) 0%, transparent 45%),
       var(--color-surface-elevated);
-    border: 1px solid rgb(255 255 255 / 0.08);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    border: var(--store-border-width, 1px) solid rgb(255 255 255 / 0.08);
+    backdrop-filter: blur(var(--store-blur-strong, 16px));
+    -webkit-backdrop-filter: blur(var(--store-blur-strong, 16px));
     box-shadow: var(--shadow-card);
   }
 
@@ -716,4 +721,77 @@ textarea {
   background-size: 200% 200%;
   animation: hero-float 8s ease-in-out infinite;
   opacity: 0.35;
+}
+
+/*
+ * Store branding tokens: default 1px borders and 12px glass follow the
+ * owner's sliders via --store-border-width / --store-blur on :root.
+ */
+.border {
+  border-width: var(--store-border-width, 1px);
+}
+
+.backdrop-blur {
+  backdrop-filter: blur(calc(var(--store-blur, 12px) * 2 / 3));
+  -webkit-backdrop-filter: blur(calc(var(--store-blur, 12px) * 2 / 3));
+}
+
+.backdrop-blur-sm {
+  backdrop-filter: blur(calc(var(--store-blur, 12px) / 3));
+  -webkit-backdrop-filter: blur(calc(var(--store-blur, 12px) / 3));
+}
+
+.backdrop-blur-md {
+  backdrop-filter: blur(var(--store-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--store-blur, 12px));
+}
+
+.backdrop-blur-xl {
+  backdrop-filter: blur(calc(var(--store-blur, 12px) * 2));
+  -webkit-backdrop-filter: blur(calc(var(--store-blur, 12px) * 2));
+}
+
+.brand-slider {
+  appearance: none;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand-500) var(--slider-pct, 0%),
+    var(--color-border) var(--slider-pct, 0%)
+  );
+  cursor: pointer;
+}
+
+.brand-slider:focus-visible {
+  outline: none;
+}
+
+.brand-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  background: var(--color-brand-500);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 4px rgb(10 10 11 / 0.25);
+}
+
+.brand-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-500) 35%, transparent);
+}
+
+.brand-slider::-moz-range-thumb {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  background: var(--color-brand-500);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 4px rgb(10 10 11 / 0.25);
+}
+
+.brand-slider::-moz-range-track {
+  height: 0.375rem;
+  background: transparent;
+  border: none;
 }
