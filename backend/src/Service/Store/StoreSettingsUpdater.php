@@ -228,6 +228,14 @@ final readonly class StoreSettingsUpdater
         if (array_key_exists('surfaceBlur', $payload)) {
             $store->setSurfaceBlur($this->intInRange($payload['surfaceBlur'], 'surfaceBlur', 0, 40));
         }
+
+        if (array_key_exists('borderGlow', $payload)) {
+            $store->setBorderGlow($this->intInRange($payload['borderGlow'], 'borderGlow', 0, 40));
+        }
+
+        if (array_key_exists('frameStyles', $payload)) {
+            $store->setFrameStyles($this->cleanFrameStyles($payload['frameStyles']));
+        }
     }
 
     /** @return array<string, mixed> */
@@ -247,6 +255,8 @@ final readonly class StoreSettingsUpdater
             'borderColor' => $store->getBorderColor(),
             'borderThickness' => $store->getBorderThickness(),
             'surfaceBlur' => $store->getSurfaceBlur(),
+            'borderGlow' => $store->getBorderGlow(),
+            'frameStyles' => $store->getFrameStyles(),
             'logoUrl' => $store->getLogoUrl(),
             'heroImageUrl' => $store->getHeroImageUrl(),
             'heroHeading' => $store->getHeroHeading(),
@@ -403,6 +413,46 @@ final readonly class StoreSettingsUpdater
         }
         if (isset($dates['promoStartsAt'], $dates['promoEndsAt']) && $dates['promoEndsAt'] <= $dates['promoStartsAt']) {
             throw new \InvalidArgumentException('tradeRates.promoEndsAt must be after promoStartsAt.');
+        }
+
+        return [] === $clean ? null : $clean;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function cleanFrameStyles(mixed $raw): ?array
+    {
+        if (null === $raw || [] === $raw) {
+            return null;
+        }
+        if (!is_array($raw)) {
+            throw new \InvalidArgumentException('frameStyles must be an object.');
+        }
+
+        $keys = ['hero', 'tile', 'card'];
+        $clean = [];
+        foreach ($keys as $frame) {
+            $piece = $raw[$frame] ?? null;
+            if (null === $piece || [] === $piece) {
+                continue;
+            }
+            if (!is_array($piece)) {
+                throw new \InvalidArgumentException(sprintf('frameStyles.%s must be an object.', $frame));
+            }
+            $row = [];
+            if (array_key_exists('borderThickness', $piece)) {
+                $row['borderThickness'] = $this->intInRange($piece['borderThickness'], 'frameStyles.'.$frame.'.borderThickness', 0, 8);
+            }
+            if (array_key_exists('borderGlow', $piece)) {
+                $row['borderGlow'] = $this->intInRange($piece['borderGlow'], 'frameStyles.'.$frame.'.borderGlow', 0, 40);
+            }
+            if (array_key_exists('surfaceBlur', $piece)) {
+                $row['surfaceBlur'] = $this->intInRange($piece['surfaceBlur'], 'frameStyles.'.$frame.'.surfaceBlur', 0, 40);
+            }
+            if ([] !== $row) {
+                $clean[$frame] = $row;
+            }
         }
 
         return [] === $clean ? null : $clean;

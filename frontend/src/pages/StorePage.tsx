@@ -506,7 +506,7 @@ export default function StorePage() {
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'group flex flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface px-2 py-3 text-fg shadow-card ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:border-white/10 dark:bg-white/[0.04]'
+              'group flex flex-col items-center justify-center gap-2 rounded-card bg-surface px-2 py-3 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
             const content = (
               <>
                 <span className="grid size-9 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] sm:size-12 dark:text-brand-300">
@@ -598,7 +598,8 @@ export default function StorePage() {
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-20 max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain [overflow-anchor:none] rounded-card border border-border bg-surface p-5 shadow-card dark:glass-card">
+          <div className="sticky top-20 rounded-card store-frame store-frame-card">
+          <div className="max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain [overflow-anchor:none] rounded-[inherit] bg-surface p-5 dark:glass-card">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
@@ -611,6 +612,7 @@ export default function StorePage() {
               )}
             </div>
             {renderFilterControls('store-search-sidebar')}
+          </div>
           </div>
         </aside>
 

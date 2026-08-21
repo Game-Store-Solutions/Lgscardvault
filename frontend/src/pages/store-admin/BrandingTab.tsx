@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LayoutGrid, Palette, Rows3 } from 'lucide-react'
+import { Image, LayoutGrid, Moon, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
 import { HeroLayoutPicker } from '../../components/store/hero/HeroLayoutPicker'
 import { normalizeHeroLayout } from '../../components/store/hero/heroLayouts'
 import api, { extractErrorMessage, httpStatus } from '../../api/client'
 import type { ApiError, CardDisplayStyle, HeroLayout, Store } from '../../api/types'
 import { useStore } from '../../hooks'
-import { Button, Card, CardBody, CardHeader, Input, Textarea } from '../../components/ui'
+import { Button, Card, CardBody, CardHeader, Input, TabPanel, Tabs, Textarea } from '../../components/ui'
 import { StorePreview } from '../../components/store'
 import { ImageUploadField } from '../../components/ImageUploadField'
 import {
@@ -21,7 +22,16 @@ import {
   sanitizeBrandingPayload,
   type ThemePreset,
 } from '../../components/store/branding'
-import { SURFACE_STYLE_DEFAULTS, SURFACE_STYLE_RANGES } from '../../lib/storeTheme'
+import {
+  SURFACE_STYLE_DEFAULTS,
+  SURFACE_STYLE_RANGES,
+  resolveFrameStyles,
+  storeFrameClass,
+  storeThemeVars,
+  type FrameKey,
+  type FrameStyle,
+  type FrameStyles,
+} from '../../lib/storeTheme'
 
 interface BrandingForm {
   primaryColor: string
@@ -33,6 +43,8 @@ interface BrandingForm {
   borderColor: string
   borderThickness: number
   surfaceBlur: number
+  borderGlow: number
+  frameStyles: FrameStyles
   logoUrl: string
   heroImageUrl: string
   heroHeading: string
@@ -60,6 +72,17 @@ interface DarkColorsForm {
   borderColor: string
 }
 
+const BRANDING_SECTIONS = [
+  { id: 'colors', label: 'Colors', icon: Palette },
+  { id: 'borders', label: 'Borders', icon: Square },
+  { id: 'dark', label: 'Dark mode', icon: Moon },
+  { id: 'hero', label: 'Hero', icon: Image },
+  { id: 'cards', label: 'Cards', icon: LayoutGrid },
+  { id: 'footer', label: 'Footer', icon: StoreIcon },
+] as const
+
+type BrandingSection = (typeof BRANDING_SECTIONS)[number]['id']
+
 const EMPTY_DARK: DarkColorsForm = {
   primaryColor: '',
   accentColor: '',
@@ -80,6 +103,8 @@ const EMPTY: BrandingForm = {
   borderColor: '',
   borderThickness: SURFACE_STYLE_DEFAULTS.borderThickness,
   surfaceBlur: SURFACE_STYLE_DEFAULTS.surfaceBlur,
+  borderGlow: SURFACE_STYLE_DEFAULTS.borderGlow,
+  frameStyles: resolveFrameStyles(null),
   logoUrl: '',
   heroImageUrl: '',
   heroHeading: '',
@@ -108,6 +133,12 @@ function fromStore(store: Store): BrandingForm {
     borderColor: store.borderColor ?? '',
     borderThickness: store.borderThickness ?? SURFACE_STYLE_DEFAULTS.borderThickness,
     surfaceBlur: store.surfaceBlur ?? SURFACE_STYLE_DEFAULTS.surfaceBlur,
+    borderGlow: store.borderGlow ?? SURFACE_STYLE_DEFAULTS.borderGlow,
+    frameStyles: resolveFrameStyles(store.frameStyles, {
+      borderThickness: store.borderThickness ?? SURFACE_STYLE_DEFAULTS.borderThickness,
+      borderGlow: store.borderGlow ?? SURFACE_STYLE_DEFAULTS.borderGlow,
+      surfaceBlur: store.surfaceBlur ?? SURFACE_STYLE_DEFAULTS.surfaceBlur,
+    }),
     logoUrl: store.logoUrl ?? '',
     heroImageUrl: store.heroImageUrl ?? '',
     heroHeading: store.heroHeading ?? '',
@@ -133,6 +164,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null)
   const [formDirty, setFormDirty] = useState(false)
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light')
+  const [section, setSection] = useState<BrandingSection>('colors')
   const formRef = useRef(form)
   formRef.current = form
 
@@ -147,6 +179,23 @@ export default function BrandingTab({ slug }: { slug: string }) {
   const set = <K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) => {
     setFormDirty(true)
     setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const setFrame = (key: FrameKey, patch: Partial<FrameStyle>) => {
+    setFormDirty(true)
+    setForm((current) => {
+      const frameStyles = {
+        ...current.frameStyles,
+        [key]: { ...current.frameStyles[key], ...patch },
+      }
+      return {
+        ...current,
+        frameStyles,
+        borderThickness: frameStyles.hero.borderThickness,
+        borderGlow: frameStyles.hero.borderGlow,
+        surfaceBlur: frameStyles.hero.surfaceBlur,
+      }
+    })
   }
 
   const setDark = (key: keyof DarkColorsForm, value: string) => {
@@ -165,6 +214,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
     setFormDirty(true)
     setForm((current) => mergeDarkThemePreset(current, preset, EMPTY_DARK))
     setPreviewMode('dark')
+    setSection('dark')
   }
 
   const mergeSavedStore = (saved: Store) => {
@@ -282,228 +332,210 @@ export default function BrandingTab({ slug }: { slug: string }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)]">
       <div className="space-y-6">
-        <Card>
-          <CardHeader
-            title="Brand colors"
-            subtitle="Pick a curated theme, then fine-tune primary, accent, surfaces, and text."
-          />
-          <CardBody className="space-y-6">
-            <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Light theme library</p>
+        <Tabs
+          aria-label="Branding sections"
+          value={section}
+          onChange={(id) => setSection(id as BrandingSection)}
+          tabs={[...BRANDING_SECTIONS]}
+        />
+
+        <TabPanel when="colors" value={section} className="space-y-6 pt-5">
+          <Card>
+            <CardHeader
+              title="Theme library"
+              subtitle="Start with a curated palette, then tune buttons and page colors."
+            />
+            <CardBody>
               <ThemePresetPicker instanceId="light" onSelect={applyPreset} />
-            </div>
-            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
-              <ColorField label="Primary / button color" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
-              <ColorField label="Accent color" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
-            </div>
-          </CardBody>
-          <CardBody className="space-y-6">
-            <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Dark theme library</p>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Brand colors" subtitle="Buttons, links, and accents shoppers see first." />
+            <CardBody className="grid gap-5 sm:grid-cols-2">
+              <ColorField label="Primary / buttons" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
+              <ColorField label="Accent" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Page & text" subtitle="Background, cards, and readable type — not borders." />
+            <CardBody className="grid gap-5 sm:grid-cols-2">
+              <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
+              <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
+              <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
+              <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
+            </CardBody>
+          </Card>
+        </TabPanel>
+
+        <TabPanel when="borders" value={section} className="space-y-6 pt-5">
+          <Card>
+            <CardHeader
+              title="Storefront frames"
+              subtitle="Each piece has its own thickness, glow, and blur. Border color is shared."
+            />
+            <CardBody className="space-y-6">
+              <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
+              <FrameEditors form={form} onChange={setFrame} />
+            </CardBody>
+          </Card>
+        </TabPanel>
+
+        <TabPanel when="dark" value={section} className="space-y-6 pt-5">
+          <Card>
+            <CardHeader
+              title="Dark theme library"
+              subtitle="Used when shoppers switch to dark mode. Pick a preset, then fine-tune."
+            />
+            <CardBody>
               <ThemePresetPicker
                 instanceId="dark"
                 categories={DARK_THEME_PRESET_CATEGORIES}
                 onSelect={applyDarkPreset}
               />
-            </div>
-            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
-            <ColorField label="Primary / button color" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
-            <ColorField label="Accent color" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
-            <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
-            <ColorField label="Card / surface" value={form.darkColors.surfaceColor} fallback="#171b2e" onChange={(v) => setDark('surfaceColor', v)} />
-            <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
-            <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
-            <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Dark colors" subtitle="Leave a field blank to inherit from the light theme." />
+            <CardBody className="grid gap-5 sm:grid-cols-2">
+              <ColorField label="Primary / buttons" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
+              <ColorField label="Accent" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
+              <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
+              <ColorField label="Card / surface" value={form.darkColors.surfaceColor} fallback="#171b2e" onChange={(v) => setDark('surfaceColor', v)} />
+              <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
+              <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
+              <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
+            </CardBody>
+          </Card>
+        </TabPanel>
 
-        <Card>
-          <CardHeader title="Surface & text" subtitle="Theme the page background, cards, text, and borders." />
-          <CardBody className="space-y-6">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
-              <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
-              <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
-              <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
-              <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
-            </div>
-            <div className="grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
-              <RangeField
-                label="Border thickness"
-                hint="Cards, inputs, and glass panels."
-                value={form.borderThickness}
-                min={SURFACE_STYLE_RANGES.borderThickness.min}
-                max={SURFACE_STYLE_RANGES.borderThickness.max}
-                onChange={(v) => set('borderThickness', v)}
-              />
-              <RangeField
-                label="Blur"
-                hint="Frosted glass on panels and storefront chrome."
-                value={form.surfaceBlur}
-                min={SURFACE_STYLE_RANGES.surfaceBlur.min}
-                max={SURFACE_STYLE_RANGES.surfaceBlur.max}
-                onChange={(v) => set('surfaceBlur', v)}
-              />
-              <div className="relative overflow-hidden rounded-card sm:col-span-2">
-                <div
-                  aria-hidden
-                  className="absolute inset-0 opacity-45"
-                  style={{
-                    background:
-                      'repeating-linear-gradient(135deg, var(--color-brand-500) 0 10px, var(--color-accent-500) 10px 20px)',
-                  }}
+        <TabPanel when="hero" value={section} className="pt-5">
+          <Card>
+            <CardHeader
+              title="Hero banner"
+              subtitle="Layout, images, and headline copy. Layout and uploads save automatically."
+              actions={
+                <DisplaySaveStatus
+                  saving={heroLayoutMutation.isPending || heroBrandingMutation.isPending}
+                  saved={heroLayoutMutation.isSuccess || heroBrandingMutation.isSuccess}
+                  error={heroLayoutMutation.isError || heroBrandingMutation.isError}
                 />
-                <div
-                  className="relative m-3 rounded-card border border-solid border-border bg-surface/60 px-4 py-3 shadow-card"
-                  style={{
-                    borderWidth: `${form.borderThickness}px`,
-                    backdropFilter: `blur(${form.surfaceBlur}px)`,
-                    WebkitBackdropFilter: `blur(${form.surfaceBlur}px)`,
-                  }}
-                >
-                  <p className="text-sm font-bold text-fg">Surface sample</p>
-                  <p className="mt-0.5 text-xs text-fg-muted">
-                    {form.borderThickness}px border · {form.surfaceBlur}px blur
-                  </p>
+              }
+            />
+            <CardBody className="space-y-8">
+              <div>
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Banner layout</p>
+                <HeroLayoutPicker
+                  selectedLayout={normalizeHeroLayout(form.heroLayout)}
+                  disabled={heroLayoutMutation.isPending}
+                  onSelect={chooseHeroLayout}
+                />
+              </div>
+              <div className="space-y-4 border-t border-border pt-6">
+                <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Logo & hero image</p>
+                <ImageUploadField
+                  label="Logo / icon"
+                  placeholder="https://…/logo.png"
+                  value={form.logoUrl}
+                  onChange={onLogoChange}
+                  onUploadComplete={(url) => saveHeroBranding({ logoUrl: url })}
+                  hint="Upload an image or paste a URL. Also used by the loading screen."
+                />
+                <ImageUploadField
+                  label="Hero banner image"
+                  placeholder="https://…/banner.jpg"
+                  value={form.heroImageUrl}
+                  onChange={onHeroImageChange}
+                  onUploadComplete={(url) => saveHeroBranding({ heroImageUrl: url })}
+                  hint="Background on most layouts (not cinematic classic). Upload shop photos or art."
+                />
+              </div>
+              <div className="space-y-4 border-t border-border pt-6">
+                <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Messaging</p>
+                <Input label="Tagline" placeholder="Your local Magic singles shop" maxLength={160} value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
+                <Input label="Hero heading" placeholder="Defaults to your store name" maxLength={160} value={form.heroHeading} onChange={(e) => set('heroHeading', e.target.value)} />
+                <Textarea label="Hero subheading" rows={3} placeholder="A sentence or two about your store, shipping, or specialties." value={form.heroSubheading} onChange={(e) => set('heroSubheading', e.target.value)} />
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => saveHeroBranding()}
+                    loading={heroBrandingMutation.isPending}
+                    disabled={isLoading}
+                  >
+                    Save hero copy
+                  </Button>
+                  {heroBrandingMutation.isError ? (
+                    <span role="alert" className="text-sm font-medium text-danger-700">
+                      {extractErrorMessage(heroBrandingMutation.error, 'Could not save hero banner.')}
+                    </span>
+                  ) : null}
                 </div>
               </div>
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+        </TabPanel>
 
-        <Card>
-          <CardHeader
-            title="Hero banner"
-            subtitle="Layout, images, and headline copy for your storefront header. Layout and uploads save automatically."
-            actions={
-              <DisplaySaveStatus
-                saving={heroLayoutMutation.isPending || heroBrandingMutation.isPending}
-                saved={heroLayoutMutation.isSuccess || heroBrandingMutation.isSuccess}
-                error={heroLayoutMutation.isError || heroBrandingMutation.isError}
+        <TabPanel when="cards" value={section} className="pt-5">
+          <Card>
+            <CardHeader
+              title="Inventory cards"
+              subtitle="How singles appear on your public storefront."
+              actions={
+                <DisplaySaveStatus
+                  saving={displayMutation.isPending}
+                  saved={displayMutation.isSuccess}
+                  error={displayMutation.isError}
+                />
+              }
+            />
+            <CardBody className="grid gap-3 md:grid-cols-2">
+              <DisplayChoice
+                icon={LayoutGrid}
+                title="Gallery"
+                description="Image-forward cards with grid and list views."
+                selected={form.cardDisplayStyle === 'gallery'}
+                disabled={displayMutation.isPending}
+                onClick={() => chooseCardDisplayStyle('gallery')}
               />
-            }
-          />
-          <CardBody className="space-y-8">
-            <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Banner layout</p>
-              <HeroLayoutPicker
-                selectedLayout={normalizeHeroLayout(form.heroLayout)}
-                disabled={heroLayoutMutation.isPending}
-                onSelect={chooseHeroLayout}
+              <DisplayChoice
+                icon={Rows3}
+                title="Marketplace compact"
+                description="Dense horizontal cards with pricing and add-to-cart visible."
+                selected={form.cardDisplayStyle === 'marketplace'}
+                disabled={displayMutation.isPending}
+                onClick={() => chooseCardDisplayStyle('marketplace')}
               />
-            </div>
+            </CardBody>
+          </Card>
+        </TabPanel>
 
-            <div className="space-y-4 border-t border-border pt-6">
-              <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Logo & hero image</p>
-              <ImageUploadField
-                label="Logo / icon"
-                placeholder="https://…/logo.png"
-                value={form.logoUrl}
-                onChange={onLogoChange}
-                onUploadComplete={(url) => saveHeroBranding({ logoUrl: url })}
-                hint="Upload an image or paste a URL. Also used by the loading screen."
+        <TabPanel when="footer" value={section} className="pt-5">
+          <Card>
+            <CardHeader
+              title="Store info & footer"
+              subtitle="Hours, contact, and social links. Your onboarding address appears automatically."
+            />
+            <CardBody className="space-y-4">
+              <Textarea
+                label="Store hours"
+                rows={3}
+                placeholder={'Mon–Fri 12–9pm\nSat 10am–10pm\nSun 11am–6pm'}
+                value={form.hoursText}
+                onChange={(e) => set('hoursText', e.target.value)}
               />
-              <ImageUploadField
-                label="Hero banner image"
-                placeholder="https://…/banner.jpg"
-                value={form.heroImageUrl}
-                onChange={onHeroImageChange}
-                onUploadComplete={(url) => saveHeroBranding({ heroImageUrl: url })}
-                hint="Background on most layouts (not cinematic classic). Upload shop photos or art."
-              />
-            </div>
-
-            <div className="space-y-4 border-t border-border pt-6">
-              <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Messaging</p>
-              <Input label="Tagline" placeholder="Your local Magic singles shop" maxLength={160} value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
-              <Input label="Hero heading" placeholder="Defaults to your store name" maxLength={160} value={form.heroHeading} onChange={(e) => set('heroHeading', e.target.value)} />
-              <Textarea label="Hero subheading" rows={3} placeholder="A sentence or two about your store, shipping, or specialties." value={form.heroSubheading} onChange={(e) => set('heroSubheading', e.target.value)} />
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => saveHeroBranding()}
-                  loading={heroBrandingMutation.isPending}
-                  disabled={isLoading}
-                >
-                  Save hero copy
-                </Button>
-                {heroBrandingMutation.isError ? (
-                  <span role="alert" className="text-sm font-medium text-danger-700">
-                    {extractErrorMessage(heroBrandingMutation.error, 'Could not save hero banner.')}
-                  </span>
-                ) : null}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input label="Contact email" type="email" placeholder="hello@yourstore.com" value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
+                <Input label="Website" placeholder="https://yourstore.com" value={form.websiteUrl} onChange={(e) => set('websiteUrl', e.target.value)} />
+                <Input label="Facebook URL" placeholder="https://facebook.com/yourstore" value={form.facebookUrl} onChange={(e) => set('facebookUrl', e.target.value)} />
+                <Input label="Instagram URL" placeholder="https://instagram.com/yourstore" value={form.instagramUrl} onChange={(e) => set('instagramUrl', e.target.value)} />
+                <Input label="Twitter / X URL" placeholder="https://x.com/yourstore" value={form.twitterUrl} onChange={(e) => set('twitterUrl', e.target.value)} />
+                <Input label="Discord invite URL" placeholder="https://discord.gg/yourstore" value={form.discordUrl} onChange={(e) => set('discordUrl', e.target.value)} />
               </div>
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+        </TabPanel>
 
-        <Card>
-          <CardHeader
-            title="Card display"
-            subtitle="Choose how inventory cards appear on your public storefront."
-            actions={
-              <DisplaySaveStatus
-                saving={displayMutation.isPending}
-                saved={displayMutation.isSuccess}
-                error={displayMutation.isError}
-              />
-            }
-          />
-          <CardBody className="grid gap-3 md:grid-cols-2">
-            <DisplayChoice
-              icon={LayoutGrid}
-              title="Gallery"
-              description="Current image-forward cards with the existing grid and list views."
-              selected={form.cardDisplayStyle === 'gallery'}
-              disabled={displayMutation.isPending}
-              onClick={() => chooseCardDisplayStyle('gallery')}
-            />
-            <DisplayChoice
-              icon={Rows3}
-              title="Marketplace compact"
-              description="Dense horizontal cards like the reference, with pricing and add-to-cart visible."
-              selected={form.cardDisplayStyle === 'marketplace'}
-              disabled={displayMutation.isPending}
-              onClick={() => chooseCardDisplayStyle('marketplace')}
-            />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Dark mode palette"
-            subtitle="Optional: shown when shoppers use the dark theme toggle. Pick a dark library theme or fine-tune below."
-          />
-    
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Store info & footer"
-            subtitle="Hours, contact, and social links shown in your storefront footer. Your business address from onboarding appears there automatically."
-          />
-          <CardBody className="space-y-4">
-            <Textarea
-              label="Store hours"
-              rows={3}
-              placeholder={'Mon–Fri 12–9pm\nSat 10am–10pm\nSun 11am–6pm'}
-              value={form.hoursText}
-              onChange={(e) => set('hoursText', e.target.value)}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Contact email" type="email" placeholder="hello@yourstore.com" value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
-              <Input label="Website" placeholder="https://yourstore.com" value={form.websiteUrl} onChange={(e) => set('websiteUrl', e.target.value)} />
-              <Input label="Facebook URL" placeholder="https://facebook.com/yourstore" value={form.facebookUrl} onChange={(e) => set('facebookUrl', e.target.value)} />
-              <Input label="Instagram URL" placeholder="https://instagram.com/yourstore" value={form.instagramUrl} onChange={(e) => set('instagramUrl', e.target.value)} />
-              <Input label="Twitter / X URL" placeholder="https://x.com/yourstore" value={form.twitterUrl} onChange={(e) => set('twitterUrl', e.target.value)} />
-              <Input label="Discord invite URL" placeholder="https://discord.gg/yourstore" value={form.discordUrl} onChange={(e) => set('discordUrl', e.target.value)} />
-            </div>
-          </CardBody>
-        </Card>
-
-        <div className="flex items-center gap-4">
+        <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-4 rounded-card border border-border bg-surface/95 px-4 py-3 shadow-card backdrop-blur-md">
           <Button onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={isLoading}>
             <Palette aria-hidden className="size-4" />
             Save branding
@@ -524,7 +556,6 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </div>
       </div>
 
-      {/* Live preview */}
       <div className="xl:sticky xl:top-8 xl:self-start">
         <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Live store preview</p>
         <StorePreview
@@ -534,9 +565,76 @@ export default function BrandingTab({ slug }: { slug: string }) {
           onPreviewModeChange={setPreviewMode}
         />
         <p className="mt-3 text-xs text-fg-muted">
-          Toggle Light or Dark above the mockup to preview each palette. Dark uses your dark theme library and color fields.
+          Toggle Light or Dark above the mockup. Borders, glow, and blur update on the hero, tiles, and cards.
         </p>
       </div>
+    </div>
+  )
+}
+
+function FrameEditors({
+  form,
+  onChange,
+}: {
+  form: BrandingForm
+  onChange: (key: FrameKey, patch: Partial<FrameStyle>) => void
+}) {
+  const vars = storeThemeVars(form) as CSSProperties
+  const pieces: { key: FrameKey; title: string; hint: string }[] = [
+    { key: 'hero', title: 'Hero box', hint: 'Banner identity panel' },
+    { key: 'tile', title: 'Shortcut tile', hint: 'Search, events, sell/trade' },
+    { key: 'card', title: 'Inventory card', hint: 'Singles grid and sidebar' },
+  ]
+
+  return (
+    <div style={vars} className="grid gap-4 sm:grid-cols-3">
+      {pieces.map((piece) => {
+        const style = form.frameStyles[piece.key]
+        return (
+          <div key={piece.key} className="space-y-3 rounded-card bg-bg p-3">
+            {piece.key === 'hero' ? (
+              <div className={`rounded-card bg-surface p-3 ${storeFrameClass('hero')}`}>
+                <p className="text-xs font-bold text-fg">{piece.title}</p>
+                <p className="mt-1 text-[11px] text-fg-muted">{piece.hint}</p>
+              </div>
+            ) : piece.key === 'tile' ? (
+              <div className={`flex flex-col items-center justify-center gap-2 rounded-card bg-surface px-2 py-4 ${storeFrameClass('tile')}`}>
+                <span className="grid size-8 place-items-center rounded-xl bg-brand-500/12 text-brand-600">
+                  <Square aria-hidden className="size-4" />
+                </span>
+                <span className="text-center text-[11px] font-bold">{piece.title}</span>
+              </div>
+            ) : (
+              <div className={`rounded-card bg-surface p-2 ${storeFrameClass('card')}`}>
+                <div className="mb-2 h-16 rounded-btn bg-bg" />
+                <p className="truncate text-xs font-bold text-fg">{piece.title}</p>
+                <p className="text-[11px] text-fg-muted">$1.53</p>
+              </div>
+            )}
+            <RangeField
+              label="Thickness"
+              value={style.borderThickness}
+              min={SURFACE_STYLE_RANGES.borderThickness.min}
+              max={SURFACE_STYLE_RANGES.borderThickness.max}
+              onChange={(v) => onChange(piece.key, { borderThickness: v })}
+            />
+            <RangeField
+              label="Glow"
+              value={style.borderGlow}
+              min={SURFACE_STYLE_RANGES.borderGlow.min}
+              max={SURFACE_STYLE_RANGES.borderGlow.max}
+              onChange={(v) => onChange(piece.key, { borderGlow: v })}
+            />
+            <RangeField
+              label="Blur"
+              value={style.surfaceBlur}
+              min={SURFACE_STYLE_RANGES.surfaceBlur.min}
+              max={SURFACE_STYLE_RANGES.surfaceBlur.max}
+              onChange={(v) => onChange(piece.key, { surfaceBlur: v })}
+            />
+          </div>
+        )
+      })}
     </div>
   )
 }

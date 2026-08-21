@@ -14,12 +14,25 @@ const HEX = /^#[0-9a-fA-F]{6}$/
 export const SURFACE_STYLE_DEFAULTS = {
   borderThickness: 1,
   surfaceBlur: 12,
+  borderGlow: 0,
 } as const
 
 export const SURFACE_STYLE_RANGES = {
   borderThickness: { min: 0, max: 8 },
   surfaceBlur: { min: 0, max: 40 },
+  borderGlow: { min: 0, max: 40 },
 } as const
+
+export const FRAME_KEYS = ['hero', 'tile', 'card'] as const
+export type FrameKey = (typeof FRAME_KEYS)[number]
+
+export interface FrameStyle {
+  borderThickness: number
+  borderGlow: number
+  surfaceBlur: number
+}
+
+export type FrameStyles = Record<FrameKey, FrameStyle>
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = typeof value === 'number' ? value : Number(value)
@@ -43,6 +56,39 @@ export function clampSurfaceBlur(value: unknown): number {
     SURFACE_STYLE_RANGES.surfaceBlur.max,
     SURFACE_STYLE_DEFAULTS.surfaceBlur,
   )
+}
+
+export function clampBorderGlow(value: unknown): number {
+  return clampInt(
+    value,
+    SURFACE_STYLE_RANGES.borderGlow.min,
+    SURFACE_STYLE_RANGES.borderGlow.max,
+    SURFACE_STYLE_DEFAULTS.borderGlow,
+  )
+}
+
+export function defaultFrameStyle(partial?: Partial<FrameStyle> | null): FrameStyle {
+  return {
+    borderThickness: clampBorderThickness(partial?.borderThickness),
+    borderGlow: clampBorderGlow(partial?.borderGlow),
+    surfaceBlur: clampSurfaceBlur(partial?.surfaceBlur),
+  }
+}
+
+export function resolveFrameStyles(
+  input?: Partial<Record<FrameKey, Partial<FrameStyle> | null>> | null,
+  fallback?: Partial<FrameStyle> | null,
+): FrameStyles {
+  const base = defaultFrameStyle(fallback)
+  return {
+    hero: defaultFrameStyle({ ...base, ...(input?.hero ?? {}) }),
+    tile: defaultFrameStyle({ ...base, ...(input?.tile ?? {}) }),
+    card: defaultFrameStyle({ ...base, ...(input?.card ?? {}) }),
+  }
+}
+
+export function storeFrameClass(key: FrameKey): string {
+  return `store-frame store-frame-${key}`
 }
 
 function norm(value?: string | null): string | undefined {
@@ -72,6 +118,8 @@ export interface StorePalette {
   borderColor?: string | null
   borderThickness?: number | null
   surfaceBlur?: number | null
+  borderGlow?: number | null
+  frameStyles?: Partial<Record<FrameKey, Partial<FrameStyle> | null>> | null
 }
 
 export function isDarkPalette(p: StorePalette): boolean {
@@ -151,11 +199,20 @@ export function storeThemeVars(p: StorePalette, forceDark?: boolean): Record<str
     if (border) vars['--color-border'] = border
   }
 
-  const thickness = clampBorderThickness(p.borderThickness)
-  const blur = clampSurfaceBlur(p.surfaceBlur)
-  vars['--store-border-width'] = `${thickness}px`
-  vars['--store-blur'] = `${blur}px`
-  vars['--store-blur-strong'] = `${Math.round(blur * 4 / 3)}px`
+  const frames = resolveFrameStyles(p.frameStyles, {
+    borderThickness: p.borderThickness ?? undefined,
+    borderGlow: p.borderGlow ?? undefined,
+    surfaceBlur: p.surfaceBlur ?? undefined,
+  })
+  vars['--store-border-width'] = `${frames.hero.borderThickness}px`
+  vars['--store-blur'] = `${frames.hero.surfaceBlur}px`
+  vars['--store-blur-strong'] = `${Math.round(frames.hero.surfaceBlur * 4 / 3)}px`
+  vars['--store-border-glow'] = `${frames.hero.borderGlow}px`
+  for (const key of FRAME_KEYS) {
+    vars[`--store-${key}-border-width`] = `${frames[key].borderThickness}px`
+    vars[`--store-${key}-border-glow`] = `${frames[key].borderGlow}px`
+    vars[`--store-${key}-blur`] = `${frames[key].surfaceBlur}px`
+  }
 
   return vars
 }

@@ -102,6 +102,7 @@ html {
   --store-border-width: 1px;
   --store-blur: 12px;
   --store-blur-strong: 16px;
+  --store-border-glow: 0px;
 
   /* Fonts */
   --font-sans: "Geist Variable", "Geist", "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
@@ -724,29 +725,71 @@ textarea {
 }
 
 /*
- * Store branding tokens: default 1px borders and 12px glass follow the
- * owner's sliders via --store-border-width / --store-blur on :root.
+ * Store branding tokens apply only inside `.store-theme` (storefront + admin
+ * page body). Platform chrome (`.app-chrome`) keeps the app's default 1px
+ * borders and glass so the top nav never inherits a store's thickness, glow,
+ * or blur.
  */
-.border {
+.app-chrome {
+  --store-border-width: 1px;
+  --store-border-glow: 0px;
+  --store-hero-border-width: 1px;
+  --store-tile-border-width: 1px;
+  --store-card-border-width: 1px;
+  --store-hero-border-glow: 0px;
+  --store-tile-border-glow: 0px;
+  --store-card-border-glow: 0px;
+  --store-blur: 12px;
+  --store-blur-strong: 16px;
+  --frame-border-width: 1px;
+  --frame-border-glow: 0px;
+}
+
+.store-theme .border {
   border-width: var(--store-border-width, 1px);
 }
 
-.backdrop-blur {
+.store-frame {
+  border-width: var(--frame-border-width, var(--store-border-width, 1px));
+  border-style: solid;
+  border-color: var(--color-border);
+  box-shadow:
+    var(--shadow-card),
+    0 0 calc(var(--frame-border-glow, var(--store-border-glow, 0px)) * 0.35) color-mix(in srgb, var(--color-border) 88%, transparent),
+    0 0 var(--frame-border-glow, var(--store-border-glow, 0px)) color-mix(in srgb, var(--color-border) 42%, transparent);
+}
+
+.store-frame-hero {
+  --frame-border-width: var(--store-hero-border-width, var(--store-border-width, 1px));
+  --frame-border-glow: var(--store-hero-border-glow, var(--store-border-glow, 0px));
+}
+
+.store-frame-tile {
+  --frame-border-width: var(--store-tile-border-width, var(--store-border-width, 1px));
+  --frame-border-glow: var(--store-tile-border-glow, var(--store-border-glow, 0px));
+}
+
+.store-frame-card {
+  --frame-border-width: var(--store-card-border-width, var(--store-border-width, 1px));
+  --frame-border-glow: var(--store-card-border-glow, var(--store-border-glow, 0px));
+}
+
+.store-theme .backdrop-blur {
   backdrop-filter: blur(calc(var(--store-blur, 12px) * 2 / 3));
   -webkit-backdrop-filter: blur(calc(var(--store-blur, 12px) * 2 / 3));
 }
 
-.backdrop-blur-sm {
+.store-theme .backdrop-blur-sm {
   backdrop-filter: blur(calc(var(--store-blur, 12px) / 3));
   -webkit-backdrop-filter: blur(calc(var(--store-blur, 12px) / 3));
 }
 
-.backdrop-blur-md {
+.store-theme .backdrop-blur-md {
   backdrop-filter: blur(var(--store-blur, 12px));
   -webkit-backdrop-filter: blur(var(--store-blur, 12px));
 }
 
-.backdrop-blur-xl {
+.store-theme .backdrop-blur-xl {
   backdrop-filter: blur(calc(var(--store-blur, 12px) * 2));
   -webkit-backdrop-filter: blur(calc(var(--store-blur, 12px) * 2));
 }

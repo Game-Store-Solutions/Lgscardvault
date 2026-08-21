@@ -11,7 +11,7 @@ export type { Theme } from './useTheme'
 export { useKioskMode } from './useKioskMode'
 export { usePromoCountdown } from './usePromoCountdown'
 export { useTilt } from './useTilt'
-export { useStoreTheme } from './useStoreTheme'
+export { useStoreTheme, STORE_THEME_CLASS, APP_CHROME_CLASS } from './useStoreTheme'
 export {
   customerKeys,
   useCustomerProfile,

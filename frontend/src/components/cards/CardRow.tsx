@@ -4,6 +4,7 @@ import { Sparkles } from 'lucide-react'
 import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { cx } from '../../lib/cx'
+import { storeFrameClass } from '../../lib/storeTheme'
 import { CardImage } from './CardImage'
 import { Badge } from '../ui'
 import { finishName } from '../../lib/finishes'
@@ -29,7 +30,8 @@ export function CardRow({ item, slug }: CardRowProps) {
       to={link.to(item.id)}
       state={link.state}
       className={cx(
-        'group flex items-center gap-3 rounded-card border border-border bg-surface p-2.5 shadow-card dark:glass-card ui-lift hover:border-brand-500/25 sm:gap-4 sm:p-3',
+        'group flex items-center gap-3 rounded-card bg-surface p-2.5 dark:glass-card ui-lift hover:border-brand-500/25 sm:gap-4 sm:p-3',
+        storeFrameClass('card'),
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
       )}
     >
