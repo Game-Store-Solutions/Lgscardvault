@@ -454,6 +454,38 @@ body {
     box-shadow: none;
   }
 
+  /*
+   * Card details: phone stacks; tablets (iPad portrait + landscape) stay 2-col
+   * so rules text is never crushed between art and the buy box. Desktop (1280+)
+   * gets the 3-column sheet.
+   */
+  .product-detail-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .product-detail-layout {
+      display: grid;
+      grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+      align-items: start;
+      gap: 0;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1279px) and (orientation: landscape) {
+    .product-detail-layout {
+      grid-template-columns: minmax(13rem, 17.5rem) minmax(0, 1fr);
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .product-detail-layout {
+      grid-template-columns: minmax(16rem, 22rem) minmax(20rem, 1fr) minmax(16rem, 22rem);
+    }
+  }
+
   .tcg-buy-box {
     border-radius: 0.375rem;
     border: 1px solid var(--color-border);

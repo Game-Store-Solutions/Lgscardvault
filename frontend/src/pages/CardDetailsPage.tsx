@@ -383,7 +383,7 @@ export default function CardDetailsPage() {
     storeSearchNav,
   )
   const productTitle = setDisplay ? `${card.name} - ${setDisplay}` : card.name
-  const colPad = 'px-4 py-5 sm:px-8 sm:py-8 lg:px-10'
+  const colPad = 'px-4 py-5 sm:px-5 sm:py-6 xl:px-8 xl:py-8'
   const displayArtist = resolveCardArtist(card, faceIndex)
 
   // Navigate straight through: the artist page queries this store's inventory
@@ -453,10 +453,10 @@ export default function CardDetailsPage() {
 
       <div>
         <article className="product-detail-sheet">
-        <div className="flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)_minmax(20rem,28rem)] xl:grid-cols-[minmax(17rem,24rem)_minmax(0,1fr)_minmax(22rem,30rem)] lg:items-start lg:gap-0">
+        <div className="product-detail-layout">
           {/* Card art. Left */}
-          <div className={cx(colPad, 'order-1 lg:col-start-1 lg:row-start-1')}>
-            <div className="mx-auto w-full max-w-[20rem] sm:max-w-[22rem] lg:mx-0 lg:max-w-none">
+          <div className={cx(colPad, 'md:col-start-1 md:row-start-1 xl:row-span-2')}>
+            <div className="mx-auto w-full max-w-[20rem] sm:max-w-[22rem] md:mx-0 md:max-w-none">
               {multiFace ? (
                 <FlipCard
                   frontImage={faceImage(faces[0]) ?? cardImage(card)}
@@ -493,7 +493,7 @@ export default function CardDetailsPage() {
                 {twoSided ? `Flip to ${nextFace?.name ?? 'back'}` : `Rotate face`}
               </Button>
             )}
-            <p className="mt-2 text-center text-xs text-fg-muted lg:text-left">
+            <p className="mt-2 text-center text-xs text-fg-muted md:text-left">
               {multiFace
                 ? 'Drag to tilt · tap to flip'
                 : item.isFoil
@@ -502,32 +502,156 @@ export default function CardDetailsPage() {
             </p>
           </div>
 
-          {/* Details + market. Center */}
-          <div className={cx(colPad, 'order-3 min-w-0 lg:order-2 lg:col-start-2 lg:row-start-1')}>
-            <header className="mb-5 max-w-3xl">
-              <h1 className="text-xl font-bold leading-snug text-fg sm:text-2xl lg:text-[1.65rem]">{productTitle}</h1>
-              {setDisplay && setPageUrl && (
+          <div className="flex min-w-0 flex-col md:col-start-2 md:row-start-1 xl:contents">
+          {/* Title + set. Sits beside the card on tablets; left of the buy box on desktop. */}
+          <header className={cx(colPad, 'xl:col-start-2 xl:row-start-1')}>
+            <h1 className="text-xl font-bold leading-snug text-fg sm:text-2xl xl:text-[1.65rem]">{productTitle}</h1>
+            {setDisplay && setPageUrl && (
+              <Link
+                to={setPageUrl}
+                state={setBrowseNavState}
+                className="mt-1 inline-block text-sm text-brand-600 underline-offset-2 hover:underline"
+              >
+                {setDisplay}
+              </Link>
+            )}
+            {setDisplay && !setPageUrl && (
+              <p className="mt-1 text-sm text-brand-600">{setDisplay}</p>
+            )}
+            {(card.setCode ?? card.collectorNumber) && (
+              <p className="mt-1 text-sm text-fg-muted">
+                {[card.setCode?.toUpperCase(), card.collectorNumber ? `#${card.collectorNumber}` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            )}
+            {typeLine && <p className="mt-2 text-sm text-fg-muted">{typeLine}</p>}
+          </header>
+
+          {/* Buy column. After the title on phones/tablets so Add to Cart stays on screen. */}
+          <aside className={cx(colPad, 'xl:col-start-3 xl:row-start-1 xl:row-span-2')}>
+            <div className="space-y-3 xl:sticky xl:top-16">
+              <div className="tcg-buy-box overflow-hidden">
+                <div className="flex items-center gap-2 border-b border-brand-200/90 bg-brand-50 px-3 py-2.5 dark:border-brand-500/25 dark:bg-brand-500/10">
+                  <ShieldCheck aria-hidden className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                  <span className="text-sm font-bold text-brand-700 dark:text-brand-300">{store?.name ?? 'This store'}</span>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-fg-muted">{item.condition}</p>
+                  <p className="mt-1 text-3xl font-bold tabular-nums leading-none text-fg">{formatPrice(item.priceCents)}</p>
+                  {marketCents != null && (
+                    <p className="mt-2 text-xs text-fg-muted">
+                      Market price{' '}
+                      <span className="font-semibold text-success-600 dark:text-success-500">{marketLabel}</span>
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-fg-muted underline decoration-border underline-offset-2">
+                    Sold by {store?.name ?? 'this store'}
+                  </p>
+
+                  <div className="mt-4 flex min-w-0">
+                    <div className="flex h-11 shrink-0 items-center gap-1 rounded-l-md border border-r-0 border-border bg-bg px-3 text-sm text-fg-muted">
+                      <span className="font-semibold text-fg">1</span>
+                      <span className="text-xs">of {Math.max(1, item.quantity)}</span>
+                    </div>
+                    {inCart ? (
+                      <Link
+                        to={`/s/${slug}/cart`}
+                        className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md px-4 shadow-none`}
+                      >
+                        <ShoppingCart aria-hidden className="size-4" />
+                        {user ? `Checkout (${cartEntry?.quantity})` : `View cart (${cartEntry?.quantity})`}
+                      </Link>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="lg"
+                        className="h-11 min-w-0 flex-1 rounded-l-none rounded-r-md shadow-none"
+                        loading={cartSetItem.isPending}
+                        disabled={cartSetItem.isPending || outOfStock}
+                        onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
+                      >
+                        {outOfStock ? 'Out of stock' : 'Add to Cart'}
+                      </Button>
+                    )}
+                  </div>
+
+                  {!user && (
+                    <p className="mt-2 text-center text-xs text-fg-muted">
+                      No account needed. Add to cart and pay in store at pickup.
+                    </p>
+                  )}
+
+                  {user && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={favoriteMutation.isPending}
+                        disabled={favoriteMutation.isPending}
+                        onClick={() => favoriteMutation.mutate({ inventoryItem: item, favorite: isFavorite })}
+                      >
+                        <Heart aria-hidden className={`size-4 ${isFavorite ? 'fill-current' : ''}`} />
+                        Save
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={wantListMutation.isPending}
+                        disabled={wantListMutation.isPending || isWanted}
+                        onClick={() => wantListMutation.mutate(item)}
+                      >
+                        <ListPlus aria-hidden className="size-4" />
+                        Want list
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {alternateListings.length > 0 && lowestAlternateCents != null && (
                 <Link
-                  to={setPageUrl}
-                  state={setBrowseNavState}
-                  className="mt-1 inline-block text-sm text-brand-600 underline-offset-2 hover:underline"
+                  to={setPageUrl ?? (storeSearchNav ? storeSearchPath(slug, storeSearchNav.search) : `/s/${slug}#store-search`)}
+                  state={setPageUrl ? setBrowseNavState : undefined}
+                  className="tcg-buy-box block p-4 text-center text-sm transition-colors hover:bg-bg/50"
                 >
-                  {setDisplay}
+                  <span className="font-semibold text-brand-600 underline-offset-2 hover:underline">
+                    View {alternateListings.length} Other Listing{alternateListings.length === 1 ? '' : 's'}
+                  </span>
+                  <span className="mt-1 block text-fg-muted">As low as {formatPrice(lowestAlternateCents)}</span>
                 </Link>
               )}
-              {setDisplay && !setPageUrl && (
-                <p className="mt-1 text-sm text-brand-600">{setDisplay}</p>
-              )}
-              {(card.setCode ?? card.collectorNumber) && (
-                <p className="mt-1 text-sm text-fg-muted">
-                  {[card.setCode?.toUpperCase(), card.collectorNumber ? `#${card.collectorNumber}` : null]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
-              )}
-              {typeLine && <p className="mt-2 text-sm text-fg-muted">{typeLine}</p>}
-            </header>
 
+              <div className="tcg-buy-box p-4">
+                <h3 className="text-sm font-bold text-fg">
+                  {item.condition} Comparison Prices
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {priceRows.map((row) => (
+                    <li key={row.key} className="flex items-baseline justify-between gap-3">
+                      <span className="text-fg-muted">{row.label}</span>
+                      <span className={cx('font-semibold tabular-nums', row.muted ? 'text-fg-muted' : 'text-fg')}>
+                        {row.display}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs text-fg-muted">
+                {card.scryfallUri && (
+                  <a href={card.scryfallUri} target="_blank" rel="noreferrer" className="hover:text-brand-600 hover:underline">
+                    Scryfall
+                  </a>
+                )}
+                <a href={edhrecUrl(card.name)} target="_blank" rel="noreferrer" className="hover:text-brand-600 hover:underline">
+                  EDHREC
+                </a>
+              </div>
+            </div>
+          </aside>
+
+          <div className={cx(colPad, 'min-w-0 xl:col-start-2 xl:row-start-2')}>
             <Tabs
               aria-label="Card information"
               value={infoTab}
@@ -540,7 +664,7 @@ export default function CardDetailsPage() {
               <TabPanel when="details" value={infoTab} className="pt-5">
                 {oracleText ? (
                   <div className="space-y-4">
-                    <p className="whitespace-pre-line text-base leading-relaxed text-fg">
+                    <p className="whitespace-pre-line break-words text-base leading-relaxed text-fg">
                       <CardText text={oracleText} symbolClassName="size-[1.1em]" />
                     </p>
                     {flavorText && (
@@ -557,9 +681,9 @@ export default function CardDetailsPage() {
                   {typeLine && <DetailRow label="Card type" value={typeLine} />}
                   {powerToughness && <DetailRow label="P / T" value={powerToughness} />}
                   {card.manaCost && (
-                    <div className="flex gap-4">
-                      <dt className="w-32 shrink-0 text-fg-muted">Mana cost</dt>
-                      <dd>
+                    <div className="flex min-w-0 gap-4">
+                      <dt className="w-24 shrink-0 text-fg-muted sm:w-32">Mana cost</dt>
+                      <dd className="min-w-0">
                         <ManaCost cost={card.manaCost} className="size-5" />
                       </dd>
                     </div>
@@ -708,129 +832,7 @@ export default function CardDetailsPage() {
               )}
             </section>
           </div>
-
-          {/* Buy column. TCGplayer Direct-style stacked modules */}
-          <aside className={cx(colPad, 'order-2 space-y-3 lg:order-3 lg:col-start-3 lg:row-start-1')}>
-            <div className="space-y-3 lg:sticky lg:top-16">
-              <div className="tcg-buy-box overflow-hidden">
-                <div className="flex items-center gap-2 border-b border-brand-200/90 bg-brand-50 px-3 py-2.5 dark:border-brand-500/25 dark:bg-brand-500/10">
-                  <ShieldCheck aria-hidden className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
-                  <span className="text-sm font-bold text-brand-700 dark:text-brand-300">{store?.name ?? 'This store'}</span>
-                </div>
-                <div className="p-4">
-                  <p className="text-sm text-fg-muted">{item.condition}</p>
-                  <p className="mt-1 text-3xl font-bold tabular-nums leading-none text-fg">{formatPrice(item.priceCents)}</p>
-                  {marketCents != null && (
-                    <p className="mt-2 text-xs text-fg-muted">
-                      Market price{' '}
-                      <span className="font-semibold text-success-600 dark:text-success-500">{marketLabel}</span>
-                    </p>
-                  )}
-                  <p className="mt-2 text-xs text-fg-muted underline decoration-border underline-offset-2">
-                    Sold by {store?.name ?? 'this store'}
-                  </p>
-
-                  <div className="mt-4 flex">
-                    <div className="flex h-11 shrink-0 items-center gap-1 rounded-l-md border border-r-0 border-border bg-bg px-3 text-sm text-fg-muted">
-                      <span className="font-semibold text-fg">1</span>
-                      <span className="text-xs">of {Math.max(1, item.quantity)}</span>
-                    </div>
-                    {inCart ? (
-                      <Link
-                        to={`/s/${slug}/cart`}
-                        className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md px-4 shadow-none`}
-                      >
-                        <ShoppingCart aria-hidden className="size-4" />
-                        {user ? `Checkout (${cartEntry?.quantity})` : `View cart (${cartEntry?.quantity})`}
-                      </Link>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="lg"
-                        className="h-11 flex-1 rounded-l-none rounded-r-md shadow-none"
-                        loading={cartSetItem.isPending}
-                        disabled={cartSetItem.isPending || outOfStock}
-                        onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
-                      >
-                        {outOfStock ? 'Out of stock' : 'Add to Cart'}
-                      </Button>
-                    )}
-                  </div>
-
-                  {!user && (
-                    <p className="mt-2 text-center text-xs text-fg-muted">
-                      No account needed. Add to cart and pay in store at pickup.
-                    </p>
-                  )}
-
-                  {user && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        loading={favoriteMutation.isPending}
-                        disabled={favoriteMutation.isPending}
-                        onClick={() => favoriteMutation.mutate({ inventoryItem: item, favorite: isFavorite })}
-                      >
-                        <Heart aria-hidden className={`size-4 ${isFavorite ? 'fill-current' : ''}`} />
-                        Save
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        loading={wantListMutation.isPending}
-                        disabled={wantListMutation.isPending || isWanted}
-                        onClick={() => wantListMutation.mutate(item)}
-                      >
-                        <ListPlus aria-hidden className="size-4" />
-                        Want list
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {alternateListings.length > 0 && lowestAlternateCents != null && (
-                <Link
-                  to={setPageUrl ?? (storeSearchNav ? storeSearchPath(slug, storeSearchNav.search) : `/s/${slug}#store-search`)}
-                  state={setPageUrl ? setBrowseNavState : undefined}
-                  className="tcg-buy-box block p-4 text-center text-sm transition-colors hover:bg-bg/50"
-                >
-                  <span className="font-semibold text-brand-600 underline-offset-2 hover:underline">
-                    View {alternateListings.length} Other Listing{alternateListings.length === 1 ? '' : 's'}
-                  </span>
-                  <span className="mt-1 block text-fg-muted">As low as {formatPrice(lowestAlternateCents)}</span>
-                </Link>
-              )}
-
-              <div className="tcg-buy-box p-4">
-                <h3 className="text-sm font-bold text-fg">
-                  {item.condition} Comparison Prices
-                </h3>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {priceRows.map((row) => (
-                    <li key={row.key} className="flex items-baseline justify-between gap-3">
-                      <span className="text-fg-muted">{row.label}</span>
-                      <span className={cx('font-semibold tabular-nums', row.muted ? 'text-fg-muted' : 'text-fg')}>
-                        {row.display}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs text-fg-muted">
-                {card.scryfallUri && (
-                  <a href={card.scryfallUri} target="_blank" rel="noreferrer" className="hover:text-brand-600 hover:underline">
-                    Scryfall
-                  </a>
-                )}
-                <a href={edhrecUrl(card.name)} target="_blank" rel="noreferrer" className="hover:text-brand-600 hover:underline">
-                  EDHREC
-                </a>
-              </div>
-            </div>
-          </aside>
+          </div>
         </div>
 
         {related.length > 0 && (
@@ -880,8 +882,8 @@ function DetailRow({
   capitalize?: boolean
 }) {
   return (
-    <div className="flex gap-6 py-0.5">
-      <dt className="w-32 shrink-0 text-fg-muted">{label}</dt>
+    <div className="flex min-w-0 gap-4 py-0.5 sm:gap-6">
+      <dt className="w-24 shrink-0 text-fg-muted sm:w-32">{label}</dt>
       <dd className={cx('min-w-0 text-fg', capitalize && 'capitalize')}>{value}</dd>
     </div>
   )
