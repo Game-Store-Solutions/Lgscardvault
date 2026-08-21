@@ -63,13 +63,11 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
         <SpotlightRailSkeleton label="Loading sealed products" />
       ) : (
         <div className="relative">
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-bg to-transparent" />
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-bg to-transparent" />
           <button
             type="button"
             onClick={() => scrollRail(-1)}
             aria-label="Scroll sealed products left"
-            className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+            className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full store-frame store-frame-tile text-fg-muted shadow-md transition-colors hover:text-brand-600 sm:grid"
           >
             <ChevronLeft aria-hidden className="size-5" />
           </button>
@@ -77,13 +75,13 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
             type="button"
             onClick={() => scrollRail(1)}
             aria-label="Scroll sealed products right"
-            className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+            className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full store-frame store-frame-tile text-fg-muted shadow-md transition-colors hover:text-brand-600 sm:grid"
           >
             <ChevronRight aria-hidden className="size-5" />
           </button>
           <div
             ref={railRef}
-            className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
+            className="store-rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
           >
             {lines.map((line) => (
               <SealedProductCard

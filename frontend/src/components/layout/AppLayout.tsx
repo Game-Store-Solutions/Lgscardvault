@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
 import { useCustomerCart, useGuestCart, useKioskMode, useTheme, APP_CHROME_CLASS, STORE_THEME_CLASS } from '../../hooks'
+import { StorefrontBackground } from '../store/backgrounds'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants, dropdownItemClass, dropdownPanelClass } from '../ui'
@@ -154,9 +155,12 @@ export default function AppLayout() {
             </div>
           </header>
 
-          <div className={cx(STORE_THEME_CLASS, 'flex min-h-0 flex-1 flex-col bg-bg text-fg')}>
-            <AppMain contentShell={headerShell} />
-            {storeSlug && <StoreFooter slug={storeSlug} />}
+          <div className={cx(STORE_THEME_CLASS, 'relative flex min-h-0 flex-1 flex-col bg-bg text-fg')}>
+            {storeSlug && <StorefrontBackground slug={storeSlug} />}
+            <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+              <AppMain contentShell={headerShell} />
+              {storeSlug && <StoreFooter slug={storeSlug} />}
+            </div>
           </div>
         </div>
       </AppShellLayoutProvider>
@@ -460,9 +464,12 @@ export default function AppLayout() {
         )}
       </header>
 
-      <div className={cx(STORE_THEME_CLASS, 'flex min-h-0 flex-1 flex-col bg-bg text-fg')}>
-        <AppMain contentShell={headerShell} />
-        {storeSlug && <StoreFooter slug={storeSlug} />}
+      <div className={cx(STORE_THEME_CLASS, 'relative flex min-h-0 flex-1 flex-col bg-bg text-fg')}>
+        {storeSlug && <StorefrontBackground slug={storeSlug} />}
+        <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+          <AppMain contentShell={headerShell} />
+          {storeSlug && <StoreFooter slug={storeSlug} />}
+        </div>
       </div>
     </div>
     </AppShellLayoutProvider>

@@ -166,6 +166,25 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private ?array $frameStyles = null;
 
+    /**
+     * Dark-mode frame styles (same shape as frameStyles). Null = inherit light frames.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?array $darkFrameStyles = null;
+
+    /**
+     * Storefront page background presets for light and dark modes.
+     * Keys: light, dark (optional), opacity (0–100), colors (light/dark pattern tints).
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?array $pageBackgrounds = null;
+
     #[ORM\Column(length: 1024, nullable: true)]
     #[Groups(['store:read', 'store:admin'])]
     private ?string $logoUrl = null;
@@ -626,6 +645,34 @@ class Store
     public function setFrameStyles(?array $frameStyles): static
     {
         $this->frameStyles = $frameStyles;
+
+        return $this;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getDarkFrameStyles(): ?array
+    {
+        return $this->darkFrameStyles;
+    }
+
+    /** @param array<string, mixed>|null $darkFrameStyles */
+    public function setDarkFrameStyles(?array $darkFrameStyles): static
+    {
+        $this->darkFrameStyles = $darkFrameStyles;
+
+        return $this;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getPageBackgrounds(): ?array
+    {
+        return $this->pageBackgrounds;
+    }
+
+    /** @param array<string, mixed>|null $pageBackgrounds */
+    public function setPageBackgrounds(?array $pageBackgrounds): static
+    {
+        $this->pageBackgrounds = $pageBackgrounds;
 
         return $this;
     }

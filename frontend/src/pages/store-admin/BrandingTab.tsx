@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Image, LayoutGrid, Moon, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
+import { Image, LayoutGrid, Layers, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
 import { HeroLayoutPicker } from '../../components/store/hero/HeroLayoutPicker'
 import { normalizeHeroLayout } from '../../components/store/hero/heroLayouts'
 import api, { extractErrorMessage, httpStatus } from '../../api/client'
 import type { ApiError, CardDisplayStyle, HeroLayout, Store } from '../../api/types'
 import { useStore } from '../../hooks'
 import { Button, Card, CardBody, CardHeader, Input, TabPanel, Tabs, Textarea } from '../../components/ui'
-import { StorePreview } from '../../components/store'
+import { StorePreview, ThemeModeSwitch } from '../../components/store'
 import { ImageUploadField } from '../../components/ImageUploadField'
 import {
   ColorField,
@@ -25,6 +25,7 @@ import {
 import {
   SURFACE_STYLE_DEFAULTS,
   SURFACE_STYLE_RANGES,
+  inheritFrameStyles,
   resolveFrameStyles,
   storeFrameClass,
   storeThemeVars,
@@ -32,6 +33,17 @@ import {
   type FrameStyle,
   type FrameStyles,
 } from '../../lib/storeTheme'
+import { BackgroundPresetPicker } from '../../components/store/backgrounds'
+import {
+  PAGE_BACKGROUND_DEFAULTS,
+  getSavedBackgroundColors,
+  resolveActiveBackgroundPreset,
+  resolvePageBackgrounds,
+  type PageBackgroundPreset,
+  type PageBackgroundThemeColors,
+  type StorePageBackgrounds,
+} from '../../lib/pageBackgrounds'
+import { cx } from '../../lib/cx'
 
 interface BrandingForm {
   primaryColor: string
@@ -45,6 +57,7 @@ interface BrandingForm {
   surfaceBlur: number
   borderGlow: number
   frameStyles: FrameStyles
+  darkFrameStyles: FrameStyles | null
   logoUrl: string
   heroImageUrl: string
   heroHeading: string
@@ -60,6 +73,7 @@ interface BrandingForm {
   twitterUrl: string
   discordUrl: string
   darkColors: DarkColorsForm
+  pageBackgrounds: StorePageBackgrounds
 }
 
 interface DarkColorsForm {
@@ -74,8 +88,8 @@ interface DarkColorsForm {
 
 const BRANDING_SECTIONS = [
   { id: 'colors', label: 'Colors', icon: Palette },
+  { id: 'backgrounds', label: 'Backgrounds', icon: Layers },
   { id: 'borders', label: 'Borders', icon: Square },
-  { id: 'dark', label: 'Dark mode', icon: Moon },
   { id: 'hero', label: 'Hero', icon: Image },
   { id: 'cards', label: 'Cards', icon: LayoutGrid },
   { id: 'footer', label: 'Footer', icon: StoreIcon },
@@ -105,6 +119,7 @@ const EMPTY: BrandingForm = {
   surfaceBlur: SURFACE_STYLE_DEFAULTS.surfaceBlur,
   borderGlow: SURFACE_STYLE_DEFAULTS.borderGlow,
   frameStyles: resolveFrameStyles(null),
+  darkFrameStyles: null,
   logoUrl: '',
   heroImageUrl: '',
   heroHeading: '',
@@ -120,9 +135,15 @@ const EMPTY: BrandingForm = {
   twitterUrl: '',
   discordUrl: '',
   darkColors: EMPTY_DARK,
+  pageBackgrounds: { ...PAGE_BACKGROUND_DEFAULTS },
 }
 
 function fromStore(store: Store): BrandingForm {
+  const frameStyles = resolveFrameStyles(store.frameStyles, {
+    borderThickness: store.borderThickness ?? SURFACE_STYLE_DEFAULTS.borderThickness,
+    borderGlow: store.borderGlow ?? SURFACE_STYLE_DEFAULTS.borderGlow,
+    surfaceBlur: store.surfaceBlur ?? SURFACE_STYLE_DEFAULTS.surfaceBlur,
+  })
   return {
     primaryColor: store.primaryColor ?? '',
     accentColor: store.accentColor ?? '',
@@ -134,11 +155,10 @@ function fromStore(store: Store): BrandingForm {
     borderThickness: store.borderThickness ?? SURFACE_STYLE_DEFAULTS.borderThickness,
     surfaceBlur: store.surfaceBlur ?? SURFACE_STYLE_DEFAULTS.surfaceBlur,
     borderGlow: store.borderGlow ?? SURFACE_STYLE_DEFAULTS.borderGlow,
-    frameStyles: resolveFrameStyles(store.frameStyles, {
-      borderThickness: store.borderThickness ?? SURFACE_STYLE_DEFAULTS.borderThickness,
-      borderGlow: store.borderGlow ?? SURFACE_STYLE_DEFAULTS.borderGlow,
-      surfaceBlur: store.surfaceBlur ?? SURFACE_STYLE_DEFAULTS.surfaceBlur,
-    }),
+    frameStyles,
+    darkFrameStyles: store.darkFrameStyles
+      ? inheritFrameStyles(store.darkFrameStyles, frameStyles)
+      : null,
     logoUrl: store.logoUrl ?? '',
     heroImageUrl: store.heroImageUrl ?? '',
     heroHeading: store.heroHeading ?? '',
@@ -154,6 +174,7 @@ function fromStore(store: Store): BrandingForm {
     twitterUrl: store.twitterUrl ?? '',
     discordUrl: store.discordUrl ?? '',
     darkColors: { ...EMPTY_DARK, ...(store.darkColors ?? {}) },
+    pageBackgrounds: resolvePageBackgrounds(store.pageBackgrounds),
   }
 }
 
@@ -198,9 +219,70 @@ export default function BrandingTab({ slug }: { slug: string }) {
     })
   }
 
+  const setDarkFrame = (key: FrameKey, patch: Partial<FrameStyle>) => {
+    setFormDirty(true)
+    setForm((current) => {
+      const base = inheritFrameStyles(current.darkFrameStyles, current.frameStyles)
+      return {
+        ...current,
+        darkFrameStyles: {
+          ...base,
+          [key]: { ...base[key], ...patch },
+        },
+      }
+    })
+  }
+
   const setDark = (key: keyof DarkColorsForm, value: string) => {
     setFormDirty(true)
     setForm((current) => ({ ...current, darkColors: { ...current.darkColors, [key]: value } }))
+  }
+
+  const resolvedBackgrounds = resolvePageBackgrounds(form.pageBackgrounds)
+  const activeBackgroundPreset = resolveActiveBackgroundPreset(resolvedBackgrounds, previewMode === 'dark')
+
+  const setBackgroundPreset = (preset: PageBackgroundPreset) => {
+    setFormDirty(true)
+    setForm((current) => {
+      const pageBackgrounds = resolvePageBackgrounds(current.pageBackgrounds)
+      if (previewMode === 'light') {
+        pageBackgrounds.light = preset
+      } else {
+        pageBackgrounds.dark = preset
+      }
+      return { ...current, pageBackgrounds }
+    })
+  }
+
+  const setBackgroundOpacity = (opacity: number) => {
+    setFormDirty(true)
+    setForm((current) => ({
+      ...current,
+      pageBackgrounds: { ...resolvePageBackgrounds(current.pageBackgrounds), opacity },
+    }))
+  }
+
+  const lightBackgroundColors = getSavedBackgroundColors(form.pageBackgrounds, 'light')
+  const darkBackgroundColors = getSavedBackgroundColors(form.pageBackgrounds, 'dark')
+
+  const setBackgroundPatternColor = (
+    theme: 'light' | 'dark',
+    key: keyof PageBackgroundThemeColors,
+    value: string,
+  ) => {
+    setFormDirty(true)
+    setForm((current) => {
+      const pageBackgrounds = { ...resolvePageBackgrounds(current.pageBackgrounds) }
+      const colors = { ...(pageBackgrounds.colors ?? {}) }
+      const themeColors = { ...(colors[theme] ?? {}) }
+      const trimmed = value.trim()
+      if (trimmed) themeColors[key] = trimmed
+      else delete themeColors[key]
+      if (Object.keys(themeColors).length > 0) colors[theme] = themeColors
+      else delete colors[theme]
+      pageBackgrounds.colors = Object.keys(colors).length > 0 ? colors : undefined
+      return { ...current, pageBackgrounds }
+    })
   }
 
   const applyPreset = (preset: ThemePreset) => {
@@ -214,7 +296,6 @@ export default function BrandingTab({ slug }: { slug: string }) {
     setFormDirty(true)
     setForm((current) => mergeDarkThemePreset(current, preset, EMPTY_DARK))
     setPreviewMode('dark')
-    setSection('dark')
   }
 
   const mergeSavedStore = (saved: Store) => {
@@ -342,27 +423,125 @@ export default function BrandingTab({ slug }: { slug: string }) {
         <TabPanel when="colors" value={section} className="space-y-6 pt-5">
           <Card>
             <CardHeader
-              title="Theme library"
-              subtitle="Start with a curated palette, then tune buttons and page colors."
+              title={previewMode === 'dark' ? 'Dark theme library' : 'Theme library'}
+              subtitle={
+                previewMode === 'dark'
+                  ? 'Used when shoppers switch to dark mode. Pick a preset, then fine-tune below.'
+                  : 'Start with a curated palette, then tune buttons and page colors.'
+              }
+              actions={
+                <ThemeModeSwitch
+                  mode={previewMode}
+                  onChange={setPreviewMode}
+                  label="Color mode"
+                />
+              }
             />
             <CardBody>
-              <ThemePresetPicker instanceId="light" onSelect={applyPreset} />
+              {previewMode === 'dark' ? (
+                <ThemePresetPicker
+                  instanceId="dark"
+                  categories={DARK_THEME_PRESET_CATEGORIES}
+                  onSelect={applyDarkPreset}
+                />
+              ) : (
+                <ThemePresetPicker instanceId="light" onSelect={applyPreset} />
+              )}
             </CardBody>
           </Card>
+          {previewMode === 'light' ? (
+            <>
+              <Card>
+                <CardHeader title="Brand colors" subtitle="Buttons, links, and accents shoppers see first." />
+                <CardBody className="grid gap-5 sm:grid-cols-2">
+                  <ColorField label="Primary / buttons" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
+                  <ColorField label="Accent" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
+                </CardBody>
+              </Card>
+              <Card>
+                <CardHeader title="Page & text" subtitle="Background, cards, and readable type — not borders." />
+                <CardBody className="grid gap-5 sm:grid-cols-2">
+                  <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
+                  <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
+                  <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
+                  <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
+                </CardBody>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardHeader title="Dark colors" subtitle="Leave a field blank to inherit from the light theme." />
+              <CardBody className="grid gap-5 sm:grid-cols-2">
+                <ColorField label="Primary / buttons" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
+                <ColorField label="Accent" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
+                <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
+                <ColorField label="Card / surface" value={form.darkColors.surfaceColor} fallback="#171b2e" onChange={(v) => setDark('surfaceColor', v)} />
+                <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
+                <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
+                <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
+              </CardBody>
+            </Card>
+          )}
+        </TabPanel>
+
+        <TabPanel when="backgrounds" value={section} className="space-y-6 pt-5">
           <Card>
-            <CardHeader title="Brand colors" subtitle="Buttons, links, and accents shoppers see first." />
-            <CardBody className="grid gap-5 sm:grid-cols-2">
-              <ColorField label="Primary / buttons" value={form.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => set('primaryColor', v)} />
-              <ColorField label="Accent" value={form.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => set('accentColor', v)} />
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Page & text" subtitle="Background, cards, and readable type — not borders." />
-            <CardBody className="grid gap-5 sm:grid-cols-2">
-              <ColorField label="Page background" value={form.backgroundColor} fallback={DEFAULTS.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
-              <ColorField label="Card / surface" value={form.surfaceColor} fallback={DEFAULTS.surfaceColor} onChange={(v) => set('surfaceColor', v)} />
-              <ColorField label="Text color" value={form.textColor} fallback={DEFAULTS.textColor} onChange={(v) => set('textColor', v)} />
-              <ColorField label="Muted text" value={form.mutedColor} fallback={DEFAULTS.mutedColor} onChange={(v) => set('mutedColor', v)} />
+            <CardHeader
+              title="Page backgrounds"
+              subtitle={
+                previewMode === 'dark'
+                  ? 'Pattern behind your storefront in dark mode. Unset dark uses the light pattern.'
+                  : 'Decorative layer on top of your page color. Pick a different look for dark mode with the switch.'
+              }
+              actions={
+                <ThemeModeSwitch
+                  mode={previewMode}
+                  onChange={setPreviewMode}
+                  label="Background mode"
+                />
+              }
+            />
+            <CardBody className="space-y-6">
+              {previewMode === 'light' ? (
+                <BackgroundPatternColorGroup
+                  title="Light pattern colors"
+                  hint="Tints for waves, aurora, and grid accents in light mode."
+                  colors={lightBackgroundColors}
+                  fallbacks={{
+                    primary: form.primaryColor || DEFAULTS.primaryColor,
+                    secondary: form.accentColor || DEFAULTS.accentColor,
+                    base: form.backgroundColor || DEFAULTS.backgroundColor,
+                  }}
+                  onChange={(key, value) => setBackgroundPatternColor('light', key, value)}
+                />
+              ) : (
+                <BackgroundPatternColorGroup
+                  title="Dark pattern colors"
+                  hint="Separate tints for dark mode. Leave blank to inherit light pattern colors on the storefront."
+                  colors={darkBackgroundColors}
+                  fallbacks={{
+                    primary: form.darkColors.primaryColor || form.primaryColor || DEFAULTS.primaryColor,
+                    secondary: form.darkColors.accentColor || form.accentColor || DEFAULTS.accentColor,
+                    base: form.darkColors.backgroundColor || form.backgroundColor || DEFAULTS.backgroundColor,
+                  }}
+                  onChange={(key, value) => setBackgroundPatternColor('dark', key, value)}
+                />
+              )}
+              <RangeField
+                label="Pattern strength"
+                value={resolvedBackgrounds.opacity ?? PAGE_BACKGROUND_DEFAULTS.opacity ?? 72}
+                min={0}
+                max={100}
+                unit="%"
+                hint="Higher values make the pattern more visible."
+                onChange={setBackgroundOpacity}
+              />
+              <BackgroundPresetPicker
+                mode={previewMode}
+                value={activeBackgroundPreset}
+                onChange={setBackgroundPreset}
+                settings={form.pageBackgrounds}
+              />
             </CardBody>
           </Card>
         </TabPanel>
@@ -371,39 +550,58 @@ export default function BrandingTab({ slug }: { slug: string }) {
           <Card>
             <CardHeader
               title="Storefront frames"
-              subtitle="Each piece has its own thickness, glow, and blur. Border color is shared."
+              subtitle={
+                previewMode === 'dark'
+                  ? 'Dark theme borders. Leave untouched to inherit the light settings.'
+                  : 'Light theme borders. Switch to Dark to set a separate look.'
+              }
+              actions={
+                <ThemeModeSwitch
+                  mode={previewMode}
+                  onChange={setPreviewMode}
+                  label="Border color mode"
+                />
+              }
             />
             <CardBody className="space-y-6">
-              <ColorField label="Border color" value={form.borderColor} fallback={DEFAULTS.borderColor} onChange={(v) => set('borderColor', v)} />
-              <FrameEditors form={form} onChange={setFrame} />
-            </CardBody>
-          </Card>
-        </TabPanel>
-
-        <TabPanel when="dark" value={section} className="space-y-6 pt-5">
-          <Card>
-            <CardHeader
-              title="Dark theme library"
-              subtitle="Used when shoppers switch to dark mode. Pick a preset, then fine-tune."
-            />
-            <CardBody>
-              <ThemePresetPicker
-                instanceId="dark"
-                categories={DARK_THEME_PRESET_CATEGORIES}
-                onSelect={applyDarkPreset}
+              {previewMode === 'dark' ? (
+                <ColorField
+                  label="Dark border color"
+                  value={form.darkColors.borderColor}
+                  fallback="#2a2f47"
+                  onChange={(v) => setDark('borderColor', v)}
+                />
+              ) : (
+                <ColorField
+                  label="Light border color"
+                  value={form.borderColor}
+                  fallback={DEFAULTS.borderColor.startsWith('#') ? DEFAULTS.borderColor : '#e7e9ee'}
+                  onChange={(v) => set('borderColor', v)}
+                />
+              )}
+              <FrameEditors
+                mode={previewMode}
+                frames={
+                  previewMode === 'dark'
+                    ? inheritFrameStyles(form.darkFrameStyles, form.frameStyles)
+                    : form.frameStyles
+                }
+                themeVars={storeThemeVars(
+                  previewMode === 'dark'
+                    ? {
+                        ...form.darkColors,
+                        backgroundColor: form.darkColors.backgroundColor || '#0f1220',
+                        surfaceColor: form.darkColors.surfaceColor || '#171b2e',
+                        textColor: form.darkColors.textColor || '#f5f6fb',
+                        mutedColor: form.darkColors.mutedColor || '#aab0cb',
+                        borderColor: form.darkColors.borderColor || '#2a2f47',
+                        frameStyles: inheritFrameStyles(form.darkFrameStyles, form.frameStyles),
+                      }
+                    : form,
+                  previewMode === 'dark',
+                )}
+                onChange={previewMode === 'dark' ? setDarkFrame : setFrame}
               />
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Dark colors" subtitle="Leave a field blank to inherit from the light theme." />
-            <CardBody className="grid gap-5 sm:grid-cols-2">
-              <ColorField label="Primary / buttons" value={form.darkColors.primaryColor} fallback={DEFAULTS.primaryColor} onChange={(v) => setDark('primaryColor', v)} />
-              <ColorField label="Accent" value={form.darkColors.accentColor} fallback={DEFAULTS.accentColor} onChange={(v) => setDark('accentColor', v)} />
-              <ColorField label="Page background" value={form.darkColors.backgroundColor} fallback="#0f1220" onChange={(v) => setDark('backgroundColor', v)} />
-              <ColorField label="Card / surface" value={form.darkColors.surfaceColor} fallback="#171b2e" onChange={(v) => setDark('surfaceColor', v)} />
-              <ColorField label="Text color" value={form.darkColors.textColor} fallback="#f5f6fb" onChange={(v) => setDark('textColor', v)} />
-              <ColorField label="Muted text" value={form.darkColors.mutedColor} fallback="#aab0cb" onChange={(v) => setDark('mutedColor', v)} />
-              <ColorField label="Border color" value={form.darkColors.borderColor} fallback="#2a2f47" onChange={(v) => setDark('borderColor', v)} />
             </CardBody>
           </Card>
         </TabPanel>
@@ -565,21 +763,67 @@ export default function BrandingTab({ slug }: { slug: string }) {
           onPreviewModeChange={setPreviewMode}
         />
         <p className="mt-3 text-xs text-fg-muted">
-          Toggle Light or Dark above the mockup. Borders, glow, and blur update on the hero, tiles, and cards.
+          Pick a pattern on Backgrounds — it fills the preview behind the hero and cards. Toggle Light or Dark to preview each theme.
         </p>
       </div>
     </div>
   )
 }
 
-function FrameEditors({
-  form,
+function BackgroundPatternColorGroup({
+  title,
+  hint,
+  colors,
+  fallbacks,
   onChange,
 }: {
-  form: BrandingForm
+  title: string
+  hint: string
+  colors: PageBackgroundThemeColors
+  fallbacks: { primary: string; secondary: string; base: string }
+  onChange: (key: keyof PageBackgroundThemeColors, value: string) => void
+}) {
+  return (
+    <div className="space-y-4 rounded-card border border-border bg-bg/40 p-4">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{title}</p>
+        <p className="mt-1 text-xs text-fg-muted">{hint}</p>
+      </div>
+      <div className="grid gap-4">
+        <ColorField
+          label="Primary tint"
+          value={colors.primary ?? ''}
+          fallback={fallbacks.primary}
+          onChange={(v) => onChange('primary', v)}
+        />
+        <ColorField
+          label="Secondary tint"
+          value={colors.secondary ?? ''}
+          fallback={fallbacks.secondary}
+          onChange={(v) => onChange('secondary', v)}
+        />
+        <ColorField
+          label="Base wash"
+          value={colors.base ?? ''}
+          fallback={fallbacks.base}
+          onChange={(v) => onChange('base', v)}
+        />
+      </div>
+    </div>
+  )
+}
+
+function FrameEditors({
+  frames,
+  themeVars,
+  mode,
+  onChange,
+}: {
+  frames: FrameStyles
+  themeVars: Record<string, string>
+  mode: 'light' | 'dark'
   onChange: (key: FrameKey, patch: Partial<FrameStyle>) => void
 }) {
-  const vars = storeThemeVars(form) as CSSProperties
   const pieces: { key: FrameKey; title: string; hint: string }[] = [
     { key: 'hero', title: 'Hero box', hint: 'Banner identity panel' },
     { key: 'tile', title: 'Shortcut tile', hint: 'Search, events, sell/trade' },
@@ -587,9 +831,12 @@ function FrameEditors({
   ]
 
   return (
-    <div style={vars} className="grid gap-4 sm:grid-cols-3">
+    <div
+      style={{ ...themeVars, colorScheme: mode } as CSSProperties}
+      className={cx('grid gap-4 sm:grid-cols-3', mode === 'dark' ? 'dark' : 'preview-light')}
+    >
       {pieces.map((piece) => {
-        const style = form.frameStyles[piece.key]
+        const style = frames[piece.key]
         return (
           <div key={piece.key} className="space-y-3 rounded-card bg-bg p-3">
             {piece.key === 'hero' ? (

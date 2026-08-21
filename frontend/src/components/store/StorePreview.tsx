@@ -6,7 +6,15 @@ import { Badge, Button, FilterPill } from '../ui'
 import { GENERIC_MTG_CARDS } from './hero/heroCardPool'
 import { normalizeHeroLayout } from './hero/heroLayouts'
 import { StoreHero } from './StoreHero'
-import { storeFrameClass, storeThemeVars, type StorePalette } from '../../lib/storeTheme'
+import { inheritFrameStyles, resolveFrameStyles, storeFrameClass, storeThemeVars, type StorePalette } from '../../lib/storeTheme'
+import {
+  PAGE_BACKGROUND_LABELS,
+  resolvePatternColorsForRender,
+  resolveActiveBackgroundPreset,
+  resolvePageBackgrounds,
+  type StorePageBackgrounds,
+} from '../../lib/pageBackgrounds'
+import { PageBackgroundLayer } from './backgrounds/PageBackgroundLayer'
 import { cx } from '../../lib/cx'
 
 /** Fallbacks that mirror the platform default theme (index.css). */
@@ -62,6 +70,8 @@ export interface StorePreviewBranding {
   surfaceBlur?: number | null
   borderGlow?: number | null
   frameStyles?: StorePalette['frameStyles']
+  darkFrameStyles?: StorePalette['frameStyles']
+  pageBackgrounds?: StorePageBackgrounds | null
   darkColors?: StorePreviewDarkColors | null
   logoUrl?: string | null
   heroImageUrl?: string | null
@@ -85,6 +95,15 @@ function hasConfiguredDarkPalette(dark?: StorePreviewDarkColors | null): boolean
 
 /** Same merge rules as useStoreTheme — light base with dark overrides when set. */
 export function resolvePreviewPalette(branding: StorePreviewBranding, mode: 'light' | 'dark'): StorePalette {
+  const lightFrames = resolveFrameStyles(branding.frameStyles, {
+    borderThickness: branding.borderThickness ?? undefined,
+    borderGlow: branding.borderGlow ?? undefined,
+    surfaceBlur: branding.surfaceBlur ?? undefined,
+  })
+  const frameStyles = mode === 'dark'
+    ? inheritFrameStyles(branding.darkFrameStyles, lightFrames)
+    : branding.frameStyles
+
   if (mode === 'light') {
     return {
       primaryColor: branding.primaryColor,
@@ -97,7 +116,7 @@ export function resolvePreviewPalette(branding: StorePreviewBranding, mode: 'lig
       borderThickness: branding.borderThickness,
       surfaceBlur: branding.surfaceBlur,
       borderGlow: branding.borderGlow,
-      frameStyles: branding.frameStyles,
+      frameStyles,
     }
   }
 
@@ -117,7 +136,7 @@ export function resolvePreviewPalette(branding: StorePreviewBranding, mode: 'lig
       borderThickness: branding.borderThickness,
       surfaceBlur: branding.surfaceBlur,
       borderGlow: branding.borderGlow,
-      frameStyles: branding.frameStyles,
+      frameStyles,
     }
   }
 
@@ -128,22 +147,24 @@ export function resolvePreviewPalette(branding: StorePreviewBranding, mode: 'lig
     borderThickness: branding.borderThickness,
     surfaceBlur: branding.surfaceBlur,
     borderGlow: branding.borderGlow,
-    frameStyles: branding.frameStyles,
+    frameStyles,
   }
 }
 
-function PreviewModeToggle({
+export function ThemeModeSwitch({
   mode,
   onChange,
+  label = 'Color mode',
 }: {
   mode: 'light' | 'dark'
   onChange: (mode: 'light' | 'dark') => void
+  label?: string
 }) {
   return (
     <div
       className="inline-flex rounded-btn border border-border bg-surface p-0.5 text-xs font-bold"
       role="group"
-      aria-label="Preview color mode"
+      aria-label={label}
     >
       <button
         type="button"
@@ -207,30 +228,65 @@ export function StorePreview({
     [branding, previewMode],
   )
 
-  const forceDark =
-    previewMode === 'dark' &&
-    !hasConfiguredDarkPalette(branding.darkColors) &&
-    !normHex(effectivePalette.backgroundColor)
+  const forceDark = previewMode === 'dark'
+  const previewPalette = {
+    ...effectivePalette,
+    backgroundColor:
+      effectivePalette.backgroundColor
+      || (previewMode === 'dark' ? PREVIEW_DARK_NEUTRALS.backgroundColor : FALLBACK_BG),
+    surfaceColor:
+      effectivePalette.surfaceColor
+      || (previewMode === 'dark' ? PREVIEW_DARK_NEUTRALS.surfaceColor : '#ffffff'),
+    textColor:
+      effectivePalette.textColor
+      || (previewMode === 'dark' ? PREVIEW_DARK_NEUTRALS.textColor : FALLBACK_FG),
+    mutedColor:
+      effectivePalette.mutedColor
+      || (previewMode === 'dark' ? PREVIEW_DARK_NEUTRALS.mutedColor : '#64748b'),
+    borderColor:
+      effectivePalette.borderColor
+      || (previewMode === 'dark' ? PREVIEW_DARK_NEUTRALS.borderColor : '#e7e9ee'),
+  }
 
-  const vars = storeThemeVars(effectivePalette, forceDark || undefined)
+  const vars = storeThemeVars(previewPalette, forceDark)
   const themeStyle = {
     ...vars,
-    backgroundColor: vars['--color-bg'] ?? (previewMode === 'dark' ? PREVIEW_DARK_NEUTRALS.backgroundColor : FALLBACK_BG),
-    color: vars['--color-fg'] ?? (previewMode === 'dark' ? PREVIEW_DARK_NEUTRALS.textColor : FALLBACK_FG),
+    backgroundColor: vars['--color-bg'] ?? previewPalette.backgroundColor,
+    color: vars['--color-fg'] ?? previewPalette.textColor,
+    colorScheme: previewMode,
   } as CSSProperties
 
   const marketplace = branding.cardDisplayStyle === 'marketplace'
   const heroLayout = normalizeHeroLayout(branding.heroLayout ?? 'cinematic')
   const previewShowcase = useMemo(() => GENERIC_MTG_CARDS, [])
+  const previewBackgrounds = resolvePageBackgrounds(branding.pageBackgrounds)
+  const previewBackgroundPreset = resolveActiveBackgroundPreset(previewBackgrounds, previewMode === 'dark')
+  const previewPatternColors = resolvePatternColorsForRender(previewBackgrounds, previewMode === 'dark')
 
   return (
     <div className="space-y-3">
       {showModeToggle ? (
         <div className="flex items-center justify-end">
-          <PreviewModeToggle mode={previewMode} onChange={setPreviewMode} />
+          <ThemeModeSwitch mode={previewMode} onChange={setPreviewMode} label="Preview color mode" />
         </div>
       ) : null}
-      <div style={themeStyle} className={`space-y-4 rounded-card p-5 ${storeFrameClass('hero')}`}>
+      <div
+        style={themeStyle}
+        className={cx(
+          'relative min-h-[32rem] overflow-hidden rounded-card border border-border shadow-card',
+          previewMode === 'dark' ? 'dark' : 'preview-light',
+        )}
+        data-page-background={previewBackgroundPreset}
+      >
+      <div className="pointer-events-none absolute inset-0 z-0 bg-bg" aria-hidden />
+      <PageBackgroundLayer
+        preset={previewBackgroundPreset}
+        opacity={previewBackgrounds.opacity ?? 72}
+        patternColors={previewPatternColors}
+        className="absolute inset-0 z-0"
+        preview
+      />
+      <div className="relative z-[1] space-y-4 p-5">
       <StoreHero
         name={storeName}
         tagline={branding.tagline}
@@ -315,7 +371,13 @@ export function StorePreview({
           Add to want list
         </Button>
       </div>
+      </div>
     </div>
+    {previewBackgroundPreset !== 'none' ? (
+      <p className="text-xs text-fg-muted">
+        Page background ({previewMode}): {PAGE_BACKGROUND_LABELS[previewBackgroundPreset]}
+      </p>
+    ) : null}
     </div>
   )
 }

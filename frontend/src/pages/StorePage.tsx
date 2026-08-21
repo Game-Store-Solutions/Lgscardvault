@@ -506,7 +506,7 @@ export default function StorePage() {
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
           {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'group flex flex-col items-center justify-center gap-2 rounded-card bg-surface px-2 py-3 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
+              'group flex flex-col items-center justify-center gap-2 rounded-card px-2 py-3 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
             const content = (
               <>
                 <span className="grid size-9 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] sm:size-12 dark:text-brand-300">
@@ -562,13 +562,11 @@ export default function StorePage() {
             <SpotlightRailSkeleton />
           ) : (
             <div className="relative">
-              <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-bg to-transparent" />
-              <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-bg to-transparent" />
               <button
                 type="button"
                 onClick={() => scrollRail(-1)}
                 aria-label="Scroll spotlight left"
-                className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+                className="absolute left-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full store-frame store-frame-tile text-fg-muted shadow-md transition-colors hover:text-brand-600 sm:grid"
               >
                 <ChevronLeft aria-hidden className="size-5" />
               </button>
@@ -576,13 +574,13 @@ export default function StorePage() {
                 type="button"
                 onClick={() => scrollRail(1)}
                 aria-label="Scroll spotlight right"
-                className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-surface/95 text-fg-muted shadow-md backdrop-blur transition-colors hover:text-brand-600 sm:grid"
+                className="absolute right-1 top-[42%] z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full store-frame store-frame-tile text-fg-muted shadow-md transition-colors hover:text-brand-600 sm:grid"
               >
                 <ChevronRight aria-hidden className="size-5" />
               </button>
               <div
                 ref={railRef}
-                className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
+                className="store-rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-4 pb-2 pl-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:scroll-pl-14 sm:pl-14 [&::-webkit-scrollbar]:hidden"
               >
                 {spotlightItems.map((item, i) => (
                   <SpotlightCard key={item.id} item={item} slug={slug} ribbon={i === 0 ? 'Featured' : undefined} />
@@ -599,7 +597,7 @@ export default function StorePage() {
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-20 rounded-card store-frame store-frame-card">
-          <div className="max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain [overflow-anchor:none] rounded-[inherit] bg-surface p-5 dark:glass-card">
+          <div className="max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain [overflow-anchor:none] rounded-[inherit] p-5">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-display text-lg font-bold text-fg">Browse</h2>
