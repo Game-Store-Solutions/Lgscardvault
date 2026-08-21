@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { BadgeCheck, Box, Dices, Sparkles } from 'lucide-react'
 import { cx } from '../../../lib/cx'
-import { isDarkHex } from '../../../lib/storeTheme'
+import { isDarkHex, storeFrameClass } from '../../../lib/storeTheme'
 import type { StoreHeroProps } from '../StoreHero'
 import { HeroLogo, HeroTagline, useHeroTokens } from '../StoreHero'
 import { HeroOptionalPhoto } from './HeroBackdrop'
@@ -32,22 +32,23 @@ function HeroShell({
   const { primary, hasImage } = tokens
   const { heroImageUrl, className: outerClass } = props
   return (
-    <div
-      className={cx(
-        'relative isolate overflow-hidden rounded-card border border-border shadow-card',
-        minClass,
-        outerClass,
-        className,
-      )}
-    >
-      <HeroOptionalPhoto
-        layout={layout}
-        heroImageUrl={heroImageUrl}
-        hasImage={hasImage}
-        primary={primary}
-        scrim={photoScrim}
-      />
-      <div className="relative z-[1]">{children}</div>
+    <div className={cx('rounded-card', storeFrameClass('hero'), outerClass)}>
+      <div
+        className={cx(
+          'relative isolate overflow-hidden rounded-[inherit]',
+          minClass,
+          className,
+        )}
+      >
+        <HeroOptionalPhoto
+          layout={layout}
+          heroImageUrl={heroImageUrl}
+          hasImage={hasImage}
+          primary={primary}
+          scrim={photoScrim}
+        />
+        <div className="relative z-[1]">{children}</div>
+      </div>
     </div>
   )
 }
@@ -104,10 +105,10 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
   const { heroImageUrl, logoUrl, tagline, heroSubheading, actions, className } = props
 
   return (
+    <div className={cx('rounded-card', storeFrameClass('hero'), className)}>
     <div
       className={cx(
-        'relative isolate flex min-h-64 items-end overflow-hidden rounded-card border border-border sm:min-h-80 lg:min-h-95',
-        className,
+        'relative isolate flex min-h-64 items-end overflow-hidden rounded-[inherit] sm:min-h-80 lg:min-h-95',
       )}
     >
       {hasImage ? (
@@ -144,6 +145,7 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
           {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">{actions}</div> : null}
         </div>
       </div>
+    </div>
     </div>
   )
 }
@@ -237,7 +239,7 @@ export function LivingInventoryHero({ props, tokens }: { props: StoreHeroProps; 
           ))}
         </div>
       </div>
-      <div className="border-t border-border bg-surface/95 p-6">
+      <div className={cx('m-4 rounded-card bg-surface/95 p-6', storeFrameClass('hero'))}>
         <IdentityHeader props={props} tokens={tokens} />
       </div>
     </HeroShell>

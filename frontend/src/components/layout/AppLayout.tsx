@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
-import { useCustomerCart, useGuestCart, useKioskMode, useTheme } from '../../hooks'
+import { useCustomerCart, useGuestCart, useKioskMode, useTheme, APP_CHROME_CLASS, STORE_THEME_CLASS } from '../../hooks'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
 import { Avatar, Button, buttonVariants, dropdownItemClass, dropdownPanelClass } from '../ui'
@@ -134,7 +134,7 @@ export default function AppLayout() {
     return (
       <AppShellLayoutProvider>
         <div className="flex min-h-screen flex-col bg-bg text-fg">
-          <header className="sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl">
+          <header className={cx(APP_CHROME_CLASS, 'sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl')}>
             <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
               <span className="flex items-center gap-2">
                 <BrandLogo size="md" />
@@ -154,9 +154,10 @@ export default function AppLayout() {
             </div>
           </header>
 
-          <AppMain contentShell={headerShell} />
-
-          {storeSlug && <StoreFooter slug={storeSlug} />}
+          <div className={cx(STORE_THEME_CLASS, 'flex min-h-0 flex-1 flex-col bg-bg text-fg')}>
+            <AppMain contentShell={headerShell} />
+            {storeSlug && <StoreFooter slug={storeSlug} />}
+          </div>
         </div>
       </AppShellLayoutProvider>
     )
@@ -165,7 +166,7 @@ export default function AppLayout() {
   return (
     <AppShellLayoutProvider>
     <div className="flex min-h-screen flex-col bg-bg text-fg">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl">
+      <header className={cx(APP_CHROME_CLASS, 'sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl')}>
         <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
           <BrandLogo size="md" withWordmark />
 
@@ -459,9 +460,10 @@ export default function AppLayout() {
         )}
       </header>
 
-      <AppMain contentShell={headerShell} />
-
-      {storeSlug && <StoreFooter slug={storeSlug} />}
+      <div className={cx(STORE_THEME_CLASS, 'flex min-h-0 flex-1 flex-col bg-bg text-fg')}>
+        <AppMain contentShell={headerShell} />
+        {storeSlug && <StoreFooter slug={storeSlug} />}
+      </div>
     </div>
     </AppShellLayoutProvider>
   )

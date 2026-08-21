@@ -5,6 +5,7 @@ import { cardImage, formatScryfallPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { useInventoryItemLink } from '../../hooks/useInventoryItemLink'
 import { cx } from '../../lib/cx'
+import { storeFrameClass } from '../../lib/storeTheme'
 import { CardImage } from './CardImage'
 import { FoilOverlays } from './FoilOverlays'
 import { useTilt } from '../../hooks'
@@ -34,10 +35,12 @@ export function CardTile({ item, slug }: CardTileProps) {
       to={link.to(item.id)}
       state={link.state}
       className={cx(
-        'group flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card dark:glass-card ui-lift',
+        'group flex flex-col rounded-card bg-surface dark:glass-card ui-lift',
+        storeFrameClass('card'),
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
       )}
     >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
       {/* Card art with holographic tilt */}
       <div
         ref={ref}
@@ -91,6 +94,7 @@ export function CardTile({ item, slug }: CardTileProps) {
           {item.isFoil ? ` · ${finishName(item.card, true, item.finish)}` : ''}
         </p>
         <p className="mt-2 text-xs font-medium text-fg-muted">{item.quantity} available</p>
+      </div>
       </div>
     </Link>
   )

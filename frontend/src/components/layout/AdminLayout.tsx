@@ -52,7 +52,7 @@ import {
 
 import { useAuth } from '../../context/AuthContext'
 
-import { useOpenStoreOrderCount, usePendingSellSubmissionCount, useStore, useStoreTheme } from '../../hooks'
+import { APP_CHROME_CLASS, STORE_THEME_CLASS, useOpenStoreOrderCount, usePendingSellSubmissionCount, useStore, useStoreTheme } from '../../hooks'
 
 import { Avatar, BackButton, Button, buttonVariants } from '../ui'
 
@@ -291,6 +291,8 @@ export default function AdminLayout() {
 
         className={[
 
+          APP_CHROME_CLASS,
+
           'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border/60 bg-surface shadow-[4px_0_24px_-12px_rgb(28_25_23/0.12)]',
 
           'transition-transform lg:translate-x-0',
@@ -423,7 +425,7 @@ export default function AdminLayout() {
 
       <div className="lg:pl-64">
 
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border/60 bg-surface/90 px-4 backdrop-blur-md">
+        <header className={`${APP_CHROME_CLASS} sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border/60 bg-surface/90 px-4 backdrop-blur-md`}>
 
           <div className="flex items-center gap-3">
 
@@ -495,9 +497,9 @@ export default function AdminLayout() {
 
             fullWidthAdmin
 
-              ? 'w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8'
+              ? `${STORE_THEME_CLASS} w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8`
 
-              : 'mx-auto max-w-7xl px-4 py-8'
+              : `${STORE_THEME_CLASS} mx-auto max-w-7xl px-4 py-8`
 
           }
 

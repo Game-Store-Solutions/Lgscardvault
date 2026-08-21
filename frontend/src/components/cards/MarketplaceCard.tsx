@@ -30,7 +30,7 @@ export function MarketplaceCard({
   const link = useInventoryItemLink(slug)
 
   return (
-    <article className="@container/market-card group flex min-h-0 min-w-0 gap-3 rounded-card border border-border bg-surface p-3 shadow-card dark:glass-card ui-lift hover:border-brand-500/30 sm:min-h-56 sm:gap-5 sm:p-5">
+    <article className="@container/market-card group flex min-h-0 min-w-0 gap-3 rounded-card store-frame store-frame-card bg-surface p-3 dark:glass-card ui-lift hover:border-brand-500/30 sm:min-h-56 sm:gap-5 sm:p-5">
       <Link
         to={link.to(item.id)}
         state={link.state}

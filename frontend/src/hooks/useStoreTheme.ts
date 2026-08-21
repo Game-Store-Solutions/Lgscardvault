@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react'
 import type { Store } from '../api/types'
 import { storeThemeVars } from '../lib/storeTheme'
 
+/** Content that may inherit a store's branding. Platform chrome stays outside this. */
+export const STORE_THEME_CLASS = 'store-theme'
+
+/** Top nav, admin sidebar, and other shell UI that must ignore store branding. */
+export const APP_CHROME_CLASS = 'app-chrome'
+
 /** Tracks the shopper's light/dark toggle by observing the `.dark` class on <html>. */
 function useIsDarkTheme(): boolean {
   const [isDark, setIsDark] = useState(
@@ -19,12 +25,14 @@ function useIsDarkTheme(): boolean {
 }
 
 /**
- * useStoreTheme — applies a store's branding palette site-wide while a
- * storefront/admin page is mounted by overriding the Tailwind design-token CSS
- * variables on :root. The palette is expanded into a complete, readable set by
- * storeThemeVars (deriving unset neutrals and flipping the brand ramp for dark
- * themes), so the whole UI retones coherently. Previous values are restored on
- * unmount, so the theme never leaks to other pages.
+ * useStoreTheme — applies a store's branding palette to `.store-theme` regions
+ * while a storefront page is mounted. Platform chrome (`.app-chrome`) is
+ * outside that region, so the top nav, account menu, and theme toggle never
+ * pick up store colors, border thickness, glow, or blur.
+ *
+ * The palette is expanded into a complete, readable set by storeThemeVars
+ * (deriving unset neutrals and flipping the brand ramp for dark themes).
+ * Previous values are restored on unmount.
  *
  * When the shopper's theme toggle is dark and the owner configured a dark
  * palette (store.darkColors), those colors override the base branding — the
@@ -46,6 +54,8 @@ export function useStoreTheme(store?: Store) {
         store.borderColor,
         store.borderThickness,
         store.surfaceBlur,
+        store.borderGlow,
+        JSON.stringify(store.frameStyles ?? null),
         isDark ? JSON.stringify(store.darkColors ?? null) : '',
         isDark ? 'dark' : 'light',
       ].join('|')
@@ -68,23 +78,32 @@ export function useStoreTheme(store?: Store) {
         accentColor: store.accentColor,
         borderThickness: store.borderThickness,
         surfaceBlur: store.surfaceBlur,
+        borderGlow: store.borderGlow,
+        frameStyles: store.frameStyles,
       }, true)
     } else {
       vars = storeThemeVars(store)
     }
-    const root = document.documentElement
-    const previous: Record<string, string> = {}
 
-    for (const [variable, value] of Object.entries(vars)) {
-      previous[variable] = root.style.getPropertyValue(variable)
-      root.style.setProperty(variable, value)
-    }
+    const roots = Array.from(document.querySelectorAll<HTMLElement>(`.${STORE_THEME_CLASS}`))
+    if (roots.length === 0) return
+
+    const previous = roots.map((root) => {
+      const snapshot: Record<string, string> = {}
+      for (const [variable, value] of Object.entries(vars)) {
+        snapshot[variable] = root.style.getPropertyValue(variable)
+        root.style.setProperty(variable, value)
+      }
+      return snapshot
+    })
 
     return () => {
-      for (const [variable, value] of Object.entries(previous)) {
-        if (value) root.style.setProperty(variable, value)
-        else root.style.removeProperty(variable)
-      }
+      roots.forEach((root, index) => {
+        for (const [variable, value] of Object.entries(previous[index] ?? {})) {
+          if (value) root.style.setProperty(variable, value)
+          else root.style.removeProperty(variable)
+        }
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])

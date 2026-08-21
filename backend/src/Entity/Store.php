@@ -150,6 +150,22 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private int $surfaceBlur = 12;
 
+    /** Soft halo around storefront frames, in px (0–40). */
+    #[ORM\Column(type: 'smallint', options: ['default' => 0])]
+    #[Assert\Range(min: 0, max: 40)]
+    #[Groups(['store:read', 'store:admin'])]
+    private int $borderGlow = 0;
+
+    /**
+     * Per-piece frame style for hero, shortcut tiles, and inventory cards.
+     * Keys: hero, tile, card. Each may include borderThickness, borderGlow, surfaceBlur.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['store:read', 'store:admin'])]
+    private ?array $frameStyles = null;
+
     #[ORM\Column(length: 1024, nullable: true)]
     #[Groups(['store:read', 'store:admin'])]
     private ?string $logoUrl = null;
@@ -584,6 +600,32 @@ class Store
     public function setSurfaceBlur(int $surfaceBlur): static
     {
         $this->surfaceBlur = $surfaceBlur;
+
+        return $this;
+    }
+
+    public function getBorderGlow(): int
+    {
+        return $this->borderGlow;
+    }
+
+    public function setBorderGlow(int $borderGlow): static
+    {
+        $this->borderGlow = $borderGlow;
+
+        return $this;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getFrameStyles(): ?array
+    {
+        return $this->frameStyles;
+    }
+
+    /** @param array<string, mixed>|null $frameStyles */
+    public function setFrameStyles(?array $frameStyles): static
+    {
+        $this->frameStyles = $frameStyles;
 
         return $this;
     }

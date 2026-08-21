@@ -78,6 +78,8 @@ export interface Store {
   borderColor?: string | null
   borderThickness?: number | null
   surfaceBlur?: number | null
+  borderGlow?: number | null
+  frameStyles?: Partial<Record<'hero' | 'tile' | 'card', Partial<{ borderThickness: number; borderGlow: number; surfaceBlur: number }>>> | null
   logoUrl?: string | null
   heroImageUrl?: string | null
   heroHeading?: string | null
