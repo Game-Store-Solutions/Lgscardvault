@@ -19,7 +19,6 @@ function HeroShell({
   children,
   className,
   minClass = 'min-h-[22rem]',
-  photoScrim = 'token',
   layout,
 }: {
   props: StoreHeroProps
@@ -27,7 +26,6 @@ function HeroShell({
   children: ReactNode
   className?: string
   minClass?: string
-  photoScrim?: 'dark' | 'token' | 'light' | 'none'
   layout?: HeroLayout
 }) {
   const { primary, hasImage } = tokens
@@ -46,7 +44,6 @@ function HeroShell({
           heroImageUrl={heroImageUrl}
           hasImage={hasImage}
           primary={primary}
-          scrim={photoScrim}
           imageOpacity={clampHeroImageOpacity(heroImageOpacity)}
         />
         <div className="relative z-[1]">{children}</div>
@@ -126,17 +123,10 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
       ) : null}
       <div
         aria-hidden
-        className="absolute inset-0 -z-10"
-        style={{
-          backgroundImage: `linear-gradient(115deg, ${primary}f2 0%, ${primary}9e 38%, ${primary}33 68%, rgba(0,0,0,0.15) 100%), linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0.15) 55%, transparent 80%)`,
-        }}
-      />
-      <div
-        aria-hidden
         className="pointer-events-none absolute -right-16 -top-20 -z-10 size-72 rounded-full opacity-50 blur-3xl"
         style={{ backgroundColor: accent }}
       />
-      <div className="relative w-full p-5 text-white sm:p-8 lg:p-10">
+      <div className="relative w-full p-5 text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.55)] sm:p-8 lg:p-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
@@ -159,16 +149,18 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
 }
 
 export function TradingTableHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
-  const { primary, accent } = tokens
+  const { primary, accent, hasImage } = tokens
   return (
-    <HeroShell props={props} tokens={tokens} layout="trading-table" photoScrim="dark" minClass="min-h-[18rem] sm:min-h-[24rem]">
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-[5] opacity-90"
-        style={{
-          backgroundImage: `radial-gradient(ellipse at center, ${primary}44 0%, transparent 70%), linear-gradient(135deg, #1a1208 0%, #0f172a 100%)`,
-        }}
-      />
+    <HeroShell props={props} tokens={tokens} layout="trading-table" minClass="min-h-[18rem] sm:min-h-[24rem]">
+      {hasImage ? null : (
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-[5]"
+          style={{
+            backgroundImage: `radial-gradient(ellipse at center, ${primary}44 0%, transparent 70%), linear-gradient(135deg, #1a1208 0%, #0f172a 100%)`,
+          }}
+        />
+      )}
       <div className="relative flex min-h-[18rem] flex-col justify-between p-5 text-white sm:min-h-[24rem] sm:p-8">
         <div className="flex justify-between opacity-80">
           <Dices aria-hidden className="size-8 rotate-12" />
@@ -190,9 +182,8 @@ export function TradingTableHero({ props, tokens }: { props: StoreHeroProps; tok
 }
 
 export function EventBoardHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
-  // No hero photo → solid primary fill. In light mode that primary is often
-  // navy/black while --color-fg is near-black, so title/subcopy must flip to
-  // white. With a photo + token scrim the field is page-colored — use normal fg.
+  // No photo: solid primary fill — flip to white when that fill is dark.
+  // With a photo, keep page text color so lowering image opacity stays readable.
   const lightCopy = !tokens.hasImage && isDarkHex(tokens.primary)
 
   return (
@@ -200,7 +191,6 @@ export function EventBoardHero({ props, tokens }: { props: StoreHeroProps; token
       props={props}
       tokens={tokens}
       layout="event-board"
-      photoScrim={lightCopy ? 'dark' : 'token'}
       className="dark:border-white/12 dark:bg-surface/40 dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.55)]"
     >
       <div className="grid gap-5 p-5 lg:grid-cols-2 lg:items-start lg:p-8">
@@ -213,9 +203,9 @@ export function EventBoardHero({ props, tokens }: { props: StoreHeroProps; token
 
 export function FloatingCardsHero({ props, tokens }: { props: StoreHeroProps; tokens: Tokens }) {
   return (
-    <HeroShell props={props} tokens={tokens} layout="floating-cards" photoScrim="dark" minClass="min-h-[18rem] sm:min-h-[26rem]">
+    <HeroShell props={props} tokens={tokens} layout="floating-cards" minClass="min-h-[18rem] sm:min-h-[26rem]">
       <FloatingCardsLayer cards={props.showcaseCards ?? []} count={20} />
-      <div className="relative flex min-h-[18rem] flex-col justify-end p-5 text-white sm:min-h-[26rem] sm:p-10">
+      <div className="relative flex min-h-[18rem] flex-col justify-end p-5 text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.55)] sm:min-h-[26rem] sm:p-10">
         <IdentityHeader props={props} tokens={tokens} light />
       </div>
     </HeroShell>
