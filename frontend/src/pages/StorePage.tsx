@@ -130,11 +130,21 @@ export default function StorePage() {
     itemsPerPage: SPOTLIGHT_MAX_ITEMS,
     enabled: catalogEnabled,
   })
+  // Broader in-stock pool to fill hero slots after spotlight (no min-price gate).
+  const heroStock = useInventoryPage(slug, {
+    inStockOnly: true,
+    game: gameFilter || undefined,
+    sort: 'price-desc',
+    page: 1,
+    itemsPerPage: 48,
+    enabled: catalogEnabled,
+  })
   const { data: shelf } = useStoreGameShelf(slug, gameFilter)
 
   const inventory = catalog.data?.items ?? []
   const resultTotal = catalog.data?.total ?? 0
   const spotlightItems = spotlight.data?.items ?? []
+  const heroStockItems = heroStock.data?.items ?? []
   const availableSets = shelf?.sets ?? []
 
   const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
@@ -147,8 +157,8 @@ export default function StorePage() {
   }, [cartQuery.data])
 
   const heroShowcaseCards = useMemo(
-    () => buildHeroCardPool(spotlightItems.length > 0 ? spotlightItems : inventory, 20),
-    [spotlightItems, inventory],
+    () => buildHeroCardPool(spotlightItems, 20, heroStockItems),
+    [spotlightItems, heroStockItems],
   )
   const heroLayout = normalizeHeroLayout(store?.heroLayout ?? 'cinematic')
   const locationLabel = [store?.city, store?.region].filter(Boolean).join(', ') || null

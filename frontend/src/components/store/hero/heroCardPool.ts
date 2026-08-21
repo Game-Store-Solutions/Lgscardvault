@@ -7,7 +7,7 @@ export interface HeroCardImage {
   isFoil?: boolean
 }
 
-/** Staple singles when inventory has no card art yet. */
+/** Last-resort art when the store has too little stock with images (or a URL 404s). */
 export const GENERIC_MTG_CARDS: HeroCardImage[] = [
   { name: 'Sol Ring', imageUrl: 'https://cards.scryfall.io/normal/front/9/1/91fdb56b-54d5-4272-8319-505ff987fe9b.jpg' },
   { name: 'Lightning Bolt', imageUrl: 'https://cards.scryfall.io/normal/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg' },
@@ -21,13 +21,19 @@ export const GENERIC_MTG_CARDS: HeroCardImage[] = [
   { name: 'Smothering Tithe', imageUrl: 'https://cards.scryfall.io/normal/front/8/6/861b5889-0183-4bee-afeb-a4b2aa700a8e.jpg' },
 ]
 
-/** Prefer real inventory art; pad with generic staples to reach `count`. */
-export function buildHeroCardPool(inventory: InventoryItem[], count = 20): HeroCardImage[] {
-  const seen = new Set<string>()
-  const pool: HeroCardImage[] = []
-
-  const shuffled = [...inventory].filter((item) => item.quantity > 0).sort(() => Math.random() - 0.5)
-  for (const item of shuffled) {
+function pushInventoryArt(
+  pool: HeroCardImage[],
+  seen: Set<string>,
+  items: InventoryItem[],
+  count: number,
+  shuffle: boolean,
+) {
+  const list = items.filter((item) => item.quantity > 0)
+  if (shuffle) {
+    list.sort(() => Math.random() - 0.5)
+  }
+  for (const item of list) {
+    if (pool.length >= count) return
     const url = cardImage(item.card)
     if (!url || seen.has(url)) continue
     seen.add(url)
@@ -36,19 +42,35 @@ export function buildHeroCardPool(inventory: InventoryItem[], count = 20): HeroC
       name: item.card.name ?? 'Card',
       isFoil: item.isFoil,
     })
-    if (pool.length >= count) return pool
   }
+}
+
+/**
+ * Hero art pool: spotlight first, then other in-stock store cards (staples /
+ * high-value fillers), then generic MTG art only if the store still cannot fill.
+ */
+export function buildHeroCardPool(
+  preferred: InventoryItem[],
+  count = 20,
+  filler: InventoryItem[] = [],
+): HeroCardImage[] {
+  const seen = new Set<string>()
+  const pool: HeroCardImage[] = []
+
+  // Keep spotlight order (price-desc from the API) so featured cards lead.
+  pushInventoryArt(pool, seen, preferred, count, false)
+  // Fill gaps from the rest of stock; shuffle so the marquee feels varied.
+  pushInventoryArt(pool, seen, filler, count, true)
 
   let genericIndex = 0
   while (pool.length < count) {
     const generic = GENERIC_MTG_CARDS[genericIndex % GENERIC_MTG_CARDS.length]!
     genericIndex += 1
-    if (seen.has(generic.imageUrl) && genericIndex > GENERIC_MTG_CARDS.length * 3) {
-      pool.push({ ...generic, imageUrl: `${generic.imageUrl}#${pool.length}` })
-    } else {
-      seen.add(generic.imageUrl)
-      pool.push(generic)
-    }
+    const uniqueUrl = seen.has(generic.imageUrl)
+      ? `${generic.imageUrl}#pad-${pool.length}`
+      : generic.imageUrl
+    seen.add(generic.imageUrl)
+    pool.push({ ...generic, imageUrl: uniqueUrl })
   }
 
   return pool.slice(0, count)

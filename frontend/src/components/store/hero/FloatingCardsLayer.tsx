@@ -1,44 +1,93 @@
 import { useMemo, useState, type CSSProperties } from 'react'
+import { cardArtDelivery } from '../../../api/client'
 import { cx } from '../../../lib/cx'
-import type { HeroCardImage } from './heroCardPool'
+import { GENERIC_MTG_CARDS, type HeroCardImage } from './heroCardPool'
 import { FoilOverlays } from '../../cards/FoilOverlays'
+
+/** Try higher/lower Scryfall sizes when the primary URL 404s. */
+function heroArtCandidates(imageUrl: string): string[] {
+  const base = imageUrl.split('#')[0] ?? imageUrl
+  const seen = new Set<string>()
+  const out: string[] = []
+  const add = (url: string) => {
+    if (!url || seen.has(url)) return
+    seen.add(url)
+    out.push(url)
+  }
+  add(base)
+  add(base.replace(/cards\.scryfall\.io\/(?:small|normal)\//, 'cards.scryfall.io/large/'))
+  add(base.replace(/cards\.scryfall\.io\/(?:large|small)\//, 'cards.scryfall.io/normal/'))
+  add(base.replace(/cards\.scryfall\.io\/(?:large|normal)\//, 'cards.scryfall.io/small/'))
+  return out
+}
 
 function HeroCardImg({
   card,
   className,
   style,
+  fallbackIndex = 0,
 }: {
   card: HeroCardImage
   className?: string
   style?: CSSProperties
+  /** Which staple to use if every candidate URL fails. */
+  fallbackIndex?: number
 }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) {
-    return (
-      <div
-        className={cx(
-          'rounded-md bg-gradient-to-br from-slate-800 via-indigo-950 to-violet-900 shadow-lg ring-1 ring-white/10',
-          className,
-        )}
-        style={style}
-        aria-hidden
-      />
-    )
+  const primaryCandidates = useMemo(() => heroArtCandidates(card.imageUrl), [card.imageUrl])
+  const fallback = GENERIC_MTG_CARDS[fallbackIndex % GENERIC_MTG_CARDS.length]!
+  const fallbackCandidates = useMemo(
+    () => heroArtCandidates(fallback.imageUrl),
+    [fallback.imageUrl],
+  )
+
+  const [phase, setPhase] = useState<'primary' | 'fallback'>('primary')
+  const [candidateIndex, setCandidateIndex] = useState(0)
+  const [exhausted, setExhausted] = useState(false)
+
+  const candidates = phase === 'primary' ? primaryCandidates : fallbackCandidates
+  const activeUrl = exhausted
+    ? GENERIC_MTG_CARDS[0]!.imageUrl
+    : candidates[Math.min(candidateIndex, Math.max(candidates.length - 1, 0))]
+  const showFoil = !exhausted && (phase === 'primary' ? Boolean(card.isFoil) : Boolean(fallback.isFoil))
+  const delivery = useMemo(() => (activeUrl ? cardArtDelivery(activeUrl) : null), [activeUrl])
+
+  const onError = () => {
+    if (exhausted) return
+    if (candidateIndex + 1 < candidates.length) {
+      setCandidateIndex((i) => i + 1)
+      return
+    }
+    if (phase === 'primary') {
+      setPhase('fallback')
+      setCandidateIndex(0)
+      return
+    }
+    setExhausted(true)
   }
+
   return (
     <span
-      className={cx('relative block overflow-hidden rounded-md shadow-lg ring-1 ring-black/20', card.isFoil && 'foil-card', className)}
+      className={cx(
+        'relative block overflow-hidden rounded-md shadow-lg ring-1 ring-black/20',
+        showFoil && 'foil-card',
+        className,
+      )}
       style={style}
       aria-hidden
     >
-      <img
-        src={card.imageUrl.split('#')[0]}
-        alt=""
-        draggable={false}
-        className="size-full rounded-md object-cover"
-        onError={() => setFailed(true)}
-      />
-      {card.isFoil && <FoilOverlays foil glare={false} />}
+      {delivery ? (
+        <img
+          key={`${phase}-${delivery.src}`}
+          src={delivery.src}
+          srcSet={delivery.srcSet}
+          alt=""
+          draggable={false}
+          decoding="async"
+          className="size-full rounded-md object-cover"
+          onError={onError}
+        />
+      ) : null}
+      {showFoil && <FoilOverlays foil glare={false} />}
     </span>
   )
 }
@@ -55,9 +104,10 @@ export function FloatingCardsLayer({
 }) {
   const [parallax, setParallax] = useState({ x: 0, y: 0 })
   const pool = useMemo(() => {
-    const list = [...cards.slice(0, count)]
-    while (list.length < count && cards.length > 0) {
-      list.push(cards[list.length % cards.length]!)
+    const source = cards.length > 0 ? cards : GENERIC_MTG_CARDS
+    const list = [...source.slice(0, count)]
+    while (list.length < count) {
+      list.push(source[list.length % source.length]!)
     }
     return list.slice(0, count)
   }, [cards, count])
@@ -108,7 +158,7 @@ export function FloatingCardsLayer({
             } as CSSProperties
           }
         >
-          <HeroCardImg card={slot.card} className="aspect-[5/7] w-full" />
+          <HeroCardImg card={slot.card} fallbackIndex={i + 3} className="aspect-[5/7] w-full" />
         </div>
       ))}
     </div>
