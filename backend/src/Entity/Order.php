@@ -109,8 +109,8 @@ class Order
     private ?string $customerEmail = null;
 
     /**
-     * How the customer receives the order. In-store pickup is the default —
-     * most LGS singles sales walk out the door — and shipping is the opt-in.
+     * How the customer receives the order. Launch checkout is pickup only;
+     * shipping is retained so historical orders still serialize.
      */
     #[ORM\Column(length: 16, options: ['default' => self::FULFILLMENT_PICKUP])]
     #[Assert\Choice(choices: self::FULFILLMENTS)]
@@ -138,6 +138,11 @@ class Order
     #[Groups(['order:read'])]
     private int $totalCents = 0;
 
+    /** Sales tax collected at the store's Square location, in cents (0 = none / pay-in-store). */
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['order:read'])]
+    private int $taxCents = 0;
+
     /** Store credit spent on this order, in cents (0 = none). Refunded on cancel/refund. */
     #[ORM\Column(options: ['default' => 0])]
     #[Groups(['order:read'])]
@@ -164,6 +169,18 @@ class Order
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['order:read'])]
     private ?string $notes = null;
+
+    #[ORM\Column(length: 16, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $disputeStatus = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $disputeReason = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['order:read'])]
+    private ?\DateTimeImmutable $disputedAt = null;
 
     #[ORM\Column]
     #[Groups(['order:read'])]
@@ -301,6 +318,18 @@ class Order
         return $this->totalCents;
     }
 
+    public function getTaxCents(): int
+    {
+        return $this->taxCents;
+    }
+
+    public function setTaxCents(int $taxCents): static
+    {
+        $this->taxCents = max(0, $taxCents);
+
+        return $this;
+    }
+
     public function getCreditAppliedCents(): int
     {
         return $this->creditAppliedCents;
@@ -365,6 +394,30 @@ class Order
     {
         $trimmed = null !== $notes ? trim($notes) : '';
         $this->notes = '' === $trimmed ? null : mb_substr($trimmed, 0, 255);
+
+        return $this;
+    }
+
+    public function getDisputeStatus(): ?string
+    {
+        return $this->disputeStatus;
+    }
+
+    public function getDisputeReason(): ?string
+    {
+        return $this->disputeReason;
+    }
+
+    public function getDisputedAt(): ?\DateTimeImmutable
+    {
+        return $this->disputedAt;
+    }
+
+    public function markDisputed(string $reason): static
+    {
+        $this->disputeStatus = 'open';
+        $this->disputeReason = mb_substr(trim($reason), 0, 255) ?: null;
+        $this->disputedAt = new \DateTimeImmutable();
 
         return $this;
     }

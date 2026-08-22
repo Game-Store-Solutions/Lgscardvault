@@ -4,6 +4,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Store;
 use App\Entity\User;
+use App\Service\Compliance\StoreComplianceGate;
 use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
@@ -33,6 +34,13 @@ final class AdminActionsTest extends WebTestCase
         $store = $this->fixtures->store('pending-store');
         $store->setStatus(Store::STATUS_PENDING);
         $store->setIsActive(false);
+        $store->setRegion('CA');
+        $store->setCompliance(StoreComplianceGate::normalize([
+            'legalBusinessName' => 'Pending Cards LLC',
+            'entityType' => 'llc',
+            'sellerPermitNumber' => 'SR-1',
+            'insuranceAttested' => true,
+        ]));
         $this->em->flush();
 
         return $store;
@@ -103,6 +111,19 @@ final class AdminActionsTest extends WebTestCase
         $reloaded = $this->em->getRepository(Store::class)->find($store->getId());
         self::assertSame(Store::STATUS_APPROVED, $reloaded->getStatus());
         self::assertTrue($reloaded->isActive());
+    }
+
+    public function testApproveStoreRequiresLicenseIntake(): void
+    {
+        $store = $this->fixtures->store('bare-pending');
+        $store->setStatus(Store::STATUS_PENDING);
+        $store->setIsActive(false);
+        $store->setRegion('CA');
+        $this->em->flush();
+
+        $this->client->loginUser($this->fixtures->user(['ROLE_SUPER_ADMIN']));
+        $this->client->request('POST', sprintf('/api/admin/stores/%d/approve', $store->getId()));
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
     }
 
     public function testRejectStoreRecordsReason(): void

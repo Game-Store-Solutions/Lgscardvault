@@ -52,6 +52,7 @@ class AuthController extends AbstractController
         $password = isset($payload['password']) ? (string) $payload['password'] : '';
         $displayName = isset($payload['displayName']) ? trim((string) $payload['displayName']) : '';
         $accountType = isset($payload['accountType']) ? trim((string) $payload['accountType']) : 'owner';
+        $acceptedTerms = $this->isTruthy($payload['acceptedTerms'] ?? false);
 
         // Admin accounts must never be self-registered through this public endpoint.
         // The supported way to bootstrap a super-admin is the `app:create-admin` console command.
@@ -60,6 +61,18 @@ class AuthController extends AbstractController
                 ['error' => 'Admin accounts cannot be self-registered.'],
                 Response::HTTP_FORBIDDEN,
             );
+        }
+
+        if (!$acceptedTerms) {
+            return $this->json(
+                ['error' => 'Please accept the Terms of Service and Privacy Policy.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        $dateOfBirth = $this->parseDateOfBirth($payload['dateOfBirth'] ?? null);
+        if ($dateOfBirth instanceof JsonResponse) {
+            return $dateOfBirth;
         }
 
         $violations = $this->validator->validate($email, [new Assert\NotBlank(), new Assert\Email()]);
@@ -86,7 +99,9 @@ class AuthController extends AbstractController
             ->setEmail($email)
             ->setDisplayName($displayName)
             ->setRoles($roles)
-            ->setEmailVerified(false);
+            ->setEmailVerified(false)
+            ->setDateOfBirth($dateOfBirth)
+            ->setTermsAcceptedAt(new \DateTimeImmutable());
 
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
@@ -274,5 +289,42 @@ class AuthController extends AbstractController
             'detail' => 'Email verified.',
             'token' => $this->jwtManager->create($result),
         ]);
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        if (true === $value || 1 === $value || '1' === $value) {
+            return true;
+        }
+
+        return is_string($value) && \in_array(strtolower($value), ['true', 'yes', 'on'], true);
+    }
+
+    private function parseDateOfBirth(mixed $raw): \DateTimeImmutable|JsonResponse
+    {
+        $dobRaw = trim((string) $raw);
+        $dateOfBirth = \DateTimeImmutable::createFromFormat('!Y-m-d', $dobRaw) ?: null;
+        if (!$dateOfBirth instanceof \DateTimeImmutable || $dateOfBirth->format('Y-m-d') !== $dobRaw) {
+            return $this->json(
+                ['error' => 'Enter your date of birth (YYYY-MM-DD).'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        $age = User::ageYears($dateOfBirth);
+        if ($age < 13) {
+            return $this->json(
+                ['error' => 'You must be at least 13 years old to create an account.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+        if ($age > 120) {
+            return $this->json(
+                ['error' => 'Please enter a valid date of birth.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        return $dateOfBirth;
     }
 }

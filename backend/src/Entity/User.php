@@ -88,6 +88,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $emailVerifyExpiresAt = null;
 
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $dateOfBirth = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $termsAcceptedAt = null;
+
     /** @var list<string> */
     #[ORM\Column]
     #[Assert\All([
@@ -394,5 +400,42 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->paymentCardId = $paymentCardId;
 
         return $this;
+    }
+
+    public function getDateOfBirth(): ?\DateTimeImmutable
+    {
+        return $this->dateOfBirth;
+    }
+
+    public function setDateOfBirth(?\DateTimeImmutable $dateOfBirth): static
+    {
+        $this->dateOfBirth = $dateOfBirth;
+
+        return $this;
+    }
+
+    public function getTermsAcceptedAt(): ?\DateTimeImmutable
+    {
+        return $this->termsAcceptedAt;
+    }
+
+    public function setTermsAcceptedAt(?\DateTimeImmutable $termsAcceptedAt): static
+    {
+        $this->termsAcceptedAt = $termsAcceptedAt;
+
+        return $this;
+    }
+
+    #[Groups(['user:read', 'user:admin'])]
+    public function isAgeVerified(): bool
+    {
+        return null !== $this->dateOfBirth && self::ageYears($this->dateOfBirth) >= 13;
+    }
+
+    public static function ageYears(\DateTimeImmutable $dateOfBirth, ?\DateTimeImmutable $now = null): int
+    {
+        $now ??= new \DateTimeImmutable('today');
+
+        return (int) $dateOfBirth->diff($now)->y;
     }
 }

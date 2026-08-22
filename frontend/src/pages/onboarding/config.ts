@@ -5,6 +5,7 @@ import {
   Layers,
   MapPin,
   Palette as PaletteIcon,
+  ShieldCheck,
   UserPlus,
 } from 'lucide-react'
 import type { PaymentMethodType } from '../../api/types'
@@ -17,6 +18,7 @@ export const STEPS = [
   { key: 'colors', title: 'Colors', icon: PaletteIcon },
   { key: 'plan', title: 'Plan', icon: Layers },
   { key: 'payment', title: 'Payment', icon: CreditCard },
+  { key: 'licenses', title: 'Licenses', icon: ShieldCheck },
   { key: 'review', title: 'Review', icon: CheckCircle2 },
 ] as const
 
@@ -29,11 +31,12 @@ export function stepIndex(key: StepKey): number {
 
 export const STEP_SUBTITLE: Record<StepKey, string> = {
   account: 'Create the owner account that manages this store.',
-  address: 'Where is your business located? Search to autofill.',
+  address: 'Physical U.S. storefront. Shoppers pay online and pick up in store.',
   branding: 'Name your store and add a logo. Watch the preview update live.',
   colors: 'Pick a palette. Everything on your storefront retones instantly.',
   plan: 'Choose the tier that fits your shop.',
   payment: 'Add a payment method for your subscription.',
+  licenses: 'Seller’s permit, city license, entity, and insurance attestation.',
   review: 'Review everything, then submit for platform review.',
 }
 
@@ -44,3 +47,6 @@ export const METHOD_LABELS: Record<PaymentMethodType, string> = {
 }
 
 export const SLUG_RE = /^[a-z0-9-]+$/
+
+/** States with no statewide sales tax (local Square tax may still apply). */
+export const NO_STATE_SALES_TAX: readonly string[] = ['AK', 'DE', 'MT', 'NH', 'OR']

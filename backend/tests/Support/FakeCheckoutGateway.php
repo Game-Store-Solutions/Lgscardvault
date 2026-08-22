@@ -29,6 +29,12 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     /** Message thrown instead of refunding; null means the refund succeeds. */
     public ?string $refundDeclineWith = null;
 
+    /** Extra sales tax added onto charges and quotes (0 keeps existing tests pre-tax). */
+    public int $addedTaxCents = 0;
+
+    /** @var list<array{lineItems: array, creditCents: int}> */
+    public array $quotes = [];
+
     public function checkoutConfig(Store $store): array
     {
         return [
@@ -46,6 +52,21 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     public function isReady(Store $store): bool
     {
         return $this->ready;
+    }
+
+    public function quotePickupTotals(Store $store, array $lineItems, int $creditCents = 0): array
+    {
+        $this->quotes[] = ['lineItems' => $lineItems, 'creditCents' => $creditCents];
+        $merchandise = 0;
+        foreach ($lineItems as $item) {
+            $merchandise += max(0, (int) ($item['priceCents'] ?? 0)) * max(1, (int) ($item['quantity'] ?? 1));
+        }
+        $due = max(0, $merchandise - max(0, $creditCents)) + max(0, $this->addedTaxCents);
+
+        return [
+            'taxCents' => max(0, $this->addedTaxCents),
+            'dueCents' => $due,
+        ];
     }
 
     public function charge(
@@ -66,11 +87,15 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
             throw new \RuntimeException($this->declineWith);
         }
 
+        $taxCents = max(0, $this->addedTaxCents);
+        $chargedCents = $amountCents + $taxCents;
+
         $this->charges[] = [
-            'amount' => $amountCents,
+            'amount' => $chargedCents,
             'sourceId' => $sourceId,
             'idempotencyKey' => $idempotencyKey,
             'lineItems' => $lineItems,
+            'taxCents' => $taxCents,
         ];
 
         $n = count($this->charges);
@@ -80,6 +105,8 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
             'status' => 'COMPLETED',
             'receiptUrl' => 'https://squareup.com/receipt/test',
             'squareOrderId' => null !== $lineItems && [] !== $lineItems ? 'sqord_'.$n : null,
+            'taxCents' => $taxCents,
+            'chargedCents' => $chargedCents,
         ];
     }
 

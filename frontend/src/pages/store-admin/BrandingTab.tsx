@@ -869,7 +869,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                 <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Messaging</p>
                 <Input label="Tagline" placeholder="Your local Magic singles shop" maxLength={160} value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
                 <Input label="Hero heading" placeholder="Defaults to your store name" maxLength={160} value={form.heroHeading} onChange={(e) => set('heroHeading', e.target.value)} />
-                <Textarea label="Hero subheading" rows={3} placeholder="A sentence or two about your store, shipping, or specialties." value={form.heroSubheading} onChange={(e) => set('heroSubheading', e.target.value)} />
+                <Textarea label="Hero subheading" rows={3} placeholder="A sentence or two about your store, pickup hours, or specialties." value={form.heroSubheading} onChange={(e) => set('heroSubheading', e.target.value)} />
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
                     type="button"

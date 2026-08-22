@@ -15,7 +15,8 @@ Customer routes are under `StoreCustomerController` at `/api/stores/{slug}/custo
 | Want list | `GET /want-list`, `POST /want-list`, `DELETE /want-list/{id}` |
 | Cart | `GET /cart`, `PUT /cart/{itemId}`, `DELETE /cart/{itemId}`, `DELETE /cart` |
 | Local test order | `POST /test-order` |
-| Paid checkout | `GET /checkout/config`, `POST /checkout` |
+| Paid checkout | `GET /checkout/config`, `POST /checkout`, `POST /checkout/quote` |
+| Guest checkout | `GET/POST /api/stores/{slug}/guest/checkout[/config|/quote|/pay-in-store]` |
 | Customer order history | `GET /orders` |
 | Customer notifications | `GET /notifications`, `PATCH /notifications/{id}/read` |
 | Owner orders | `GET /api/stores/{slug}/orders`, `POST /api/stores/{slug}/orders`, `GET /api/stores/{slug}/orders/{id}`, `PATCH /api/stores/{slug}/orders/{id}` |
@@ -101,7 +102,9 @@ sequenceDiagram
 
 ### Paid checkout
 
-`POST /customer/checkout` is the real path: it charges the shopper through the store's connected Square account (`StoreCheckoutGateway`) and settles the order as `paid`.
+`POST /customer/checkout` is the real path: it charges the shopper through the store's connected Square account (`PickupCardCharge` / `StoreCheckoutGateway`) and settles the order as `paid`. Checkout is **pickup only**. `POST /customer/checkout/quote` (and the guest twin) returns `taxReady` / `taxBlockReason`.
+
+In a sales-tax state, **$0 quoted Square tax blocks card checkout** (pay-in-store stays). In **AK, DE, MT, NH, and OR** — no statewide sales tax — $0 tax **does not** block; the shopper can finish paying by card. See [compliance.md](compliance.md).
 
 Both paths share `CartOrderBuilder`, so they consume stock and spend store credit identically. The paid path commits that reservation first, then charges, then settles — a decline calls `OrderStockReleaser` to restock, refund the credit, and cancel the order, returning `402`. The order reference doubles as the processor idempotency key, so a retried request cannot charge twice.
 
@@ -150,7 +153,7 @@ stateDiagram-v2
 
 Legacy statuses are still accepted for existing data and reports: `paid`, `shipped`, and `completed`. The frontend normalizes `paid` and `shipped` into the active received step and treats `completed` as fulfilled.
 
-The order detail panel includes a print sheet action. The print sheet renders order reference, date, customer, card name, set, collector number, quantity, unit price, line total, pre-tax total, tax, and post-tax total. Tax is currently displayed as `$0.00` because tax calculation is not persisted yet.
+The order detail panel includes a print sheet action. The print sheet renders order reference, date, customer, card name, set, collector number, quantity, unit price, line total, pre-tax total, tax (`orders.tax_cents` from Square location tax), and post-tax total. Disputed orders show a badge; Square `dispute.created` does not restock.
 
 ---
 

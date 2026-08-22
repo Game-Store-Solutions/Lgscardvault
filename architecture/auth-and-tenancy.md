@@ -65,7 +65,7 @@ flowchart LR
 flowchart LR
     subgraph FE["🖥️ Frontend"]
         rp["RegisterPage.tsx"] --> ac["AuthContext.register()"]
-        ac -->|"POST /register {email, password, displayName, accountType}"| r
+        ac -->|"POST /register {email, password, displayName, accountType, acceptedTerms, dateOfBirth}"| r
     end
     subgraph API["🌐 Route"]
         r["POST /api/register"]
@@ -85,7 +85,7 @@ flowchart LR
 ```
 
 - `accountType: 'owner'` grants `ROLE_STORE_OWNER`; `'customer'` gets `ROLE_USER`. **Admins cannot self-register** — use `php bin/console app:create-admin`.
-- Validation: email format, password ≥ 8 chars, display name required.
+- Validation: email format, password ≥ 8 chars, display name required, **`acceptedTerms`**, **`dateOfBirth` (13+)**. Date of birth is stored and never returned by `/api/me`. See [compliance.md](compliance.md).
 
 | Layer | Where |
 |-------|-------|

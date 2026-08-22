@@ -148,6 +148,46 @@ export interface Store {
     displayName: string
   }
   createdAt?: string
+  compliance?: StoreCompliance | null
+  complianceDocuments?: ComplianceDocumentMeta[]
+  complianceReview?: {
+    errors: string[]
+    cdtfaVerifyUrl: string | null
+  }
+}
+
+export interface StoreCompliance {
+  legalBusinessName?: string
+  entityType?: string
+  sellerPermitNumber?: string
+  ein?: string
+  noStateSalesTax?: boolean
+  cityLicenseNumber?: string
+  usesBuyTrade?: boolean
+  secondhandStatus?: string
+  secondhandLicenseNumber?: string
+  insuranceAttested?: boolean
+}
+
+export interface ComplianceDocumentMeta {
+  id: number
+  kind: 'seller_permit' | 'city_license' | 'secondhand' | string
+  originalFilename: string
+  mime: string
+  createdAt: string
+}
+
+export interface PrivacyRequest {
+  id: number
+  type: 'access' | 'delete' | 'do_not_sell' | 'correct' | string
+  status: 'received' | 'in_progress' | 'completed' | 'rejected' | string
+  email: string
+  name: string
+  details?: string | null
+  californiaResident: boolean
+  adminNotes?: string | null
+  createdAt: string
+  completedAt?: string | null
 }
 
 export interface StorePaymentAccount {
@@ -774,6 +814,17 @@ export interface OrderLine {
 
 export type OrderFulfillment = 'pickup' | 'shipping'
 
+export interface CheckoutQuote {
+  subtotalCents: number
+  creditCents: number
+  taxCents: number
+  dueCents: number
+  fulfillment: 'pickup'
+  taxNote?: string
+  taxReady?: boolean
+  taxBlockReason?: string | null
+}
+
 export type OrderChannel = 'online' | 'kiosk'
 
 export interface Order {
@@ -791,8 +842,14 @@ export interface Order {
   creditAppliedCents?: number
   /** Cash captured by Square, in cents. Zero for unpaid pay-in-store orders. */
   paidCents?: number
+  /** Sales tax collected at the store location, in cents. */
+  taxCents?: number
   /** Staff-facing checkout note, e.g. "Paying in store". */
   notes?: string | null
+  /** Square chargeback / dispute, when a webhook recorded one. */
+  disputeStatus?: string | null
+  disputeReason?: string | null
+  disputedAt?: string | null
   /** Square hosted checkout URL returned once when a pay-in-store QR is minted. */
   paymentUrl?: string | null
   createdAt: string

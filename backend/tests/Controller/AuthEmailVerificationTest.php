@@ -65,6 +65,8 @@ final class AuthEmailVerificationTest extends WebTestCase
             'password' => 'verify-pass-1',
             'displayName' => 'New Shopper',
             'accountType' => 'customer',
+            'acceptedTerms' => true,
+            'dateOfBirth' => '1990-01-15',
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode(), json_encode($created));
         self::assertFalse($created['emailVerified'] ?? true);
@@ -99,6 +101,8 @@ final class AuthEmailVerificationTest extends WebTestCase
             'password' => 'verify-pass-1',
             'displayName' => 'Wrong Pass',
             'accountType' => 'customer',
+            'acceptedTerms' => true,
+            'dateOfBirth' => '1990-01-15',
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
 
@@ -128,6 +132,44 @@ final class AuthEmailVerificationTest extends WebTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testRegisterRequiresAcceptedTerms(): void
+    {
+        $email = $this->uniqueEmail('verify-terms');
+        $body = $this->jsonRequest('POST', '/api/register', [
+            'email' => $email,
+            'password' => 'verify-pass-1',
+            'displayName' => 'No Terms',
+            'accountType' => 'customer',
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('Terms', (string) ($body['error'] ?? ''));
+    }
+
+    public function testRegisterRequiresDateOfBirthAndRejectsUnder13(): void
+    {
+        $email = $this->uniqueEmail('too-young');
+        $missing = $this->jsonRequest('POST', '/api/register', [
+            'email' => $email,
+            'password' => 'verify-pass-1',
+            'displayName' => 'Kid',
+            'accountType' => 'customer',
+            'acceptedTerms' => true,
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('date of birth', strtolower((string) ($missing['error'] ?? '')));
+
+        $young = $this->jsonRequest('POST', '/api/register', [
+            'email' => $email,
+            'password' => 'verify-pass-1',
+            'displayName' => 'Kid',
+            'accountType' => 'customer',
+            'acceptedTerms' => true,
+            'dateOfBirth' => (new \DateTimeImmutable('today'))->modify('-10 years')->format('Y-m-d'),
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('13', (string) ($young['error'] ?? ''));
+    }
+
     public function testOwnerSignupAlsoRequiresVerification(): void
     {
         $email = $this->uniqueEmail('verify-owner');
@@ -136,6 +178,8 @@ final class AuthEmailVerificationTest extends WebTestCase
             'password' => 'owner-pass-1',
             'displayName' => 'Store Owner',
             'accountType' => 'owner',
+            'acceptedTerms' => true,
+            'dateOfBirth' => '1988-06-01',
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode(), json_encode($created));
         self::assertFalse($created['emailVerified'] ?? true);

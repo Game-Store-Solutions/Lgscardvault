@@ -1,4 +1,4 @@
-import type { CardDisplayStyle, PaymentMethodType } from '../../api/types'
+import type { CardDisplayStyle, ComplianceDocumentMeta, PaymentMethodType } from '../../api/types'
 import type { StorePreviewBranding } from '../../components/store'
 
 export interface OnboardingBranding {
@@ -37,6 +37,19 @@ export interface OnboardingPayment {
   verificationToken: string
 }
 
+export interface OnboardingCompliance {
+  legalBusinessName: string
+  entityType: '' | 'sole_prop' | 'llc' | 'corp' | 'partnership' | 'other'
+  sellerPermitNumber: string
+  ein: string
+  noStateSalesTax: boolean
+  cityLicenseNumber: string
+  usesBuyTrade: boolean
+  secondhandStatus: 'not_applicable' | 'will_comply' | 'licensed'
+  secondhandLicenseNumber: string
+  insuranceAttested: boolean
+}
+
 export interface OnboardingData {
   // Account
   displayName: string
@@ -51,6 +64,11 @@ export interface OnboardingData {
   branding: OnboardingBranding
   planKey: string
   payment: OnboardingPayment
+  acceptedTerms: boolean
+  dateOfBirth: string
+  acceptedMerchantTerms: boolean
+  compliance: OnboardingCompliance
+  complianceDocuments: ComplianceDocumentMeta[]
 }
 
 export const EMPTY_ONBOARDING: OnboardingData = {
@@ -66,7 +84,7 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     city: '',
     region: '',
     postalCode: '',
-    country: '',
+    country: 'US',
     latitude: null,
     longitude: null,
   },
@@ -87,6 +105,22 @@ export const EMPTY_ONBOARDING: OnboardingData = {
   },
   planKey: '',
   payment: { methodType: '', token: '', last4: '', verificationToken: '' },
+  acceptedTerms: false,
+  dateOfBirth: '',
+  acceptedMerchantTerms: false,
+  compliance: {
+    legalBusinessName: '',
+    entityType: '',
+    sellerPermitNumber: '',
+    ein: '',
+    noStateSalesTax: false,
+    cityLicenseNumber: '',
+    usesBuyTrade: false,
+    secondhandStatus: 'not_applicable',
+    secondhandLicenseNumber: '',
+    insuranceAttested: false,
+  },
+  complianceDocuments: [],
 }
 
 /** Shared state-updater signatures, so step components stay terse. */

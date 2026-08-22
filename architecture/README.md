@@ -36,6 +36,7 @@ Two backend styles coexist:
 | **Commander deck builder** | Reference-deck harvesting, strategy classification, card relationships, contextual scoring, and 100-card construction | [commander-deck-builder.md](commander-deck-builder.md) |
 | **CSV import** | Async bulk import lifecycle, failed-row recovery, card resolution, inventory writes, and live polling | [csv-import.md](csv-import.md) |
 | **Customers & orders** | Per-store customer profiles, favorites, want lists, cart, test checkout, order workflow, notifications, and reports | [customers-and-orders.md](customers-and-orders.md) |
+| **Launch compliance** | US pickup-only launch: SaaS copy, licenses, DOB, cookies, CCPA queue, $0-tax card block, disputes — and what is still lawyer/operator work | [compliance.md](compliance.md) |
 
 ## Ops & developer guides
 
@@ -115,6 +116,7 @@ flowchart LR
 - **Batched async import** - the CSV worker claims rows with `SELECT ... FOR UPDATE SKIP LOCKED`, processes 25 at a time, and self-dispatches the next batch.
 - **Persisted notifications** - customer notifications are stored in `customer_notifications`; Mailpit email is a delivery side effect. The frontend currently polls every 15 seconds.
 - **Two Square money paths** - the platform bills store owners with its own access token; each store charges shoppers through a connected OAuth account. See [payments-and-billing.md](payments-and-billing.md).
+- **Launch compliance is mixed software + counsel** - pickup-only US stores, license intake, tax-ready card checkout, and privacy requests live in the app; facilitator analysis, entity formation, and Square production go-live do not. See [compliance.md](compliance.md).
 - **Provider-owned payments** - payment provider credentials belong to the store connection in `store_payment_accounts`; the API never returns provider tokens.
 
 ## Local development dependencies

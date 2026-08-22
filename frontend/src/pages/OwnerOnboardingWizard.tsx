@@ -10,6 +10,7 @@ import {
   AddressStep,
   BrandingStep,
   ColorsStep,
+  LicensesStep,
   PaymentStep,
   PlanStep,
   ReviewStep,
@@ -76,8 +77,15 @@ export default function OwnerOnboardingWizard() {
               patchPayment={o.patchPayment}
             />
           )}
+          {o.currentKey === 'licenses' && <LicensesStep data={o.data} patch={o.patch} />}
           {o.currentKey === 'review' && (
-            <ReviewStep data={o.data} plan={o.selectedPlan} paymentRequired={o.paymentRequired} onJump={o.jumpTo} />
+            <ReviewStep
+              data={o.data}
+              plan={o.selectedPlan}
+              paymentRequired={o.paymentRequired}
+              onJump={o.jumpTo}
+              onAcceptMerchantTerms={(value) => o.patch({ acceptedMerchantTerms: value })}
+            />
           )}
 
           {o.error && (

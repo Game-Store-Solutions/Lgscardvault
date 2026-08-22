@@ -22,9 +22,13 @@ final class CustomerOrderSerializer
             'fulfillment' => $order->getFulfillment(),
             'channel' => $order->getChannel(),
             'totalCents' => $order->getTotalCents(),
+            'taxCents' => $order->getTaxCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
             'notes' => $order->getNotes(),
+            'disputeStatus' => $order->getDisputeStatus(),
+            'disputeReason' => $order->getDisputeReason(),
+            'disputedAt' => $order->getDisputedAt()?->format(DATE_ATOM),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeLine(...), $order->getLines()->toArray()),
         ];

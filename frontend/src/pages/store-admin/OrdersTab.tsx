@@ -535,6 +535,9 @@ function OrderRow({
       </td>
       <td className="px-5 py-4 align-middle">
         <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>{statusUi.label}</span>
+        {order.disputeStatus && (
+          <p className="mt-1 text-xs font-bold text-danger-700">Dispute · {order.disputeReason || order.disputeStatus}</p>
+        )}
       </td>
       <td className="px-3 py-4 align-middle text-right">
         <button
@@ -743,15 +746,25 @@ function OrderDetailModal({
           <div className="flex flex-col justify-center rounded-xl border border-border bg-bg p-5">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Order total</p>
             <p className="mt-2 font-display text-3xl font-bold tabular-nums text-fg">{formatPrice(order.totalCents)}</p>
+            {(order.taxCents ?? 0) > 0 && (
+              <p className="mt-1 text-sm text-fg-muted">Tax {formatPrice(order.taxCents ?? 0)} · paid {formatPrice(order.paidCents ?? 0)}</p>
+            )}
             {order.fulfillment && (
               <p className="mt-2 text-sm text-fg-muted">
                 Fulfillment:{' '}
-                <span className="font-semibold text-fg">{order.fulfillment === 'shipping' ? 'Shipping' : 'Pickup'}</span>
+                <span className="font-semibold text-fg">Pickup</span>
               </p>
             )}
             {order.notes ? (
               <p className="mt-2 text-sm text-fg-muted">
                 Note: <span className="font-semibold text-fg">{order.notes}</span>
+              </p>
+            ) : null}
+            {order.disputeStatus ? (
+              <p className="mt-2 text-sm font-medium text-danger-700">
+                Square dispute ({order.disputeStatus}
+                {order.disputeReason ? ` · ${order.disputeReason}` : ''}). Respond in Square Dashboard with pickup
+                proof. Do not restock unless you win or refund.
               </p>
             ) : null}
             <p className="mt-2 text-sm text-fg-muted">{paymentSubtitle(order)}</p>
@@ -961,7 +974,7 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
 
 function printOrderSheet(order: Order) {
   const preTaxTotalCents = order.totalCents
-  const taxCents = 0
+  const taxCents = order.taxCents ?? 0
   const postTaxTotalCents = preTaxTotalCents + taxCents
   const iframe = document.createElement('iframe')
   iframe.setAttribute('title', `Print ${order.reference}`)

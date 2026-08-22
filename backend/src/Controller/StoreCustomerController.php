@@ -25,9 +25,14 @@ use App\Repository\StoreCustomerRepository;
 use App\Repository\StoreRepository;
 use App\Enum\OrderStatus;
 use App\Service\Checkout\CartOrderBuilder;
+use App\Service\Checkout\CartQuoteLines;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
 use App\Service\Checkout\PayInStoreFinalizer;
+use App\Service\Checkout\PickupCardCharge;
+use App\Service\Checkout\PickupFulfillment;
+use App\Service\Checkout\PickupTaxNotReadyException;
+use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CheckoutGatewayInterface;
@@ -62,6 +67,8 @@ final class StoreCustomerController extends AbstractController
         private readonly CartOrderBuilder $orderBuilder,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly CheckoutGatewayInterface $checkoutGateway,
+        private readonly PickupCardCharge $pickupCardCharge,
+        private readonly PickupTaxPolicy $pickupTaxPolicy,
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly CustomerPaymentProfileSync $paymentProfileSync,
         private readonly EntityManagerInterface $entityManager,
@@ -586,9 +593,9 @@ final class StoreCustomerController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        $fulfillment = is_array($payload) ? ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP) : Order::FULFILLMENT_PICKUP;
-        if (!in_array($fulfillment, Order::FULFILLMENTS, true)) {
-            return $this->json(['detail' => sprintf('Unknown fulfillment method. Valid: %s.', implode(', ', Order::FULFILLMENTS))], 422);
+        $fulfillment = PickupFulfillment::resolve(is_array($payload) ? ($payload['fulfillment'] ?? null) : null);
+        if ($fulfillment instanceof JsonResponse) {
+            return $fulfillment;
         }
 
         // Kiosk checkout: the terminal is signed in as a staff/admin account,
@@ -645,9 +652,9 @@ final class StoreCustomerController extends AbstractController
         /** @var array<string, mixed> $payload */
         $payload = json_decode($request->getContent(), true) ?? [];
 
-        $fulfillment = (string) ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP);
-        if (Order::FULFILLMENT_PICKUP !== $fulfillment) {
-            return $this->json(['detail' => 'Pay in store is only available for pickup orders. Choose in-store pickup above.'], 422);
+        $fulfillment = PickupFulfillment::resolve($payload['fulfillment'] ?? null);
+        if ($fulfillment instanceof JsonResponse) {
+            return $fulfillment;
         }
 
         $customer = $this->findCustomer($store);
@@ -716,9 +723,9 @@ final class StoreCustomerController extends AbstractController
         /** @var array<string, mixed> $payload */
         $payload = json_decode($request->getContent(), true) ?? [];
 
-        $fulfillment = (string) ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP);
-        if (!in_array($fulfillment, Order::FULFILLMENTS, true)) {
-            return $this->json(['detail' => sprintf('Unknown fulfillment method. Valid: %s.', implode(', ', Order::FULFILLMENTS))], 422);
+        $fulfillment = PickupFulfillment::resolve($payload['fulfillment'] ?? null);
+        if ($fulfillment instanceof JsonResponse) {
+            return $fulfillment;
         }
 
         if (!$this->checkoutGateway->isReady($store)) {
@@ -760,29 +767,15 @@ final class StoreCustomerController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
-        $amountDue = $order->getTotalCents() - $order->getCreditAppliedCents();
-
-        // Store credit can cover the whole basket, in which case there is
-        // nothing to charge and no card is required. Status stays pending so
-        // staff still accept → fulfill (payment is recorded via paidCents).
-        if ($amountDue <= 0) {
-            $order->setPaidCents(0);
-            $this->entityManager->flush();
-
-            return $this->json($this->customerOrderSerializer->serialize($order), 201);
-        }
-
-        $useSavedCard = false;
         $sourceId = trim((string) ($payload['token'] ?? ''));
         $verificationToken = $this->nullableString($payload['verificationToken'] ?? null, 1024);
 
         $this->entityManager->flush();
 
         try {
-            $payment = $this->captureCheckoutPayment(
+            $payment = $this->pickupCardCharge->capture(
                 $store,
                 $order,
-                $amountDue,
                 $sourceId,
                 $verificationToken,
                 $user->getEmail(),
@@ -794,68 +787,54 @@ final class StoreCustomerController extends AbstractController
             $this->entityManager->flush();
 
             $message = $e->getMessage();
-            $status = 'A payment method is required.' === $message ? 422 : 402;
+            $status = $e instanceof PickupTaxNotReadyException || 'A payment method is required.' === $message ? 422 : 402;
 
             return $this->json(['detail' => $message], $status);
         }
 
-        $order
-            ->setPaidCents($amountDue)
-            ->setPaymentReference($payment['paymentId'])
-            ->setSquareOrderId($payment['squareOrderId'] ?? null);
-
         $this->entityManager->flush();
 
-        return $this->json($this->customerOrderSerializer->serialize($order) + ['receiptUrl' => $payment['receiptUrl']], 201);
-    }
-
-    /**
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
-     */
-    private function captureCheckoutPayment(
-        Store $store,
-        Order $order,
-        int $amountDue,
-        string $sourceId,
-        ?string $verificationToken,
-        string $buyerEmail,
-        ?string $squareCustomerId,
-    ): array {
-        if ('' === $sourceId) {
-            throw new \RuntimeException('A payment method is required.');
+        $extra = [];
+        if (null !== $payment['receiptUrl']) {
+            $extra['receiptUrl'] = $payment['receiptUrl'];
         }
 
-        return $this->checkoutGateway->charge(
-            $store,
-            $amountDue,
-            $sourceId,
-            $order->getReference(),
-            $verificationToken,
-            $order->getReference(),
-            $buyerEmail,
-            $squareCustomerId,
-            $this->squareLineItems($order),
-            $order->getCreditAppliedCents(),
-            $order->getCustomerName(),
-            $order->getFulfillment(),
-        );
+        return $this->json($this->customerOrderSerializer->serialize($order) + $extra, 201);
     }
 
-    /**
-     * @return list<array{name: string, quantity: int, priceCents: int}>
-     */
-    private function squareLineItems(Order $order): array
+    /** Preview pickup tax from the store's Square location without placing an order. */
+    #[Route('/checkout/quote', name: 'api_store_customer_checkout_quote', methods: ['POST'])]
+    public function checkoutQuote(Request $request, string $slug): JsonResponse
     {
-        $items = [];
-        foreach ($order->getLines() as $line) {
-            $items[] = [
-                'name' => $line->getCardName(),
-                'quantity' => $line->getQuantity(),
-                'priceCents' => $line->getPriceCents(),
-            ];
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        return $items;
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+
+        $customer = $this->findCustomer($store);
+        $cartItems = $customer instanceof StoreCustomer ? $this->cartRepository->findForCustomer($customer) : [];
+        $preview = CartQuoteLines::fromCartItems($cartItems);
+        $credit = 0;
+        if ((bool) ($payload['useStoreCredit'] ?? false)) {
+            $credit = min($this->creditLedger->balance($user, $store), $preview['subtotalCents']);
+        }
+
+        $quote = $this->checkoutGateway->quotePickupTotals($store, $preview['lineItems'], $credit);
+
+        return $this->json($this->pickupTaxPolicy->decorateQuote(
+            $store,
+            $preview['subtotalCents'],
+            $credit,
+            $quote,
+        ));
     }
 
     /** Public Square configuration the cart needs to render its payment form. */

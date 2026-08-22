@@ -150,6 +150,8 @@ Until those are set, the endpoint rejects every request.
 
 ## Known gaps
 
-- Cancelling an order in store admin restocks but does **not** automatically refund the shopper's Square payment.
+- Cancelling an order in store admin restocks **and** refunds the Square payment when one was captured.
+- Checkout is **pickup only**. Shipping is hidden and rejected by the API.
+- Pickup card checkout applies the store's Square location taxes (`auto_apply_taxes`) and charges the tax-inclusive total. In a sales-tax state, **$0 quoted tax blocks card checkout** (pay-in-store stays). **AK / DE / MT / NH / OR can complete card checkout with $0 tax.** See [compliance.md](compliance.md).
 - Apple Pay needs a registered domain in the Square dashboard.
 - Webhook deliveries need a public HTTPS URL (skipped locally for now).

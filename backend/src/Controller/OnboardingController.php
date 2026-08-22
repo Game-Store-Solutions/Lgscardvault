@@ -5,10 +5,13 @@ namespace App\Controller;
 use App\Entity\Store;
 use App\Entity\SubscriptionCharge;
 use App\Entity\User;
+use App\Entity\ComplianceDocument;
 use App\Repository\StoreRepository;
 use App\Repository\UserRepository;
+use App\Service\Compliance\StoreComplianceGate;
 use App\Service\Onboarding\AddressAutocompleteClient;
 use App\Service\Onboarding\PlanCatalog;
+use App\Service\Onboarding\UsRegion;
 use App\Service\Payments\SubscriptionBillingInterface;
 use App\Service\Store\StoreSettingsUpdater;
 use Doctrine\ORM\EntityManagerInterface;
@@ -101,6 +104,23 @@ class OnboardingController extends AbstractController
             }
         }
 
+        $country = strtoupper(trim((string) ($address['country'] ?? '')));
+        if ('US' !== $country) {
+            return $this->json(['error' => 'Stores must be located in the United States.'], Response::HTTP_BAD_REQUEST);
+        }
+        $region = UsRegion::normalize((string) ($address['region'] ?? ''));
+        if (null === $region) {
+            return $this->json(['error' => 'A valid U.S. state is required.'], Response::HTTP_BAD_REQUEST);
+        }
+        $address['region'] = $region;
+        $address['country'] = 'US';
+        if (!$this->isTruthy($payload['acceptedMerchantTerms'] ?? false)) {
+            return $this->json(['error' => 'You must accept the merchant terms to open a store.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $complianceRaw = is_array($payload['compliance'] ?? null) ? $payload['compliance'] : [];
+        $compliance = StoreComplianceGate::normalize($complianceRaw);
+
         // --- Payment input (paid tiers only) ---
         $priceCents = (int) ($plan['priceCents'] ?? 0);
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
@@ -135,7 +155,17 @@ class OnboardingController extends AbstractController
             ->setCountry($this->nullableString(strtoupper((string) ($address['country'] ?? '')) ?: null, 2))
             ->setPhone($this->nullableString($payload['phone'] ?? null, 32))
             ->setLatitude(isset($address['latitude']) && is_numeric($address['latitude']) ? (float) $address['latitude'] : null)
-            ->setLongitude(isset($address['longitude']) && is_numeric($address['longitude']) ? (float) $address['longitude'] : null);
+            ->setLongitude(isset($address['longitude']) && is_numeric($address['longitude']) ? (float) $address['longitude'] : null)
+            ->setCompliance($compliance);
+
+        $documentError = $this->attachComplianceDocuments($store, $user, $payload['documentIds'] ?? []);
+        if (null !== $documentError) {
+            return $this->json(['error' => $documentError], Response::HTTP_BAD_REQUEST);
+        }
+        $complianceErrors = StoreComplianceGate::errors($store);
+        if ($complianceErrors !== []) {
+            return $this->json(['error' => $complianceErrors[0]], Response::HTTP_BAD_REQUEST);
+        }
 
         // Branding — same validation as the store-admin settings endpoint.
         $branding = is_array($payload['branding'] ?? null) ? $payload['branding'] : [];
@@ -209,5 +239,43 @@ class OnboardingController extends AbstractController
         }
 
         return null !== $maxLength ? mb_substr($trimmed, 0, $maxLength) : $trimmed;
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        if (true === $value || 1 === $value || '1' === $value) {
+            return true;
+        }
+
+        return is_string($value) && \in_array(strtolower($value), ['true', 'yes', 'on'], true);
+    }
+
+    /**
+     * @param mixed $documentIds
+     */
+    private function attachComplianceDocuments(Store $store, User $user, mixed $documentIds): ?string
+    {
+        if (!is_array($documentIds) || [] === $documentIds) {
+            return null;
+        }
+
+        foreach ($documentIds as $id) {
+            if (!is_numeric($id)) {
+                continue;
+            }
+            $document = $this->entityManager->find(ComplianceDocument::class, (int) $id);
+            if (!$document instanceof ComplianceDocument || $document->getOwner()->getId() !== $user->getId()) {
+                return 'Unknown compliance document.';
+            }
+            if (null !== $document->getStore() && $document->getStore() !== $store) {
+                return 'That document belongs to another store.';
+            }
+            $document->setStore($store);
+            if (!$store->getComplianceDocuments()->contains($document)) {
+                $store->getComplianceDocuments()->add($document);
+            }
+        }
+
+        return null;
     }
 }

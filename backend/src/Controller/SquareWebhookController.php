@@ -282,6 +282,10 @@ final class SquareWebhookController extends AbstractController
             'reason' => $dispute['reason'] ?? null,
         ]);
 
+        if ($order instanceof Order) {
+            $order->markDisputed((string) ($dispute['reason'] ?? 'chargeback'));
+        }
+
         return [SquareWebhookEvent::STATUS_PROCESSED, 'Dispute recorded for '.$reference];
     }
 
