@@ -774,6 +774,15 @@ export interface OrderLine {
 
 export type OrderFulfillment = 'pickup' | 'shipping'
 
+export interface CheckoutQuote {
+  subtotalCents: number
+  creditCents: number
+  taxCents: number
+  dueCents: number
+  fulfillment: 'pickup'
+  taxNote?: string
+}
+
 export type OrderChannel = 'online' | 'kiosk'
 
 export interface Order {
@@ -791,6 +800,8 @@ export interface Order {
   creditAppliedCents?: number
   /** Cash captured by Square, in cents. Zero for unpaid pay-in-store orders. */
   paidCents?: number
+  /** Sales tax collected at the store location, in cents. */
+  taxCents?: number
   /** Staff-facing checkout note, e.g. "Paying in store". */
   notes?: string | null
   /** Square hosted checkout URL returned once when a pay-in-store QR is minted. */

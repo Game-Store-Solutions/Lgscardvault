@@ -114,6 +114,49 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertSame(3, $fresh->getQuantity(), 'a paid order consumes stock');
     }
 
+    public function testCheckoutRejectsShipping(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing();
+        $this->fillCart($store, $customer, $item, 1);
+
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'fulfillment' => 'shipping',
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+
+        self::assertSame(422, $this->responseCode());
+        self::assertStringContainsString('pickup', strtolower((string) ($body['detail'] ?? '')));
+        self::assertSame([], $this->gateway->charges);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(5, $fresh->getQuantity(), 'a rejected shipping checkout never touches stock');
+    }
+
+    public function testCheckoutAddsLocationTaxToTheCharge(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 2500);
+        $this->gateway->addedTaxCents = 200;
+        $this->fillCart($store, $customer, $item, 2);
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/quote", []);
+        self::assertSame(200, $this->responseCode());
+        self::assertSame(5000, $quote['subtotalCents']);
+        self::assertSame(200, $quote['taxCents']);
+        self::assertSame(5200, $quote['dueCents']);
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'fulfillment' => 'pickup',
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+
+        self::assertSame(201, $this->responseCode());
+        self::assertSame(5000, $order['totalCents']);
+        self::assertSame(200, $order['taxCents']);
+        self::assertSame(5200, $order['paidCents']);
+        self::assertSame(5200, $this->gateway->charges[0]['amount']);
+    }
+
     public function testDeclinedPaymentRestoresStockAndLeavesNoPaidOrder(): void
     {
         [$store, $item, $customer] = $this->storeWithStockedListing(stock: 4, priceCents: 1500);
@@ -155,6 +198,34 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertSame(1500, $order['creditAppliedCents']);
         self::assertSame(2500, $order['paidCents']);
         self::assertSame(2500, $this->gateway->charges[0]['amount'], 'the card covers only what credit did not');
+    }
+
+    public function testCreditCoveringMerchandiseStillChargesLocationTax(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 1000);
+        $this->grantCredit($store, $customer, 5000);
+        $this->gateway->addedTaxCents = 80;
+        $this->fillCart($store, $customer, $item, 1);
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/quote", [
+            'useStoreCredit' => true,
+        ]);
+        self::assertSame(200, $this->responseCode());
+        self::assertSame(1000, $quote['subtotalCents']);
+        self::assertSame(1000, $quote['creditCents']);
+        self::assertSame(80, $quote['taxCents']);
+        self::assertSame(80, $quote['dueCents']);
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'useStoreCredit' => true,
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+
+        self::assertSame(201, $this->responseCode());
+        self::assertSame(1000, $order['creditAppliedCents']);
+        self::assertSame(80, $order['taxCents']);
+        self::assertSame(80, $order['paidCents']);
+        self::assertSame(80, $this->gateway->charges[0]['amount']);
     }
 
     public function testCreditCoveringTheWholeBasketSkipsTheCardEntirely(): void

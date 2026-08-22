@@ -101,7 +101,27 @@ Open the site in a browser: home page loads, register/login works.
 6. In **Store admin → Payments**, each live store **Connect Square** (production OAuth).
 
 Until Square is connected, shoppers can still use **pickup + pay in store** when
-online payments are unavailable (see checkout UX).
+online payments are unavailable (see checkout UX). Card-pay + pickup stays the
+primary paid path.
+
+**Sales tax:** in Square Dashboard → each connected store location, enable the
+correct sales tax rate(s). Checkout quotes and charges that location tax on
+pickup card payments. Pay-in-store reservations collect tax at the counter.
+
+---
+
+## Phase 3b — Launch compliance (you do this outside the repo)
+
+The app now includes pickup-only checkout, location tax, US-only stores, and
+legal pages. You still need to:
+
+1. Set `LEGAL_ENTITY_NAME`, `LEGAL_CONTACT_EMAIL`, and `LEGAL_ADDRESS` in `prod.env`.
+2. Have a lawyer review `/privacy`, `/terms`, `/pickup`, and `/merchant-terms`.
+3. Get a **CDTFA seller’s permit** if *you* sell cards from a California store (each store owner needs their own permit in their state).
+4. Enable **Square location taxes** for every live store before taking card payments.
+5. Keep **Archidekt harvest off** in production until you have written permission (`ARCHIDEKT_ENABLED`).
+6. Confirm city rules if you use sell/trade (secondhand dealer).
+7. Turn on Sentry, off-host Postgres backups, and an uptime check (`LAUNCH.md` Phase 5).
 
 ---
 

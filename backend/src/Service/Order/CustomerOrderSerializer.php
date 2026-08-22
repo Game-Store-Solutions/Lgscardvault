@@ -22,6 +22,7 @@ final class CustomerOrderSerializer
             'fulfillment' => $order->getFulfillment(),
             'channel' => $order->getChannel(),
             'totalCents' => $order->getTotalCents(),
+            'taxCents' => $order->getTaxCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
             'notes' => $order->getNotes(),

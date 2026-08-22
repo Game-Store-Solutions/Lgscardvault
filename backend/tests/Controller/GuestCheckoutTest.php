@@ -95,6 +95,39 @@ final class GuestCheckoutTest extends WebTestCase
         self::assertSame($beforeStock - 2, $item->getQuantity());
     }
 
+    public function testGuestCheckoutQuoteIncludesTax(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing(stock: 3, priceCents: 900);
+        $this->gateway->ready = true;
+        $this->gateway->addedTaxCents = 75;
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout/quote", [
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 2]],
+        ]);
+
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame(1800, $quote['subtotalCents'] ?? null);
+        self::assertSame(75, $quote['taxCents'] ?? null);
+        self::assertSame(1875, $quote['dueCents'] ?? null);
+    }
+
+    public function testGuestCheckoutRejectsShipping(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing();
+        $this->gateway->ready = true;
+
+        $response = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout", [
+            'customerName' => 'Pat',
+            'fulfillment' => Order::FULFILLMENT_SHIPPING,
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+            'token' => 'fake-nonce',
+        ]);
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('pickup', strtolower((string) ($response['detail'] ?? '')));
+        self::assertSame([], $this->gateway->charges);
+    }
+
     public function testGuestPayInStoreWhenSquareIsReady(): void
     {
         [$store, $item] = $this->storeWithStockedListing(stock: 2, priceCents: 500);

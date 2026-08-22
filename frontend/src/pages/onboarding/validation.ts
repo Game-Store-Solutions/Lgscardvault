@@ -17,14 +17,18 @@ export function isStepValid(
     case 'account':
       return (
         ctx.accountCreated ||
-        (data.displayName.trim() !== '' && /\S+@\S+/.test(data.email) && data.password.length >= 8)
+        (data.displayName.trim() !== '' &&
+          /\S+@\S+/.test(data.email) &&
+          data.password.length >= 8 &&
+          data.acceptedTerms)
       )
     case 'address':
       return (
         data.address.addressLine1.trim() !== '' &&
         data.address.city.trim() !== '' &&
+        data.address.region.trim() !== '' &&
         data.address.postalCode.trim() !== '' &&
-        data.address.country.trim() !== ''
+        data.address.country.trim().toUpperCase() === 'US'
       )
     case 'branding':
       return (
@@ -46,6 +50,7 @@ export function isStepValid(
     case 'payment':
       return !ctx.paymentRequired || (data.payment.methodType !== '' && data.payment.token !== '')
     case 'review':
+      return data.acceptedMerchantTerms
     default:
       return true
   }

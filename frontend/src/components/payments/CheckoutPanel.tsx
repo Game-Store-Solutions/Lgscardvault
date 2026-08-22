@@ -19,6 +19,7 @@ import {
 export function CheckoutPanel({
   slug,
   amountDueCents,
+  reserveAmountCents,
   buyerEmail,
   checkoutPath,
   checkoutBody,
@@ -32,6 +33,8 @@ export function CheckoutPanel({
 }: {
   slug: string
   amountDueCents: number
+  /** Merchandise remaining for a pay-in-store reserve (tax is collected at the counter). */
+  reserveAmountCents?: number
   buyerEmail: string
   checkoutPath: string
   checkoutBody: Record<string, unknown>
@@ -97,6 +100,7 @@ export function CheckoutPanel({
   const config = configQuery.data
   const loadingConfig = configQuery.isLoading
   const squareEnabled = config?.enabled === true
+  const holdCents = reserveAmountCents ?? amountDueCents
 
   if (loadingConfig) {
     return (
@@ -122,7 +126,7 @@ export function CheckoutPanel({
           onClick={() => payInStore.mutate()}
         >
           <Store aria-hidden className="size-4" />
-          Reserve order · pay in store {formatPrice(amountDueCents)}
+          Reserve order · pay in store {formatPrice(holdCents)}
         </Button>
       )}
       {payInStore.isError ? (

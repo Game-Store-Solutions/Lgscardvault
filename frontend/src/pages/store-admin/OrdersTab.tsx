@@ -743,10 +743,13 @@ function OrderDetailModal({
           <div className="flex flex-col justify-center rounded-xl border border-border bg-bg p-5">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Order total</p>
             <p className="mt-2 font-display text-3xl font-bold tabular-nums text-fg">{formatPrice(order.totalCents)}</p>
+            {(order.taxCents ?? 0) > 0 && (
+              <p className="mt-1 text-sm text-fg-muted">Tax {formatPrice(order.taxCents ?? 0)} · paid {formatPrice(order.paidCents ?? 0)}</p>
+            )}
             {order.fulfillment && (
               <p className="mt-2 text-sm text-fg-muted">
                 Fulfillment:{' '}
-                <span className="font-semibold text-fg">{order.fulfillment === 'shipping' ? 'Shipping' : 'Pickup'}</span>
+                <span className="font-semibold text-fg">Pickup</span>
               </p>
             )}
             {order.notes ? (
@@ -961,7 +964,7 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
 
 function printOrderSheet(order: Order) {
   const preTaxTotalCents = order.totalCents
-  const taxCents = 0
+  const taxCents = order.taxCents ?? 0
   const postTaxTotalCents = preTaxTotalCents + taxCents
   const iframe = document.createElement('iframe')
   iframe.setAttribute('title', `Print ${order.reference}`)

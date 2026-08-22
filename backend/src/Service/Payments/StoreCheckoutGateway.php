@@ -70,6 +70,50 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
     }
 
     /**
+     * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     *
+     * @return array{taxCents: int, dueCents: int}
+     */
+    public function quotePickupTotals(Store $store, array $lineItems, int $creditCents = 0): array
+    {
+        $merchandiseDue = $this->merchandiseDue($lineItems, $creditCents);
+        $fallback = ['taxCents' => 0, 'dueCents' => $merchandiseDue];
+
+        if ([] === $lineItems || !$this->isReady($store)) {
+            return $fallback;
+        }
+
+        $account = $this->connectedAccount($store);
+        $locationId = (string) ($account?->getProviderLocationId() ?? '');
+        if (null === $account || '' === $locationId) {
+            return $fallback;
+        }
+
+        try {
+            $response = $this->request($account, 'POST', '/v2/orders/calculate', [
+                'order' => $this->squareOrderPayload(
+                    $locationId,
+                    $lineItems,
+                    $creditCents,
+                    null,
+                    null,
+                    null,
+                    'pickup',
+                ),
+            ]);
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Square CalculateOrder failed; quoting without tax', [
+                'store' => $store->getSlug(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $fallback;
+        }
+
+        return $this->totalsFromSquareOrder($response['order'] ?? null, $merchandiseDue);
+    }
+
+    /**
      * @return array{ready: bool, message: string|null, ownerMessage: string|null, account: StorePaymentAccount|null}
      */
     private function evaluateReadiness(Store $store): array
@@ -152,7 +196,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      *
      * @param list<array{name: string, quantity: int, priceCents: int}>|null $lineItems
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int}
      *
      * @throws \RuntimeException when the store is not connected or Square declines
      */
@@ -170,7 +214,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         ?string $buyerName = null,
         string $fulfillment = 'pickup',
     ): array {
-        if ($amountCents <= 0) {
+        if ($amountCents <= 0 && (null === $lineItems || [] === $lineItems)) {
             throw new \RuntimeException('There is nothing to charge.');
         }
 
@@ -185,9 +229,11 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         }
 
         $squareOrderId = null;
+        $taxCents = 0;
+        $chargedCents = $amountCents;
         if (null !== $lineItems && [] !== $lineItems) {
             try {
-                $squareOrderId = $this->createSquareOrder(
+                $created = $this->createSquareOrder(
                     $account,
                     $idempotencyKey.'-order',
                     $this->squareOrderPayload(
@@ -200,6 +246,11 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
                         $fulfillment,
                     ),
                 );
+                $squareOrderId = $created['id'];
+                $taxCents = $created['taxCents'];
+                if ($created['totalCents'] > 0) {
+                    $chargedCents = $created['totalCents'];
+                }
             } catch (\RuntimeException $e) {
                 // Checkout must still succeed if Orders API hiccups; payment alone is enough.
                 $this->logger->warning('Square CreateOrder failed; charging without order_id', [
@@ -209,12 +260,16 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             }
         }
 
+        if ($chargedCents <= 0) {
+            throw new \RuntimeException('There is nothing to charge.');
+        }
+
         $payload = [
             'idempotency_key' => $idempotencyKey,
             'source_id' => $sourceId,
             'location_id' => $locationId,
             'autocomplete' => true,
-            'amount_money' => ['amount' => $amountCents, 'currency' => $this->credentials->currency()],
+            'amount_money' => ['amount' => $chargedCents, 'currency' => $this->credentials->currency()],
         ];
         if (null !== $squareOrderId) {
             $payload['order_id'] = $squareOrderId;
@@ -244,6 +299,8 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             'status' => (string) ($response['payment']['status'] ?? 'UNKNOWN'),
             'receiptUrl' => isset($response['payment']['receipt_url']) ? (string) $response['payment']['receipt_url'] : null,
             'squareOrderId' => $squareOrderId,
+            'taxCents' => $taxCents,
+            'chargedCents' => $chargedCents,
         ];
     }
 
@@ -393,6 +450,9 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         $orderPayload = [
             'location_id' => $locationId,
             'line_items' => $squareLines,
+            'pricing_options' => [
+                'auto_apply_taxes' => true,
+            ],
         ];
         if (null !== $referenceId && '' !== $referenceId) {
             $orderPayload['reference_id'] = substr($referenceId, 0, 40);
@@ -429,23 +489,63 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
 
     /**
      * @param array<string, mixed> $orderPayload
+     *
+     * @return array{id: string, taxCents: int, totalCents: int}
      */
     private function createSquareOrder(
         StorePaymentAccount $account,
         string $idempotencyKey,
         array $orderPayload,
-    ): string {
+    ): array {
         $response = $this->request($account, 'POST', '/v2/orders', [
             'idempotency_key' => $idempotencyKey,
             'order' => $orderPayload,
         ]);
 
-        $orderId = $response['order']['id'] ?? null;
+        $order = $response['order'] ?? null;
+        $orderId = is_array($order) ? ($order['id'] ?? null) : null;
         if (!is_string($orderId) || '' === $orderId) {
             throw new \RuntimeException('Square did not return an order id.');
         }
 
-        return $orderId;
+        $totals = $this->totalsFromSquareOrder($order, 0);
+
+        return [
+            'id' => $orderId,
+            'taxCents' => $totals['taxCents'],
+            'totalCents' => $totals['dueCents'],
+        ];
+    }
+
+    /**
+     * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     */
+    private function merchandiseDue(array $lineItems, int $creditCents): int
+    {
+        $merchandise = 0;
+        foreach ($lineItems as $item) {
+            $merchandise += max(0, (int) $item['priceCents']) * max(1, (int) $item['quantity']);
+        }
+
+        return max(0, $merchandise - max(0, $creditCents));
+    }
+
+    /**
+     * @return array{taxCents: int, dueCents: int}
+     */
+    private function totalsFromSquareOrder(mixed $order, int $fallbackDue): array
+    {
+        if (!is_array($order)) {
+            return ['taxCents' => 0, 'dueCents' => $fallbackDue];
+        }
+
+        $tax = isset($order['total_tax_money']['amount']) ? (int) $order['total_tax_money']['amount'] : 0;
+        $due = isset($order['total_money']['amount']) ? (int) $order['total_money']['amount'] : $fallbackDue;
+
+        return [
+            'taxCents' => max(0, $tax),
+            'dueCents' => max(0, $due),
+        ];
     }
 
     /**

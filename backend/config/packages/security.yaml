@@ -54,6 +54,7 @@ security:
         - { path: ^/api/catalog, roles: PUBLIC_ACCESS, methods: [GET] }
         # Landing-page contact form; rate limited per IP in the controller.
         - { path: ^/api/contact, roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api/legal, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/admin, roles: ROLE_SUPER_ADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

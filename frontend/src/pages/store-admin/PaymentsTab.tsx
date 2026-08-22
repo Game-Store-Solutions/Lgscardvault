@@ -276,6 +276,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                   </div>
                   <p className="mt-1 max-w-2xl text-sm leading-6 text-fg-muted">
                     Let this store authorize Square so checkout can charge through the store owner&apos;s Square seller account.
+                    Enable the correct sales tax on that Square location — pickup card payments collect it automatically.
                   </p>
 
                   {!connected && isDevBuild && (

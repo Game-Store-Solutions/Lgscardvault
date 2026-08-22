@@ -9,6 +9,7 @@ use App\Repository\StoreRepository;
 use App\Repository\UserRepository;
 use App\Service\Onboarding\AddressAutocompleteClient;
 use App\Service\Onboarding\PlanCatalog;
+use App\Service\Onboarding\UsRegion;
 use App\Service\Payments\SubscriptionBillingInterface;
 use App\Service\Store\StoreSettingsUpdater;
 use Doctrine\ORM\EntityManagerInterface;
@@ -99,6 +100,20 @@ class OnboardingController extends AbstractController
             if ('' === trim((string) ($address[$required] ?? ''))) {
                 return $this->json(['error' => 'A complete business address is required.'], Response::HTTP_BAD_REQUEST);
             }
+        }
+
+        $country = strtoupper(trim((string) ($address['country'] ?? '')));
+        if ('US' !== $country) {
+            return $this->json(['error' => 'Stores must be located in the United States.'], Response::HTTP_BAD_REQUEST);
+        }
+        $region = UsRegion::normalize((string) ($address['region'] ?? ''));
+        if (null === $region) {
+            return $this->json(['error' => 'A valid U.S. state is required.'], Response::HTTP_BAD_REQUEST);
+        }
+        $address['region'] = $region;
+        $address['country'] = 'US';
+        if (!$this->isTruthy($payload['acceptedMerchantTerms'] ?? false)) {
+            return $this->json(['error' => 'You must accept the merchant terms to open a store.'], Response::HTTP_BAD_REQUEST);
         }
 
         // --- Payment input (paid tiers only) ---
@@ -209,5 +224,14 @@ class OnboardingController extends AbstractController
         }
 
         return null !== $maxLength ? mb_substr($trimmed, 0, $maxLength) : $trimmed;
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        if (true === $value || 1 === $value || '1' === $value) {
+            return true;
+        }
+
+        return is_string($value) && \in_array(strtolower($value), ['true', 'yes', 'on'], true);
     }
 }

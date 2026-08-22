@@ -65,6 +65,7 @@ final class AuthEmailVerificationTest extends WebTestCase
             'password' => 'verify-pass-1',
             'displayName' => 'New Shopper',
             'accountType' => 'customer',
+            'acceptedTerms' => true,
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode(), json_encode($created));
         self::assertFalse($created['emailVerified'] ?? true);
@@ -99,6 +100,7 @@ final class AuthEmailVerificationTest extends WebTestCase
             'password' => 'verify-pass-1',
             'displayName' => 'Wrong Pass',
             'accountType' => 'customer',
+            'acceptedTerms' => true,
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
 
@@ -128,6 +130,19 @@ final class AuthEmailVerificationTest extends WebTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testRegisterRequiresAcceptedTerms(): void
+    {
+        $email = $this->uniqueEmail('verify-terms');
+        $body = $this->jsonRequest('POST', '/api/register', [
+            'email' => $email,
+            'password' => 'verify-pass-1',
+            'displayName' => 'No Terms',
+            'accountType' => 'customer',
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('Terms', (string) ($body['error'] ?? ''));
+    }
+
     public function testOwnerSignupAlsoRequiresVerification(): void
     {
         $email = $this->uniqueEmail('verify-owner');
@@ -136,6 +151,7 @@ final class AuthEmailVerificationTest extends WebTestCase
             'password' => 'owner-pass-1',
             'displayName' => 'Store Owner',
             'accountType' => 'owner',
+            'acceptedTerms' => true,
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode(), json_encode($created));
         self::assertFalse($created['emailVerified'] ?? true);

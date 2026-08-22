@@ -13,9 +13,12 @@ use App\Repository\InventoryItemRepository;
 use App\Repository\SealedInventoryItemRepository;
 use App\Repository\StoreRepository;
 use App\Service\Checkout\CartOrderBuilder;
+use App\Service\Checkout\CartQuoteLines;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
 use App\Service\Checkout\PayInStoreFinalizer;
+use App\Service\Checkout\PickupCardCharge;
+use App\Service\Checkout\PickupFulfillment;
 use App\Service\Payments\CheckoutGatewayInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,6 +36,7 @@ final class StoreGuestCheckoutController extends AbstractController
         private readonly SealedInventoryItemRepository $sealedRepository,
         private readonly CartOrderBuilder $orderBuilder,
         private readonly CheckoutGatewayInterface $checkoutGateway,
+        private readonly PickupCardCharge $pickupCardCharge,
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly EntityManagerInterface $entityManager,
@@ -48,6 +52,30 @@ final class StoreGuestCheckoutController extends AbstractController
         }
 
         return $this->json($this->checkoutGateway->checkoutConfig($store));
+    }
+
+    #[Route('/checkout/quote', name: 'api_store_guest_checkout_quote', methods: ['POST'])]
+    public function checkoutQuote(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $cartItems = $this->virtualCartFromPayload($store, $payload['lines'] ?? null);
+        $preview = CartQuoteLines::fromCartItems($cartItems);
+        $quote = $this->checkoutGateway->quotePickupTotals($store, $preview['lineItems'], 0);
+
+        return $this->json([
+            'subtotalCents' => $preview['subtotalCents'],
+            'creditCents' => 0,
+            'taxCents' => $quote['taxCents'],
+            'dueCents' => $quote['dueCents'],
+            'fulfillment' => Order::FULFILLMENT_PICKUP,
+            'taxNote' => 'Sales tax is charged at this store\'s location for pickup orders.',
+        ]);
     }
 
     #[Route('/checkout', name: 'api_store_guest_checkout', methods: ['POST'])]
@@ -72,9 +100,9 @@ final class StoreGuestCheckoutController extends AbstractController
 
         $customerEmail = $this->nullableEmail($payload['customerEmail'] ?? null);
 
-        $fulfillment = (string) ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP);
-        if (!in_array($fulfillment, Order::FULFILLMENTS, true)) {
-            return $this->json(['detail' => sprintf('Unknown fulfillment method. Valid: %s.', implode(', ', Order::FULFILLMENTS))], 422);
+        $fulfillment = PickupFulfillment::resolve($payload['fulfillment'] ?? null);
+        if ($fulfillment instanceof JsonResponse) {
+            return $fulfillment;
         }
 
         $cartItems = $this->virtualCartFromPayload($store, $payload['lines'] ?? null);
@@ -97,61 +125,37 @@ final class StoreGuestCheckoutController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
-        $amountDue = $order->getTotalCents() - $order->getCreditAppliedCents();
-        if ($amountDue <= 0) {
-            $order->setPaidCents(0);
-            $this->entityManager->flush();
-
-            return $this->json($this->serializeOrder($order), 201);
-        }
-
         $sourceId = trim((string) ($payload['token'] ?? ''));
-        if ('' === $sourceId) {
-            return $this->json(['detail' => 'A payment method is required.'], 422);
-        }
-
         $this->entityManager->flush();
 
         try {
-            $lineItems = [];
-            foreach ($order->getLines() as $line) {
-                $lineItems[] = [
-                    'name' => $line->getCardName(),
-                    'quantity' => $line->getQuantity(),
-                    'priceCents' => $line->getPriceCents(),
-                ];
-            }
-
-            $payment = $this->checkoutGateway->charge(
+            $payment = $this->pickupCardCharge->capture(
                 $store,
-                $amountDue,
+                $order,
                 $sourceId,
-                $order->getReference(),
                 trim((string) ($payload['verificationToken'] ?? '')) ?: null,
-                $order->getReference(),
                 $customerEmail,
                 null,
-                $lineItems,
-                $order->getCreditAppliedCents(),
-                $order->getCustomerName(),
-                $order->getFulfillment(),
             );
         } catch (\RuntimeException $e) {
             $this->stockReleaser->release($order);
             $order->setStatus(OrderStatus::CANCELLED);
             $this->entityManager->flush();
 
-            return $this->json(['detail' => $e->getMessage()], 402);
-        }
+            $message = $e->getMessage();
+            $status = 'A payment method is required.' === $message ? 422 : 402;
 
-        $order
-            ->setPaidCents($amountDue)
-            ->setPaymentReference($payment['paymentId'])
-            ->setSquareOrderId($payment['squareOrderId'] ?? null);
+            return $this->json(['detail' => $message], $status);
+        }
 
         $this->entityManager->flush();
 
-        return $this->json($this->serializeOrder($order) + ['receiptUrl' => $payment['receiptUrl'] ?? null], 201);
+        $extra = [];
+        if (null !== $payment['receiptUrl']) {
+            $extra['receiptUrl'] = $payment['receiptUrl'];
+        }
+
+        return $this->json($this->serializeOrder($order) + $extra, 201);
     }
 
     #[Route('/checkout/pay-in-store', name: 'api_store_guest_checkout_pay_in_store', methods: ['POST'])]
@@ -170,9 +174,9 @@ final class StoreGuestCheckoutController extends AbstractController
             return $this->json(['detail' => 'Please enter your name for this order.'], 422);
         }
 
-        $fulfillment = (string) ($payload['fulfillment'] ?? Order::FULFILLMENT_PICKUP);
-        if (Order::FULFILLMENT_PICKUP !== $fulfillment) {
-            return $this->json(['detail' => 'Pay in store is only available for pickup orders. Choose in-store pickup above.'], 422);
+        $fulfillment = PickupFulfillment::resolve($payload['fulfillment'] ?? null);
+        if ($fulfillment instanceof JsonResponse) {
+            return $fulfillment;
         }
 
         $cartItems = $this->virtualCartFromPayload($store, $payload['lines'] ?? null);
@@ -279,6 +283,7 @@ final class StoreGuestCheckoutController extends AbstractController
             'fulfillment' => $order->getFulfillment(),
             'channel' => $order->getChannel(),
             'totalCents' => $order->getTotalCents(),
+            'taxCents' => $order->getTaxCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
             'notes' => $order->getNotes(),

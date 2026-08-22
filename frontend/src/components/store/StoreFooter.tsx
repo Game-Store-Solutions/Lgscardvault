@@ -1,6 +1,7 @@
 import { Clock3, Facebook, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, Twitter } from 'lucide-react'
 import { STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { useStore } from '../../hooks'
+import { LegalLinks } from '../legal/LegalLinks'
 
 /**
  * Storefront footer: hours, address, contact, and social links — everything a
@@ -133,6 +134,7 @@ export function StoreFooter({ slug }: { slug: string }) {
             <img src="/brand/mark.png" alt="" aria-hidden className="size-5 rounded-[20%] object-cover" />
             Powered by LGS Card Vault
           </p>
+          <LegalLinks compact />
           <div className="flex items-center gap-2">
             <span className="font-bold text-fg">{store.name}</span>
             {store.logoUrl && (

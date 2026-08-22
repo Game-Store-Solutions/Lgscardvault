@@ -40,6 +40,7 @@ import PlatformReportsPage from './pages/platform-admin/PlatformReportsPage'
 import PatchNotesTab from './pages/store-admin/PatchNotesTab'
 import SellTradePage from './pages/SellTradePage'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
+import LegalPage from './pages/LegalPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +93,10 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="privacy" element={<LegalPage />} />
+              <Route path="terms" element={<LegalPage />} />
+              <Route path="pickup" element={<LegalPage />} />
+              <Route path="merchant-terms" element={<LegalPage />} />
               <Route path="s/:slug" element={<StorePage />} />
               <Route path="s/:slug/sealed" element={<SealedBrowsePage />} />
               <Route path="s/:slug/mass-search" element={<MassSearchPage />} />

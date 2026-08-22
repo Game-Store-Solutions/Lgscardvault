@@ -29,7 +29,7 @@ export function stepIndex(key: StepKey): number {
 
 export const STEP_SUBTITLE: Record<StepKey, string> = {
   account: 'Create the owner account that manages this store.',
-  address: 'Where is your business located? Search to autofill.',
+  address: 'Physical U.S. storefront. Shoppers pay online and pick up in store.',
   branding: 'Name your store and add a logo. Watch the preview update live.',
   colors: 'Pick a palette. Everything on your storefront retones instantly.',
   plan: 'Choose the tier that fits your shop.',

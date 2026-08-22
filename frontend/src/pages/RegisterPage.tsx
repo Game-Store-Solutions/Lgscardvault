@@ -52,6 +52,7 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const sso = useSsoStatus()
@@ -65,7 +66,7 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
     setLoading(true)
     try {
       sessionStorage.setItem('verify-next', from)
-      await register(email, password, displayName, accountType)
+      await register(email, password, displayName, accountType, acceptedTerms)
       const sent = new URLSearchParams({ email })
       if (storeSlug) sent.set('store', storeSlug)
       navigate(`/verify-email/sent?${sent.toString()}`)
@@ -147,12 +148,32 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
               aria-invalid={hasError || undefined}
               required
             />
+            <label className="flex items-start gap-2 text-sm leading-5 text-fg-muted">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-current"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                required
+              />
+              <span>
+                I agree to the{' '}
+                <Link to="/terms" className="font-semibold text-brand-600 hover:underline">
+                  Terms
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" className="font-semibold text-brand-600 hover:underline">
+                  Privacy Policy
+                </Link>
+                . I am at least 13.
+              </span>
+            </label>
             {hasError && (
               <p role="alert" aria-live="polite" className="rounded-btn bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
                 {error}
               </p>
             )}
-            <Button type="submit" size="lg" loading={loading} className="w-full">
+            <Button type="submit" size="lg" loading={loading} className="w-full" disabled={!acceptedTerms}>
               <UserPlus aria-hidden className="size-4" />
               {loading ? copy.loading : copy.button}
             </Button>

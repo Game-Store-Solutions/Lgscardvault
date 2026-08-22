@@ -51,6 +51,8 @@ export interface OnboardingData {
   branding: OnboardingBranding
   planKey: string
   payment: OnboardingPayment
+  acceptedTerms: boolean
+  acceptedMerchantTerms: boolean
 }
 
 export const EMPTY_ONBOARDING: OnboardingData = {
@@ -66,7 +68,7 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     city: '',
     region: '',
     postalCode: '',
-    country: '',
+    country: 'US',
     latitude: null,
     longitude: null,
   },
@@ -87,6 +89,8 @@ export const EMPTY_ONBOARDING: OnboardingData = {
   },
   planKey: '',
   payment: { methodType: '', token: '', last4: '', verificationToken: '' },
+  acceptedTerms: false,
+  acceptedMerchantTerms: false,
 }
 
 /** Shared state-updater signatures, so step components stay terse. */

@@ -24,6 +24,7 @@ interface AuthContextValue {
     password: string,
     displayName: string,
     accountType: 'owner' | 'customer' | 'admin',
+    acceptedTerms?: boolean,
   ) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<UserProfile | null>
@@ -91,8 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     displayName: string,
     accountType: 'owner' | 'customer' | 'admin',
+    acceptedTerms = false,
   ) => {
-    await api.post('/register', { email, password, displayName, accountType })
+    await api.post('/register', { email, password, displayName, accountType, acceptedTerms })
   }, [])
 
   const logout = useCallback(() => {

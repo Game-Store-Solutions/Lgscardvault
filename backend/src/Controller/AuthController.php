@@ -52,6 +52,7 @@ class AuthController extends AbstractController
         $password = isset($payload['password']) ? (string) $payload['password'] : '';
         $displayName = isset($payload['displayName']) ? trim((string) $payload['displayName']) : '';
         $accountType = isset($payload['accountType']) ? trim((string) $payload['accountType']) : 'owner';
+        $acceptedTerms = $this->isTruthy($payload['acceptedTerms'] ?? false);
 
         // Admin accounts must never be self-registered through this public endpoint.
         // The supported way to bootstrap a super-admin is the `app:create-admin` console command.
@@ -59,6 +60,13 @@ class AuthController extends AbstractController
             return $this->json(
                 ['error' => 'Admin accounts cannot be self-registered.'],
                 Response::HTTP_FORBIDDEN,
+            );
+        }
+
+        if (!$acceptedTerms) {
+            return $this->json(
+                ['error' => 'Please accept the Terms of Service and Privacy Policy.'],
+                Response::HTTP_BAD_REQUEST,
             );
         }
 
@@ -274,5 +282,14 @@ class AuthController extends AbstractController
             'detail' => 'Email verified.',
             'token' => $this->jwtManager->create($result),
         ]);
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        if (true === $value || 1 === $value || '1' === $value) {
+            return true;
+        }
+
+        return is_string($value) && \in_array(strtolower($value), ['true', 'yes', 'on'], true);
     }
 }

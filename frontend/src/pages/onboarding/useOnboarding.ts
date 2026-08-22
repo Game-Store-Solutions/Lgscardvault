@@ -86,7 +86,7 @@ export function useOnboarding() {
       city: s.city,
       region: s.region,
       postalCode: s.postalCode,
-      country: s.country,
+      country: 'US',
       latitude: s.latitude,
       longitude: s.longitude,
     })
@@ -99,7 +99,7 @@ export function useOnboarding() {
       setBusy(true)
       try {
         sessionStorage.setItem('verify-next', '/register/owner')
-        await register(data.email, data.password, data.displayName, 'owner')
+        await register(data.email, data.password, data.displayName, 'owner', data.acceptedTerms)
         navigate(`/verify-email/sent?email=${encodeURIComponent(data.email)}`)
         return
       } catch (e) {
@@ -135,6 +135,7 @@ export function useOnboarding() {
               verificationToken: data.payment.verificationToken,
             }
           : {},
+        acceptedMerchantTerms: data.acceptedMerchantTerms,
       })
       await refreshUser()
       setSubmitted({ name: data.storeName, slug: data.slug })

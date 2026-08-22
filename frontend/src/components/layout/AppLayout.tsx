@@ -5,6 +5,7 @@ import { useCustomerCart, useGuestCart, useKioskMode, useTheme, APP_CHROME_CLASS
 import { StorefrontBackground } from '../store/backgrounds'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
+import { LegalLinks } from '../legal/LegalLinks'
 import { Avatar, Button, buttonVariants, dropdownItemClass, dropdownPanelClass } from '../ui'
 import { BrandLogo } from '../BrandLogo'
 import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
@@ -159,7 +160,7 @@ export default function AppLayout() {
             {storeSlug && <StorefrontBackground slug={storeSlug} />}
             <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
               <AppMain contentShell={headerShell} />
-              {storeSlug && <StoreFooter slug={storeSlug} />}
+              {storeSlug ? <StoreFooter slug={storeSlug} /> : <MarketplaceLegalFooter />}
             </div>
           </div>
         </div>
@@ -468,7 +469,7 @@ export default function AppLayout() {
         {storeSlug && <StorefrontBackground slug={storeSlug} />}
         <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
           <AppMain contentShell={headerShell} />
-          {storeSlug && <StoreFooter slug={storeSlug} />}
+          {storeSlug ? <StoreFooter slug={storeSlug} /> : <MarketplaceLegalFooter />}
         </div>
       </div>
     </div>
@@ -487,5 +488,16 @@ function AppMain({ contentShell }: { contentShell: string }) {
         <Outlet />
       </PageTransition>
     </main>
+  )
+}
+
+function MarketplaceLegalFooter() {
+  return (
+    <footer className="mt-auto border-t border-border bg-surface">
+      <div className={cx(DEFAULT_APP_SHELL, 'flex flex-wrap items-center justify-between gap-3 py-5')}>
+        <p className="text-xs text-fg-muted">LGS Card Vault · US stores · pickup only</p>
+        <LegalLinks compact />
+      </div>
+    </footer>
   )
 }
