@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Store;
 use App\Repository\StoreRepository;
+use App\Service\Compliance\StoreComplianceGate;
 use App\Service\Store\StoreAdminRemover;
 use App\Service\Store\StoreApplicationMailer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,6 +41,11 @@ class StoreApprovalController extends AbstractController
         $store = $this->storeRepository->find($id);
         if (!$store instanceof Store) {
             return $this->json(['error' => 'Store not found.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $errors = StoreComplianceGate::errors($store);
+        if ($errors !== []) {
+            return $this->json(['error' => $errors[0]], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $store->setStatus(Store::STATUS_APPROVED)

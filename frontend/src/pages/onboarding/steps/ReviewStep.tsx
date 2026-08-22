@@ -42,6 +42,12 @@ export function ReviewStep({
             : 'Not set'
           : 'No payment required (free plan)'}
       </ReviewRow>
+      <ReviewRow title="Licenses" onEdit={() => onJump(stepIndex('licenses'))}>
+        {data.compliance.legalBusinessName}
+        {data.compliance.entityType ? ` · ${data.compliance.entityType.replace('_', ' ')}` : ''}
+        {data.compliance.sellerPermitNumber ? ` · permit ${data.compliance.sellerPermitNumber}` : ''}
+        {data.complianceDocuments.length ? ` · ${data.complianceDocuments.length} file(s)` : ''}
+      </ReviewRow>
 
       <label className="flex items-start gap-2 rounded-card border border-border bg-surface p-4 text-sm leading-6 text-fg">
         <input
@@ -52,8 +58,9 @@ export function ReviewStep({
           required
         />
         <span>
-          I am the merchant of record for this store, located in the United States. I will collect sales tax on
-          pickup orders via Square, complete pickup in person, and I accept the{' '}
+          I am the merchant of record for this store, located in the United States. This platform is software
+          only and is not the seller of my inventory. I will collect sales tax on pickup orders via Square,
+          complete pickup in person, and I accept the{' '}
           <Link to="/merchant-terms" className="font-semibold text-brand-600 hover:underline">
             Merchant terms
           </Link>

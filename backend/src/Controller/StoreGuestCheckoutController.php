@@ -19,6 +19,8 @@ use App\Service\Checkout\OutOfStockException;
 use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Checkout\PickupCardCharge;
 use App\Service\Checkout\PickupFulfillment;
+use App\Service\Checkout\PickupTaxNotReadyException;
+use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Payments\CheckoutGatewayInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -37,6 +39,7 @@ final class StoreGuestCheckoutController extends AbstractController
         private readonly CartOrderBuilder $orderBuilder,
         private readonly CheckoutGatewayInterface $checkoutGateway,
         private readonly PickupCardCharge $pickupCardCharge,
+        private readonly PickupTaxPolicy $pickupTaxPolicy,
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly EntityManagerInterface $entityManager,
@@ -68,14 +71,12 @@ final class StoreGuestCheckoutController extends AbstractController
         $preview = CartQuoteLines::fromCartItems($cartItems);
         $quote = $this->checkoutGateway->quotePickupTotals($store, $preview['lineItems'], 0);
 
-        return $this->json([
-            'subtotalCents' => $preview['subtotalCents'],
-            'creditCents' => 0,
-            'taxCents' => $quote['taxCents'],
-            'dueCents' => $quote['dueCents'],
-            'fulfillment' => Order::FULFILLMENT_PICKUP,
-            'taxNote' => 'Sales tax is charged at this store\'s location for pickup orders.',
-        ]);
+        return $this->json($this->pickupTaxPolicy->decorateQuote(
+            $store,
+            $preview['subtotalCents'],
+            0,
+            $quote,
+        ));
     }
 
     #[Route('/checkout', name: 'api_store_guest_checkout', methods: ['POST'])]
@@ -143,7 +144,7 @@ final class StoreGuestCheckoutController extends AbstractController
             $this->entityManager->flush();
 
             $message = $e->getMessage();
-            $status = 'A payment method is required.' === $message ? 422 : 402;
+            $status = $e instanceof PickupTaxNotReadyException || 'A payment method is required.' === $message ? 422 : 402;
 
             return $this->json(['detail' => $message], $status);
         }
@@ -287,6 +288,9 @@ final class StoreGuestCheckoutController extends AbstractController
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
             'notes' => $order->getNotes(),
+            'disputeStatus' => $order->getDisputeStatus(),
+            'disputeReason' => $order->getDisputeReason(),
+            'disputedAt' => $order->getDisputedAt()?->format(DATE_ATOM),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeOrderLine(...), $order->getLines()->toArray()),
         ];

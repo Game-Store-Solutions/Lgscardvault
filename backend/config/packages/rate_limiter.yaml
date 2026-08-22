@@ -58,3 +58,10 @@ framework:
             policy: 'sliding_window'
             limit: 5
             interval: '30 minutes'
+
+        # Public CCPA / privacy-rights form. Same envelope as contact: a person
+        # can correct a typo; a script cannot flood the intake queue.
+        privacy_request:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '15 minutes'

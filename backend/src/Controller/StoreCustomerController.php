@@ -31,6 +31,8 @@ use App\Service\Checkout\OutOfStockException;
 use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Checkout\PickupCardCharge;
 use App\Service\Checkout\PickupFulfillment;
+use App\Service\Checkout\PickupTaxNotReadyException;
+use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CheckoutGatewayInterface;
@@ -66,6 +68,7 @@ final class StoreCustomerController extends AbstractController
         private readonly OrderStockReleaser $stockReleaser,
         private readonly CheckoutGatewayInterface $checkoutGateway,
         private readonly PickupCardCharge $pickupCardCharge,
+        private readonly PickupTaxPolicy $pickupTaxPolicy,
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly CustomerPaymentProfileSync $paymentProfileSync,
         private readonly EntityManagerInterface $entityManager,
@@ -784,7 +787,7 @@ final class StoreCustomerController extends AbstractController
             $this->entityManager->flush();
 
             $message = $e->getMessage();
-            $status = 'A payment method is required.' === $message ? 422 : 402;
+            $status = $e instanceof PickupTaxNotReadyException || 'A payment method is required.' === $message ? 422 : 402;
 
             return $this->json(['detail' => $message], $status);
         }
@@ -826,14 +829,12 @@ final class StoreCustomerController extends AbstractController
 
         $quote = $this->checkoutGateway->quotePickupTotals($store, $preview['lineItems'], $credit);
 
-        return $this->json([
-            'subtotalCents' => $preview['subtotalCents'],
-            'creditCents' => $credit,
-            'taxCents' => $quote['taxCents'],
-            'dueCents' => $quote['dueCents'],
-            'fulfillment' => Order::FULFILLMENT_PICKUP,
-            'taxNote' => 'Sales tax is charged at this store\'s location for pickup orders.',
-        ]);
+        return $this->json($this->pickupTaxPolicy->decorateQuote(
+            $store,
+            $preview['subtotalCents'],
+            $credit,
+            $quote,
+        ));
     }
 
     /** Public Square configuration the cart needs to render its payment form. */

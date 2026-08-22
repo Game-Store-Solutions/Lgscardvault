@@ -26,6 +26,9 @@ final class CustomerOrderSerializer
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
             'notes' => $order->getNotes(),
+            'disputeStatus' => $order->getDisputeStatus(),
+            'disputeReason' => $order->getDisputeReason(),
+            'disputedAt' => $order->getDisputedAt()?->format(DATE_ATOM),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeLine(...), $order->getLines()->toArray()),
         ];

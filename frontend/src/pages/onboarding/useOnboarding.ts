@@ -99,7 +99,7 @@ export function useOnboarding() {
       setBusy(true)
       try {
         sessionStorage.setItem('verify-next', '/register/owner')
-        await register(data.email, data.password, data.displayName, 'owner', data.acceptedTerms)
+        await register(data.email, data.password, data.displayName, 'owner', data.acceptedTerms, data.dateOfBirth)
         navigate(`/verify-email/sent?email=${encodeURIComponent(data.email)}`)
         return
       } catch (e) {
@@ -136,6 +136,8 @@ export function useOnboarding() {
             }
           : {},
         acceptedMerchantTerms: data.acceptedMerchantTerms,
+        compliance: data.compliance,
+        documentIds: data.complianceDocuments.map((d) => d.id),
       })
       await refreshUser()
       setSubmitted({ name: data.storeName, slug: data.slug })

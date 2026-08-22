@@ -51,6 +51,12 @@ final class OnboardingStoreTest extends WebTestCase
             'planKey' => 'starter',
             'phone' => '4155550100',
             'acceptedMerchantTerms' => true,
+            'compliance' => [
+                'legalBusinessName' => 'Bay Area Cards LLC',
+                'entityType' => 'llc',
+                'sellerPermitNumber' => 'SR-CA-1',
+                'insuranceAttested' => true,
+            ],
             'address' => [
                 'addressLine1' => '123 Market St',
                 'city' => 'San Francisco',
@@ -79,6 +85,25 @@ final class OnboardingStoreTest extends WebTestCase
         self::assertInstanceOf(Store::class, $store);
         self::assertSame('US', $store->getCountry());
         self::assertSame('CA', $store->getRegion());
+        self::assertSame('Bay Area Cards LLC', $store->getCompliance()['legalBusinessName'] ?? null);
+    }
+
+    public function testSubmitRequiresLicenseIntake(): void
+    {
+        $owner = $this->fixtures->user(['ROLE_STORE_OWNER']);
+        $this->authenticate($owner);
+
+        $body = $this->jsonRequest('POST', '/api/onboarding/store', $this->validPayload('no-license-shop', [
+            'compliance' => [
+                'legalBusinessName' => '',
+                'entityType' => '',
+                'sellerPermitNumber' => '',
+                'insuranceAttested' => false,
+            ],
+        ]));
+
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+        self::assertNotEmpty($body['error'] ?? null);
     }
 
     public function testSubmitRejectsNonUsCountry(): void

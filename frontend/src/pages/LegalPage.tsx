@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import api from '../api/client'
 import { DEFAULT_APP_SHELL } from '../lib/layoutShell'
 import { LegalLinks } from '../components/legal/LegalLinks'
+import { PrivacyRequestForm } from '../components/legal/PrivacyRequestForm'
 
 interface LegalSite {
   entityName: string
@@ -21,14 +22,16 @@ const FALLBACK: LegalSite = {
   country: 'US',
 }
 
-const SLUGS = ['privacy', 'terms', 'pickup', 'merchant-terms'] as const
+const SLUGS = ['privacy', 'privacy-request', 'terms', 'pickup', 'merchant-terms', 'fan-content'] as const
 type LegalSlug = (typeof SLUGS)[number]
 
 const TITLES: Record<LegalSlug, string> = {
   privacy: 'Privacy Policy',
+  'privacy-request': 'Privacy request',
   terms: 'Terms of Service',
   pickup: 'Pickup & refunds',
   'merchant-terms': 'Merchant terms',
+  'fan-content': 'Fan content & trademarks',
 }
 
 export default function LegalPage() {
@@ -52,9 +55,11 @@ export default function LegalPage() {
 
       <div className="prose-legal mt-8 space-y-6 text-sm leading-7 text-fg">
         {legalSlug === 'privacy' && <PrivacyPolicy site={site} />}
+        {legalSlug === 'privacy-request' && <PrivacyRequestPage />}
         {legalSlug === 'terms' && <TermsOfService site={site} />}
         {legalSlug === 'pickup' && <PickupPolicy site={site} />}
         {legalSlug === 'merchant-terms' && <MerchantTerms site={site} />}
+        {legalSlug === 'fan-content' && <FanContent site={site} />}
       </div>
     </article>
   )
@@ -74,8 +79,9 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
     <>
       <p>
         This Privacy Policy describes how {site.entityName} (“we”, “us”) collects, uses, and shares personal
-        information when you use our website and storefronts. Each local game store that lists inventory is an
-        independent business. We provide the software; that store is the merchant of record for your purchase.
+        information when you use our website and storefronts. {site.entityName} is software-as-a-service. Each
+        local game store that lists inventory is an independent business and the merchant of record for your
+        purchase. We are not a marketplace facilitator and we are not the seller of the cards.
       </p>
       <Section title="Information we collect">
         <p>
@@ -110,14 +116,22 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
       </Section>
       <Section title="California privacy rights">
         <p>
-          If you are a California resident, you may request access to the personal information we hold about you
-          or ask us to delete it, subject to legal exceptions. Email {site.contactEmail}. We will not discriminate
-          against you for exercising these rights. We do not sell or share personal information as those terms
-          are defined under the CCPA/CPRA.
+          If you are a California resident, you may request access to the personal information we hold about you,
+          ask us to delete it, or tell us not to sell or share it, subject to legal exceptions. Submit that
+          request on the{' '}
+          <Link className="font-semibold text-brand-600 hover:underline" to="/privacy-request">
+            privacy request form
+          </Link>
+          . We will not discriminate against you for exercising these rights. We do not sell or share personal
+          information as those terms are defined under the CCPA/CPRA.
         </p>
       </Section>
       <Section title="Children">
-        <p>The service is intended for users 13 and older. We do not knowingly collect personal information from children under 13.</p>
+        <p>
+          The service is intended for users 13 and older. We collect date of birth at signup to enforce that
+          floor. That is a COPPA-shaped age gate, not government ID verification. We do not knowingly collect
+          personal information from children under 13.
+        </p>
       </Section>
       <Section title="Contact">
         <p>
@@ -138,9 +152,10 @@ function TermsOfService({ site }: { site: LegalSite }) {
       </p>
       <Section title="The marketplace and the stores">
         <p>
-          {site.entityName} is software for local game stores. When you buy cards or sealed product, you are
-          buying from that store, not from us. The store sets prices, inventory, and pickup hours. Payment is
-          charged to the store’s Square account. We are not the seller of the cards.
+          {site.entityName} is software for local game stores (SaaS). When you buy cards or sealed product, you
+          are buying from that store, not from us. The store sets prices, inventory, and pickup hours. Payment is
+          charged to the store’s Square account. We are not the seller, we do not take possession of inventory,
+          and we are not a marketplace facilitator for sales tax. Confirm this structure with your own counsel.
         </p>
       </Section>
       <Section title="Pickup only">
@@ -157,15 +172,18 @@ function TermsOfService({ site }: { site: LegalSite }) {
       </Section>
       <Section title="Accounts">
         <p>
-          You must provide accurate information and keep your password confidential. You must be at least 13.
-          We may suspend accounts for fraud, abuse, or violation of these terms.
+          You must provide accurate information and keep your password confidential. You must be at least 13
+          (date of birth is collected at signup; we do not verify government ID). We may suspend accounts for
+          fraud, abuse, or violation of these terms.
         </p>
       </Section>
       <Section title="Card images and trademarks">
         <p>
-          Card names, artwork, and related marks belong to their publishers (including Wizards of the Coast,
-          The Pokémon Company, and others). We display them to help you identify product. This site is not
-          endorsed by those publishers.
+          Card names, artwork, and related marks belong to their publishers. See{' '}
+          <Link className="font-semibold text-brand-600 hover:underline" to="/fan-content">
+            Fan content & trademarks
+          </Link>
+          . This site is not endorsed by those publishers.
         </p>
       </Section>
       <Section title="Limitation of liability">
@@ -204,11 +222,14 @@ function PickupPolicy({ site }: { site: LegalSite }) {
           the store.
         </p>
       </Section>
-      <Section title="Refunds and cancellations">
+      <Section title="Refunds, cancellations, and chargebacks">
         <p>
           The selling store handles refunds. If staff cancel or refund a card-paid order in store admin, the
           Square payment is refunded and stock is restocked. Contact the store first; {site.entityName} does not
-          hold your payment.
+          hold your payment. Card-network disputes (chargebacks) are opened with Square against the store’s
+          seller account. The store should gather pickup proof (name, time, staff notes, ID if collected) and
+          respond in Square’s dispute console. The platform records the dispute on the order for staff; it does
+          not auto-restock, because the goods may already have left the counter.
         </p>
       </Section>
       <Section title="Condition and authenticity">
@@ -232,7 +253,8 @@ function MerchantTerms({ site }: { site: LegalSite }) {
         <p>
           You sell your own inventory. Shopper payments settle to your connected Square account. You are
           responsible for pricing, stock accuracy, pickup, customer service, refunds, chargebacks, and all
-          taxes on those sales.
+          taxes on those sales. {site.entityName} is SaaS, not a party to the sale, and is not a marketplace
+          facilitator. Have your lawyer confirm that structure for your facts.
         </p>
       </Section>
       <Section title="United States only, pickup only">
@@ -241,22 +263,28 @@ function MerchantTerms({ site }: { site: LegalSite }) {
           through this platform.
         </p>
       </Section>
-      <Section title="Sales tax">
+      <Section title="Sales tax and licenses">
         <p>
           You must hold any required seller’s permit and configure sales tax on your Square location so pickup
-          orders collect the correct local tax. {site.entityName} does not file sales tax returns for your store.
+          orders collect the correct local tax. Upload the permit (or type the number) during onboarding; a
+          platform admin reviews it before go-live. {site.entityName} does not file sales tax returns for your
+          store and does not automatically validate permit numbers against a state API.
         </p>
       </Section>
       <Section title="Buy / trade">
         <p>
           If you buy or trade cards from the public, you are responsible for secondhand-dealer, pawn, and local
           reporting rules in your city and state. Complete those transactions in person when the law requires it.
+          Disclose that activity during onboarding so reviewers can see your license intake.
         </p>
       </Section>
-      <Section title="Square and fees">
+      <Section title="Square, PCI, and fees">
         <p>
-          You must keep a valid Square connection to take card payments. Square’s fees are charged by Square.
-          Platform subscription fees (if any) are billed separately to you by {site.entityName}.
+          You must keep a valid Square connection to take card payments. Card data is tokenized in the browser
+          by Square’s Web Payments SDK; {site.entityName} never stores full PAN. Completing Square’s production
+          go-live checklist (OAuth redirect, webhooks including dispute.created, location tax, production
+          credentials) is still your operational work. Square’s fees are charged by Square. Platform
+          subscription fees (if any) are billed separately to you by {site.entityName}.
         </p>
       </Section>
       <Section title="Prohibited use">
@@ -268,6 +296,61 @@ function MerchantTerms({ site }: { site: LegalSite }) {
       <Section title="Contact">
         <p>
           <a className="font-semibold text-brand-600 hover:underline" href={`mailto:${site.contactEmail}`}>{site.contactEmail}</a>
+        </p>
+      </Section>
+    </>
+  )
+}
+
+function PrivacyRequestPage() {
+  return (
+    <>
+      <p>
+        Use this form to exercise privacy rights, including a California “Do Not Sell or Share My Personal
+        Information” request. We log the request for our team and email you at the address you provide. This is
+        not only a mailto: link in the policy.
+      </p>
+      <PrivacyRequestForm />
+    </>
+  )
+}
+
+function FanContent({ site }: { site: LegalSite }) {
+  return (
+    <>
+      <p>
+        {site.entityName} helps local game stores list trading-card inventory. Card names, set symbols, artwork,
+        and related marks are owned by their publishers. This page is our fan-content / image-use notice — not a
+        license from those publishers.
+      </p>
+      <Section title="What we display">
+        <p>
+          Storefronts show catalog photos and names so shoppers can identify product (for example Magic: The
+          Gathering® images via Scryfall, Pokémon TCG, and other games a store stocks). Images are used to
+          identify goods for sale by the listing store, not as stand-alone artwork downloads.
+        </p>
+      </Section>
+      <Section title="Not affiliated">
+        <p>
+          {site.entityName} is not affiliated with, endorsed by, or sponsored by Wizards of the Coast, Hasbro,
+          The Pokémon Company International, Nintendo, or any other card publisher. All trademarks are the
+          property of their respective owners.
+        </p>
+      </Section>
+      <Section title="Publisher programs">
+        <p>
+          Store owners must follow the fan-content, organized-play, and retailer policies that apply to them
+          (including Wizards Fan Content Policy and Pokémon TCG retailer rules). Do not upload publisher logos
+          or promotional art as store branding unless you have permission. If a publisher asks us to take down
+          an image, we will.
+        </p>
+      </Section>
+      <Section title="Contact">
+        <p>
+          Rights holders:{' '}
+          <a className="font-semibold text-brand-600 hover:underline" href={`mailto:${site.contactEmail}`}>
+            {site.contactEmail}
+          </a>
         </p>
       </Section>
     </>

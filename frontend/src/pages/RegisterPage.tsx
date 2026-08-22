@@ -53,6 +53,7 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [dateOfBirth, setDateOfBirth] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const sso = useSsoStatus()
@@ -66,7 +67,7 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
     setLoading(true)
     try {
       sessionStorage.setItem('verify-next', from)
-      await register(email, password, displayName, accountType, acceptedTerms)
+      await register(email, password, displayName, accountType, acceptedTerms, dateOfBirth)
       const sent = new URLSearchParams({ email })
       if (storeSlug) sent.set('store', storeSlug)
       navigate(`/verify-email/sent?${sent.toString()}`)
@@ -148,6 +149,15 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
               aria-invalid={hasError || undefined}
               required
             />
+            <Input
+              label="Date of birth"
+              type="date"
+              autoComplete="bday"
+              hint="Required. You must be 13 or older. We do not run ID verification."
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              required
+            />
             <label className="flex items-start gap-2 text-sm leading-5 text-fg-muted">
               <input
                 type="checkbox"
@@ -165,7 +175,7 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
                 <Link to="/privacy" className="font-semibold text-brand-600 hover:underline">
                   Privacy Policy
                 </Link>
-                . I am at least 13.
+                . I confirm the date of birth above and that I am at least 13.
               </span>
             </label>
             {hasError && (
@@ -173,7 +183,7 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
                 {error}
               </p>
             )}
-            <Button type="submit" size="lg" loading={loading} className="w-full" disabled={!acceptedTerms}>
+            <Button type="submit" size="lg" loading={loading} className="w-full" disabled={!acceptedTerms || !dateOfBirth}>
               <UserPlus aria-hidden className="size-4" />
               {loading ? copy.loading : copy.button}
             </Button>

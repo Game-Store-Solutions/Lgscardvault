@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, X } from 'lucide-react'
+import { CheckCircle2, ExternalLink, X } from 'lucide-react'
 import type { Store } from '../../api/types'
 import { Badge, Button, Modal, Textarea } from '../../components/ui'
+import api from '../../api/client'
 
 const COLOR_KEYS: { key: keyof Store; label: string }[] = [
   { key: 'primaryColor', label: 'Primary' },
@@ -61,7 +62,7 @@ export function StoreApplicationModal({
           <Button
             variant="primary"
             loading={busyAction === 'approve'}
-            disabled={busyAction !== null}
+            disabled={busyAction !== null || (store.complianceReview?.errors.length ?? 0) > 0}
             onClick={() => onApprove(store.id)}
           >
             <CheckCircle2 aria-hidden className="size-4" />
@@ -97,6 +98,8 @@ export function StoreApplicationModal({
         </Detail>
 
         {store.tagline && <Detail label="Tagline">{store.tagline}</Detail>}
+
+        <ComplianceReview store={store} />
 
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Branding</p>
@@ -140,6 +143,59 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
     <div>
       <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{label}</p>
       <p className="mt-0.5 break-words text-sm text-fg">{children}</p>
+    </div>
+  )
+}
+
+function ComplianceReview({ store }: { store: Store }) {
+  const c = store.compliance
+  const docs = store.complianceDocuments ?? []
+  const errors = store.complianceReview?.errors ?? []
+  const cdtfa = store.complianceReview?.cdtfaVerifyUrl
+
+  async function openDocument(id: number) {
+    const { data } = await api.get(`/compliance-documents/${id}`, { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <div className="space-y-3 rounded-card border border-border bg-bg p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Licenses & entity</p>
+      {errors.length > 0 && (
+        <ul className="list-disc space-y-1 pl-5 text-sm text-danger-700">
+          {errors.map((err) => (
+            <li key={err}>{err}</li>
+          ))}
+        </ul>
+      )}
+      <Detail label="Legal name">{c?.legalBusinessName || '—'}</Detail>
+      <Detail label="Entity">{c?.entityType || '—'}</Detail>
+      <Detail label="EIN">{c?.ein || '—'}</Detail>
+      <Detail label="Seller’s permit">{c?.sellerPermitNumber || (c?.noStateSalesTax ? 'No statewide sales tax' : '—')}</Detail>
+      <Detail label="City license">{c?.cityLicenseNumber || '—'}</Detail>
+      <Detail label="Buy / trade">
+        {c?.usesBuyTrade ? `${c.secondhandStatus}${c.secondhandLicenseNumber ? ` · ${c.secondhandLicenseNumber}` : ''}` : 'Not used'}
+      </Detail>
+      <Detail label="Insurance attested">{c?.insuranceAttested ? 'Yes' : 'No'}</Detail>
+      {cdtfa && (
+        <p className="text-sm">
+          <a href={cdtfa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline">
+            Verify CA seller’s permit on CDTFA
+            <ExternalLink aria-hidden className="size-3.5" />
+          </a>
+          <span className="text-fg-muted"> — lookup only; we do not scrape or auto-validate.</span>
+        </p>
+      )}
+      {docs.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {docs.map((doc) => (
+            <Button key={doc.id} type="button" size="sm" variant="secondary" onClick={() => void openDocument(doc.id)}>
+              {doc.kind.replace('_', ' ')} · {doc.originalFilename}
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

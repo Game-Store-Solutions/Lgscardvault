@@ -11,6 +11,7 @@ import { BrandLogo } from '../BrandLogo'
 import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { manageableStores } from '../../lib/manageableStores'
 import { AppShellLayoutProvider, useAppShellLayout } from './AppShellLayout'
+import { SkipToContent } from './SkipToContent'
 import { PageTransition, EASE_PREMIUM } from '../motion'
 import { motion } from 'framer-motion'
 import { cx } from '../../lib/cx'
@@ -136,6 +137,7 @@ export default function AppLayout() {
     return (
       <AppShellLayoutProvider>
         <div className="flex min-h-screen flex-col bg-bg text-fg">
+          <SkipToContent />
           <header className={cx(APP_CHROME_CLASS, 'sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl')}>
             <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
               <span className="flex items-center gap-2">
@@ -171,6 +173,7 @@ export default function AppLayout() {
   return (
     <AppShellLayoutProvider>
     <div className="flex min-h-screen flex-col bg-bg text-fg">
+      <SkipToContent />
       <header className={cx(APP_CHROME_CLASS, 'sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl')}>
         <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
           <BrandLogo size="md" withWordmark />
@@ -483,7 +486,7 @@ function AppMain({ contentShell }: { contentShell: string }) {
   const location = useLocation()
 
   return (
-    <main className={cx(flush ? FLUSH_APP_SHELL : contentShell, 'flex-1', flush ? 'py-0' : 'py-5 sm:py-8')}>
+    <main id="main-content" className={cx(flush ? FLUSH_APP_SHELL : contentShell, 'flex-1', flush ? 'py-0' : 'py-5 sm:py-8')}>
       <PageTransition routeKey={location.pathname}>
         <Outlet />
       </PageTransition>

@@ -3,8 +3,10 @@ import { cx } from '../../lib/cx'
 
 const LINKS = [
   { to: '/privacy', label: 'Privacy' },
+  { to: '/privacy-request', label: 'Do Not Sell' },
   { to: '/terms', label: 'Terms' },
   { to: '/pickup', label: 'Pickup & refunds' },
+  { to: '/fan-content', label: 'Fan content' },
   { to: '/merchant-terms', label: 'Merchant terms' },
 ] as const
 

@@ -170,6 +170,18 @@ class Order
     #[Groups(['order:read'])]
     private ?string $notes = null;
 
+    #[ORM\Column(length: 16, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $disputeStatus = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $disputeReason = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['order:read'])]
+    private ?\DateTimeImmutable $disputedAt = null;
+
     #[ORM\Column]
     #[Groups(['order:read'])]
     private \DateTimeImmutable $createdAt;
@@ -382,6 +394,30 @@ class Order
     {
         $trimmed = null !== $notes ? trim($notes) : '';
         $this->notes = '' === $trimmed ? null : mb_substr($trimmed, 0, 255);
+
+        return $this;
+    }
+
+    public function getDisputeStatus(): ?string
+    {
+        return $this->disputeStatus;
+    }
+
+    public function getDisputeReason(): ?string
+    {
+        return $this->disputeReason;
+    }
+
+    public function getDisputedAt(): ?\DateTimeImmutable
+    {
+        return $this->disputedAt;
+    }
+
+    public function markDisputed(string $reason): static
+    {
+        $this->disputeStatus = 'open';
+        $this->disputeReason = mb_substr(trim($reason), 0, 255) ?: null;
+        $this->disputedAt = new \DateTimeImmutable();
 
         return $this;
     }

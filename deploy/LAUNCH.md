@@ -96,32 +96,43 @@ Open the site in a browser: home page loads, register/login works.
    `$COMPOSE up -d backend worker scheduler`
 5. **Webhooks** → create subscription:
    - URL: `https://<your-domain>/api/integrations/square/webhook` (= `SQUARE_WEBHOOK_URL`)
-   - Events (minimum): `oauth.authorization.revoked`, `refund.created`, `refund.updated`, `dispute.created`
+   - Events (minimum): `oauth.authorization.revoked`, `refund.created`, `refund.updated`, `dispute.created`, `payment.created`
    - Copy **Signature key** → `SQUARE_PRODUCTION_WEBHOOK_SIGNATURE_KEY`
-6. In **Store admin → Payments**, each live store **Connect Square** (production OAuth).
+6. Complete Square’s own production checklist for the app (OAuth, payments, webhooks, location tax). Tokenization via Square is the PCI path; the production go-live items are still yours.
+7. In **Store admin → Payments**, each live store **Connect Square** (production OAuth).
+8. In Square Dashboard → each connected **location**, enable the correct sales tax rate(s). Checkout quotes and charges that location tax on pickup card payments. If Square returns $0 tax in a state that charges sales tax, **card checkout is blocked** (pay-in-store still works). Stores in AK/DE/MT/NH/OR may charge $0.
 
-Until Square is connected, shoppers can still use **pickup + pay in store** when
-online payments are unavailable (see checkout UX). Card-pay + pickup stays the
+Until Square is connected, shoppers can still use **pickup + pay in store**. Card-pay + pickup stays the
 primary paid path.
 
-**Sales tax:** in Square Dashboard → each connected store location, enable the
-correct sales tax rate(s). Checkout quotes and charges that location tax on
-pickup card payments. Pay-in-store reservations collect tax at the counter.
+**Chargebacks:** `dispute.created` records the dispute on the LGS order (status + reason) and does **not**
+restock. Staff respond in Square’s dispute console with pickup proof (name, time window, staff notes, ID if
+collected). Refunds from Square still restock via `refund.updated`.
 
 ---
 
-## Phase 3b — Launch compliance (you do this outside the repo)
+## Phase 3b — Launch compliance (mix of software + operator work)
 
-The app now includes pickup-only checkout, location tax, US-only stores, and
-legal pages. You still need to:
+The app now includes pickup-only checkout, location tax, US-only stores, legal pages, license intake, a
+privacy-request queue, cookie banner, and a 13+ date-of-birth gate.
 
-1. Set `LEGAL_ENTITY_NAME`, `LEGAL_CONTACT_EMAIL`, and `LEGAL_ADDRESS` in `prod.env`.
-2. Have a lawyer review `/privacy`, `/terms`, `/pickup`, and `/merchant-terms`.
-3. Get a **CDTFA seller’s permit** if *you* sell cards from a California store (each store owner needs their own permit in their state).
-4. Enable **Square location taxes** for every live store before taking card payments.
-5. Keep **Archidekt harvest off** in production until you have written permission (`ARCHIDEKT_ENABLED`).
-6. Confirm city rules if you use sell/trade (secondhand dealer).
-7. Turn on Sentry, off-host Postgres backups, and an uptime check (`LAUNCH.md` Phase 5).
+**Have a lawyer confirm:** the platform is **SaaS / software**, each store is merchant of record, and you are **not**
+a marketplace facilitator for sales tax. In-app copy states that; it does not replace counsel.
+
+**You still need to do outside the repo:**
+
+1. Form the platform legal entity, get an EIN, appoint a registered agent, and buy business insurance for *your* company (store owners attest to their own insurance during onboarding).
+2. Set `LEGAL_ENTITY_NAME`, `LEGAL_CONTACT_EMAIL`, and `LEGAL_ADDRESS` in `prod.env`.
+3. Have a lawyer review `/privacy`, `/privacy-request`, `/terms`, `/pickup`, `/merchant-terms`, and `/fan-content`.
+4. Each **store owner** needs their own seller’s permit (CDTFA in California). There is **no reliable 50-state permit validation API**. California CDTFA is a manual webpage lookup — admins get a verify link; we do not scrape CDTFA. Owners upload a PDF/image or type the number; approve is blocked until intake is complete.
+5. City business license / pawn / secondhand-dealer: collected on the Licenses onboarding step when the owner buys/trades from the public. Local rules still sit with the store.
+6. Enable **Square location taxes** for every live store before taking card payments (see Phase 3).
+7. Age gate is date of birth (13+), not ID verification. That is COPPA-shaped, not KYC.
+8. Keep **Archidekt harvest off** in production until you have written permission (`ARCHIDEKT_ENABLED`).
+9. Turn on Sentry, off-host Postgres backups, and an uptime check (`LAUNCH.md` Phase 5).
+10. Walk Square’s production checklist (Phase 3). PCI: you tokenize via Square; you still own go-live.
+
+**Permit APIs:** do not integrate a scraper. If a state later publishes a real permit API with a ToS that allows automated checks, we can add an optional verify button — it will not be the source of truth over the uploaded document.
 
 ---
 

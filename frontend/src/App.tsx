@@ -41,6 +41,7 @@ import PatchNotesTab from './pages/store-admin/PatchNotesTab'
 import SellTradePage from './pages/SellTradePage'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 import LegalPage from './pages/LegalPage'
+import { CookieConsentBanner } from './components/CookieConsentBanner'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,9 +95,11 @@ export default function App() {
                 }
               />
               <Route path="privacy" element={<LegalPage />} />
+              <Route path="privacy-request" element={<LegalPage />} />
               <Route path="terms" element={<LegalPage />} />
               <Route path="pickup" element={<LegalPage />} />
               <Route path="merchant-terms" element={<LegalPage />} />
+              <Route path="fan-content" element={<LegalPage />} />
               <Route path="s/:slug" element={<StorePage />} />
               <Route path="s/:slug/sealed" element={<SealedBrowsePage />} />
               <Route path="s/:slug/mass-search" element={<MassSearchPage />} />
@@ -151,6 +154,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
+        <CookieConsentBanner />
         </MotionRoot>
       </AuthProvider>
     </QueryClientProvider>

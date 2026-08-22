@@ -81,4 +81,31 @@ final class UsRegion
 
         return null;
     }
+
+    /** States with no statewide sales tax (local taxes may still apply via Square). */
+    public static function hasNoStateSalesTax(?string $region): bool
+    {
+        $code = null === $region ? null : self::normalize($region);
+
+        return in_array($code, ['AK', 'DE', 'MT', 'NH', 'OR'], true);
+    }
+
+    /**
+     * True only when we know the store is in a sales-tax state. Null/unknown
+     * regions are not blocked (admin-provisioned and test stores).
+     */
+    public static function chargesStateSalesTax(?string $region): bool
+    {
+        $code = null === $region || '' === trim($region) ? null : self::normalize($region);
+        if (null === $code) {
+            return false;
+        }
+
+        return !self::hasNoStateSalesTax($code);
+    }
+
+    public static function cdtfaVerifyUrl(): string
+    {
+        return 'https://www.cdtfa.ca.gov/services/permits-licenses.htm';
+    }
 }

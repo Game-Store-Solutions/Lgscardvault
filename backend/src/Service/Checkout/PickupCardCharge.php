@@ -11,8 +11,10 @@ use App\Service\Payments\CheckoutGatewayInterface;
  */
 final readonly class PickupCardCharge
 {
-    public function __construct(private CheckoutGatewayInterface $checkoutGateway)
-    {
+    public function __construct(
+        private CheckoutGatewayInterface $checkoutGateway,
+        private PickupTaxPolicy $taxPolicy,
+    ) {
     }
 
     /**
@@ -31,6 +33,11 @@ final readonly class PickupCardCharge
         $order->setTaxCents($quote['taxCents']);
 
         $merchandiseDue = max(0, $order->getTotalCents() - $order->getCreditAppliedCents());
+        $block = $this->taxPolicy->cardCheckoutBlockReason($store, (int) $quote['taxCents'], $merchandiseDue);
+        if (null !== $block) {
+            throw new PickupTaxNotReadyException($block);
+        }
+
         $amountDue = $merchandiseDue + $order->getTaxCents();
         if ($amountDue <= 0) {
             $order->setPaidCents(0);

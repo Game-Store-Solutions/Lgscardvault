@@ -368,6 +368,22 @@ export default function PaymentsTab({ slug }: { slug: string }) {
           </div>
         </CardBody>
       </Card>
+
+      <Card>
+        <CardHeader
+          title="Square production checklist (PCI)"
+          subtitle="Card data is tokenized in the browser by Square. Completing Square’s production go-live is still this store’s work."
+        />
+        <CardBody>
+          <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-fg">
+            <li>Connect Square on this page with the production application (not sandbox) before taking real cards.</li>
+            <li>In Square Dashboard for this location, turn on the correct sales tax. Card checkout blocks if tax quotes as $0 in a sales-tax state.</li>
+            <li>Confirm webhooks include <span className="font-medium">dispute.created</span>, refunds, and OAuth revocation.</li>
+            <li>Never type card numbers into LGS Card Vault, email, or chat — only Square’s payment form.</li>
+            <li>Respond to chargebacks in Square’s dispute console. Open orders in this admin: a dispute flag appears when Square notifies us. Gather pickup proof; we do not auto-restock.</li>
+          </ol>
+        </CardBody>
+      </Card>
     </div>
   )
 }

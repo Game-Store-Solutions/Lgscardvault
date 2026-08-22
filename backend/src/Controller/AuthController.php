@@ -70,6 +70,11 @@ class AuthController extends AbstractController
             );
         }
 
+        $dateOfBirth = $this->parseDateOfBirth($payload['dateOfBirth'] ?? null);
+        if ($dateOfBirth instanceof JsonResponse) {
+            return $dateOfBirth;
+        }
+
         $violations = $this->validator->validate($email, [new Assert\NotBlank(), new Assert\Email()]);
         $violations->addAll($this->validator->validate($password, [new Assert\NotBlank(), new Assert\Length(min: 8)]));
         $violations->addAll($this->validator->validate($displayName, [new Assert\NotBlank()]));
@@ -94,7 +99,9 @@ class AuthController extends AbstractController
             ->setEmail($email)
             ->setDisplayName($displayName)
             ->setRoles($roles)
-            ->setEmailVerified(false);
+            ->setEmailVerified(false)
+            ->setDateOfBirth($dateOfBirth)
+            ->setTermsAcceptedAt(new \DateTimeImmutable());
 
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
@@ -291,5 +298,33 @@ class AuthController extends AbstractController
         }
 
         return is_string($value) && \in_array(strtolower($value), ['true', 'yes', 'on'], true);
+    }
+
+    private function parseDateOfBirth(mixed $raw): \DateTimeImmutable|JsonResponse
+    {
+        $dobRaw = trim((string) $raw);
+        $dateOfBirth = \DateTimeImmutable::createFromFormat('!Y-m-d', $dobRaw) ?: null;
+        if (!$dateOfBirth instanceof \DateTimeImmutable || $dateOfBirth->format('Y-m-d') !== $dobRaw) {
+            return $this->json(
+                ['error' => 'Enter your date of birth (YYYY-MM-DD).'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        $age = User::ageYears($dateOfBirth);
+        if ($age < 13) {
+            return $this->json(
+                ['error' => 'You must be at least 13 years old to create an account.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+        if ($age > 120) {
+            return $this->json(
+                ['error' => 'Please enter a valid date of birth.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        return $dateOfBirth;
     }
 }

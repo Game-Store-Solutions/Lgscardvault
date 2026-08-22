@@ -423,6 +423,30 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertArrayNotHasKey('secret', $config);
     }
 
+    public function testCardCheckoutBlocksWhenSquareTaxIsZeroInATaxState(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 2500);
+        $store->setRegion('CA');
+        $this->em->flush();
+        $this->fillCart($store, $customer, $item, 1);
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/quote", []);
+        self::assertSame(200, $this->responseCode());
+        self::assertFalse($quote['taxReady'] ?? true);
+        self::assertNotEmpty($quote['taxBlockReason'] ?? null);
+
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'fulfillment' => 'pickup',
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+        self::assertSame(422, $this->responseCode());
+        self::assertStringContainsString('sales tax', strtolower((string) ($body['detail'] ?? '')));
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(5, $fresh->getQuantity());
+    }
+
     private function grantCredit(Store $store, User $customer, int $amountCents): void
     {
         static::getContainer()->get(\App\Service\Credit\StoreCreditLedger::class)->grant(

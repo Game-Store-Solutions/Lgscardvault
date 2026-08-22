@@ -258,4 +258,28 @@ final class SquareWebhookTest extends WebTestCase
 
         self::assertNotSame(401, $this->responseCode());
     }
+
+    public function testDisputeCreatedMarksTheOrder(): void
+    {
+        [, $item, $order] = $this->paidOrder(stock: 4, quantity: 1);
+
+        $body = $this->send($this->event('dispute.created', [
+            'dispute' => [
+                'id' => 'dp-1',
+                'reason' => 'NO_KNOWLEDGE',
+                'disputed_payment' => ['payment_id' => 'sqpmt_1'],
+                'amount_money' => ['amount' => 2500, 'currency' => 'USD'],
+            ],
+        ], 'evt-dispute-1'));
+
+        self::assertSame(200, $this->responseCode());
+        self::assertSame('processed', $body['status']);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(Order::class)->find($order['id']);
+        self::assertSame('open', $fresh->getDisputeStatus());
+        self::assertSame('NO_KNOWLEDGE', $fresh->getDisputeReason());
+        self::assertNotNull($fresh->getDisputedAt());
+        self::assertSame(3, $this->em->getRepository(InventoryItem::class)->find($item->getId())->getQuantity(), 'disputes must not auto-restock');
+    }
 }
