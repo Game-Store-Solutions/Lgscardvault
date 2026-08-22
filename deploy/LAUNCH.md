@@ -116,6 +116,9 @@ collected). Refunds from Square still restock via `refund.updated`.
 The app now includes pickup-only checkout, location tax, US-only stores, legal pages, license intake, a
 privacy-request queue, cookie banner, and a 13+ date-of-birth gate.
 
+Architecture scorecard (what ships vs what is still counsel/ops), with links into the repo:
+[architecture/compliance.md](../architecture/compliance.md).
+
 **Have a lawyer confirm:** the platform is **SaaS / software**, each store is merchant of record, and you are **not**
 a marketplace facilitator for sales tax. In-app copy states that; it does not replace counsel.
 
@@ -126,7 +129,7 @@ a marketplace facilitator for sales tax. In-app copy states that; it does not re
 3. Have a lawyer review `/privacy`, `/privacy-request`, `/terms`, `/pickup`, `/merchant-terms`, and `/fan-content`.
 4. Each **store owner** needs their own seller’s permit (CDTFA in California). There is **no reliable 50-state permit validation API**. California CDTFA is a manual webpage lookup — admins get a verify link; we do not scrape CDTFA. Owners upload a PDF/image or type the number; approve is blocked until intake is complete.
 5. City business license / pawn / secondhand-dealer: collected on the Licenses onboarding step when the owner buys/trades from the public. Local rules still sit with the store.
-6. Enable **Square location taxes** for every live store before taking card payments (see Phase 3).
+6. Enable **Square location taxes** for every live store in a **sales-tax state** before taking card payments (see Phase 3). **AK, DE, MT, NH, and OR** have no statewide sales tax — shoppers can complete card checkout with $0 tax.
 7. Age gate is date of birth (13+), not ID verification. That is COPPA-shaped, not KYC.
 8. Keep **Archidekt harvest off** in production until you have written permission (`ARCHIDEKT_ENABLED`).
 9. Turn on Sentry, off-host Postgres backups, and an uptime check (`LAUNCH.md` Phase 5).

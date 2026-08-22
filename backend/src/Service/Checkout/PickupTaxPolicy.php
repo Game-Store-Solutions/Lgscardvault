@@ -53,9 +53,20 @@ final class PickupTaxPolicy
             'taxCents' => $taxCents,
             'dueCents' => (int) ($quote['dueCents'] ?? ($merchandiseDue + $taxCents)),
             'fulfillment' => Order::FULFILLMENT_PICKUP,
-            'taxNote' => 'Sales tax is charged at this store\'s location for pickup orders.',
+            'taxNote' => $this->taxNote($store, $taxCents),
             'taxReady' => null === $block,
             'taxBlockReason' => $block,
         ];
+    }
+
+    private function taxNote(Store $store, int $taxCents): string
+    {
+        if (UsRegion::hasNoStateSalesTax($store->getRegion())) {
+            return $taxCents > 0
+                ? 'There is no statewide sales tax here. Local tax from this store\'s Square location may still appear on the charge.'
+                : 'This store is in a state with no statewide sales tax. Card checkout can be completed with $0 tax.';
+        }
+
+        return 'Sales tax is charged at this store\'s location for pickup orders.';
     }
 }

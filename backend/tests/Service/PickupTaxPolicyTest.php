@@ -19,12 +19,34 @@ final class PickupTaxPolicyTest extends TestCase
         self::assertNull($quote['taxBlockReason']);
     }
 
-    public function testOregonAllowsZeroTax(): void
+    /**
+     * @dataProvider noStateSalesTaxRegions
+     */
+    public function testNoSalesTaxStateAllowsZeroTaxAndMarksQuoteReady(string $region): void
     {
-        $store = (new Store())->setName('X')->setSlug('x')->setRegion('OR');
+        $store = (new Store())->setName('X')->setSlug('x')->setRegion($region);
         $policy = new PickupTaxPolicy();
 
         self::assertNull($policy->cardCheckoutBlockReason($store, 0, 2500));
+        $quote = $policy->decorateQuote($store, 2500, 0, ['taxCents' => 0, 'dueCents' => 2500]);
+        self::assertTrue($quote['taxReady']);
+        self::assertNull($quote['taxBlockReason']);
+        self::assertStringContainsString('no statewide sales tax', strtolower($quote['taxNote']));
+    }
+
+    /** @return array<string, array{string}> */
+    public static function noStateSalesTaxRegions(): array
+    {
+        return [
+            'AK' => ['AK'],
+            'Alaska' => ['Alaska'],
+            'DE' => ['DE'],
+            'Delaware' => ['Delaware'],
+            'MT' => ['MT'],
+            'NH' => ['NH'],
+            'OR' => ['OR'],
+            'Oregon' => ['Oregon'],
+        ];
     }
 
     public function testCaliforniaBlocksZeroTax(): void

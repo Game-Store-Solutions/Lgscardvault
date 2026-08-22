@@ -170,6 +170,7 @@ flowchart LR
 - All `/api/admin/*` operations require `ROLE_SUPER_ADMIN`.
 - The tenant filter is disabled for admin routes so platform administrators can manage all stores.
 - Creating a store through `StoreAdminProcessor` promotes the chosen owner to `ROLE_STORE_OWNER`.
+- Pending marketplace applications cannot be approved until license intake passes `StoreComplianceGate` (legal name, entity, insurance attestation, seller’s permit or no-statewide-tax attestation). Super-admins also staff the privacy-request queue. See [compliance.md](compliance.md).
 - `UserAdminProcessor` hashes `plainPassword` before persisting.
 - Subscription billing (MRR, overdue, monthly history, charge-now) lives in `BillingPanel` — see [payments-and-billing.md](payments-and-billing.md#platform-admin-billing-dashboard).
 

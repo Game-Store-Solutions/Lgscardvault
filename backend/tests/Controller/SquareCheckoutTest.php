@@ -447,6 +447,54 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertSame(5, $fresh->getQuantity());
     }
 
+    /**
+     * AK / DE / MT / NH / OR have no statewide sales tax — $0 Square tax must
+     * still let the shopper finish card checkout.
+     *
+     * @dataProvider noStateSalesTaxRegions
+     */
+    public function testCardCheckoutCompletesWithZeroTaxInNoSalesTaxState(string $region): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 2500);
+        $store->setRegion($region);
+        $this->em->flush();
+        $this->gateway->addedTaxCents = 0;
+        $this->fillCart($store, $customer, $item, 1);
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/quote", []);
+        self::assertSame(200, $this->responseCode());
+        self::assertTrue($quote['taxReady'] ?? false);
+        self::assertEmpty($quote['taxBlockReason'] ?? null);
+        self::assertSame(0, $quote['taxCents'] ?? null);
+        self::assertSame(2500, $quote['dueCents'] ?? null);
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'fulfillment' => 'pickup',
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+        self::assertSame(201, $this->responseCode());
+        self::assertSame(2500, $order['totalCents'] ?? null);
+        self::assertSame(0, $order['taxCents'] ?? null);
+        self::assertSame(2500, $order['paidCents'] ?? null);
+        self::assertCount(1, $this->gateway->charges);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(4, $fresh->getQuantity());
+    }
+
+    /** @return array<string, array{string}> */
+    public static function noStateSalesTaxRegions(): array
+    {
+        return [
+            'AK' => ['AK'],
+            'DE' => ['DE'],
+            'MT' => ['MT'],
+            'NH' => ['NH'],
+            'OR' => ['OR'],
+        ];
+    }
+
     private function grantCredit(Store $store, User $customer, int $amountCents): void
     {
         static::getContainer()->get(\App\Service\Credit\StoreCreditLedger::class)->grant(
