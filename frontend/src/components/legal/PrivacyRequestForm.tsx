@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { CheckCircle2, Send } from 'lucide-react'
-import api, { extractErrorMessage } from '../api/client'
-import { Button, Input, Select, Textarea } from './ui'
+import api, { extractErrorMessage } from '../../api/client'
+import { Button, Input, Select, Textarea } from '../ui'
 
 const TYPES = [
   { value: 'do_not_sell', label: 'Do not sell or share my personal information' },

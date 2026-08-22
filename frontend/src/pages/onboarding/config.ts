@@ -49,4 +49,4 @@ export const METHOD_LABELS: Record<PaymentMethodType, string> = {
 export const SLUG_RE = /^[a-z0-9-]+$/
 
 /** States with no statewide sales tax (local Square tax may still apply). */
-export const NO_STATE_SALES_TAX = ['AK', 'DE', 'MT', 'NH', 'OR'] as const
+export const NO_STATE_SALES_TAX: readonly string[] = ['AK', 'DE', 'MT', 'NH', 'OR']

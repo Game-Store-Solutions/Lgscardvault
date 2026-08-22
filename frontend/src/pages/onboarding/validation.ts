@@ -22,7 +22,7 @@ function licensesValid(data: OnboardingData): boolean {
   const c = data.compliance
   if (!c.legalBusinessName.trim() || !c.entityType || !c.insuranceAttested) return false
   const region = data.address.region.trim().toUpperCase()
-  const noTax = (NO_STATE_SALES_TAX as readonly string[]).includes(region)
+  const noTax = NO_STATE_SALES_TAX.includes(region)
   if (noTax) {
     if (!c.noStateSalesTax) return false
   } else {
