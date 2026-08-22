@@ -1,9 +1,9 @@
 import { Link, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import api from '../../api/client'
-import { DEFAULT_APP_SHELL } from '../../lib/layoutShell'
-import { LegalLinks } from '../../components/legal/LegalLinks'
+import api from '../api/client'
+import { DEFAULT_APP_SHELL } from '../lib/layoutShell'
+import { LegalLinks } from '../components/legal/LegalLinks'
 
 interface LegalSite {
   entityName: string
