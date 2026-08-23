@@ -50,7 +50,7 @@ export default function LegalPage() {
     <article className={DEFAULT_APP_SHELL + ' max-w-3xl pb-16'}>
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-600">Legal</p>
       <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">{TITLES[legalSlug]}</h1>
-      <p className="mt-2 text-sm text-fg-muted">Last updated August 22, 2026 · {site.entityName}</p>
+      <p className="mt-2 text-sm text-fg-muted">Last updated August 23, 2026 · {site.entityName}</p>
       <LegalLinks className="mt-4" />
 
       <div className="prose-legal mt-8 space-y-6 text-sm leading-7 text-fg">
@@ -79,10 +79,9 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
     <>
       <p>
         This Privacy Policy describes how {site.entityName} (“we”, “us”) collects, uses, and shares personal
-        information when you use our website and storefronts. {site.entityName} is software-as-a-service. Each
-        local game store that lists inventory is an independent business and the merchant of record for your
-        purchase. We intend to operate as software-as-a-service, not as the seller of the cards and not as a
-        marketplace facilitator — confirm that structure with your own counsel.
+        information when you use our website and storefronts. {site.entityName} provides software that local
+        game stores use to run their own shops. Each store that lists inventory is an independent business and
+        the merchant of record for your purchase. We are not the seller of the cards.
       </p>
       <Section title="Information we collect">
         <p>
@@ -123,9 +122,8 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
           <Link className="font-semibold text-brand-600 hover:underline" to="/privacy-request">
             privacy request form
           </Link>
-          . We will not discriminate against you for exercising these rights. We do not knowingly sell personal
-          information for money. Whether we “sell” or “share” as the CCPA/CPRA define those terms is a legal
-          determination — use the form above and our counsel to handle requests.
+          . We will not discriminate against you for exercising these rights. We do not sell personal information
+          for money.
         </p>
         <p>
           We honor the Global Privacy Control (GPC) signal, including the <code>Sec-GPC</code> request header
@@ -142,9 +140,9 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
       </Section>
       <Section title="Children">
         <p>
-          The service is intended for users 13 and older. We collect date of birth at password signup and at
-          first Google sign-in to enforce that floor. That is a COPPA-shaped age gate, not government ID
-          verification. We do not knowingly collect personal information from children under 13.
+          The service is for people 13 and older. We collect date of birth at password signup and at first
+          Google sign-in to enforce that. We do not verify government ID. We do not knowingly collect personal
+          information from children under 13.
         </p>
       </Section>
       <Section title="Contact">
@@ -166,10 +164,10 @@ function TermsOfService({ site }: { site: LegalSite }) {
       </p>
       <Section title="The marketplace and the stores">
         <p>
-          {site.entityName} is software for local game stores (SaaS). When you buy cards or sealed product, you
-          are buying from that store, not from us. The store sets prices, inventory, and pickup hours. Payment is
+          {site.entityName} is software for local game stores. When you buy cards or sealed product, you are
+          buying from that store, not from us. The store sets prices, inventory, and pickup hours. Payment is
           charged to the store’s Square account. We are not the seller, we do not take possession of inventory,
-          and we are not a marketplace facilitator for sales tax. Confirm this structure with your own counsel.
+          and we do not collect sales tax on the store’s behalf.
         </p>
       </Section>
       <Section title="Pickup only">
@@ -187,8 +185,8 @@ function TermsOfService({ site }: { site: LegalSite }) {
       </Section>
       <Section title="Accounts">
         <p>
-          You must provide accurate information and keep your password confidential. You must be at least 13
-          (date of birth is collected at signup; we do not verify government ID). We may suspend accounts for
+          You must provide accurate information and keep your password confidential. You must be at least 13.
+          Date of birth is collected at signup; we do not verify government ID. We may suspend accounts for
           fraud, abuse, or violation of these terms.
         </p>
       </Section>
@@ -268,8 +266,8 @@ function MerchantTerms({ site }: { site: LegalSite }) {
         <p>
           You sell your own inventory. Shopper payments settle to your connected Square account. You are
           responsible for pricing, stock accuracy, pickup, customer service, refunds, chargebacks, and all
-          taxes on those sales. {site.entityName} is SaaS, not a party to the sale, and is not a marketplace
-          facilitator. Have your lawyer confirm that structure for your facts.
+          taxes on those sales. {site.entityName} provides the software and is not a party to the sale. You
+          are solely responsible for your licenses, permits, and tax filings.
         </p>
       </Section>
       <Section title="United States only, pickup only">
@@ -293,13 +291,12 @@ function MerchantTerms({ site }: { site: LegalSite }) {
           Disclose that activity during onboarding so reviewers can see your license intake.
         </p>
       </Section>
-      <Section title="Square, PCI, and fees">
+      <Section title="Square and fees">
         <p>
-          You must keep a valid Square connection to take card payments. Card data is tokenized in the browser
-          by Square’s Web Payments SDK; {site.entityName} never stores full PAN. Completing Square’s production
-          go-live checklist (OAuth redirect, webhooks including dispute.created, location tax, production
-          credentials) is still your operational work. Square’s fees are charged by Square. Platform
-          subscription fees (if any) are billed separately to you by {site.entityName}.
+          You must keep a valid Square connection to take card payments. Shoppers enter card details only in
+          Square’s payment form; {site.entityName} never stores full card numbers. Turn on sales tax for your
+          Square location before you take live cards. Square charges its own processing fees. Any{' '}
+          {site.entityName} subscription is billed separately to you.
         </p>
       </Section>
       <Section title="Prohibited use">
@@ -321,9 +318,8 @@ function PrivacyRequestPage() {
   return (
     <>
       <p>
-        Use this form to exercise privacy rights, including a California “Do Not Sell or Share My Personal
-        Information” request. We log the request for our team and email you at the address you provide. This is
-        not only a mailto: link in the policy.
+        Use this form to request access, deletion, or a California “Do Not Sell or Share My Personal
+        Information” preference. We log the request and email you at the address you provide.
       </p>
       <PrivacyRequestForm />
     </>
@@ -335,8 +331,8 @@ function FanContent({ site }: { site: LegalSite }) {
     <>
       <p>
         {site.entityName} helps local game stores list trading-card inventory. Card names, set symbols, artwork,
-        and related marks are owned by their publishers. This page is our fan-content / image-use notice — not a
-        license from those publishers.
+        and related marks are owned by their publishers. This page is a notice about how those materials appear
+        on the site. It is not a license from those publishers.
       </p>
       <Section title="What we display">
         <p>
@@ -355,18 +351,18 @@ function FanContent({ site }: { site: LegalSite }) {
       <Section title="Publisher programs">
         <p>
           Store owners must follow the fan-content, organized-play, and retailer policies that apply to them
-          (including Wizards Fan Content Policy and Pokémon TCG retailer rules). Do not upload publisher logos
-          or promotional art as store branding unless you have permission. If a publisher asks us to take down
-          an image, we review the request and act on valid ones. The form does not remove listings automatically.
+          (including the Wizards Fan Content Policy and Pokémon TCG retailer rules). Do not upload publisher
+          logos or promotional art as store branding unless you have permission. If a publisher asks us to take
+          down an image, we review the request and act on valid ones.
         </p>
       </Section>
       <Section title="Takedown mailbox">
         <p>
-          Rights holders can submit a takedown below (queued for platform admins) or email{' '}
+          Rights holders can submit a takedown below or email{' '}
           <a className="font-semibold text-brand-600 hover:underline" href={`mailto:${site.contactEmail}`}>
             {site.contactEmail}
           </a>
-          . We still have to watch that queue — the form does not auto-remove listings.
+          . A person on our team reviews each request. Submitting the form does not remove listings automatically.
         </p>
         <div className="mt-4">
           <PrivacyRequestForm variant="takedown" />

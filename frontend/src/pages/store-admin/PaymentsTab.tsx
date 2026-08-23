@@ -151,7 +151,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
       <Card>
         <CardHeader
           title="Platform subscription"
-          subtitle="Your payment method for the Pro or Enterprise plan you pay to the marketplace."
+          subtitle="Your payment method for the LGS Card Vault software plan. Shopper card charges go to your Square account."
           actions={
             <div className="flex items-center gap-2">
               {subscriptionBadge}
@@ -371,16 +371,22 @@ export default function PaymentsTab({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader
-          title="Square production checklist (PCI)"
-          subtitle="Card data is tokenized in the browser by Square. Completing Square’s production go-live is still this store’s work."
+          title="Before you take live card payments"
+          subtitle="Shoppers enter card details only in Square’s form. Finish these steps for this store in Square."
         />
         <CardBody>
           <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-fg">
-            <li>Connect Square on this page with the production application (not sandbox) before taking real cards.</li>
-            <li>In Square Dashboard for this location, turn on the correct sales tax. Card checkout blocks if tax quotes as $0 in a sales-tax state.</li>
-            <li>Confirm webhooks include <span className="font-medium">dispute.created</span>, refunds, and OAuth revocation.</li>
-            <li>Never type card numbers into LGS Card Vault, email, or chat — only Square’s payment form.</li>
-            <li>Respond to chargebacks in Square’s dispute console. Open orders in this admin: a dispute flag appears when Square notifies us. Gather pickup proof; we do not auto-restock.</li>
+            <li>Connect Square on this page and approve access so checkout can charge your seller account.</li>
+            <li>
+              In Square Dashboard for this location, turn on the correct sales tax. In a sales-tax state, card
+              checkout will not complete if Square quotes $0 tax.
+            </li>
+            <li>Never type card numbers into LGS Card Vault, email, or chat. Use only Square’s payment form.</li>
+            <li>
+              Chargebacks are handled in Square’s dispute console. A flag appears on the order here when Square
+              notifies us. Collect pickup proof (name, time, staff notes). We do not automatically restock
+              disputed orders.
+            </li>
           </ol>
         </CardBody>
       </Card>
