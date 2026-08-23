@@ -7,6 +7,7 @@ use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final class ComplianceDocumentControllerTest extends WebTestCase
@@ -50,9 +51,12 @@ final class ComplianceDocumentControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
         self::assertResponseIsSuccessful();
-        self::assertSame('image/png', $this->client->getResponse()->headers->get('Content-Type'));
-        self::assertStringContainsString('inline', (string) $this->client->getResponse()->headers->get('Content-Disposition'));
-        self::assertNotEmpty($this->client->getResponse()->getContent());
+        $response = $this->client->getResponse();
+        self::assertInstanceOf(BinaryFileResponse::class, $response);
+        self::assertSame('image/png', $response->headers->get('Content-Type'));
+        self::assertStringContainsString('inline', (string) $response->headers->get('Content-Disposition'));
+        self::assertFileExists($response->getFile()->getPathname());
+        self::assertGreaterThan(0, $response->getFile()->getSize());
     }
 
     public function testOtherUserCannotDownloadDocument(): void
