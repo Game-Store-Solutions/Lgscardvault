@@ -93,6 +93,7 @@ final class ComplianceDocumentController extends AbstractController
         $response = new BinaryFileResponse($path);
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE, $document->getOriginalFilename());
         $response->headers->set('Content-Type', $document->getMime());
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
 
         return $response;
     }

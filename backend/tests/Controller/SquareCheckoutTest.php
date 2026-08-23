@@ -44,6 +44,10 @@ final class SquareCheckoutTest extends WebTestCase
         // (config/services.yaml, when@test), so this is the same instance the
         // controller receives.
         $this->gateway = $container->get(CheckoutGatewayInterface::class);
+        $this->gateway->failCreateOrder = false;
+        $this->gateway->addedTaxCents = 0;
+        $this->gateway->declineWith = null;
+        $this->gateway->charges = [];
     }
 
     private function authenticate(User $user): void
@@ -481,6 +485,59 @@ final class SquareCheckoutTest extends WebTestCase
         $this->em->clear();
         $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
         self::assertSame(4, $fresh->getQuantity());
+    }
+
+    public function testCardCheckoutBlocksZeroTaxWhenCreditCoversATaxStateCart(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 1000);
+        $store->setRegion('CA');
+        $this->em->flush();
+        $this->grantCredit($store, $customer, 5000);
+        $this->gateway->addedTaxCents = 0;
+        $this->fillCart($store, $customer, $item, 1);
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/quote", [
+            'useStoreCredit' => true,
+        ]);
+        self::assertSame(200, $this->responseCode());
+        self::assertFalse($quote['taxReady'] ?? true);
+
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'useStoreCredit' => true,
+        ]);
+        self::assertSame(422, $this->responseCode());
+        self::assertStringContainsString('sales tax', strtolower((string) ($body['detail'] ?? '')));
+        self::assertSame([], $this->gateway->charges);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(5, $fresh->getQuantity());
+    }
+
+    public function testCardCheckoutDoesNotChargeWhenCreateOrderFailsAfterATaxedQuote(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 2500);
+        $store->setRegion('CA');
+        $this->em->flush();
+        $this->gateway->addedTaxCents = 200;
+        $this->gateway->failCreateOrder = true;
+        $this->fillCart($store, $customer, $item, 1);
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/quote", []);
+        self::assertSame(200, $this->responseCode());
+        self::assertTrue($quote['taxReady'] ?? false);
+
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout", [
+            'fulfillment' => 'pickup',
+            'token' => 'cnon:card-nonce-ok',
+        ]);
+        self::assertSame(402, $this->responseCode());
+        self::assertStringContainsString('sales tax', strtolower((string) ($body['detail'] ?? '')));
+        self::assertSame([], $this->gateway->charges);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
+        self::assertSame(5, $fresh->getQuantity());
     }
 
     /** @return array<string, array{string}> */

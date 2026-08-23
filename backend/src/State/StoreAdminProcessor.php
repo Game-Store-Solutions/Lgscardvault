@@ -7,6 +7,7 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Store;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /** @implements ProcessorInterface<Store, Store> */
 final readonly class StoreAdminProcessor implements ProcessorInterface
@@ -24,6 +25,12 @@ final readonly class StoreAdminProcessor implements ProcessorInterface
 
         if (null === $data->getId()) {
             $this->entityManager->persist($data);
+        }
+
+        if ($data->isActive() && Store::STATUS_APPROVED !== $data->getStatus()) {
+            throw new UnprocessableEntityHttpException(
+                'Pending or rejected stores must be approved after license review.',
+            );
         }
 
         $owner = $data->getOwner();

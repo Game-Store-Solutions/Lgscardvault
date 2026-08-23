@@ -55,6 +55,7 @@ final class ComplianceDocumentControllerTest extends WebTestCase
         self::assertInstanceOf(BinaryFileResponse::class, $response);
         self::assertSame('image/png', $response->headers->get('Content-Type'));
         self::assertStringContainsString('inline', (string) $response->headers->get('Content-Disposition'));
+        self::assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
         self::assertFileExists($response->getFile()->getPathname());
         self::assertGreaterThan(0, $response->getFile()->getSize());
     }

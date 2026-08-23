@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\AgeAttestation;
 use App\Service\Auth\OidcClient;
 use App\Service\Mail\TransactionalMailer;
 use App\Service\Payments\SignedOAuthState;
@@ -13,6 +14,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -25,6 +27,7 @@ use Symfony\Component\Routing\Attribute\Route;
 class SsoController extends AbstractController
 {
     private const STATE_PROVIDER = 'oidc';
+    private const AGE_STATE = 'sso-age';
 
     public function __construct(
         private readonly OidcClient $oidc,
@@ -79,6 +82,14 @@ class SsoController extends AbstractController
             $profile = $this->oidc->fetchUserInfo($accessToken);
 
             $user = $this->findOrCreateUser($profile['email'], $profile['name']);
+            if (!$user->isAgeVerified()) {
+                $ticket = $this->state->create(self::AGE_STATE, '', (int) $user->getId(), 1800);
+
+                return new RedirectResponse(
+                    $this->frontendUrl().'/auth/sso/callback#complete=1&ticket='.rawurlencode($ticket),
+                );
+            }
+
             $token = $this->jwtManager->create($user);
 
             // Fragment, not query string: fragments never reach server/proxy
@@ -89,6 +100,53 @@ class SsoController extends AbstractController
 
             return new RedirectResponse($this->frontendUrl().'/login?sso=failed');
         }
+    }
+
+    #[Route('/complete', name: 'api_sso_complete', methods: ['POST'])]
+    public function complete(Request $request): JsonResponse
+    {
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $ticket = trim((string) ($payload['ticket'] ?? ''));
+
+        try {
+            $state = $this->state->verify($ticket);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => 'This sign-in link has expired. Please try Google again.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (self::AGE_STATE !== $state['provider'] || $state['userId'] < 1) {
+            return $this->json(['error' => 'This sign-in link is invalid.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $user = $this->userRepository->find($state['userId']);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'This sign-in link is invalid.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!$this->isTruthy($payload['acceptedTerms'] ?? false)) {
+            return $this->json(
+                ['error' => 'Please accept the Terms of Service and Privacy Policy.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        try {
+            $dateOfBirth = AgeAttestation::parse($payload['dateOfBirth'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        $user->setDateOfBirth($dateOfBirth);
+        if (null === $user->getTermsAcceptedAt()) {
+            $user->setTermsAcceptedAt(new \DateTimeImmutable());
+        }
+        $this->userRepository->save($user, true);
+
+        return $this->json([
+            'detail' => 'Signed in.',
+            'token' => $this->jwtManager->create($user),
+        ]);
     }
 
     private function findOrCreateUser(string $email, string $displayName): User
@@ -123,6 +181,15 @@ class SsoController extends AbstractController
         }
 
         return $user;
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        if (true === $value || 1 === $value || '1' === $value) {
+            return true;
+        }
+
+        return is_string($value) && \in_array(strtolower($value), ['true', 'yes', 'on'], true);
     }
 
     /**

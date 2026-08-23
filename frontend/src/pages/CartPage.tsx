@@ -707,7 +707,7 @@ function OrderSummary({
           isGuest={isGuest}
           showOwnerDiagnostics={showOwnerCheckoutDiagnostics}
           paymentsAdminHref={paymentsAdminHref}
-          cardCheckoutReady={quote?.taxReady !== false}
+          cardCheckoutReady={quote?.taxReady === true}
           cardCheckoutBlockedMessage={quote?.taxBlockReason}
           onPlaced={onOrderPlaced}
         />

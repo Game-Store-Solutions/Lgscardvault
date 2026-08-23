@@ -100,6 +100,18 @@ final class PrivacyRequestTest extends WebTestCase
         self::assertSame('takedown', $row->getType());
     }
 
+    public function testTakedownRequiresDetails(): void
+    {
+        $body = $this->jsonRequest('POST', '/api/privacy/requests', [
+            'type' => 'takedown',
+            'name' => 'Rights Holder',
+            'email' => 'legal@publisher.example',
+        ]);
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode(), json_encode($body));
+        self::assertStringContainsString('Describe', (string) ($body['detail'] ?? ''));
+    }
+
     public function testOwnerCannotListPrivacyRequests(): void
     {
         $owner = $this->fixtures->user(['ROLE_STORE_OWNER']);

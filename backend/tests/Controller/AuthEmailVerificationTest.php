@@ -233,6 +233,39 @@ final class AuthEmailVerificationTest extends WebTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testOtpIsBurnedAfterTooManyWrongGuesses(): void
+    {
+        $email = $this->uniqueEmail('verify-otp-lock');
+        $this->jsonRequest('POST', '/api/register', [
+            'email' => $email,
+            'password' => 'owner-pass-1',
+            'displayName' => 'OTP Lock',
+            'accountType' => 'owner',
+            'acceptedTerms' => true,
+            'dateOfBirth' => '1988-06-01',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        $otp = $this->otpFromLastEmail();
+
+        for ($i = 0; $i < EmailVerificationService::OTP_MAX_ATTEMPTS; ++$i) {
+            $this->jsonRequest('POST', '/api/auth/verify-email', [
+                'email' => $email,
+                'code' => '000000',
+            ]);
+            self::assertSame(400, $this->client->getResponse()->getStatusCode());
+        }
+
+        /** @var CacheItemPoolInterface $pool */
+        $pool = static::getContainer()->get('cache.rate_limiter');
+        $pool->clear();
+
+        $locked = $this->jsonRequest('POST', '/api/auth/verify-email', [
+            'email' => $email,
+            'code' => $otp,
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode(), json_encode($locked));
+    }
+
     private function otpFromLastEmail(): string
     {
         $message = $this->getMailerMessage();

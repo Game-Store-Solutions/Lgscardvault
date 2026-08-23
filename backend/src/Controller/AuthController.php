@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Security\ApiRateLimit;
+use App\Service\Auth\AgeAttestation;
 use App\Service\Auth\EmailVerificationService;
 use App\Service\Auth\PasswordResetService;
 use App\Service\Mail\TransactionalMailer;
@@ -259,8 +260,8 @@ class AuthController extends AbstractController
     public function verifyEmail(Request $request): JsonResponse
     {
         $blocked = ApiRateLimit::enforce(
-            $this->resetPasswordLimiter,
-            'verify:'.($request->getClientIp() ?? 'unknown'),
+            $this->emailVerificationLimiter,
+            'verify-ip:'.($request->getClientIp() ?? 'unknown'),
             'Too many verification attempts. Please wait and try again.',
         );
         if ($blocked instanceof JsonResponse) {
@@ -272,6 +273,17 @@ class AuthController extends AbstractController
         $token = isset($payload['token']) ? trim((string) $payload['token']) : '';
         $email = isset($payload['email']) ? trim((string) $payload['email']) : '';
         $code = isset($payload['code']) ? trim((string) $payload['code']) : '';
+
+        if ('' !== $email) {
+            $blocked = ApiRateLimit::enforce(
+                $this->emailVerificationLimiter,
+                'verify-email:'.hash('sha256', strtolower($email)),
+                'Too many verification attempts. Please wait and try again.',
+            );
+            if ($blocked instanceof JsonResponse) {
+                return $blocked;
+            }
+        }
 
         $result = '' !== $token
             ? $this->emailVerification->consume($token)
@@ -306,29 +318,10 @@ class AuthController extends AbstractController
 
     private function parseDateOfBirth(mixed $raw): \DateTimeImmutable|JsonResponse
     {
-        $dobRaw = trim((string) $raw);
-        $dateOfBirth = \DateTimeImmutable::createFromFormat('!Y-m-d', $dobRaw) ?: null;
-        if (!$dateOfBirth instanceof \DateTimeImmutable || $dateOfBirth->format('Y-m-d') !== $dobRaw) {
-            return $this->json(
-                ['error' => 'Enter your date of birth (YYYY-MM-DD).'],
-                Response::HTTP_BAD_REQUEST,
-            );
+        try {
+            return AgeAttestation::parse($raw);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        $age = User::ageYears($dateOfBirth);
-        if ($age < 13) {
-            return $this->json(
-                ['error' => 'You must be at least 13 years old to create an account.'],
-                Response::HTTP_BAD_REQUEST,
-            );
-        }
-        if ($age > 120) {
-            return $this->json(
-                ['error' => 'Please enter a valid date of birth.'],
-                Response::HTTP_BAD_REQUEST,
-            );
-        }
-
-        return $dateOfBirth;
     }
 }

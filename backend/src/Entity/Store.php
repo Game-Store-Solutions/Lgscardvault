@@ -433,6 +433,10 @@ class Store
     #[Groups(['store:admin'])]
     private ?array $compliance = null;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['store:admin'])]
+    private ?\DateTimeImmutable $merchantTermsAcceptedAt = null;
+
     /** @var Collection<int, ComplianceDocument> */
     #[ORM\OneToMany(mappedBy: 'store', targetEntity: ComplianceDocument::class)]
     private Collection $complianceDocuments;
@@ -1271,6 +1275,18 @@ class Store
     public function setCompliance(?array $compliance): static
     {
         $this->compliance = $compliance;
+
+        return $this;
+    }
+
+    public function getMerchantTermsAcceptedAt(): ?\DateTimeImmutable
+    {
+        return $this->merchantTermsAcceptedAt;
+    }
+
+    public function setMerchantTermsAcceptedAt(?\DateTimeImmutable $merchantTermsAcceptedAt): static
+    {
+        $this->merchantTermsAcceptedAt = $merchantTermsAcceptedAt;
 
         return $this;
     }

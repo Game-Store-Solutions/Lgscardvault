@@ -5,6 +5,8 @@ namespace App\Service\Payments;
 use App\Entity\Store;
 use App\Entity\StorePaymentAccount;
 use App\Repository\StorePaymentAccountRepository;
+use App\Service\Checkout\PickupTaxNotReadyException;
+use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Security\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -35,6 +37,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         private readonly SecretCipher $cipher,
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
+        private readonly PickupTaxPolicy $taxPolicy,
     ) {
     }
 
@@ -251,12 +254,28 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
                 if ($created['totalCents'] > 0) {
                     $chargedCents = $created['totalCents'];
                 }
+            } catch (PickupTaxNotReadyException $e) {
+                throw $e;
             } catch (\RuntimeException $e) {
-                // Checkout must still succeed if Orders API hiccups; payment alone is enough.
-                $this->logger->warning('Square CreateOrder failed; charging without order_id', [
+                // Fail closed: charging merchandise only would skip location tax.
+                $this->logger->warning('Square CreateOrder failed; refusing card capture', [
                     'store' => $store->getSlug(),
                     'error' => $e->getMessage(),
                 ]);
+                throw new \RuntimeException(
+                    'Could not calculate sales tax for this order. Try again or pay in store.',
+                    0,
+                    $e,
+                );
+            }
+
+            $taxableSubtotal = 0;
+            foreach ($lineItems as $item) {
+                $taxableSubtotal += max(0, (int) ($item['priceCents'] ?? 0)) * max(1, (int) ($item['quantity'] ?? 1));
+            }
+            $block = $this->taxPolicy->cardCheckoutBlockReason($store, $taxCents, $taxableSubtotal);
+            if (null !== $block) {
+                throw new PickupTaxNotReadyException($block);
             }
         }
 

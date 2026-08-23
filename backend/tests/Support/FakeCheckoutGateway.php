@@ -32,6 +32,9 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     /** Extra sales tax added onto charges and quotes (0 keeps existing tests pre-tax). */
     public int $addedTaxCents = 0;
 
+    /** When true, charge() throws as if Square CreateOrder failed. */
+    public bool $failCreateOrder = false;
+
     /** @var list<array{lineItems: array, creditCents: int}> */
     public array $quotes = [];
 
@@ -85,6 +88,9 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     ): array {
         if (null !== $this->declineWith) {
             throw new \RuntimeException($this->declineWith);
+        }
+        if ($this->failCreateOrder) {
+            throw new \RuntimeException('Could not calculate sales tax for this order. Try again or pay in store.');
         }
 
         $taxCents = max(0, $this->addedTaxCents);

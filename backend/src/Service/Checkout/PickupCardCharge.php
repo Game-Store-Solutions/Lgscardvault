@@ -32,8 +32,9 @@ final readonly class PickupCardCharge
         $quote = $this->checkoutGateway->quotePickupTotals($store, $lineItems, $order->getCreditAppliedCents());
         $order->setTaxCents($quote['taxCents']);
 
-        $merchandiseDue = max(0, $order->getTotalCents() - $order->getCreditAppliedCents());
-        $block = $this->taxPolicy->cardCheckoutBlockReason($store, (int) $quote['taxCents'], $merchandiseDue);
+        $taxableSubtotal = $order->getTotalCents();
+        $merchandiseDue = max(0, $taxableSubtotal - $order->getCreditAppliedCents());
+        $block = $this->taxPolicy->cardCheckoutBlockReason($store, (int) $quote['taxCents'], $taxableSubtotal);
         if (null !== $block) {
             throw new PickupTaxNotReadyException($block);
         }

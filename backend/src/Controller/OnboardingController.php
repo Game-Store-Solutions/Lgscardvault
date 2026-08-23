@@ -156,7 +156,8 @@ class OnboardingController extends AbstractController
             ->setPhone($this->nullableString($payload['phone'] ?? null, 32))
             ->setLatitude(isset($address['latitude']) && is_numeric($address['latitude']) ? (float) $address['latitude'] : null)
             ->setLongitude(isset($address['longitude']) && is_numeric($address['longitude']) ? (float) $address['longitude'] : null)
-            ->setCompliance($compliance);
+            ->setCompliance($compliance)
+            ->setMerchantTermsAcceptedAt(new \DateTimeImmutable());
 
         $documentError = $this->attachComplianceDocuments($store, $user, $payload['documentIds'] ?? []);
         if (null !== $documentError) {

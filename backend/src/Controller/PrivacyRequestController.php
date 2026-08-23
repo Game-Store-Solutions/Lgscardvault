@@ -45,6 +45,9 @@ final class PrivacyRequestController extends AbstractController
         if ('' === $name || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return $this->json(['detail' => 'Name and a valid email are required.'], 422);
         }
+        if (PrivacyRequest::TYPE_TAKEDOWN === $type && '' === $details) {
+            return $this->json(['detail' => 'Describe the work and where it appears.'], 422);
+        }
 
         $row = (new PrivacyRequest($type, mb_substr($email, 0, 180), $name))
             ->setDetails('' !== $details ? $details : null)

@@ -16,6 +16,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 final class EmailVerificationService
 {
     public const TTL_SECONDS = 86400;
+    public const OTP_MAX_ATTEMPTS = 5;
     public const GENERIC_SENT = 'If that email needs verification, we sent a code.';
     public const INVALID_LINK = 'This verification link is invalid or has expired.';
     public const INVALID_CODE = 'That code is invalid or has expired.';
@@ -45,6 +46,7 @@ final class EmailVerificationService
         $item->set($this->hashToken($otp));
         $item->expiresAfter(self::TTL_SECONDS);
         $this->cache->save($item);
+        $this->cache->deleteItem($this->otpAttemptsKey($user));
 
         return ['token' => $raw, 'otp' => $otp];
     }
@@ -78,10 +80,27 @@ final class EmailVerificationService
             return self::INVALID_CODE;
         }
 
-        $item = $this->cache->getItem($this->otpCacheKey($user));
-        if (!$item->isHit() || !hash_equals((string) $item->get(), $this->hashToken($code))) {
+        $attemptsItem = $this->cache->getItem($this->otpAttemptsKey($user));
+        $attempts = (int) ($attemptsItem->isHit() ? $attemptsItem->get() : 0);
+        if ($attempts >= self::OTP_MAX_ATTEMPTS) {
+            $this->cache->deleteItem($this->otpCacheKey($user));
+
             return self::INVALID_CODE;
         }
+
+        $item = $this->cache->getItem($this->otpCacheKey($user));
+        if (!$item->isHit() || !hash_equals((string) $item->get(), $this->hashToken($code))) {
+            $attemptsItem->set($attempts + 1);
+            $attemptsItem->expiresAfter(self::TTL_SECONDS);
+            $this->cache->save($attemptsItem);
+            if (($attempts + 1) >= self::OTP_MAX_ATTEMPTS) {
+                $this->cache->deleteItem($this->otpCacheKey($user));
+            }
+
+            return self::INVALID_CODE;
+        }
+
+        $this->cache->deleteItem($this->otpAttemptsKey($user));
 
         return $this->complete($user, self::INVALID_CODE);
     }
@@ -113,6 +132,11 @@ final class EmailVerificationService
     private function otpCacheKey(User $user): string
     {
         return 'email_verify_otp_'.(int) $user->getId();
+    }
+
+    private function otpAttemptsKey(User $user): string
+    {
+        return 'email_verify_otp_attempts_'.(int) $user->getId();
     }
 
     private function findUserForToken(string $rawToken): ?User
