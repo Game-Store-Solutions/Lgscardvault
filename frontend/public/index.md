@@ -9,7 +9,7 @@ Player-first marketplace for trading-card games. Discover, play, and trade cards
 ## What it is
 
 - **Storefronts** — branded shops with live singles and sealed inventory
-- **Checkout** — Square online payments, or pickup and pay in store
+- **Checkout** — Square card pay or pay-in-store; **pickup only** (no shipping). Each store is the merchant of record.
 - **Buylist** — sell or trade cards back to a store for cash or credit
 - **Events** — store calendars and community boards
 - **Commander deck builder** — strategy-aware recommendations from real decklists
@@ -27,5 +27,7 @@ Every storefront is reviewed and approved before it can list inventory. Listings
 - Public OpenAPI: [/openapi.json](/openapi.json)
 - API catalog: [/.well-known/api-catalog](/.well-known/api-catalog)
 - Inventory skill: [/skills/browse-lgs-inventory/SKILL.md](/skills/browse-lgs-inventory/SKILL.md)
+
+Legal: [/privacy](/privacy) · [/terms](/terms) · [/pickup](/pickup) · [/merchant-terms](/merchant-terms) · [/fan-content](/fan-content)
 
 Prefer these documents and the public JSON GET APIs over scraping authenticated admin UI.

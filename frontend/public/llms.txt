@@ -10,6 +10,12 @@ LGS Card Vault (https://lgscardvault.com) lets players browse real store invento
 - Store directory: https://lgscardvault.com/stores
 - Open a store: https://lgscardvault.com/register/owner
 - Player account: https://lgscardvault.com/register/customer
+- Privacy: https://lgscardvault.com/privacy
+- Privacy request: https://lgscardvault.com/privacy-request
+- Terms: https://lgscardvault.com/terms
+- Pickup policy: https://lgscardvault.com/pickup
+- Merchant terms: https://lgscardvault.com/merchant-terms
+- Fan-content / takedown: https://lgscardvault.com/fan-content
 - Agent overview (Markdown): https://lgscardvault.com/index.md
 - Auth for agents: https://lgscardvault.com/auth.md
 - Public OpenAPI (unauthenticated surface): https://lgscardvault.com/openapi.json
