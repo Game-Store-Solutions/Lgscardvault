@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { CheckCircle2, CreditCard, ExternalLink, RefreshCw, Square, Unplug } from 'lucide-react'
+import { CheckCircle2, CircleHelp, CreditCard, ExternalLink, RefreshCw, Square, Unplug } from 'lucide-react'
 import api, { extractErrorMessage, formatPrice } from '../../api/client'
 import type { SquareConnectResponse, StorePaymentStatus, StoreSubscriptionStatus } from '../../api/types'
-import { Badge, Button, Card, CardBody, CardHeader, ErrorState, LoadingPanel } from '../../components/ui'
+import { Badge, Button, Card, CardBody, CardHeader, ErrorState, LoadingPanel, dropdownPanelClass } from '../../components/ui'
 import { SquarePaymentPanel, type TokenizedPayment } from '../../components/payments/SquarePaymentPanel'
 import { isDevBuild } from '../../lib/runtimeEnv'
 import { METHOD_LABELS } from '../onboarding/config'
@@ -238,7 +238,12 @@ export default function PaymentsTab({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader
-          title="Customer checkout (Square)"
+          title={
+            <span className="inline-flex items-center gap-2">
+              Customer checkout (Square)
+              <CheckoutGoLiveTip />
+            </span>
+          }
           subtitle="Connect Square so shoppers can pay your store at checkout."
           actions={
             <Button variant="secondary" size="sm" onClick={() => void refetch()}>
@@ -368,14 +373,53 @@ export default function PaymentsTab({ slug }: { slug: string }) {
           </div>
         </CardBody>
       </Card>
+    </div>
+  )
+}
 
-      <Card>
-        <CardHeader
-          title="Before you take live card payments"
-          subtitle="Shoppers enter card details only in Square’s form. Finish these steps for this store in Square."
-        />
-        <CardBody>
-          <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-fg">
+function CheckoutGoLiveTip() {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <span ref={rootRef} className="relative inline-flex shrink-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="checkout-golive-tip"
+        onClick={() => setOpen((current) => !current)}
+        className="rounded-full p-0.5 text-fg-muted hover:bg-bg hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+      >
+        <CircleHelp aria-hidden className="size-4" />
+        <span className="sr-only">Before you take live card payments</span>
+      </button>
+      {open && (
+        <div
+          id="checkout-golive-tip"
+          role="tooltip"
+          className={`${dropdownPanelClass} absolute left-0 top-full z-30 mt-2 w-[min(22rem,calc(100vw-2.5rem))] p-4 text-left normal-case`}
+        >
+          <p className="text-sm font-semibold text-fg">Before you take live card payments</p>
+          <p className="mt-1 text-xs leading-5 text-fg-muted">
+            Shoppers enter card details only in Square’s form. Finish these steps for this store in Square.
+          </p>
+          <ol className="mt-3 list-decimal space-y-2 pl-4 text-xs leading-5 text-fg">
             <li>Connect Square on this page and approve access so checkout can charge your seller account.</li>
             <li>
               In Square Dashboard for this location, turn on the correct sales tax. In a sales-tax state, card
@@ -388,9 +432,9 @@ export default function PaymentsTab({ slug }: { slug: string }) {
               disputed orders.
             </li>
           </ol>
-        </CardBody>
-      </Card>
-    </div>
+        </div>
+      )}
+    </span>
   )
 }
 

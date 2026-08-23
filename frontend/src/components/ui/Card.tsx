@@ -62,7 +62,7 @@ export function CardHeader({
       {hasSlots ? (
         <>
           <div className="min-w-0">
-            {title != null && <h3 className="truncate text-display-xs">{title}</h3>}
+            {title != null && <h3 className="text-display-xs">{title}</h3>}
             {subtitle != null && <p className="mt-1 text-sm leading-relaxed text-fg-muted">{subtitle}</p>}
           </div>
           {actions != null && (
