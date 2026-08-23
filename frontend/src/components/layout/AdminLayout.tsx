@@ -46,6 +46,8 @@ import {
 
   WalletCards,
 
+  GraduationCap,
+
   X,
 
 } from 'lucide-react'
@@ -207,6 +209,7 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
           { to: `${base}/spotlight`, label: 'Spotlight', icon: Sparkles },
 
           { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
+          { to: `${base}/training`, label: 'Training', icon: GraduationCap },
           { to: `${base}/users`, label: 'Users', icon: Users },
 
         ],
