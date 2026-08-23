@@ -1,0 +1,80 @@
+# LGS Card Vault — https://lgscardvault.com
+# Robots Exclusion Protocol (RFC 9309) + Content Signals (https://contentsignals.org/)
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /platform
+Disallow: /s/*/admin
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+# Answer-engine / AI crawlers: allow indexing so stores and inventory can be cited.
+# GPTBot / ChatGPT-User / OAI-SearchBot = OpenAI
+# ClaudeBot / Claude-Web / anthropic-ai = Anthropic
+# Google-Extended = Gemini training opt-in (Googlebot still follows User-agent: *)
+User-agent: GPTBot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: ChatGPT-User
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: OAI-SearchBot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: ClaudeBot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: Claude-Web
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: anthropic-ai
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: PerplexityBot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: Google-Extended
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: Google-CloudVertexBot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: CCBot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: Applebot-Extended
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: Bytespider
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: meta-externalagent
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: FacebookBot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: Amazonbot
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+User-agent: cohere-ai
+Allow: /
+Content-Signal: search=yes, ai-train=yes, ai-input=yes
+
+Sitemap: https://lgscardvault.com/sitemap.xml
