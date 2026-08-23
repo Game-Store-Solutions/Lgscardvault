@@ -18,6 +18,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: StoreRepository::class)]
@@ -434,7 +435,6 @@ class Store
 
     /** @var Collection<int, ComplianceDocument> */
     #[ORM\OneToMany(mappedBy: 'store', targetEntity: ComplianceDocument::class)]
-    #[Groups(['store:admin'])]
     private Collection $complianceDocuments;
 
     // --- Subscription plan / tier (selected during onboarding) ---
@@ -1279,6 +1279,22 @@ class Store
     public function getComplianceDocuments(): Collection
     {
         return $this->complianceDocuments;
+    }
+
+    /**
+     * Embedded file metadata for the platform-admin review modal.
+     * Storage keys stay on the server.
+     *
+     * @return list<array{id: int|null, kind: string, originalFilename: string, mime: string, createdAt: string}>
+     */
+    #[Groups(['store:admin'])]
+    #[SerializedName('complianceDocuments')]
+    public function getComplianceDocumentSummaries(): array
+    {
+        return array_values(array_map(
+            static fn (ComplianceDocument $document) => $document->toArray(),
+            $this->complianceDocuments->toArray(),
+        ));
     }
 
     public function hasComplianceDocument(string $kind): bool

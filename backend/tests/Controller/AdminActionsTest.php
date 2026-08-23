@@ -2,6 +2,7 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\ComplianceDocument;
 use App\Entity\Store;
 use App\Entity\User;
 use App\Service\Compliance\StoreComplianceGate;
@@ -208,5 +209,46 @@ final class AdminActionsTest extends WebTestCase
 
         $this->em->clear();
         self::assertNull($this->em->getRepository(Store::class)->find($id));
+    }
+
+    public function testAdminStoreListIncludesComplianceDocuments(): void
+    {
+        $store = $this->pendingStore();
+        $document = new ComplianceDocument(
+            $store->getOwner(),
+            ComplianceDocument::KIND_SELLER_PERMIT,
+            bin2hex(random_bytes(16)).'.pdf',
+            'seller-permit.pdf',
+            'application/pdf',
+        );
+        $document->setStore($store);
+        $store->getComplianceDocuments()->add($document);
+        $this->em->persist($document);
+        $this->em->flush();
+
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $this->authRequest($admin, 'GET', '/api/admin/stores');
+        self::assertResponseIsSuccessful();
+
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertIsArray($body);
+        $members = $body['member'] ?? $body['hydra:member'] ?? $body;
+        self::assertIsArray($members);
+
+        $found = null;
+        foreach ($members as $row) {
+            if (($row['id'] ?? null) === $store->getId()) {
+                $found = $row;
+                break;
+            }
+        }
+        self::assertIsArray($found);
+        self::assertIsArray($found['complianceDocuments'] ?? null);
+        self::assertCount(1, $found['complianceDocuments']);
+        self::assertSame($document->getId(), $found['complianceDocuments'][0]['id'] ?? null);
+        self::assertSame('seller_permit', $found['complianceDocuments'][0]['kind'] ?? null);
+        self::assertSame('seller-permit.pdf', $found['complianceDocuments'][0]['originalFilename'] ?? null);
+        self::assertSame('application/pdf', $found['complianceDocuments'][0]['mime'] ?? null);
+        self::assertArrayNotHasKey('storageKey', $found['complianceDocuments'][0]);
     }
 }

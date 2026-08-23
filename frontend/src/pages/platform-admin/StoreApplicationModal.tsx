@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, ExternalLink, X } from 'lucide-react'
 import type { Store } from '../../api/types'
 import { Badge, Button, Modal, Textarea } from '../../components/ui'
-import api from '../../api/client'
+import { ComplianceDocumentGallery } from './ComplianceDocumentPreview'
 
 const COLOR_KEYS: { key: keyof Store; label: string }[] = [
   { key: 'primaryColor', label: 'Primary' },
@@ -47,7 +47,7 @@ export function StoreApplicationModal({
       open={Boolean(store)}
       onClose={onClose}
       title={`Review · ${store.name}`}
-      className="max-w-2xl"
+      className="max-w-4xl"
       footer={
         <>
           <Button
@@ -153,12 +153,6 @@ function ComplianceReview({ store }: { store: Store }) {
   const errors = store.complianceReview?.errors ?? []
   const cdtfa = store.complianceReview?.cdtfaVerifyUrl
 
-  async function openDocument(id: number) {
-    const { data } = await api.get(`/compliance-documents/${id}`, { responseType: 'blob' })
-    const url = URL.createObjectURL(data)
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-
   return (
     <div className="space-y-3 rounded-card border border-border bg-bg p-4">
       <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Licenses & entity</p>
@@ -187,15 +181,7 @@ function ComplianceReview({ store }: { store: Store }) {
           <span className="text-fg-muted"> — lookup only; we do not scrape or auto-validate.</span>
         </p>
       )}
-      {docs.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {docs.map((doc) => (
-            <Button key={doc.id} type="button" size="sm" variant="secondary" onClick={() => void openDocument(doc.id)}>
-              {doc.kind.replace('_', ' ')} · {doc.originalFilename}
-            </Button>
-          ))}
-        </div>
-      )}
+      <ComplianceDocumentGallery documents={docs} />
     </div>
   )
 }

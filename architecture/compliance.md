@@ -47,7 +47,7 @@ Descriptions of the product behavior that already lives in this repository. Each
 | **Legal pages** | Public `/privacy`, `/terms`, `/pickup`, `/merchant-terms`, `/fan-content` — SaaS / store-is-seller copy. | [`LegalPage.tsx`](../frontend/src/pages/LegalPage.tsx) |
 | **License intake** | Onboarding Licenses step: legal name, entity, EIN optional, seller’s permit number and/or private file, city/secondhand when they buy from the public, insurance attestation. | [`LicensesStep.tsx`](../frontend/src/pages/onboarding/steps/LicensesStep.tsx) |
 | **Approve gate** | Submit and super-admin approve both call `StoreComplianceGate`. Incomplete intake cannot go live. | [`StoreComplianceGate.php`](../backend/src/Service/Compliance/StoreComplianceGate.php) |
-| **Private permit files** | PDF/JPEG/PNG/WebP under `var/share/compliance-docs/` (not web root). Owner or super-admin download only. | [`ComplianceDocumentStore.php`](../backend/src/Service/Compliance/ComplianceDocumentStore.php) |
+| **Private permit files** | PDF/JPEG/PNG/WebP under `var/share/compliance-docs/` (not web root). Owner or super-admin download only. Platform-admin review modal shows the file inline (image or PDF). | [`ComplianceDocumentStore.php`](../backend/src/Service/Compliance/ComplianceDocumentStore.php), [`StoreApplicationModal.tsx`](../frontend/src/pages/platform-admin/StoreApplicationModal.tsx) |
 | **CA admin helper** | California applications show a CDTFA permits webpage link. **No scrape, no 50-state API.** | [`UsRegion::cdtfaVerifyUrl()`](../backend/src/Service/Onboarding/UsRegion.php) |
 | **13+ date of birth** | Register and owner Account step require `dateOfBirth`. Under 13 is 400. DOB is stored and **never** returned in API JSON. | [`AuthController.php`](../backend/src/Controller/AuthController.php) |
 | **Cookie banner** | Necessary vs accept-all stored in `lgscv-cookie-consent`. `analyticsAllowed()` is the gate for any future pixel. | [`cookieConsent.ts`](../frontend/src/lib/cookieConsent.ts) |
@@ -167,7 +167,7 @@ sequenceDiagram
     API->>Docs: store on disk, not web root
     Owner->>API: POST /api/onboarding/store { compliance, documentIds }
     API->>Gate: errors(store) before Square subscription charge
-    Admin->>Admin: Review permit / CDTFA link / files
+    Admin->>Admin: Review permit / CDTFA link / inline file preview
     Admin->>API: POST /api/admin/stores/{id}/approve
     API->>Gate: refuse if intake incomplete
 ```
