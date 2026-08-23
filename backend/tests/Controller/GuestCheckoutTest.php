@@ -27,6 +27,11 @@ final class GuestCheckoutTest extends WebTestCase
         $this->em = $container->get('doctrine')->getManager();
         $this->fixtures = new CatalogFixtures($this->em);
         $this->gateway = $container->get(CheckoutGatewayInterface::class);
+        $this->gateway->failCreateOrder = false;
+        $this->gateway->addedTaxCents = 0;
+        $this->gateway->declineWith = null;
+        $this->gateway->charges = [];
+        $this->gateway->ready = true;
     }
 
     /** @return array<string, mixed> */
@@ -93,6 +98,93 @@ final class GuestCheckoutTest extends WebTestCase
 
         $this->em->refresh($item);
         self::assertSame($beforeStock - 2, $item->getQuantity());
+    }
+
+    public function testGuestCardCheckoutCompletesWithZeroTaxInOregon(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing(stock: 3, priceCents: 900);
+        $store->setRegion('OR');
+        $this->em->flush();
+        $this->gateway->ready = true;
+        $this->gateway->addedTaxCents = 0;
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout/quote", [
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertTrue($quote['taxReady'] ?? false);
+        self::assertSame(0, $quote['taxCents'] ?? null);
+
+        $response = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout", [
+            'customerName' => 'Oregon Guest',
+            'fulfillment' => Order::FULFILLMENT_PICKUP,
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+            'token' => 'fake-nonce',
+        ]);
+
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertSame(0, $response['taxCents'] ?? null);
+        self::assertSame(900, $response['paidCents'] ?? null);
+        self::assertCount(1, $this->gateway->charges);
+    }
+
+    public function testGuestCardCheckoutBlocksZeroTaxInCalifornia(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing(stock: 3, priceCents: 900);
+        $store->setRegion('CA');
+        $this->em->flush();
+        $this->gateway->ready = true;
+        $this->gateway->addedTaxCents = 0;
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout/quote", [
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertFalse($quote['taxReady'] ?? true);
+
+        $response = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout", [
+            'customerName' => 'California Guest',
+            'fulfillment' => Order::FULFILLMENT_PICKUP,
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+            'token' => 'fake-nonce',
+        ]);
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('sales tax', strtolower((string) ($response['detail'] ?? '')));
+        self::assertSame([], $this->gateway->charges);
+    }
+
+    public function testGuestCheckoutQuoteIncludesTax(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing(stock: 3, priceCents: 900);
+        $this->gateway->ready = true;
+        $this->gateway->addedTaxCents = 75;
+
+        $quote = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout/quote", [
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 2]],
+        ]);
+
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame(1800, $quote['subtotalCents'] ?? null);
+        self::assertSame(75, $quote['taxCents'] ?? null);
+        self::assertSame(1875, $quote['dueCents'] ?? null);
+    }
+
+    public function testGuestCheckoutRejectsShipping(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing();
+        $this->gateway->ready = true;
+
+        $response = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout", [
+            'customerName' => 'Pat',
+            'fulfillment' => Order::FULFILLMENT_SHIPPING,
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+            'token' => 'fake-nonce',
+        ]);
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('pickup', strtolower((string) ($response['detail'] ?? '')));
+        self::assertSame([], $this->gateway->charges);
     }
 
     public function testGuestPayInStoreWhenSquareIsReady(): void

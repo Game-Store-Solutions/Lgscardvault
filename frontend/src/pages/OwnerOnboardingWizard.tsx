@@ -8,8 +8,10 @@ import { useOnboarding } from './onboarding/useOnboarding'
 import {
   AccountStep,
   AddressStep,
+  VerifyStep,
   BrandingStep,
   ColorsStep,
+  LicensesStep,
   PaymentStep,
   PlanStep,
   ReviewStep,
@@ -57,6 +59,9 @@ export default function OwnerOnboardingWizard() {
           }
         >
           {o.currentKey === 'account' && <AccountStep data={o.data} patch={o.patch} locked={o.accountCreated} />}
+          {o.currentKey === 'verify' && (
+            <VerifyStep data={o.data} patch={o.patch} verified={o.emailVerified} />
+          )}
           {o.currentKey === 'address' && (
             <AddressStep data={o.data} patch={o.patch} patchAddress={o.patchAddress} applyAddress={o.applyAddress} />
           )}
@@ -76,8 +81,15 @@ export default function OwnerOnboardingWizard() {
               patchPayment={o.patchPayment}
             />
           )}
+          {o.currentKey === 'licenses' && <LicensesStep data={o.data} patch={o.patch} />}
           {o.currentKey === 'review' && (
-            <ReviewStep data={o.data} plan={o.selectedPlan} paymentRequired={o.paymentRequired} onJump={o.jumpTo} />
+            <ReviewStep
+              data={o.data}
+              plan={o.selectedPlan}
+              paymentRequired={o.paymentRequired}
+              onJump={o.jumpTo}
+              onAcceptMerchantTerms={(value) => o.patch({ acceptedMerchantTerms: value })}
+            />
           )}
 
           {o.error && (

@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router'
 import { Moon, Sun } from 'lucide-react'
 import { BackButton } from '../ui'
 import { PageTransition } from '../motion'
+import { SkipToContent } from './SkipToContent'
 import { useTheme } from '../../hooks'
 
 /**
@@ -15,6 +16,7 @@ export default function AuthLayout() {
 
   return (
     <div className="min-h-screen bg-bg text-fg">
+      <SkipToContent />
       <div className="pointer-events-none fixed right-4 top-4 z-30 flex items-center gap-2">
         <BackButton to="/" tone="overlay" className="pointer-events-auto">
           Marketplace
@@ -29,7 +31,9 @@ export default function AuthLayout() {
         </button>
       </div>
       <PageTransition routeKey={location.pathname}>
-        <Outlet />
+        <main id="main-content">
+          <Outlet />
+        </main>
       </PageTransition>
     </div>
   )

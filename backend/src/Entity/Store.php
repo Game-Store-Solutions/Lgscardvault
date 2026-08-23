@@ -9,6 +9,8 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\StoreRepository;
+use App\Service\Compliance\StoreComplianceGate;
+use App\Service\Onboarding\UsRegion;
 use App\State\ActiveStoreCollectionProvider;
 use App\State\StoreAdminProcessor;
 use App\State\StoreBySlugProvider;
@@ -16,6 +18,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: StoreRepository::class)]
@@ -421,6 +424,23 @@ class Store
     #[Groups(['store:admin'])]
     private ?float $longitude = null;
 
+    /**
+     * Owner-submitted license intake (legal name, permits, secondhand). Admin-only.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['store:admin'])]
+    private ?array $compliance = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['store:admin'])]
+    private ?\DateTimeImmutable $merchantTermsAcceptedAt = null;
+
+    /** @var Collection<int, ComplianceDocument> */
+    #[ORM\OneToMany(mappedBy: 'store', targetEntity: ComplianceDocument::class)]
+    private Collection $complianceDocuments;
+
     // --- Subscription plan / tier (selected during onboarding) ---
 
     /** Never billed: free tier, or a paid store that has not paid yet. */
@@ -497,6 +517,7 @@ class Store
         $this->createdAt = new \DateTimeImmutable();
         $this->inventoryItems = new ArrayCollection();
         $this->staff = new ArrayCollection();
+        $this->complianceDocuments = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -1242,6 +1263,81 @@ class Store
         $this->longitude = $longitude;
 
         return $this;
+    }
+
+    /** @return array<string, mixed> */
+    public function getCompliance(): array
+    {
+        return $this->compliance ?? [];
+    }
+
+    /** @param array<string, mixed>|null $compliance */
+    public function setCompliance(?array $compliance): static
+    {
+        $this->compliance = $compliance;
+
+        return $this;
+    }
+
+    public function getMerchantTermsAcceptedAt(): ?\DateTimeImmutable
+    {
+        return $this->merchantTermsAcceptedAt;
+    }
+
+    public function setMerchantTermsAcceptedAt(?\DateTimeImmutable $merchantTermsAcceptedAt): static
+    {
+        $this->merchantTermsAcceptedAt = $merchantTermsAcceptedAt;
+
+        return $this;
+    }
+
+    /** @return Collection<int, ComplianceDocument> */
+    public function getComplianceDocuments(): Collection
+    {
+        return $this->complianceDocuments;
+    }
+
+    /**
+     * Embedded file metadata for the platform-admin review modal.
+     * Storage keys stay on the server.
+     *
+     * @return list<array{id: int|null, kind: string, originalFilename: string, mime: string, createdAt: string}>
+     */
+    #[Groups(['store:admin'])]
+    #[SerializedName('complianceDocuments')]
+    public function getComplianceDocumentSummaries(): array
+    {
+        return array_values(array_map(
+            static fn (ComplianceDocument $document) => $document->toArray(),
+            $this->complianceDocuments->toArray(),
+        ));
+    }
+
+    public function hasComplianceDocument(string $kind): bool
+    {
+        foreach ($this->complianceDocuments as $document) {
+            if ($document->getKind() === $kind) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Admin review helpers. Not persisted — computed from intake + region.
+     *
+     * @return array{errors: list<string>, cdtfaVerifyUrl: string|null}
+     */
+    #[Groups(['store:admin'])]
+    public function getComplianceReview(): array
+    {
+        $code = UsRegion::normalize((string) $this->getRegion());
+
+        return [
+            'errors' => StoreComplianceGate::errors($this),
+            'cdtfaVerifyUrl' => 'CA' === $code ? UsRegion::cdtfaVerifyUrl() : null,
+        ];
     }
 
     public function getPlanKey(): ?string

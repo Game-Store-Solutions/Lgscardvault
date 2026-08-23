@@ -59,6 +59,7 @@ import { Avatar, BackButton, Button, buttonVariants } from '../ui'
 import { ProfileNavBadge } from '../profile'
 
 import { PageTransition } from '../motion'
+import { SkipToContent } from './SkipToContent'
 
 import { CASE_CARDS_LABEL } from '../../pages/utils/actionsUtil'
 
@@ -268,6 +269,8 @@ export default function AdminLayout() {
   return (
 
     <div className="min-h-screen bg-bg text-fg">
+
+      <SkipToContent />
 
       {sidebarOpen && (
 
@@ -492,6 +495,8 @@ export default function AdminLayout() {
 
 
         <main
+
+          id="main-content"
 
           className={
 

@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import api, { extractErrorMessage } from '../../api/client'
 import type { GeocodeSuggestion, Plan } from '../../api/types'
 import { useAuth } from '../../context/AuthContext'
-import { STEPS } from './config'
+import { STEPS, stepIndex } from './config'
 import { isStepValid } from './validation'
 import {
   EMPTY_ONBOARDING,
@@ -20,8 +19,7 @@ import {
  * thin view: it reads this hook's values and wires actions to buttons/steps.
  */
 export function useOnboarding() {
-  const { register, user, refreshUser } = useAuth()
-  const navigate = useNavigate()
+  const { register, user, refreshUser, loginWithToken } = useAuth()
 
   const [data, setData] = useState<OnboardingData>(() => ({
     ...EMPTY_ONBOARDING,
@@ -30,6 +28,7 @@ export function useOnboarding() {
   }))
   const [step, setStep] = useState(0)
   const [accountCreated, setAccountCreated] = useState(Boolean(user))
+  const [emailVerified, setEmailVerified] = useState(Boolean(user?.emailVerified))
   const [slugEdited, setSlugEdited] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -41,6 +40,9 @@ export function useOnboarding() {
   useEffect(() => {
     if (!user) return
     setAccountCreated(true)
+    if (user.emailVerified) {
+      setEmailVerified(true)
+    }
     setData((d) => ({
       ...d,
       displayName: d.displayName || (user.displayName ?? ''),
@@ -48,22 +50,18 @@ export function useOnboarding() {
     }))
   }, [user])
 
-  // Only fetch plans once the owner is authenticated — the /plans endpoint
-  // requires auth, and firing it on the (pre-login) account step would 401 and
-  // bounce the user to /login via the axios interceptor.
   const plansQuery = useQuery({
     queryKey: ['plans'],
     queryFn: async () => {
       const { data } = await api.get<{ plans: Plan[] }>('/plans')
       return data.plans
     },
-    enabled: accountCreated,
+    enabled: Boolean(user),
   })
   const plans = plansQuery.data ?? []
   const selectedPlan = plans.find((p) => p.key === data.planKey)
   const paymentRequired = (selectedPlan?.priceCents ?? 0) > 0
 
-  // --- state updaters ---
   const patch = (partial: Partial<OnboardingData>) => setData((d) => ({ ...d, ...partial }))
   const patchAddress = (partial: Partial<OnboardingAddress>) =>
     setData((d) => ({ ...d, address: { ...d.address, ...partial } }))
@@ -72,7 +70,6 @@ export function useOnboarding() {
   const patchPayment = (partial: Partial<OnboardingPayment>) =>
     setData((d) => ({ ...d, payment: { ...d.payment, ...partial } }))
 
-  // Store name auto-derives the slug until the owner edits the slug directly.
   const setStoreName = (name: string) =>
     setData((d) => ({ ...d, storeName: name, slug: slugEdited ? d.slug : slugify(name) }))
   const setSlug = (value: string) => {
@@ -86,34 +83,75 @@ export function useOnboarding() {
       city: s.city,
       region: s.region,
       postalCode: s.postalCode,
-      country: s.country,
+      country: 'US',
       latitude: s.latitude,
       longitude: s.longitude,
     })
 
-  // --- navigation ---
+  function goToAfterAccount() {
+    setStep(emailVerified ? stepIndex('address') : stepIndex('verify'))
+  }
+
   async function goNext() {
     setError('')
-    // The account step provisions the user so every later request is authenticated.
-    if (STEPS[step].key === 'account' && !accountCreated) {
+    const key = STEPS[step].key
+
+    if (key === 'account' && !accountCreated) {
       setBusy(true)
       try {
-        sessionStorage.setItem('verify-next', '/register/owner')
-        await register(data.email, data.password, data.displayName, 'owner')
-        navigate(`/verify-email/sent?email=${encodeURIComponent(data.email)}`)
-        return
+        await register(data.email, data.password, data.displayName, 'owner', data.acceptedTerms, data.dateOfBirth)
+        setAccountCreated(true)
+        setEmailVerified(false)
+        setStep(stepIndex('verify'))
       } catch (e) {
         setError(extractErrorMessage(e, 'Could not create your account. The email may already be in use.'))
+      } finally {
         setBusy(false)
-        return
       }
+      return
     }
+
+    if (key === 'account') {
+      goToAfterAccount()
+      return
+    }
+
+    if (key === 'verify' && !emailVerified) {
+      setBusy(true)
+      try {
+        const { data: verified } = await api.post<{ token: string }>('/auth/verify-email', {
+          email: data.email.trim(),
+          code: data.verifyCode.trim(),
+        })
+        await loginWithToken(verified.token)
+        setEmailVerified(true)
+        setStep(stepIndex('address'))
+      } catch (e) {
+        setError(extractErrorMessage(e, 'That code is invalid or has expired.'))
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
   function goBack() {
     setError('')
+    if (STEPS[step].key === 'address' && emailVerified) {
+      setStep(stepIndex('account'))
+      return
+    }
     setStep((s) => Math.max(s - 1, 0))
+  }
+
+  function jumpTo(index: number) {
+    if (!emailVerified && index > stepIndex('verify')) {
+      setStep(stepIndex('verify'))
+      return
+    }
+    setStep(index)
   }
 
   async function submit() {
@@ -135,6 +173,9 @@ export function useOnboarding() {
               verificationToken: data.payment.verificationToken,
             }
           : {},
+        acceptedMerchantTerms: data.acceptedMerchantTerms,
+        compliance: data.compliance,
+        documentIds: data.complianceDocuments.map((d) => d.id),
       })
       await refreshUser()
       setSubmitted({ name: data.storeName, slug: data.slug })
@@ -149,10 +190,9 @@ export function useOnboarding() {
 
   const currentKey = STEPS[step].key
   const isLast = step === STEPS.length - 1
-  const canProceed = isStepValid(currentKey, data, { accountCreated, paymentRequired })
+  const canProceed = isStepValid(currentKey, data, { accountCreated, paymentRequired, emailVerified })
 
   return {
-    // state
     data,
     step,
     currentKey,
@@ -162,12 +202,11 @@ export function useOnboarding() {
     error,
     submitted,
     accountCreated,
-    // plans
+    emailVerified,
     plans,
     plansLoading: plansQuery.isLoading,
     selectedPlan,
     paymentRequired,
-    // updaters
     patch,
     patchAddress,
     patchBranding,
@@ -175,10 +214,9 @@ export function useOnboarding() {
     setStoreName,
     setSlug,
     applyAddress,
-    // navigation
     goNext,
     goBack,
     submit,
-    jumpTo: setStep,
+    jumpTo,
   }
 }

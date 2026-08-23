@@ -2,8 +2,10 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\ComplianceDocument;
 use App\Entity\Store;
 use App\Entity\User;
+use App\Service\Compliance\StoreComplianceGate;
 use App\Tests\Support\CatalogFixtures;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
@@ -33,6 +35,13 @@ final class AdminActionsTest extends WebTestCase
         $store = $this->fixtures->store('pending-store');
         $store->setStatus(Store::STATUS_PENDING);
         $store->setIsActive(false);
+        $store->setRegion('CA');
+        $store->setCompliance(StoreComplianceGate::normalize([
+            'legalBusinessName' => 'Pending Cards LLC',
+            'entityType' => 'llc',
+            'sellerPermitNumber' => 'SR-1',
+            'insuranceAttested' => true,
+        ]));
         $this->em->flush();
 
         return $store;
@@ -105,6 +114,19 @@ final class AdminActionsTest extends WebTestCase
         self::assertTrue($reloaded->isActive());
     }
 
+    public function testApproveStoreRequiresLicenseIntake(): void
+    {
+        $store = $this->fixtures->store('bare-pending');
+        $store->setStatus(Store::STATUS_PENDING);
+        $store->setIsActive(false);
+        $store->setRegion('CA');
+        $this->em->flush();
+
+        $this->client->loginUser($this->fixtures->user(['ROLE_SUPER_ADMIN']));
+        $this->client->request('POST', sprintf('/api/admin/stores/%d/approve', $store->getId()));
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testRejectStoreRecordsReason(): void
     {
         $store = $this->pendingStore();
@@ -160,6 +182,40 @@ final class AdminActionsTest extends WebTestCase
         self::assertSame(Store::STATUS_APPROVED, $enabled->getStatus());
     }
 
+    public function testEnableDoesNotApproveAPendingStore(): void
+    {
+        $store = $this->pendingStore();
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+
+        $this->authRequest($admin, 'POST', sprintf('/api/admin/stores/%d/enable', $store->getId()));
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(Store::class)->find($store->getId());
+        self::assertSame(Store::STATUS_PENDING, $reloaded->getStatus());
+        self::assertFalse($reloaded->isActive());
+    }
+
+    public function testAdminPatchCannotActivateAPendingStore(): void
+    {
+        $store = $this->pendingStore();
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+
+        $this->authRequest(
+            $admin,
+            'PATCH',
+            sprintf('/api/admin/stores/%d', $store->getId()),
+            ['CONTENT_TYPE' => 'application/merge-patch+json'],
+            (string) json_encode(['isActive' => true]),
+        );
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(Store::class)->find($store->getId());
+        self::assertFalse($reloaded->isActive());
+        self::assertSame(Store::STATUS_PENDING, $reloaded->getStatus());
+    }
+
     public function testDeleteStoreRequiresSlugConfirmation(): void
     {
         $store = $this->fixtures->store('doomed-store');
@@ -187,5 +243,46 @@ final class AdminActionsTest extends WebTestCase
 
         $this->em->clear();
         self::assertNull($this->em->getRepository(Store::class)->find($id));
+    }
+
+    public function testAdminStoreListIncludesComplianceDocuments(): void
+    {
+        $store = $this->pendingStore();
+        $document = new ComplianceDocument(
+            $store->getOwner(),
+            ComplianceDocument::KIND_SELLER_PERMIT,
+            bin2hex(random_bytes(16)).'.pdf',
+            'seller-permit.pdf',
+            'application/pdf',
+        );
+        $document->setStore($store);
+        $store->getComplianceDocuments()->add($document);
+        $this->em->persist($document);
+        $this->em->flush();
+
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $this->authRequest($admin, 'GET', '/api/admin/stores');
+        self::assertResponseIsSuccessful();
+
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertIsArray($body);
+        $members = $body['member'] ?? $body['hydra:member'] ?? $body;
+        self::assertIsArray($members);
+
+        $found = null;
+        foreach ($members as $row) {
+            if (($row['id'] ?? null) === $store->getId()) {
+                $found = $row;
+                break;
+            }
+        }
+        self::assertIsArray($found);
+        self::assertIsArray($found['complianceDocuments'] ?? null);
+        self::assertCount(1, $found['complianceDocuments']);
+        self::assertSame($document->getId(), $found['complianceDocuments'][0]['id'] ?? null);
+        self::assertSame('seller_permit', $found['complianceDocuments'][0]['kind'] ?? null);
+        self::assertSame('seller-permit.pdf', $found['complianceDocuments'][0]['originalFilename'] ?? null);
+        self::assertSame('application/pdf', $found['complianceDocuments'][0]['mime'] ?? null);
+        self::assertArrayNotHasKey('storageKey', $found['complianceDocuments'][0]);
     }
 }

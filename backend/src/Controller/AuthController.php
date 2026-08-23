@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Security\ApiRateLimit;
+use App\Service\Auth\AgeAttestation;
 use App\Service\Auth\EmailVerificationService;
 use App\Service\Auth\PasswordResetService;
 use App\Service\Mail\TransactionalMailer;
@@ -52,6 +53,7 @@ class AuthController extends AbstractController
         $password = isset($payload['password']) ? (string) $payload['password'] : '';
         $displayName = isset($payload['displayName']) ? trim((string) $payload['displayName']) : '';
         $accountType = isset($payload['accountType']) ? trim((string) $payload['accountType']) : 'owner';
+        $acceptedTerms = $this->isTruthy($payload['acceptedTerms'] ?? false);
 
         // Admin accounts must never be self-registered through this public endpoint.
         // The supported way to bootstrap a super-admin is the `app:create-admin` console command.
@@ -60,6 +62,18 @@ class AuthController extends AbstractController
                 ['error' => 'Admin accounts cannot be self-registered.'],
                 Response::HTTP_FORBIDDEN,
             );
+        }
+
+        if (!$acceptedTerms) {
+            return $this->json(
+                ['error' => 'Please accept the Terms of Service and Privacy Policy.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        $dateOfBirth = $this->parseDateOfBirth($payload['dateOfBirth'] ?? null);
+        if ($dateOfBirth instanceof JsonResponse) {
+            return $dateOfBirth;
         }
 
         $violations = $this->validator->validate($email, [new Assert\NotBlank(), new Assert\Email()]);
@@ -86,15 +100,17 @@ class AuthController extends AbstractController
             ->setEmail($email)
             ->setDisplayName($displayName)
             ->setRoles($roles)
-            ->setEmailVerified(false);
+            ->setEmailVerified(false)
+            ->setDateOfBirth($dateOfBirth)
+            ->setTermsAcceptedAt(new \DateTimeImmutable());
 
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
         $this->userRepository->save($user, true);
 
         try {
-            $token = $this->emailVerification->issueToken($user);
-            $this->mail->sendEmailVerification($user, $token);
+            $issued = $this->emailVerification->issue($user);
+            $this->mail->sendEmailVerification($user, $issued['token'], $issued['otp']);
         } catch (\Throwable $e) {
             $this->logger->error('Verification email failed.', [
                 'user' => $user->getId(),
@@ -227,8 +243,8 @@ class AuthController extends AbstractController
         $user = $this->userRepository->findOneByEmailInsensitive($email);
         if ($user instanceof User && !$user->isEmailVerified()) {
             try {
-                $token = $this->emailVerification->issueToken($user);
-                $this->mail->sendEmailVerification($user, $token);
+                $issued = $this->emailVerification->issue($user);
+                $this->mail->sendEmailVerification($user, $issued['token'], $issued['otp']);
             } catch (\Throwable $e) {
                 $this->logger->error('Verification email failed.', [
                     'user' => $user->getId(),
@@ -244,8 +260,8 @@ class AuthController extends AbstractController
     public function verifyEmail(Request $request): JsonResponse
     {
         $blocked = ApiRateLimit::enforce(
-            $this->resetPasswordLimiter,
-            'verify:'.($request->getClientIp() ?? 'unknown'),
+            $this->emailVerificationLimiter,
+            'verify-ip:'.($request->getClientIp() ?? 'unknown'),
             'Too many verification attempts. Please wait and try again.',
         );
         if ($blocked instanceof JsonResponse) {
@@ -254,9 +270,24 @@ class AuthController extends AbstractController
 
         /** @var array<string, mixed> $payload */
         $payload = json_decode($request->getContent(), true) ?? [];
-        $token = isset($payload['token']) ? (string) $payload['token'] : '';
+        $token = isset($payload['token']) ? trim((string) $payload['token']) : '';
+        $email = isset($payload['email']) ? trim((string) $payload['email']) : '';
+        $code = isset($payload['code']) ? trim((string) $payload['code']) : '';
 
-        $result = $this->emailVerification->consume($token);
+        if ('' !== $email) {
+            $blocked = ApiRateLimit::enforce(
+                $this->emailVerificationLimiter,
+                'verify-email:'.hash('sha256', strtolower($email)),
+                'Too many verification attempts. Please wait and try again.',
+            );
+            if ($blocked instanceof JsonResponse) {
+                return $blocked;
+            }
+        }
+
+        $result = '' !== $token
+            ? $this->emailVerification->consume($token)
+            : $this->emailVerification->consumeOtp($email, $code);
         if (!$result instanceof User) {
             return $this->json(['error' => $result], Response::HTTP_BAD_REQUEST);
         }
@@ -274,5 +305,23 @@ class AuthController extends AbstractController
             'detail' => 'Email verified.',
             'token' => $this->jwtManager->create($result),
         ]);
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        if (true === $value || 1 === $value || '1' === $value) {
+            return true;
+        }
+
+        return is_string($value) && \in_array(strtolower($value), ['true', 'yes', 'on'], true);
+    }
+
+    private function parseDateOfBirth(mixed $raw): \DateTimeImmutable|JsonResponse
+    {
+        try {
+            return AgeAttestation::parse($raw);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
     }
 }

@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Store;
 use App\Repository\StoreRepository;
+use App\Service\Compliance\StoreComplianceGate;
 use App\Service\Store\StoreAdminRemover;
 use App\Service\Store\StoreApplicationMailer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,6 +41,11 @@ class StoreApprovalController extends AbstractController
         $store = $this->storeRepository->find($id);
         if (!$store instanceof Store) {
             return $this->json(['error' => 'Store not found.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $errors = StoreComplianceGate::errors($store);
+        if ($errors !== []) {
+            return $this->json(['error' => $errors[0]], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $store->setStatus(Store::STATUS_APPROVED)
@@ -100,7 +106,7 @@ class StoreApprovalController extends AbstractController
         return $this->json($this->serialize($store));
     }
 
-    /** Bring a disabled store back online (also clears a prior rejection). */
+    /** Bring a previously approved, disabled store back online. */
     #[Route('/stores/{id}/enable', name: 'api_admin_store_enable', methods: ['POST'])]
     public function enable(int $id): JsonResponse
     {
@@ -109,9 +115,13 @@ class StoreApprovalController extends AbstractController
             return $this->json(['error' => 'Store not found.'], Response::HTTP_NOT_FOUND);
         }
 
-        $store->setStatus(Store::STATUS_APPROVED)
-            ->setIsActive(true)
-            ->setRejectionReason(null);
+        if (Store::STATUS_APPROVED !== $store->getStatus()) {
+            return $this->json([
+                'error' => 'Pending or rejected stores must be approved after license review.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $store->setIsActive(true);
         $this->entityManager->flush();
 
         return $this->json($this->serialize($store));

@@ -2,6 +2,8 @@
 
 PostgreSQL 16. Doctrine migrations in `backend/migrations/` create the schema. Card data uses UUID primary keys from Scryfall; most application-owned records use auto-increment integer IDs.
 
+Launch-compliance tables (`stores.compliance`, `compliance_documents`, `privacy_requests`, DOB, order tax/disputes) are explained in [compliance.md](compliance.md).
+
 ## Entity relationship diagram
 
 ```mermaid
@@ -9,6 +11,8 @@ erDiagram
     users ||--o{ stores : "owns"
     users ||--o{ store_customers : "shops as"
     users ||--o{ customer_notifications : "receives"
+    users ||--o{ compliance_documents : "uploads"
+    stores ||--o{ compliance_documents : "reviewed on"
     stores ||--o{ store_customers : "has customers"
     stores ||--o{ inventory_items : "stocks"
     stores ||--o{ orders : "receives"
@@ -34,6 +38,8 @@ erDiagram
         string password
         json roles
         string display_name
+        date date_of_birth "nullable, not in API JSON"
+        timestamp terms_accepted_at "nullable"
     }
     stores {
         int id PK
@@ -65,6 +71,7 @@ erDiagram
         string payment_customer_id
         string payment_card_id
         string payment_last4
+        json compliance "license intake, admin-only"
         timestamp created_at
     }
     subscription_charges {
@@ -110,7 +117,11 @@ erDiagram
         int total_cents
         int credit_applied_cents
         int paid_cents
+        int tax_cents
         string payment_reference
+        string dispute_status "nullable"
+        string dispute_reason "nullable"
+        timestamp disputed_at "nullable"
         timestamp created_at
     }
     order_lines {
@@ -149,6 +160,29 @@ erDiagram
         text last_error
         timestamp created_at
         timestamp updated_at
+    }
+    compliance_documents {
+        int id PK
+        int owner_id FK
+        int store_id FK "nullable until onboarding submit"
+        string kind "seller_permit / city_license / secondhand"
+        string storage_key UK
+        string original_filename
+        string mime
+        timestamp created_at
+    }
+    privacy_requests {
+        int id PK
+        string type "access / delete / do_not_sell / correct"
+        string status
+        string email
+        string name
+        bool california_resident
+        bool gpc_signal
+        text details
+        text admin_notes
+        timestamp created_at
+        timestamp completed_at
     }
     store_customers {
         int id PK
@@ -225,9 +259,9 @@ The tenant discriminator is `store_id`.
 | Group | Tables | How they are scoped |
 |-------|--------|---------------------|
 | Tenant root | `stores` | Resolved from the URL slug |
-| Directly scoped | `inventory_items`, `orders`, `csv_import_jobs`, `store_customers`, `store_payment_accounts`, `subscription_charges`, `customer_notifications` | Have a `store_id` column. `inventory_items` and `orders` are additionally enforced by `TenantFilter` at the SQL level |
+| Directly scoped | `inventory_items`, `orders`, `csv_import_jobs`, `store_customers`, `store_payment_accounts`, `subscription_charges`, `customer_notifications`, `compliance_documents` (nullable `store_id` until onboarding submit) | Have a `store_id` column. `inventory_items` and `orders` are additionally enforced by `TenantFilter` at the SQL level. Compliance files are owner-or-super-admin, not tenant-filtered SQL. |
 | Transitively scoped | `order_lines`, `csv_import_rows`, `cart_items`, `customer_favorites`, `customer_want_list_entries` | Reached through a directly scoped parent |
-| Global/shared | `users`, `cards` | `users` are global identities; `cards` is the shared catalog |
+| Global/shared | `users`, `cards`, `privacy_requests` | `users` are global identities; `cards` is the shared catalog; privacy requests are platform-wide (super-admin queue), not store-scoped |
 
 See [auth-and-tenancy.md](auth-and-tenancy.md#multi-tenancy-filter) for request-time filter behavior.
 
@@ -243,6 +277,9 @@ See [auth-and-tenancy.md](auth-and-tenancy.md#multi-tenancy-filter) for request-
 | Subscription status | `stores.subscription_status` | `inactive`, `payment_required`, `active`, `past_due`, `suspended` |
 | Subscription charge | `subscription_charges.status` | `paid`, `failed` |
 | Notification type | `customer_notifications.type` | `order_fulfilled` today |
+| Compliance document kind | `compliance_documents.kind` | `seller_permit`, `city_license`, `secondhand` |
+| Privacy request type | `privacy_requests.type` | `access`, `delete`, `do_not_sell`, `correct` |
+| Privacy request status | `privacy_requests.status` | `received`, `in_progress`, `completed`, `rejected` |
 
 ## Key constraints
 
@@ -269,3 +306,7 @@ See [auth-and-tenancy.md](auth-and-tenancy.md#multi-tenancy-filter) for request-
 - Payment status serialization intentionally excludes provider tokens.
 - Platform subscription vault ids (`payment_customer_id`, `payment_card_id`) live on `stores` and are never returned by the API; only `payment_last4` and status are exposed to store owners / platform admins.
 - `subscription_charges` is the month-over-month ledger for platform billing; `stores.current_period_end` is the current-state pointer the renewer uses.
+- `users.date_of_birth` is collected at register (13+) and is **never** returned by the API.
+- `stores.compliance` JSON is admin/owner intake (legal name, permits, entity, insurance attestation). It is not a public storefront field.
+- `compliance_documents` files live under `backend/var/share/compliance-docs/` (not `public/uploads`); only the uploading owner or a super-admin may download.
+- `privacy_requests` hold requester email and narrative for CCPA-style access / delete / do-not-sell / correct — super-admin only after create.

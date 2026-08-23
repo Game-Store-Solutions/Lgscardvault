@@ -19,6 +19,7 @@ import {
 export function CheckoutPanel({
   slug,
   amountDueCents,
+  reserveAmountCents,
   buyerEmail,
   checkoutPath,
   checkoutBody,
@@ -28,10 +29,14 @@ export function CheckoutPanel({
   showOwnerDiagnostics = false,
   paymentBlockedMessage = 'Enter your name to continue.',
   paymentsAdminHref,
+  cardCheckoutReady = true,
+  cardCheckoutBlockedMessage,
   onPlaced,
 }: {
   slug: string
   amountDueCents: number
+  /** Merchandise remaining for a pay-in-store reserve (tax is collected at the counter). */
+  reserveAmountCents?: number
   buyerEmail: string
   checkoutPath: string
   checkoutBody: Record<string, unknown>
@@ -41,6 +46,8 @@ export function CheckoutPanel({
   showOwnerDiagnostics?: boolean
   paymentBlockedMessage?: string
   paymentsAdminHref?: string
+  cardCheckoutReady?: boolean
+  cardCheckoutBlockedMessage?: string | null
   onPlaced: (order: Order) => void
 }) {
   const queryClient = useQueryClient()
@@ -97,6 +104,7 @@ export function CheckoutPanel({
   const config = configQuery.data
   const loadingConfig = configQuery.isLoading
   const squareEnabled = config?.enabled === true
+  const holdCents = reserveAmountCents ?? amountDueCents
 
   if (loadingConfig) {
     return (
@@ -122,7 +130,7 @@ export function CheckoutPanel({
           onClick={() => payInStore.mutate()}
         >
           <Store aria-hidden className="size-4" />
-          Reserve order · pay in store {formatPrice(amountDueCents)}
+          Reserve order · pay in store {formatPrice(holdCents)}
         </Button>
       )}
       {payInStore.isError ? (
@@ -138,15 +146,19 @@ export function CheckoutPanel({
     </p>
   )
 
-  if (!squareEnabled) {
-    const shopperMessage =
-      config?.message?.trim() ||
-      'Online wallets aren\'t available right now. Reserve your order and pay in store at pickup.'
+  if (!squareEnabled || !cardCheckoutReady) {
+    const shopperMessage = !cardCheckoutReady
+      ? cardCheckoutBlockedMessage?.trim() ||
+        'Online card checkout is paused until this store enables sales tax on Square. Reserve and pay in store.'
+      : config?.message?.trim() ||
+        'Online wallets aren\'t available right now. Reserve your order and pay in store at pickup.'
     const ownerMessage = config?.ownerMessage?.trim()
 
     return (
       <div className="mt-5 space-y-3">
-        {showOwnerDiagnostics && ownerMessage ? (
+        {!cardCheckoutReady || !showOwnerDiagnostics || !ownerMessage ? (
+          <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{shopperMessage}</p>
+        ) : (
           <p className="rounded-btn bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-800 dark:bg-warning-950/40 dark:text-warning-200">
             {ownerMessage}
             {paymentsAdminHref ? (
@@ -158,8 +170,6 @@ export function CheckoutPanel({
               </>
             ) : null}
           </p>
-        ) : (
-          <p className="rounded-btn bg-bg px-3 py-2 text-xs leading-5 text-fg-muted">{shopperMessage}</p>
         )}
         {payInStoreBlock}
       </div>

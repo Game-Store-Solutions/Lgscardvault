@@ -8,9 +8,18 @@
   <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#4b5563;">
     Hi {{ displayName }},
   </p>
+  {% if otp %}
+  <p style="margin:0 0 12px;font-size:15px;line-height:1.65;color:#4b5563;">
+    Enter this code on the store setup screen to keep going. It expires in 24 hours.
+  </p>
+  <p style="margin:0 0 24px;font-size:32px;line-height:1.2;font-weight:700;letter-spacing:0.28em;color:#111827;text-align:center;">
+    Your code: {{ otp }}
+  </p>
+  {% else %}
   <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#4b5563;">
     Thanks for creating an LGS Card Vault account. Confirm this email address to finish signing up. This link expires in 24 hours.
   </p>
+  {% endif %}
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 16px;">
     <tr>
       <td align="center" style="border-radius:8px;background:{{ ctaColor|default('#0a1627') }};">

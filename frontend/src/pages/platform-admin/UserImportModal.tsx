@@ -7,9 +7,9 @@ import { Button, Field, Modal } from '../../components/ui'
 import { cx } from '../../lib/cx'
 
 const TEMPLATE_CSV = [
-  'email,displayName,password,roles,emailVerified',
-  'jane@example.com,Jane Doe,,ROLE_USER,true',
-  'owner@example.com,Shop Owner,,ROLE_STORE_OWNER,true',
+  'email,displayName,password,roles,emailVerified,dateOfBirth',
+  'jane@example.com,Jane Doe,,ROLE_USER,true,1991-04-12',
+  'owner@example.com,Shop Owner,,ROLE_STORE_OWNER,true,1988-06-01',
 ].join('\n')
 
 const TEMPLATE_HREF = `data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE_CSV)}`
@@ -104,7 +104,7 @@ export default function UserImportModal({
           <p className="text-xs text-fg-muted">
             Columns:{' '}
             <code className="rounded-btn bg-bg px-1.5 py-0.5 text-brand-600">
-              email, displayName, password, roles, emailVerified
+              email, displayName, password, roles, emailVerified, dateOfBirth
             </code>
           </p>
           <a

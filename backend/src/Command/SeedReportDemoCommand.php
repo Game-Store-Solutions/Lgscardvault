@@ -89,7 +89,7 @@ final class SeedReportDemoCommand extends Command
                 ->setStatus($template['status'])
                 ->setCustomerName($template['customer'])
                 ->setCustomerEmail(strtolower(str_replace(' ', '.', $template['customer'])).'@example.com')
-                ->setFulfillment($index % 5 === 0 ? Order::FULFILLMENT_SHIPPING : Order::FULFILLMENT_PICKUP)
+                ->setFulfillment(Order::FULFILLMENT_PICKUP)
                 ->setChannel($index % 7 === 0 ? Order::CHANNEL_KIOSK : Order::CHANNEL_ONLINE)
                 ->setCreatedAt($createdAt);
 

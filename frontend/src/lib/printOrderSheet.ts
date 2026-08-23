@@ -14,7 +14,7 @@ function escapeHtml(value: string): string {
 
 function orderSheetHtml(order: Order): string {
   const preTaxTotalCents = order.totalCents
-  const taxCents = 0
+  const taxCents = order.taxCents ?? 0
   const postTaxTotalCents = preTaxTotalCents + taxCents
   const itemCount = orderItemCount(order)
 
@@ -108,7 +108,7 @@ function orderSheetHtml(order: Order): string {
             <span>Post-tax total</span>
             <strong>${formatPrice(postTaxTotalCents)}</strong>
           </div>
-          <div class="tax-note">Tax is not calculated yet, so post-tax total currently matches pre-tax total.</div>
+          <div class="tax-note">Tax is collected at the store location for pickup orders. Pay-in-store orders collect tax at the counter.</div>
         </div>
       </body>
     </html>

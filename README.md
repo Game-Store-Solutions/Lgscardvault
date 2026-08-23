@@ -20,9 +20,11 @@ Symfony 8 + API Platform · React 19 + Vite · PostgreSQL · Square · Symfony M
 | Doc | Contents |
 |-----|----------|
 | [architecture/](architecture/README.md) | Feature flowcharts (frontend → API → DB) |
+| [architecture/compliance.md](architecture/compliance.md) | Launch compliance: what the app ships, repo links, and what is still operator/lawyer work |
 | [architecture/commands.md](architecture/commands.md) | Console & worker command cheat sheet |
 | [architecture/local-development.md](architecture/local-development.md) | Local setup, Square sandbox, testing, prod config |
 | [deploy/LAUNCH.md](deploy/LAUNCH.md) | Go-live checklist |
+| [deploy/CHARGEBACKS.md](deploy/CHARGEBACKS.md) | Pickup-proof chargeback runbook (Square disputes) |
 | [deploy/RUNBOOK.md](deploy/RUNBOOK.md) | Day-two ops |
 
 ## Quick start

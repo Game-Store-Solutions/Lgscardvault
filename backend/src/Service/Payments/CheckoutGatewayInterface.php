@@ -23,10 +23,19 @@ interface CheckoutGatewayInterface
     public function isReady(Store $store): bool;
 
     /**
+     * Preview pickup sales tax from the store's Square location (no payment).
+     *
+     * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     *
+     * @return array{taxCents: int, dueCents: int}
+     */
+    public function quotePickupTotals(Store $store, array $lineItems, int $creditCents = 0): array;
+
+    /**
      * @param string                                                              $idempotencyKey stable per order, so a retry cannot double-charge
      * @param list<array{name: string, quantity: int, priceCents: int}>|null       $lineItems      when set, creates a Square Order then pays it
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int}
      *
      * @throws \RuntimeException when the store is not connected or the payment is declined
      */
@@ -48,7 +57,7 @@ interface CheckoutGatewayInterface
     /**
      * @param list<array{name: string, quantity: int, priceCents: int}>|null $lineItems
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int}
      */
     public function chargeVaultedCard(
         Store $store,

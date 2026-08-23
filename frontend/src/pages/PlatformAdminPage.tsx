@@ -37,6 +37,7 @@ import {
   RefreshCw,
   Star,
   Store as StoreIcon,
+  ShieldCheck,
   Trash2,
   Users as UsersIcon,
   XCircle,
@@ -45,14 +46,16 @@ import api, { extractErrorMessage, unwrapCollection } from '../api/client'
 import type { AdminIntegrations, AdminUser, IntegrationStatus, Store } from '../api/types'
 import { StoreApplicationModal } from './platform-admin/StoreApplicationModal'
 import { BillingPanel } from './platform-admin/BillingPanel'
+import { PrivacyRequestsPanel } from './platform-admin/PrivacyRequestsPanel'
 import { isDevBuild } from '../lib/runtimeEnv'
 
-type PlatformAdminTab = 'overview' | 'billing' | 'stores' | 'platform'
+type PlatformAdminTab = 'overview' | 'billing' | 'stores' | 'privacy' | 'platform'
 
 const PLATFORM_TABS: { id: PlatformAdminTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'billing', label: 'Billing', icon: CreditCard },
   { id: 'stores', label: 'Stores', icon: StoreIcon },
+  { id: 'privacy', label: 'Privacy', icon: ShieldCheck },
   { id: 'platform', label: 'Integrations', icon: Plug },
 ]
 
@@ -464,7 +467,7 @@ export default function PlatformAdminPage() {
                           >
                             Imports
                           </Link>
-                          {store.status !== 'pending' && (
+                          {store.status === 'approved' && (
                             <Button
                               variant="secondary"
                               size="sm"
@@ -474,11 +477,11 @@ export default function PlatformAdminPage() {
                               onClick={() =>
                                 setStoreActive.mutate({
                                   id: store.id,
-                                  enable: store.isActive === false || store.status === 'rejected',
+                                  enable: store.isActive === false && store.status === 'approved',
                                 })
                               }
                             >
-                              {store.isActive === false || store.status === 'rejected' ? (
+                              {store.isActive === false ? (
                                 <>
                                   <Power aria-hidden className="size-4" />
                                   Enable
@@ -517,6 +520,16 @@ export default function PlatformAdminPage() {
               </Table>
             )}
           </Card>
+        </TabPanel>
+
+        <TabPanel when="privacy" value={activeTab} className="space-y-4 pt-6">
+          <div>
+            <h2 className="font-display text-xl font-bold text-fg">Privacy requests</h2>
+            <p className="text-sm text-fg-muted">
+              CCPA / Do Not Sell tickets from the public form. Complete within 45 days.
+            </p>
+          </div>
+          <PrivacyRequestsPanel />
         </TabPanel>
 
         <TabPanel when="platform" value={activeTab} className="space-y-6 pt-6">
