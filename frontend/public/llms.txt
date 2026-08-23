@@ -1,0 +1,40 @@
+# LGS Card Vault
+
+> Player-first marketplace for Magic: The Gathering, Pokémon, One Piece, Flesh & Blood, and other TCGs sold by verified local game stores.
+
+LGS Card Vault (https://lgscardvault.com) lets players browse real store inventory, check out online or in store, and sell or trade cards back to shops they already trust. Store owners get a branded storefront, CSV inventory import, Square checkout, events, and a Commander deck builder.
+
+## Start here
+
+- Homepage: https://lgscardvault.com/
+- Store directory: https://lgscardvault.com/stores
+- Open a store: https://lgscardvault.com/register/owner
+- Player account: https://lgscardvault.com/register/customer
+- Privacy: https://lgscardvault.com/privacy
+- Privacy request: https://lgscardvault.com/privacy-request
+- Terms: https://lgscardvault.com/terms
+- Pickup policy: https://lgscardvault.com/pickup
+- Merchant terms: https://lgscardvault.com/merchant-terms
+- Fan-content / takedown: https://lgscardvault.com/fan-content
+- Agent overview (Markdown): https://lgscardvault.com/index.md
+- Auth for agents: https://lgscardvault.com/auth.md
+- Public OpenAPI (unauthenticated surface): https://lgscardvault.com/openapi.json
+- API catalog: https://lgscardvault.com/.well-known/api-catalog
+
+## Public HTTP API (same origin, prefix `/api`)
+
+- `GET /api/stores` — approved storefronts
+- `GET /api/stores/{slug}` — one store
+- `GET /api/stores/{slug}/inventory` — singles in stock
+- `GET /api/health` and `GET /api/health/ready` are exposed as `/health` and `/health/ready` on the site origin
+- `POST /api/contact` — landing-page contact form (rate limited)
+
+Storefront URLs follow `/s/{slug}` (inventory, sealed, mass search, deck builder, sell/trade, events, cart).
+
+## Do not crawl
+
+Admin, account, and raw API collection dumps: `/platform`, `/account`, `/s/*/admin`, `/api/`. Prefer HTML storefronts and the documented public GET endpoints.
+
+## Optional skill
+
+- Browse inventory: https://lgscardvault.com/skills/browse-lgs-inventory/SKILL.md

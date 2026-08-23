@@ -166,6 +166,7 @@ rely on dev seeds (`owner@store.local`).
 - [ ] Uptime monitor on `/health/ready`
 - [ ] GitHub **branch protection** + CI green before merge (`.github/workflows/ci.yml`)
 - [ ] Optional: Google SSO redirect `https://<domain>/api/auth/sso/callback`
+- [ ] **Cloudflare Bot Fight / WAF:** skip or allow `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/index.md`, `/auth.md`, `/openapi.json`, `/.well-known/*`, and known AI crawlers. Super Bot Fight Mode returning **403 + challenge HTML** on `/` makes agent-readiness scanners (and GPTBot/ClaudeBot) treat the site as missing those files even when nginx serves them. After a frontend deploy, purge those paths from cache.
 
 ---
 

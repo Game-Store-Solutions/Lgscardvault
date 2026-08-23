@@ -1,0 +1,10 @@
+{
+  "skills": [
+    {
+      "name": "browse-lgs-inventory",
+      "type": "skill",
+      "description": "Find verified local game stores on LGS Card Vault and look up singles they have in stock.",
+      "url": "https://lgscardvault.com/skills/browse-lgs-inventory/SKILL.md"
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LGS Card Vault public API",
+    "version": "1.0.0",
+    "description": "Unauthenticated marketplace endpoints. Authenticated admin, cart, and account routes are omitted. See /auth.md."
+  },
+  "servers": [
+    {
+      "url": "https://lgscardvault.com/api",
+      "description": "Production (same origin as the storefront)"
+    }
+  ],
+  "paths": {
+    "/stores": {
+      "get": {
+        "operationId": "listStores",
+        "summary": "List approved storefronts",
+        "responses": {
+          "200": {
+            "description": "Store collection"
+          }
+        }
+      }
+    },
+    "/stores/{slug}": {
+      "get": {
+        "operationId": "getStore",
+        "summary": "Get one approved store",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Store" },
+          "404": { "description": "Unknown or inactive store" }
+        }
+      }
+    },
+    "/stores/{slug}/inventory": {
+      "get": {
+        "operationId": "listStoreInventory",
+        "summary": "List singles inventory for a storefront",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Inventory collection" }
+        }
+      }
+    },
+    "/contact": {
+      "post": {
+        "operationId": "submitContact",
+        "summary": "Landing-page contact form",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Accepted" },
+          "429": { "description": "Rate limited" }
+        }
+      }
+    }
+  }
+}
