@@ -197,4 +197,50 @@ final class AuthEmailVerificationTest extends WebTestCase
         self::assertSame(200, $this->client->getResponse()->getStatusCode(), json_encode($verified));
         self::assertArrayHasKey('token', $verified);
     }
+
+    public function testOwnerCanVerifyWithOtpFromTheEmail(): void
+    {
+        $email = $this->uniqueEmail('verify-otp');
+        $this->jsonRequest('POST', '/api/register', [
+            'email' => $email,
+            'password' => 'owner-pass-1',
+            'displayName' => 'OTP Owner',
+            'accountType' => 'owner',
+            'acceptedTerms' => true,
+            'dateOfBirth' => '1988-06-01',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertEmailCount(1);
+        $otp = $this->otpFromLastEmail();
+
+        $wrong = $this->jsonRequest('POST', '/api/auth/verify-email', [
+            'email' => $email,
+            'code' => '000000',
+        ]);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode(), json_encode($wrong));
+
+        $verified = $this->jsonRequest('POST', '/api/auth/verify-email', [
+            'email' => $email,
+            'code' => $otp,
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode(), json_encode($verified));
+        self::assertArrayHasKey('token', $verified);
+
+        $this->jsonRequest('POST', '/api/login', [
+            'email' => $email,
+            'password' => 'owner-pass-1',
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+    }
+
+    private function otpFromLastEmail(): string
+    {
+        $message = $this->getMailerMessage();
+        self::assertNotNull($message);
+        $body = ($message->getTextBody() ?? '').($message->getHtmlBody() ?? '');
+        self::assertMatchesRegularExpression('/Your (?:LGS Card Vault verification )?code: (\d{6})/', $body);
+        preg_match('/Your (?:LGS Card Vault verification )?code: (\d{6})/', $body, $matches);
+
+        return $matches[1];
+    }
 }

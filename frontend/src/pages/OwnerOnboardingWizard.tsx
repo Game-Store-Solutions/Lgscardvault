@@ -8,6 +8,7 @@ import { useOnboarding } from './onboarding/useOnboarding'
 import {
   AccountStep,
   AddressStep,
+  VerifyStep,
   BrandingStep,
   ColorsStep,
   LicensesStep,
@@ -58,6 +59,9 @@ export default function OwnerOnboardingWizard() {
           }
         >
           {o.currentKey === 'account' && <AccountStep data={o.data} patch={o.patch} locked={o.accountCreated} />}
+          {o.currentKey === 'verify' && (
+            <VerifyStep data={o.data} patch={o.patch} verified={o.emailVerified} />
+          )}
           {o.currentKey === 'address' && (
             <AddressStep data={o.data} patch={o.patch} patchAddress={o.patchAddress} applyAddress={o.applyAddress} />
           )}

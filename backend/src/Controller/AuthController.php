@@ -108,8 +108,8 @@ class AuthController extends AbstractController
         $this->userRepository->save($user, true);
 
         try {
-            $token = $this->emailVerification->issueToken($user);
-            $this->mail->sendEmailVerification($user, $token);
+            $issued = $this->emailVerification->issue($user);
+            $this->mail->sendEmailVerification($user, $issued['token'], $issued['otp']);
         } catch (\Throwable $e) {
             $this->logger->error('Verification email failed.', [
                 'user' => $user->getId(),
@@ -242,8 +242,8 @@ class AuthController extends AbstractController
         $user = $this->userRepository->findOneByEmailInsensitive($email);
         if ($user instanceof User && !$user->isEmailVerified()) {
             try {
-                $token = $this->emailVerification->issueToken($user);
-                $this->mail->sendEmailVerification($user, $token);
+                $issued = $this->emailVerification->issue($user);
+                $this->mail->sendEmailVerification($user, $issued['token'], $issued['otp']);
             } catch (\Throwable $e) {
                 $this->logger->error('Verification email failed.', [
                     'user' => $user->getId(),
@@ -269,9 +269,13 @@ class AuthController extends AbstractController
 
         /** @var array<string, mixed> $payload */
         $payload = json_decode($request->getContent(), true) ?? [];
-        $token = isset($payload['token']) ? (string) $payload['token'] : '';
+        $token = isset($payload['token']) ? trim((string) $payload['token']) : '';
+        $email = isset($payload['email']) ? trim((string) $payload['email']) : '';
+        $code = isset($payload['code']) ? trim((string) $payload['code']) : '';
 
-        $result = $this->emailVerification->consume($token);
+        $result = '' !== $token
+            ? $this->emailVerification->consume($token)
+            : $this->emailVerification->consumeOtp($email, $code);
         if (!$result instanceof User) {
             return $this->json(['error' => $result], Response::HTTP_BAD_REQUEST);
         }

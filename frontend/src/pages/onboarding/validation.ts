@@ -45,7 +45,7 @@ function licensesValid(data: OnboardingData): boolean {
 export function isStepValid(
   key: StepKey,
   data: OnboardingData,
-  ctx: { accountCreated: boolean; paymentRequired: boolean },
+  ctx: { accountCreated: boolean; paymentRequired: boolean; emailVerified?: boolean },
 ): boolean {
   switch (key) {
     case 'account':
@@ -57,6 +57,8 @@ export function isStepValid(
           data.acceptedTerms &&
           isAtLeast13(data.dateOfBirth))
       )
+    case 'verify':
+      return Boolean(ctx.emailVerified) || /^\d{6}$/.test(data.verifyCode.trim())
     case 'address':
       return (
         data.address.addressLine1.trim() !== '' &&

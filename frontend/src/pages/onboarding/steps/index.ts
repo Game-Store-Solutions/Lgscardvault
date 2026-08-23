@@ -1,4 +1,5 @@
 export { AccountStep } from './AccountStep'
+export { VerifyStep } from './VerifyStep'
 export { AddressStep } from './AddressStep'
 export { BrandingStep } from './BrandingStep'
 export { ColorsStep } from './ColorsStep'

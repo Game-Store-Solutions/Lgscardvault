@@ -66,6 +66,7 @@ export interface OnboardingData {
   payment: OnboardingPayment
   acceptedTerms: boolean
   dateOfBirth: string
+  verifyCode: string
   acceptedMerchantTerms: boolean
   compliance: OnboardingCompliance
   complianceDocuments: ComplianceDocumentMeta[]
@@ -107,6 +108,7 @@ export const EMPTY_ONBOARDING: OnboardingData = {
   payment: { methodType: '', token: '', last4: '', verificationToken: '' },
   acceptedTerms: false,
   dateOfBirth: '',
+  verifyCode: '',
   acceptedMerchantTerms: false,
   compliance: {
     legalBusinessName: '',

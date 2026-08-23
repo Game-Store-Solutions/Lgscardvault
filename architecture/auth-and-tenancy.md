@@ -86,6 +86,7 @@ flowchart LR
 
 - `accountType: 'owner'` grants `ROLE_STORE_OWNER`; `'customer'` gets `ROLE_USER`. **Admins cannot self-register** — use `php bin/console app:create-admin`.
 - Validation: email format, password ≥ 8 chars, display name required, **`acceptedTerms`**, **`dateOfBirth` (13+)**. Date of birth is stored and never returned by `/api/me`. See [compliance.md](compliance.md).
+- Email confirmation: register emails a **6-digit OTP** plus a clickable link. Owner onboarding stays in the wizard (`Account` → `Verify` → address…). Shoppers still use `/verify-email`. `POST /api/auth/verify-email` accepts `{ token }` or `{ email, code }` and returns a JWT.
 
 | Layer | Where |
 |-------|-------|

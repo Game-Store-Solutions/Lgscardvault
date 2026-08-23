@@ -108,7 +108,7 @@ final class TransactionalMailer
     }
 
     /** Platform — confirm a new email+password signup. */
-    public function sendEmailVerification(User $user, string $rawToken): void
+    public function sendEmailVerification(User $user, string $rawToken, string $otp = ''): void
     {
         $email = $user->getEmail();
         if (null === $email || '' === $email) {
@@ -117,20 +117,25 @@ final class TransactionalMailer
 
         $name = $user->getDisplayName() ?: 'there';
         $verifyUrl = $this->frontendUrl().'/verify-email?token='.rawurlencode($rawToken);
+        $code = preg_replace('/\D+/', '', $otp) ?? '';
 
         $this->sendHtml(
             to: $email,
             subject: 'Confirm your LGS Card Vault email',
             htmlTemplate: 'emails/platform/email_verification.html.twig',
             context: [
-                'preheader' => 'Confirm your email to finish creating your account. This link expires in 24 hours.',
+                'preheader' => '' !== $code
+                    ? 'Your verification code is '.$code.'. It expires in 24 hours.'
+                    : 'Confirm your email to finish creating your account. This link expires in 24 hours.',
                 'displayName' => $name,
                 'verifyUrl' => $verifyUrl,
+                'otp' => $code,
                 'footerNote' => "You're receiving this because an LGS Card Vault account was created with this address.",
             ],
             textBody: sprintf(
-                "Hi %s,\n\nConfirm your LGS Card Vault email (expires in 24 hours):\n%s\n",
+                "Hi %s,\n\nYour LGS Card Vault verification code: %s\n\nOr confirm with this link (expires in 24 hours):\n%s\n",
                 $name,
+                '' !== $code ? $code : '(see the link below)',
                 $verifyUrl,
             ),
             store: null,
