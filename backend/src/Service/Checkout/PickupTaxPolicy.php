@@ -9,15 +9,20 @@ use App\Service\Onboarding\UsRegion;
 /**
  * Card checkout must collect Square location tax in states that charge sales
  * tax. Stores in AK/DE/MT/NH/OR may charge $0 tax. Unknown region is not
- * blocked so admin-provisioned and test stores keep working.
+ * blocked so admin-provisioned and test stores keep working. Store credit
+ * does not skip the gate — the taxable subtotal is what matters, not the
+ * card remainder.
  */
 final class PickupTaxPolicy
 {
     public const BLOCK_MESSAGE = 'Online card checkout is paused until this store enables sales tax on its Square location. Reserve and pay in store, or ask the store to turn location tax on in Square.';
 
-    public function cardCheckoutBlockReason(Store $store, int $taxCents, int $merchandiseDueCents): ?string
+    /**
+     * @param int $taxableSubtotalCents merchandise before store credit
+     */
+    public function cardCheckoutBlockReason(Store $store, int $taxCents, int $taxableSubtotalCents): ?string
     {
-        if ($merchandiseDueCents <= 0 || $taxCents > 0) {
+        if ($taxableSubtotalCents <= 0 || $taxCents > 0) {
             return null;
         }
         if (!UsRegion::chargesStateSalesTax($store->getRegion())) {
@@ -45,7 +50,7 @@ final class PickupTaxPolicy
     {
         $taxCents = (int) ($quote['taxCents'] ?? 0);
         $merchandiseDue = max(0, $subtotalCents - $creditCents);
-        $block = $this->cardCheckoutBlockReason($store, $taxCents, $merchandiseDue);
+        $block = $this->cardCheckoutBlockReason($store, $taxCents, $subtotalCents);
 
         return [
             'subtotalCents' => $subtotalCents,

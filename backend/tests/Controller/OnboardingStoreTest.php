@@ -86,6 +86,7 @@ final class OnboardingStoreTest extends WebTestCase
         self::assertSame('US', $store->getCountry());
         self::assertSame('CA', $store->getRegion());
         self::assertSame('Bay Area Cards LLC', $store->getCompliance()['legalBusinessName'] ?? null);
+        self::assertInstanceOf(\DateTimeImmutable::class, $store->getMerchantTermsAcceptedAt());
     }
 
     public function testSubmitRequiresLicenseIntake(): void

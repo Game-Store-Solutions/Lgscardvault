@@ -467,7 +467,7 @@ export default function PlatformAdminPage() {
                           >
                             Imports
                           </Link>
-                          {store.status !== 'pending' && (
+                          {store.status === 'approved' && (
                             <Button
                               variant="secondary"
                               size="sm"
@@ -477,11 +477,11 @@ export default function PlatformAdminPage() {
                               onClick={() =>
                                 setStoreActive.mutate({
                                   id: store.id,
-                                  enable: store.isActive === false || store.status === 'rejected',
+                                  enable: store.isActive === false && store.status === 'approved',
                                 })
                               }
                             >
-                              {store.isActive === false || store.status === 'rejected' ? (
+                              {store.isActive === false ? (
                                 <>
                                   <Power aria-hidden className="size-4" />
                                   Enable

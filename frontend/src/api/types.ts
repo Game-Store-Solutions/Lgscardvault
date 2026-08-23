@@ -185,6 +185,7 @@ export interface PrivacyRequest {
   name: string
   details?: string | null
   californiaResident: boolean
+  gpcSignal?: boolean
   adminNotes?: string | null
   createdAt: string
   completedAt?: string | null
@@ -732,6 +733,7 @@ export interface UserProfile {
   avatarUrl?: string | null
   roles: string[]
   emailVerified?: boolean
+  ageVerified?: boolean
   ownedStores: Pick<Store, 'id' | 'name' | 'slug'>[]
   /** Stores this user administers as staff (not as the owner). */
   managedStores?: Pick<Store, 'id' | 'name' | 'slug'>[]
@@ -748,6 +750,7 @@ export interface AdminUser {
   displayName: string
   roles: string[]
   emailVerified: boolean
+  ageVerified?: boolean
 }
 
 export interface AdminUserImportIssue {

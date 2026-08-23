@@ -126,6 +126,7 @@ export function ComplianceDocumentPreview({ document }: { document: ComplianceDo
           <iframe
             title={`${kindLabel(document.kind)}: ${document.originalFilename}`}
             src={preview.url}
+            sandbox=""
             className="h-[28rem] w-full border-0 bg-white"
           />
         )}

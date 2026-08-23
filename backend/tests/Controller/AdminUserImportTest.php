@@ -66,6 +66,24 @@ CSV;
         self::assertResponseIsSuccessful();
     }
 
+    public function testImportRecordsDateOfBirthAndRejectsUnder13(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $kidDob = (new \DateTimeImmutable('today'))->modify('-10 years')->format('Y-m-d');
+        $csv = "email,displayName,dateOfBirth\nadult@test.local,Adult Shopper,1991-04-12\nkid@test.local,Kid,{$kidDob}\n";
+
+        $payload = $this->importAs($admin, $csv, ['sendResetEmails' => '0']);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertSame(1, $payload['created']);
+        self::assertNotEmpty($payload['errors']);
+
+        $this->entityManager->clear();
+        $adult = $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'adult@test.local']);
+        self::assertNotNull($adult);
+        self::assertTrue($adult->isAgeVerified());
+        self::assertNull($this->entityManager->getRepository(User::class)->findOneBy(['email' => 'kid@test.local']));
+    }
+
     public function testDryRunDoesNotPersistUsers(): void
     {
         $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);

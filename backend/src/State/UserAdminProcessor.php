@@ -6,8 +6,11 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\AgeAttestation;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -20,6 +23,7 @@ final readonly class UserAdminProcessor implements ProcessorInterface
         private UserPasswordHasherInterface $passwordHasher,
         private Security $security,
         private UserRepository $users,
+        private RequestStack $requestStack,
     ) {
     }
 
@@ -59,6 +63,8 @@ final readonly class UserAdminProcessor implements ProcessorInterface
             $data->eraseCredentials();
         }
 
+        $this->applySubmittedDateOfBirth($data);
+
         if (null === $data->getId()) {
             $this->entityManager->persist($data);
         }
@@ -66,5 +72,54 @@ final readonly class UserAdminProcessor implements ProcessorInterface
         $this->entityManager->flush();
 
         return $data;
+    }
+
+    private function applySubmittedDateOfBirth(User $data): void
+    {
+        $request = $this->requestStack->getCurrentRequest();
+        $payload = $request instanceof Request
+            ? json_decode($request->getContent() ?: '', true)
+            : null;
+        $submitted = is_array($payload) && array_key_exists('dateOfBirth', $payload);
+
+        if ($submitted) {
+            $raw = $payload['dateOfBirth'];
+            if (null === $raw || '' === $raw) {
+                if (null === $data->getId()) {
+                    throw new UnprocessableEntityHttpException(
+                        'Date of birth (YYYY-MM-DD) is required. Users must be at least 13.',
+                    );
+                }
+
+                return;
+            }
+            try {
+                $data->setDateOfBirth(AgeAttestation::parse($raw));
+            } catch (\InvalidArgumentException $e) {
+                throw new UnprocessableEntityHttpException($e->getMessage());
+            }
+        }
+
+        $this->assertAdultDateOfBirth($data);
+    }
+
+    private function assertAdultDateOfBirth(User $data): void
+    {
+        $dob = $data->getDateOfBirth();
+        if (!$dob instanceof \DateTimeImmutable) {
+            if (null === $data->getId()) {
+                throw new UnprocessableEntityHttpException(
+                    'Date of birth (YYYY-MM-DD) is required. Users must be at least 13.',
+                );
+            }
+
+            return;
+        }
+
+        try {
+            AgeAttestation::parse($dob->format('Y-m-d'));
+        } catch (\InvalidArgumentException $e) {
+            throw new UnprocessableEntityHttpException($e->getMessage());
+        }
     }
 }

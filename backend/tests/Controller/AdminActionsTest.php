@@ -182,6 +182,40 @@ final class AdminActionsTest extends WebTestCase
         self::assertSame(Store::STATUS_APPROVED, $enabled->getStatus());
     }
 
+    public function testEnableDoesNotApproveAPendingStore(): void
+    {
+        $store = $this->pendingStore();
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+
+        $this->authRequest($admin, 'POST', sprintf('/api/admin/stores/%d/enable', $store->getId()));
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(Store::class)->find($store->getId());
+        self::assertSame(Store::STATUS_PENDING, $reloaded->getStatus());
+        self::assertFalse($reloaded->isActive());
+    }
+
+    public function testAdminPatchCannotActivateAPendingStore(): void
+    {
+        $store = $this->pendingStore();
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+
+        $this->authRequest(
+            $admin,
+            'PATCH',
+            sprintf('/api/admin/stores/%d', $store->getId()),
+            ['CONTENT_TYPE' => 'application/merge-patch+json'],
+            (string) json_encode(['isActive' => true]),
+        );
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(Store::class)->find($store->getId());
+        self::assertFalse($reloaded->isActive());
+        self::assertSame(Store::STATUS_PENDING, $reloaded->getStatus());
+    }
+
     public function testDeleteStoreRequiresSlugConfirmation(): void
     {
         $store = $this->fixtures->store('doomed-store');

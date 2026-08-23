@@ -77,4 +77,15 @@ final class PickupTaxPolicyTest extends TestCase
 
         self::assertNull($policy->cardCheckoutBlockReason($store, 0, 0));
     }
+
+    public function testCaliforniaBlocksZeroTaxWhenCreditCoversMerchandise(): void
+    {
+        $store = (new Store())->setName('X')->setSlug('x')->setRegion('CA');
+        $policy = new PickupTaxPolicy();
+
+        self::assertSame(PickupTaxPolicy::BLOCK_MESSAGE, $policy->cardCheckoutBlockReason($store, 0, 2500));
+        $quote = $policy->decorateQuote($store, 2500, 2500, ['taxCents' => 0, 'dueCents' => 0]);
+        self::assertFalse($quote['taxReady']);
+        self::assertSame(PickupTaxPolicy::BLOCK_MESSAGE, $quote['taxBlockReason']);
+    }
 }

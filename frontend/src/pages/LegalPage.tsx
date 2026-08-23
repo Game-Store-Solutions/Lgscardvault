@@ -81,7 +81,8 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
         This Privacy Policy describes how {site.entityName} (“we”, “us”) collects, uses, and shares personal
         information when you use our website and storefronts. {site.entityName} is software-as-a-service. Each
         local game store that lists inventory is an independent business and the merchant of record for your
-        purchase. We are not a marketplace facilitator and we are not the seller of the cards.
+        purchase. We intend to operate as software-as-a-service, not as the seller of the cards and not as a
+        marketplace facilitator — confirm that structure with your own counsel.
       </p>
       <Section title="Information we collect">
         <p>
@@ -122,15 +123,28 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
           <Link className="font-semibold text-brand-600 hover:underline" to="/privacy-request">
             privacy request form
           </Link>
-          . We will not discriminate against you for exercising these rights. We do not sell or share personal
-          information as those terms are defined under the CCPA/CPRA.
+          . We will not discriminate against you for exercising these rights. We do not knowingly sell personal
+          information for money. Whether we “sell” or “share” as the CCPA/CPRA define those terms is a legal
+          determination — use the form above and our counsel to handle requests.
+        </p>
+        <p>
+          We honor the Global Privacy Control (GPC) signal, including the <code>Sec-GPC</code> request header
+          and <code>navigator.globalPrivacyControl</code>. When GPC is present we treat it as a Do Not Sell or
+          Share preference: optional analytics stay off, and privacy-request tickets record that the signal was
+          sent.
+        </p>
+      </Section>
+      <Section title="Cookies">
+        <p>
+          Necessary cookies run sign-in, checkout, and security. We do not load advertising cookies. Optional
+          analytics would load only after you choose Accept all on the cookie notice, and never when GPC is on.
         </p>
       </Section>
       <Section title="Children">
         <p>
-          The service is intended for users 13 and older. We collect date of birth at signup to enforce that
-          floor. That is a COPPA-shaped age gate, not government ID verification. We do not knowingly collect
-          personal information from children under 13.
+          The service is intended for users 13 and older. We collect date of birth at password signup and at
+          first Google sign-in to enforce that floor. That is a COPPA-shaped age gate, not government ID
+          verification. We do not knowingly collect personal information from children under 13.
         </p>
       </Section>
       <Section title="Contact">
@@ -166,8 +180,9 @@ function TermsOfService({ site }: { site: LegalSite }) {
       </Section>
       <Section title="Sales tax">
         <p>
-          Sales tax is charged at the store’s location for pickup orders, using tax rates configured on that
-          store’s Square account. Tax appears on checkout before you pay.
+          Sales tax is charged at the store’s Square location when that location has tax configured. States
+          without statewide sales tax (Alaska, Delaware, Montana, New Hampshire, Oregon) may complete card
+          checkout at $0 tax. Tax appears on checkout before you pay when Square returns it.
         </p>
       </Section>
       <Section title="Accounts">
@@ -342,7 +357,7 @@ function FanContent({ site }: { site: LegalSite }) {
           Store owners must follow the fan-content, organized-play, and retailer policies that apply to them
           (including Wizards Fan Content Policy and Pokémon TCG retailer rules). Do not upload publisher logos
           or promotional art as store branding unless you have permission. If a publisher asks us to take down
-          an image, we will.
+          an image, we review the request and act on valid ones. The form does not remove listings automatically.
         </p>
       </Section>
       <Section title="Takedown mailbox">

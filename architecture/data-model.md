@@ -178,6 +178,7 @@ erDiagram
         string email
         string name
         bool california_resident
+        bool gpc_signal
         text details
         text admin_notes
         timestamp created_at

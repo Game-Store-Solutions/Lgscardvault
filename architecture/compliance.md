@@ -43,14 +43,14 @@ Descriptions of the product behavior that already lives in this repository. Each
 | **US storefronts** | Onboarding country is locked to `US`; region must be a real state/DC. | [`UsRegion.php`](../backend/src/Service/Onboarding/UsRegion.php) |
 | **Square location tax** | Card checkout asks Square to auto-apply the connected location’s tax and stores `orders.tax_cents`. | [`PickupCardCharge.php`](../backend/src/Service/Checkout/PickupCardCharge.php) |
 | **Tax-ready quotes** | `POST …/checkout/quote` returns `taxReady` / `taxBlockReason` so the UI can hide card pay. | [`StoreCustomerController.php`](../backend/src/Controller/StoreCustomerController.php), [`StoreGuestCheckoutController.php`](../backend/src/Controller/StoreGuestCheckoutController.php) |
-| **$0-tax card block** | In a sales-tax state, card capture is refused when quoted tax is $0. **AK / DE / MT / NH / OR complete card checkout with $0 tax.** Pay-in-store always stays. | [`PickupTaxPolicy.php`](../backend/src/Service/Checkout/PickupTaxPolicy.php) |
+| **$0-tax card block** | In a sales-tax state, card capture is refused when quoted **or final CreateOrder** tax is $0. Full store credit does not skip that gate. **AK / DE / MT / NH / OR complete card checkout with $0 tax.** Pay-in-store always stays. CreateOrder failure fails closed (no merchandise-only charge). | [`PickupTaxPolicy.php`](../backend/src/Service/Checkout/PickupTaxPolicy.php), [`StoreCheckoutGateway.php`](../backend/src/Service/Payments/StoreCheckoutGateway.php) |
 | **Legal pages** | Public `/privacy`, `/terms`, `/pickup`, `/merchant-terms`, `/fan-content` — SaaS / store-is-seller copy. | [`LegalPage.tsx`](../frontend/src/pages/LegalPage.tsx) |
 | **License intake** | Onboarding Licenses step: legal name, entity, EIN optional, seller’s permit number and/or private file, city/secondhand when they buy from the public, insurance attestation. | [`LicensesStep.tsx`](../frontend/src/pages/onboarding/steps/LicensesStep.tsx) |
-| **Approve gate** | Submit and super-admin approve both call `StoreComplianceGate`. Incomplete intake cannot go live. | [`StoreComplianceGate.php`](../backend/src/Service/Compliance/StoreComplianceGate.php) |
+| **Approve gate** | Submit and super-admin **approve** both call `StoreComplianceGate`. `enable()` only reactivates already-approved stores; admin `PATCH isActive` cannot skip review. | [`StoreComplianceGate.php`](../backend/src/Service/Compliance/StoreComplianceGate.php), [`StoreApprovalController.php`](../backend/src/Controller/StoreApprovalController.php) |
 | **Private permit files** | PDF/JPEG/PNG/WebP under `var/share/compliance-docs/` (not web root). Owner or super-admin download only. Platform-admin review modal shows the file inline (image or PDF). | [`ComplianceDocumentStore.php`](../backend/src/Service/Compliance/ComplianceDocumentStore.php), [`StoreApplicationModal.tsx`](../frontend/src/pages/platform-admin/StoreApplicationModal.tsx) |
 | **CA admin helper** | California applications show a CDTFA permits webpage link. **No scrape, no 50-state API.** | [`UsRegion::cdtfaVerifyUrl()`](../backend/src/Service/Onboarding/UsRegion.php) |
-| **13+ date of birth** | Register and owner Account step require `dateOfBirth`. Under 13 is 400. DOB is stored and **never** returned in API JSON. | [`AuthController.php`](../backend/src/Controller/AuthController.php) |
-| **Cookie banner** | Necessary vs accept-all stored in `lgscv-cookie-consent`. `analyticsAllowed()` is the gate for any future pixel. | [`cookieConsent.ts`](../frontend/src/lib/cookieConsent.ts) |
+| **13+ date of birth** | Register, owner Account step, first Google SSO, and **admin `POST /admin/users`** require `dateOfBirth`. `/api/me` returns `ageVerified` (never the date). CSV import accepts optional `dateOfBirth`. | [`AuthController.php`](../backend/src/Controller/AuthController.php), [`SsoController.php`](../backend/src/Controller/SsoController.php), [`UserAdminProcessor.php`](../backend/src/State/UserAdminProcessor.php) |
+| **Cookie banner** | Necessary vs accept-all stored in `lgscv-cookie-consent`. `analyticsAllowed()` is false unless Accept all **and** GPC is off. | [`cookieConsent.ts`](../frontend/src/lib/cookieConsent.ts) |
 | **Error boundary** | A render crash shows a reload/home screen instead of a blank white page. | [`ErrorBoundary.tsx`](../frontend/src/components/ErrorBoundary.tsx) |
 | **Publisher takedown form** | `/fan-content` queues a `takedown` ticket (same admin queue as privacy). Mailbox still has to be watched. | [`PrivacyRequestForm.tsx`](../frontend/src/components/legal/PrivacyRequestForm.tsx) |
 | **Privacy 45-day SLA** | Each ticket has `dueAt` / `overdue`. Admin sorts overdue first. `app:privacy:sla-remind` emails a digest. | [`PrivacyRequest.php`](../backend/src/Entity/PrivacyRequest.php) |
@@ -67,18 +67,18 @@ Descriptions of the product behavior that already lives in this repository. Each
 | Ask | In the repo today | Still missing (do this outside code) |
 |-----|-------------------|--------------------------------------|
 | Marketplace-facilitator analysis | Copy that we are SaaS / not the seller / not a facilitator | **Lawyer letter** confirming that for your entity and facts |
-| Cookie / analytics consent banner | Necessary-cookies banner; preference in `localStorage` | No analytics pixels yet. If you add GA/Sentry browser SDK, gate it on “Accept all” |
-| CCPA “Do Not Sell” beyond a policy email | Public form + `privacy_requests` table + admin queue | Human fulfillment within 45 days; California “Do Not Sell” link in the footer is the form, not a GPC signal parser |
+| Cookie / analytics consent banner | Necessary-cookies banner; preference in `localStorage`; GPC hides the banner and keeps analytics off | No analytics pixels yet. If you add GA/Sentry browser SDK, gate it on `analyticsAllowed()` |
+| CCPA “Do Not Sell” beyond a policy email | Public form + `privacy_requests` table + admin queue; **GPC / `Sec-GPC` recorded on tickets** | Human fulfillment within 45 days |
 | Age verification beyond a checkbox | Date of birth at signup, 13+ | **Not ID-checked.** No Persona/Stripe Identity. COPPA-shaped only |
 | Seller’s permit upload / admin review | Number and/or private file; approve blocked until intake is complete | Human review. **No 50-state permit API.** CA admins get a CDTFA webpage link — do not scrape it |
 | City license / pawn / secondhand | Onboarding fields + optional upload when the store buys/trades from the public | Local law still sits with the store; we do not look up city licenses |
-| Accessibility (ADA / WCAG) | Skip-to-content; labeled cookie dialog (`aria-modal`); privacy / takedown forms; root **ErrorBoundary** so a crash is not a white screen | **Not a WCAG 2.2 AA audit.** Hire a third party if you need ADA confidence |
+| Accessibility (ADA / WCAG) | Skip-to-content; cookie notice (`role="region"`); privacy / takedown forms; root **ErrorBoundary** so a crash is not a white screen | **Not a WCAG 2.2 AA audit.** Hire a third party if you need ADA confidence |
 | Wizards / Pokémon / fan-content | `/fan-content` notice + **takedown form** queued for admins | Follow publisher / retailer programs; **watch** the privacy queue and the legal mailbox |
 | PCI / Square production checklist | Tokenize via Square; Payments tab + `LAUNCH.md` checklist | **You** finish Square production: OAuth redirect, webhooks, location tax, production credentials |
 | Insurance, entity, EIN, registered agent | Store: legal name, entity type, optional EIN, insurance **attestation** | **Platform** entity, EIN, RA, and *your* insurance are operator work. We do not form companies |
 | Chargeback / dispute SOPs | `dispute.created` persists; no auto-restock; order UI checklist + [CHARGEBACKS.md](../deploy/CHARGEBACKS.md) | Respond in **Square’s** dispute console with pickup proof |
 | Privacy ops (45 days) | Queue + SLA dates + overdue badges + `app:privacy:sla-remind` | A human still has to fulfill the request |
-| Analytics consent | `analyticsAllowed()` is true only after Accept all | Do not add a pixel that ignores this helper |
+| Analytics consent | `analyticsAllowed()` is true only after Accept all **and** GPC is off | Do not add a pixel that ignores this helper |
 | Block checkout if Square tax is $0 | **Done in software.** Card checkout blocked in sales-tax states when quote tax is $0. **AK, DE, MT, NH, OR complete card (and pay-in-store) purchase with $0 tax.** Pay-in-store always available. | Enable location tax in Square Dashboard **for sales-tax states**. No-tax states do not need it to take cards. |
 
 ---
@@ -131,6 +131,7 @@ erDiagram
         string email
         string name
         bool california_resident
+        bool gpc_signal "Sec-GPC or client gpcSignal"
         text details
         text admin_notes
         timestamp created_at
@@ -144,7 +145,7 @@ erDiagram
 ```
 
 - Compliance files live under `backend/var/share/compliance-docs/` (**not** `public/uploads`). PDF / JPEG / PNG / WebP, 8 MB.
-- Date of birth is stored on `users` and **never** serialized (`GET /api/me` does not include DOB or an `ageVerified` flag). `User::isAgeVerified()` exists for server-side checks only.
+- Date of birth is stored on `users` and **never** serialized. `GET /api/me` and admin user JSON expose `ageVerified` only.
 
 ---
 
@@ -320,11 +321,9 @@ These are product holes, not “hire a lawyer” items:
 
 | Gap | Why it is still open |
 |-----|----------------------|
-| No `ageVerified` on `/api/me` | DOB is write-only. The frontend cannot show “verified” from the session payload. |
-| Admin-created / SSO users skip DOB | Only `POST /api/register` and the owner wizard Account step collect it. |
-| No Global Privacy Control parser | Footer “Do Not Sell” is the `/privacy-request` form, not a GPC/`Sec-GPC` signal. |
+| Staff invite / CSV rows without DOB | Staff invites and legacy CSV imports can still create accounts with `ageVerified: false`. Public register, SSO, and admin POST require 13+. |
 | Unknown store region does not block $0 tax | Fixture and admin-provisioned tenants keep working; a live CA store with tax off **is** blocked. |
-| Cookie banner does not load a pixel today | `analyticsAllowed()` is ready; nothing calls it yet. Adding a pixel that ignores it would be a regression. |
+| Cookie banner does not load a pixel today | `analyticsAllowed()` is ready (and honors GPC); nothing calls it yet. Adding a pixel that ignores it would be a regression. |
 | No 50-state permit validator | Intentionally absent — see [Permit APIs](#permit-apis-do-not-integrate). |
 | Not a WCAG certification | Skip link, labels, cookie dialog, ErrorBoundary — still not an audit. |
 
@@ -358,7 +357,10 @@ Software for 6–10 and 12 is in the repo (forms, SLA, runbook, consent helper, 
 | [OnboardingStoreTest.php](../backend/tests/Controller/OnboardingStoreTest.php) | US + license intake on submit |
 | [AdminActionsTest.php](../backend/tests/Controller/AdminActionsTest.php) | Approve refused without intake |
 | [AuthEmailVerificationTest.php](../backend/tests/Controller/AuthEmailVerificationTest.php) | DOB required; under-13 rejected |
-| [PrivacyRequestTest.php](../backend/tests/Controller/PrivacyRequestTest.php) | Public create + takedown + admin complete + SLA fields |
+| [SsoCompleteTest.php](../backend/tests/Controller/SsoCompleteTest.php) | First Google SSO needs DOB + terms before a JWT |
+| [MeControllerTest.php](../backend/tests/Controller/MeControllerTest.php) | `ageVerified` on `/api/me`; DOB never returned |
+| [AdminUserManagementTest.php](../backend/tests/Controller/AdminUserManagementTest.php) | Admin create requires 13+ DOB |
+| [PrivacyRequestTest.php](../backend/tests/Controller/PrivacyRequestTest.php) | Public create + takedown + admin complete + SLA fields + GPC |
 | [PrivacyRequestSlaTest.php](../backend/tests/Service/PrivacyRequestSlaTest.php) | 45-day due date / overdue / completed |
 
 | [SquareCheckoutTest.php](../backend/tests/Controller/SquareCheckoutTest.php) | CA + $0 tax → 422; AK/DE/MT/NH/OR + $0 tax → 201 card capture |

@@ -27,6 +27,7 @@ import UserImportModal from './UserImportModal'
 
 type EditableUser = Pick<AdminUser, 'displayName' | 'email' | 'roles' | 'emailVerified'> & {
   plainPassword: string
+  dateOfBirth: string
 }
 
 const emptyForm: EditableUser = {
@@ -35,6 +36,7 @@ const emptyForm: EditableUser = {
   roles: ['ROLE_USER'],
   emailVerified: true,
   plainPassword: '',
+  dateOfBirth: '',
 }
 
 export default function PlatformUsersPage() {
@@ -72,6 +74,7 @@ export default function PlatformUsersPage() {
       roles: editing.roles,
       emailVerified: editing.emailVerified,
       plainPassword: '',
+      dateOfBirth: '',
     })
   }, [editing])
 
@@ -87,6 +90,7 @@ export default function PlatformUsersPage() {
         emailVerified: form.emailVerified,
       }
       if (form.plainPassword) payload.plainPassword = form.plainPassword
+      if (form.dateOfBirth.trim()) payload.dateOfBirth = form.dateOfBirth.trim()
       await api.patch(`/admin/users/${editing.id}`, payload)
     },
     onSuccess: async () => {
@@ -179,17 +183,24 @@ export default function PlatformUsersPage() {
                     <p className="text-sm text-fg-muted">{platformUser.email}</p>
                   </TD>
                   <TD>
-                    {platformUser.emailVerified ? (
-                      <Badge tone="success">
-                        <CheckCircle2 aria-hidden className="size-3.5" />
-                        Verified
-                      </Badge>
-                    ) : (
-                      <Badge tone="neutral">
-                        <XCircle aria-hidden className="size-3.5" />
-                        Unverified
-                      </Badge>
-                    )}
+                    <div className="flex flex-wrap gap-1.5">
+                      {platformUser.emailVerified ? (
+                        <Badge tone="success">
+                          <CheckCircle2 aria-hidden className="size-3.5" />
+                          Verified
+                        </Badge>
+                      ) : (
+                        <Badge tone="neutral">
+                          <XCircle aria-hidden className="size-3.5" />
+                          Unverified
+                        </Badge>
+                      )}
+                      {platformUser.ageVerified ? (
+                        <Badge tone="success">13+</Badge>
+                      ) : (
+                        <Badge tone="neutral">Age not attested</Badge>
+                      )}
+                    </div>
                   </TD>
                   <TD>
                     <div className="flex flex-wrap gap-1.5">
@@ -278,6 +289,17 @@ export default function PlatformUsersPage() {
             value={form.plainPassword}
             onChange={(event) => setForm((current) => ({ ...current, plainPassword: event.target.value }))}
             hint="Leave blank to keep the current password. New passwords require at least 8 characters."
+          />
+          <Input
+            label="Date of birth"
+            type="date"
+            value={form.dateOfBirth}
+            onChange={(event) => setForm((current) => ({ ...current, dateOfBirth: event.target.value }))}
+            hint={
+              editing?.ageVerified
+                ? 'Age is already attested. Leave blank to keep it, or enter a new YYYY-MM-DD value.'
+                : 'Required for COPPA-shaped 13+ accounts. Date of birth is never shown after save.'
+            }
           />
 
           <fieldset className="space-y-3">
