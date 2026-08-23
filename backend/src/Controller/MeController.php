@@ -539,6 +539,7 @@ class MeController extends AbstractController
             'avatarUrl' => $user->getAvatarUrl(),
             'roles' => $user->getRoles(),
             'emailVerified' => $user->isEmailVerified(),
+            'ageVerified' => $user->isAgeVerified(),
             'ownedStores' => $ownedStores,
             'managedStores' => $managedStores,
             'paymentBrand' => $user->getPaymentBrand(),

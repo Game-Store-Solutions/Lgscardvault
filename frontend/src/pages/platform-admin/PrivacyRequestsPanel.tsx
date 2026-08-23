@@ -92,6 +92,7 @@ export function PrivacyRequestsPanel() {
               </Badge>
               <Badge tone={row.overdue ? 'danger' : row.open ? 'neutral' : 'success'}>{slaLabel(row)}</Badge>
               {row.californiaResident && <Badge tone="neutral">California resident</Badge>}
+              {row.gpcSignal && <Badge tone="brand">GPC</Badge>}
             </div>
             {row.details && <p className="whitespace-pre-wrap text-sm text-fg">{row.details}</p>}
             <div className="grid gap-3 sm:grid-cols-[12rem_1fr_auto] sm:items-end">

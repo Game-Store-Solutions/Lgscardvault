@@ -24,9 +24,9 @@ final class PrivacyRequestTest extends WebTestCase
     }
 
     /** @param array<string, mixed> $body */
-    private function jsonRequest(string $method, string $url, array $body = [], ?User $user = null): array
+    private function jsonRequest(string $method, string $url, array $body = [], ?User $user = null, array $headers = []): array
     {
-        $server = ['CONTENT_TYPE' => 'application/json'];
+        $server = array_merge(['CONTENT_TYPE' => 'application/json'], $headers);
         if ($user instanceof User) {
             $server['HTTP_AUTHORIZATION'] = 'Bearer '.static::getContainer()->get(JWTTokenManagerInterface::class)->create($user);
         }
@@ -44,7 +44,7 @@ final class PrivacyRequestTest extends WebTestCase
             'email' => 'ada@example.com',
             'californiaResident' => true,
             'details' => 'Please do not sell my data.',
-        ]);
+        ], null, ['HTTP_SEC_GPC' => '1']);
 
         self::assertSame(202, $this->client->getResponse()->getStatusCode(), json_encode($body));
         self::assertSame('received', $body['status'] ?? null);
@@ -54,6 +54,7 @@ final class PrivacyRequestTest extends WebTestCase
         self::assertInstanceOf(PrivacyRequest::class, $row);
         self::assertSame('do_not_sell', $row->getType());
         self::assertTrue($row->isCaliforniaResident());
+        self::assertTrue($row->hasGpcSignal());
     }
 
     public function testAdminCanCompleteRequest(): void
@@ -62,6 +63,7 @@ final class PrivacyRequestTest extends WebTestCase
             'type' => 'access',
             'name' => 'Bea',
             'email' => 'bea@example.com',
+            'gpcSignal' => true,
         ]);
         self::assertSame(202, $this->client->getResponse()->getStatusCode());
 
@@ -74,6 +76,7 @@ final class PrivacyRequestTest extends WebTestCase
         self::assertArrayHasKey('dueAt', $list[0]);
         self::assertArrayHasKey('overdue', $list[0]);
         self::assertTrue($list[0]['open'] ?? false);
+        self::assertTrue($list[0]['gpcSignal'] ?? false);
 
         $updated = $this->jsonRequest('PATCH', '/api/admin/privacy-requests/'.$id, [
             'status' => 'completed',

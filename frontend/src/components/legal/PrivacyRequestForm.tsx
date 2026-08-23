@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { CheckCircle2, Send } from 'lucide-react'
 import api, { extractErrorMessage } from '../../api/client'
+import { hasGlobalPrivacyControl } from '../../lib/cookieConsent'
 import { Button, Input, Select, Textarea } from '../ui'
 
 const PRIVACY_TYPES = [
@@ -41,6 +42,7 @@ export function PrivacyRequestForm({
         type,
         californiaResident: variant === 'takedown' ? false : californiaResident,
         details: details.trim(),
+        gpcSignal: hasGlobalPrivacyControl(),
       })
       return data
     },

@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from './ui'
-import { readCookieConsent, writeCookieConsent } from '../lib/cookieConsent'
+import { hasGlobalPrivacyControl, readCookieConsent, writeCookieConsent } from '../lib/cookieConsent'
 
 /**
  * Necessary-cookies notice. The app does not load advertising or analytics
  * pixels today; the choice is stored so a future tracker cannot fire until
- * the shopper opts in (`analyticsAllowed()`). California residents get a
- * Do Not Sell path.
+ * the shopper opts in (`analyticsAllowed()`). Global Privacy Control is
+ * treated as Do Not Sell / Share (analytics stay off; banner is not shown).
  */
 export function CookieConsentBanner() {
-  const [open, setOpen] = useState(() => readCookieConsent() === null)
+  const gpc = hasGlobalPrivacyControl()
+  const [open, setOpen] = useState(() => !gpc && readCookieConsent() === null)
 
   function choose(value: 'necessary' | 'all') {
     writeCookieConsent(value)

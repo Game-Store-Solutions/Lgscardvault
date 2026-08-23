@@ -127,6 +127,18 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
           information for money. Whether we “sell” or “share” as the CCPA/CPRA define those terms is a legal
           determination — use the form above and our counsel to handle requests.
         </p>
+        <p>
+          We honor the Global Privacy Control (GPC) signal, including the <code>Sec-GPC</code> request header
+          and <code>navigator.globalPrivacyControl</code>. When GPC is present we treat it as a Do Not Sell or
+          Share preference: optional analytics stay off, and privacy-request tickets record that the signal was
+          sent.
+        </p>
+      </Section>
+      <Section title="Cookies">
+        <p>
+          Necessary cookies run sign-in, checkout, and security. We do not load advertising cookies. Optional
+          analytics would load only after you choose Accept all on the cookie notice, and never when GPC is on.
+        </p>
       </Section>
       <Section title="Children">
         <p>

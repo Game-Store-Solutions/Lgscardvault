@@ -47,6 +47,10 @@ class PrivacyRequest
     #[ORM\Column]
     private bool $californiaResident = false;
 
+    /** Browser Global Privacy Control (`Sec-GPC: 1`) or client `gpcSignal`. */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $gpcSignal = false;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $adminNotes = null;
 
@@ -123,6 +127,18 @@ class PrivacyRequest
         return $this;
     }
 
+    public function hasGpcSignal(): bool
+    {
+        return $this->gpcSignal;
+    }
+
+    public function setGpcSignal(bool $gpcSignal): static
+    {
+        $this->gpcSignal = $gpcSignal;
+
+        return $this;
+    }
+
     public function getAdminNotes(): ?string
     {
         return $this->adminNotes;
@@ -178,6 +194,7 @@ class PrivacyRequest
             'name' => $this->name,
             'details' => $this->details,
             'californiaResident' => $this->californiaResident,
+            'gpcSignal' => $this->gpcSignal,
             'adminNotes' => $this->adminNotes,
             'createdAt' => $this->createdAt->format(DATE_ATOM),
             'completedAt' => $this->completedAt?->format(DATE_ATOM),

@@ -66,12 +66,32 @@ final class MeControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSame('New Name', $body['displayName']);
         self::assertSame('https://cdn.example/me.png', $body['avatarUrl']);
+        self::assertArrayHasKey('ageVerified', $body);
+        self::assertArrayNotHasKey('dateOfBirth', $body);
 
         // Clearing the avatar and rejecting junk URLs.
         $body = $this->jsonRequest('PATCH', '/api/me', ['avatarUrl' => '']);
         self::assertNull($body['avatarUrl']);
         $this->jsonRequest('PATCH', '/api/me', ['avatarUrl' => 'javascript:alert(1)']);
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testMeExposesAgeVerifiedWithoutReturningDateOfBirth(): void
+    {
+        $user = $this->fixtures->user(['ROLE_USER']);
+        $this->authenticate($user);
+
+        $body = $this->jsonRequest('GET', '/api/me');
+        self::assertResponseIsSuccessful();
+        self::assertFalse($body['ageVerified'] ?? true);
+        self::assertArrayNotHasKey('dateOfBirth', $body);
+
+        $user->setDateOfBirth(new \DateTimeImmutable('1990-01-15'));
+        $this->em->flush();
+
+        $body = $this->jsonRequest('GET', '/api/me');
+        self::assertTrue($body['ageVerified'] ?? false);
+        self::assertArrayNotHasKey('dateOfBirth', $body);
     }
 
     public function testPasswordChangeRequiresCurrentPassword(): void

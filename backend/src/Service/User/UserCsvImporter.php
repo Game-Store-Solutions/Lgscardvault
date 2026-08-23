@@ -4,6 +4,7 @@ namespace App\Service\User;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\AgeAttestation;
 use App\Service\Auth\PasswordResetService;
 use App\Service\CsvImport\CsvGrid;
 use App\Service\Mail\TransactionalMailer;
@@ -44,6 +45,10 @@ final class UserCsvImporter
         'emailverified' => 'emailVerified',
         'verified' => 'emailVerified',
         'isverified' => 'emailVerified',
+        'dateofbirth' => 'dateOfBirth',
+        'dob' => 'dateOfBirth',
+        'birthday' => 'dateOfBirth',
+        'birthdate' => 'dateOfBirth',
     ];
 
     public function __construct(
@@ -151,6 +156,23 @@ final class UserCsvImporter
             $verifiedRaw = $cell('emailVerified');
             $emailVerified = '' === $verifiedRaw ? true : $this->parseBool($verifiedRaw, true);
 
+            $dobRaw = $cell('dateOfBirth');
+            $dateOfBirth = null;
+            if ('' !== $dobRaw) {
+                try {
+                    $dateOfBirth = AgeAttestation::parse($dobRaw);
+                } catch (\InvalidArgumentException $e) {
+                    $errors[] = ['row' => $rowNumber, 'email' => $email, 'message' => $e->getMessage()];
+                    continue;
+                }
+            } else {
+                $warnings[] = [
+                    'row' => $rowNumber,
+                    'email' => $email,
+                    'message' => 'No date of birth; age is not attested. Add a dateOfBirth column (YYYY-MM-DD) when you have it.',
+                ];
+            }
+
             if ($dryRun) {
                 ++$created;
                 if ($needsReset && $sendResetEmails) {
@@ -168,6 +190,9 @@ final class UserCsvImporter
             $user->setDisplayName($displayName);
             $user->setRoles($roles);
             $user->setEmailVerified($emailVerified);
+            if ($dateOfBirth instanceof \DateTimeImmutable) {
+                $user->setDateOfBirth($dateOfBirth);
+            }
             $plain = $needsReset ? bin2hex(random_bytes(24)) : $password;
             $user->setPassword($this->passwordHasher->hashPassword($user, $plain));
             $this->entityManager->persist($user);

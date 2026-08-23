@@ -65,3 +65,24 @@ framework:
             policy: 'sliding_window'
             limit: 5
             interval: '15 minutes'
+
+when@test:
+    framework:
+        rate_limiter:
+            # Tests share 127.0.0.1; keep production limits in the default config.
+            privacy_request:
+                policy: 'sliding_window'
+                limit: 1000
+                interval: '1 minute'
+            contact_form:
+                policy: 'sliding_window'
+                limit: 1000
+                interval: '1 minute'
+            email_verification:
+                policy: 'sliding_window'
+                limit: 1000
+                interval: '1 minute'
+            forgot_password:
+                policy: 'sliding_window'
+                limit: 1000
+                interval: '1 minute'

@@ -49,9 +49,15 @@ final class PrivacyRequestController extends AbstractController
             return $this->json(['detail' => 'Describe the work and where it appears.'], 422);
         }
 
+        $gpc = '1' === $request->headers->get('Sec-GPC')
+            || '1' === $request->headers->get('Sec-Gpc')
+            || true === ($payload['gpcSignal'] ?? false)
+            || '1' === (string) ($payload['gpcSignal'] ?? '');
+
         $row = (new PrivacyRequest($type, mb_substr($email, 0, 180), $name))
             ->setDetails('' !== $details ? $details : null)
-            ->setCaliforniaResident((bool) ($payload['californiaResident'] ?? false));
+            ->setCaliforniaResident((bool) ($payload['californiaResident'] ?? false))
+            ->setGpcSignal($gpc);
         $this->entityManager->persist($row);
         $this->entityManager->flush();
 
@@ -73,7 +79,13 @@ final class PrivacyRequestController extends AbstractController
                             : 'A CCPA / privacy request was submitted.',
                         'senderName' => $name,
                         'senderEmail' => $email,
-                        'messageBody' => sprintf("Type: %s\nCalifornia resident: %s\n\n%s", $type, $row->isCaliforniaResident() ? 'yes' : 'no', $details),
+                        'messageBody' => sprintf(
+                            "Type: %s\nCalifornia resident: %s\nGPC: %s\n\n%s",
+                            $type,
+                            $row->isCaliforniaResident() ? 'yes' : 'no',
+                            $row->hasGpcSignal() ? 'yes' : 'no',
+                            $details,
+                        ),
                         'footerNote' => 'Submitted from the LGS Card Vault privacy request form.',
                     ],
                     textBody: sprintf("Type: %s\nFrom: %s <%s>\n\n%s\n", $type, $name, $email, $details),

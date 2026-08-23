@@ -156,4 +156,67 @@ final class AdminUserManagementTest extends WebTestCase
         self::assertSame('free@test.local', $reloaded->getEmail());
         self::assertSame('taken@test.local', $existing->getEmail());
     }
+
+    public function testAdminCreateRequiresAdultDateOfBirth(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+
+        $this->authRequest($admin, 'POST', '/api/admin/users', [
+            'email' => 'new-shopper@test.local',
+            'displayName' => 'New Shopper',
+            'plainPassword' => 'Secret123!',
+            'roles' => ['ROLE_USER'],
+            'emailVerified' => true,
+        ]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertNull($this->entityManager->getRepository(User::class)->findOneBy(['email' => 'new-shopper@test.local']));
+
+        $this->authRequest($admin, 'POST', '/api/admin/users', [
+            'email' => 'new-shopper@test.local',
+            'displayName' => 'New Shopper',
+            'plainPassword' => 'Secret123!',
+            'roles' => ['ROLE_USER'],
+            'emailVerified' => true,
+            'dateOfBirth' => '1991-04-12',
+        ]);
+        self::assertResponseIsSuccessful();
+        $this->entityManager->clear();
+        $created = $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'new-shopper@test.local']);
+        self::assertNotNull($created);
+        self::assertTrue($created->isAgeVerified());
+
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertIsArray($payload);
+        self::assertArrayNotHasKey('dateOfBirth', $payload);
+        self::assertTrue($payload['ageVerified'] ?? false);
+    }
+
+    public function testAdminCanAttestAgeOnExistingUser(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $target = $this->fixtures->user(['ROLE_USER']);
+        self::assertFalse($target->isAgeVerified());
+
+        $this->authRequest($admin, 'PATCH', '/api/admin/users/'.$target->getId(), [
+            'dateOfBirth' => '1988-06-01',
+        ], 'application/merge-patch+json');
+        self::assertResponseIsSuccessful();
+        $this->entityManager->clear();
+        $updated = $this->entityManager->getRepository(User::class)->find($target->getId());
+        self::assertTrue($updated->isAgeVerified());
+    }
+
+    public function testAdminCreateRejectsUnder13(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $this->authRequest($admin, 'POST', '/api/admin/users', [
+            'email' => 'kid@test.local',
+            'displayName' => 'Kid',
+            'plainPassword' => 'Secret123!',
+            'roles' => ['ROLE_USER'],
+            'dateOfBirth' => (new \DateTimeImmutable('today'))->modify('-10 years')->format('Y-m-d'),
+        ]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertNull($this->entityManager->getRepository(User::class)->findOneBy(['email' => 'kid@test.local']));
+    }
 }

@@ -3,6 +3,12 @@ export const COOKIE_CONSENT_KEY = 'lgscv-cookie-consent'
 
 export type CookieConsent = 'necessary' | 'all'
 
+declare global {
+  interface Navigator {
+    globalPrivacyControl?: boolean
+  }
+}
+
 export function readCookieConsent(): CookieConsent | null {
   try {
     const raw = localStorage.getItem(COOKIE_CONSENT_KEY)
@@ -21,11 +27,21 @@ export function writeCookieConsent(value: CookieConsent): void {
   }
 }
 
+/** Global Privacy Control (GPC) — treated as Do Not Sell / Share. */
+export function hasGlobalPrivacyControl(): boolean {
+  try {
+    return navigator.globalPrivacyControl === true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Optional pixels (GA, marketing, non-error browser analytics) may load only
- * after the shopper chose Accept all. Necessary cookies and first-party API
- * calls do not use this gate.
+ * after the shopper chose Accept all **and** GPC is not set. Necessary cookies
+ * and first-party API calls do not use this gate.
  */
 export function analyticsAllowed(): boolean {
+  if (hasGlobalPrivacyControl()) return false
   return readCookieConsent() === 'all'
 }
