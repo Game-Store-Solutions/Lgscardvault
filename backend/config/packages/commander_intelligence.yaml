@@ -54,6 +54,8 @@ parameters:
 
     # Provider toggles. The engine only ever reads our own tables, so turning a
     # provider off degrades data freshness, never availability.
+    # Default off: commercial harvest needs written permission (fail closed).
+    env(ARCHIDEKT_ENABLED): '0'
     commander_intelligence.archidekt.enabled: '%env(bool:ARCHIDEKT_ENABLED)%'
     # Archidekt documents no rate limit. Two seconds between requests plus a
     # week-long cache keeps our footprint small; we only fetch the top N decks

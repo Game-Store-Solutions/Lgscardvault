@@ -761,11 +761,22 @@ function OrderDetailModal({
               </p>
             ) : null}
             {order.disputeStatus ? (
-              <p className="mt-2 text-sm font-medium text-danger-700">
-                Square dispute ({order.disputeStatus}
-                {order.disputeReason ? ` · ${order.disputeReason}` : ''}). Respond in Square Dashboard with pickup
-                proof. Do not restock unless you win or refund.
-              </p>
+              <div className="mt-3 space-y-2 rounded-xl border border-danger-500/30 bg-danger-50 p-3 text-sm text-danger-800">
+                <p className="font-bold">
+                  Square dispute ({order.disputeStatus}
+                  {order.disputeReason ? ` · ${order.disputeReason}` : ''})
+                </p>
+                <p>
+                  Respond in Square Dashboard with pickup proof. Do not restock unless you lose or choose to
+                  refund. Runbook: <span className="font-semibold">deploy/CHARGEBACKS.md</span>
+                </p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>Shopper name: {order.customerName || '—'}</li>
+                  <li>Order time: {formatOrderDate(order.createdAt)}</li>
+                  <li>Pickup / staff notes: write evidence in Square (name, time, who handed over the cards)</li>
+                  <li>Do not restock from this screen because of the dispute</li>
+                </ul>
+              </div>
             ) : null}
             <p className="mt-2 text-sm text-fg-muted">{paymentSubtitle(order)}</p>
           </div>

@@ -12,7 +12,11 @@ class PrivacyRequest
     public const TYPE_DELETE = 'delete';
     public const TYPE_DO_NOT_SELL = 'do_not_sell';
     public const TYPE_CORRECT = 'correct';
-    public const TYPES = [self::TYPE_ACCESS, self::TYPE_DELETE, self::TYPE_DO_NOT_SELL, self::TYPE_CORRECT];
+    public const TYPE_TAKEDOWN = 'takedown';
+    public const TYPES = [self::TYPE_ACCESS, self::TYPE_DELETE, self::TYPE_DO_NOT_SELL, self::TYPE_CORRECT, self::TYPE_TAKEDOWN];
+
+    /** CCPA-shaped response window used for due dates and the SLA reminder. */
+    public const SLA_DAYS = 45;
 
     public const STATUS_RECEIVED = 'received';
     public const STATUS_IN_PROGRESS = 'in_progress';
@@ -141,6 +145,28 @@ class PrivacyRequest
         return $this->completedAt;
     }
 
+    public function dueAt(): \DateTimeImmutable
+    {
+        return $this->createdAt->modify('+'.self::SLA_DAYS.' days');
+    }
+
+    public function isOpen(): bool
+    {
+        return !in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_REJECTED], true);
+    }
+
+    public function daysRemaining(?\DateTimeImmutable $now = null): int
+    {
+        $now ??= new \DateTimeImmutable();
+
+        return (int) floor(($this->dueAt()->getTimestamp() - $now->getTimestamp()) / 86400);
+    }
+
+    public function isOverdue(?\DateTimeImmutable $now = null): bool
+    {
+        return $this->isOpen() && $this->daysRemaining($now) < 0;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
@@ -155,6 +181,10 @@ class PrivacyRequest
             'adminNotes' => $this->adminNotes,
             'createdAt' => $this->createdAt->format(DATE_ATOM),
             'completedAt' => $this->completedAt?->format(DATE_ATOM),
+            'dueAt' => $this->dueAt()->format(DATE_ATOM),
+            'daysRemaining' => $this->daysRemaining(),
+            'overdue' => $this->isOverdue(),
+            'open' => $this->isOpen(),
         ];
     }
 }

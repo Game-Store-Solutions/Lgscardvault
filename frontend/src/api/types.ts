@@ -179,7 +179,7 @@ export interface ComplianceDocumentMeta {
 
 export interface PrivacyRequest {
   id: number
-  type: 'access' | 'delete' | 'do_not_sell' | 'correct' | string
+  type: 'access' | 'delete' | 'do_not_sell' | 'correct' | 'takedown' | string
   status: 'received' | 'in_progress' | 'completed' | 'rejected' | string
   email: string
   name: string
@@ -188,6 +188,10 @@ export interface PrivacyRequest {
   adminNotes?: string | null
   createdAt: string
   completedAt?: string | null
+  dueAt?: string
+  daysRemaining?: number
+  overdue?: boolean
+  open?: boolean
 }
 
 export interface StorePaymentAccount {

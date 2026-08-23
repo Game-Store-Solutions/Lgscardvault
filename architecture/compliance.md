@@ -50,7 +50,11 @@ Descriptions of the product behavior that already lives in this repository. Each
 | **Private permit files** | PDF/JPEG/PNG/WebP under `var/share/compliance-docs/` (not web root). Owner or super-admin download only. | [`ComplianceDocumentStore.php`](../backend/src/Service/Compliance/ComplianceDocumentStore.php) |
 | **CA admin helper** | California applications show a CDTFA permits webpage link. **No scrape, no 50-state API.** | [`UsRegion::cdtfaVerifyUrl()`](../backend/src/Service/Onboarding/UsRegion.php) |
 | **13+ date of birth** | Register and owner Account step require `dateOfBirth`. Under 13 is 400. DOB is stored and **never** returned in API JSON. | [`AuthController.php`](../backend/src/Controller/AuthController.php) |
-| **Cookie banner** | Necessary vs accept-all stored in `lgscv-cookie-consent`. No analytics pixels exist yet, so neither choice loads a tracker. | [`CookieConsentBanner.tsx`](../frontend/src/components/CookieConsentBanner.tsx) |
+| **Cookie banner** | Necessary vs accept-all stored in `lgscv-cookie-consent`. `analyticsAllowed()` is the gate for any future pixel. | [`cookieConsent.ts`](../frontend/src/lib/cookieConsent.ts) |
+| **Error boundary** | A render crash shows a reload/home screen instead of a blank white page. | [`ErrorBoundary.tsx`](../frontend/src/components/ErrorBoundary.tsx) |
+| **Publisher takedown form** | `/fan-content` queues a `takedown` ticket (same admin queue as privacy). Mailbox still has to be watched. | [`PrivacyRequestForm.tsx`](../frontend/src/components/legal/PrivacyRequestForm.tsx) |
+| **Privacy 45-day SLA** | Each ticket has `dueAt` / `overdue`. Admin sorts overdue first. `app:privacy:sla-remind` emails a digest. | [`PrivacyRequest.php`](../backend/src/Entity/PrivacyRequest.php) |
+| **Chargeback runbook** | In-app dispute checklist (name, time, staff notes) plus [deploy/CHARGEBACKS.md](../deploy/CHARGEBACKS.md). You still respond in Square. | [`OrdersTab.tsx`](../frontend/src/pages/store-admin/OrdersTab.tsx) |
 | **CCPA / privacy queue** | Public `/privacy-request` writes `privacy_requests`, emails `LEGAL_CONTACT_EMAIL`, rate limited. Super-admin list + PATCH. | [`PrivacyRequestController.php`](../backend/src/Controller/PrivacyRequestController.php) |
 | **Chargeback flag** | Square `dispute.created` marks the order disputed and **does not restock**. Staff see a badge and “respond in Square” copy. | [`SquareWebhookController.php`](../backend/src/Controller/SquareWebhookController.php) |
 | **Skip to content** | Skip link on app, admin, and auth shells targeting `#main-content`. | [`SkipToContent.tsx`](../frontend/src/components/layout/SkipToContent.tsx) |
@@ -68,11 +72,13 @@ Descriptions of the product behavior that already lives in this repository. Each
 | Age verification beyond a checkbox | Date of birth at signup, 13+ | **Not ID-checked.** No Persona/Stripe Identity. COPPA-shaped only |
 | Seller’s permit upload / admin review | Number and/or private file; approve blocked until intake is complete | Human review. **No 50-state permit API.** CA admins get a CDTFA webpage link — do not scrape it |
 | City license / pawn / secondhand | Onboarding fields + optional upload when the store buys/trades from the public | Local law still sits with the store; we do not look up city licenses |
-| Accessibility (ADA / WCAG) | Skip-to-content; labeled cookie banner and privacy form | **Not a WCAG audit or certification.** Hire an a11y pass before you treat this as ADA-complete |
-| Wizards / Pokémon / fan-content | `/fan-content` notice | Follow publisher programs; take down on request; do not treat this page as a license |
+| Accessibility (ADA / WCAG) | Skip-to-content; labeled cookie dialog (`aria-modal`); privacy / takedown forms; root **ErrorBoundary** so a crash is not a white screen | **Not a WCAG 2.2 AA audit.** Hire a third party if you need ADA confidence |
+| Wizards / Pokémon / fan-content | `/fan-content` notice + **takedown form** queued for admins | Follow publisher / retailer programs; **watch** the privacy queue and the legal mailbox |
 | PCI / Square production checklist | Tokenize via Square; Payments tab + `LAUNCH.md` checklist | **You** finish Square production: OAuth redirect, webhooks, location tax, production credentials |
 | Insurance, entity, EIN, registered agent | Store: legal name, entity type, optional EIN, insurance **attestation** | **Platform** entity, EIN, RA, and *your* insurance are operator work. We do not form companies |
-| Chargeback / dispute SOPs | `dispute.created` persists on the order; no auto-restock; staff copy in legal + order UI | Respond in **Square’s** dispute console with pickup proof. Write your own internal runbook if you want more than this |
+| Chargeback / dispute SOPs | `dispute.created` persists; no auto-restock; order UI checklist + [CHARGEBACKS.md](../deploy/CHARGEBACKS.md) | Respond in **Square’s** dispute console with pickup proof |
+| Privacy ops (45 days) | Queue + SLA dates + overdue badges + `app:privacy:sla-remind` | A human still has to fulfill the request |
+| Analytics consent | `analyticsAllowed()` is true only after Accept all | Do not add a pixel that ignores this helper |
 | Block checkout if Square tax is $0 | **Done in software.** Card checkout blocked in sales-tax states when quote tax is $0. **AK, DE, MT, NH, OR complete card (and pay-in-store) purchase with $0 tax.** Pay-in-store always available. | Enable location tax in Square Dashboard **for sales-tax states**. No-tax states do not need it to take cards. |
 
 ---
@@ -318,28 +324,28 @@ These are product holes, not “hire a lawyer” items:
 | Admin-created / SSO users skip DOB | Only `POST /api/register` and the owner wizard Account step collect it. |
 | No Global Privacy Control parser | Footer “Do Not Sell” is the `/privacy-request` form, not a GPC/`Sec-GPC` signal. |
 | Unknown store region does not block $0 tax | Fixture and admin-provisioned tenants keep working; a live CA store with tax off **is** blocked. |
-| Cookie banner does not gate any SDK | There are no analytics pixels. Adding one without honoring `all` vs `necessary` would be a regression. |
+| Cookie banner does not load a pixel today | `analyticsAllowed()` is ready; nothing calls it yet. Adding a pixel that ignores it would be a regression. |
 | No 50-state permit validator | Intentionally absent — see [Permit APIs](#permit-apis-do-not-integrate). |
-| Not a WCAG certification | Skip link + labels only. |
+| Not a WCAG certification | Skip link, labels, cookie dialog, ErrorBoundary — still not an audit. |
 
 ---
 
 ## Missing today (operator checklist)
 
-Do these before you call the product “launch compliant.” None of them are finished by merging this PR.
+Software for 6–10 and 12 is in the repo (forms, SLA, runbook, consent helper, ErrorBoundary). These remaining items are still **people / counsel / production config** — merging the PR does not finish them.
 
 1. **Lawyer** — SaaS / not facilitator / not seller; review all six legal pages.
 2. **Platform entity** — formation, EIN, registered agent, *your* business insurance.
 3. **Env** — `LEGAL_ENTITY_NAME`, `LEGAL_CONTACT_EMAIL`, `LEGAL_ADDRESS` in `prod.env`.
 4. **Square production** — OAuth redirect, production keys, webhooks, **location tax on every live store in a sales-tax state**. AK/DE/MT/NH/OR may take cards at $0 tax.
 5. **Human permit review** — open the PDF, use the CDTFA link for California, reject incomplete applications.
-6. **WCAG audit** — third party if you need ADA confidence.
-7. **Publisher** — fan-content / retailer policy compliance; takedown mailbox watched.
-8. **Privacy ops** — staff the `/privacy-request` queue (45 days).
-9. **Chargeback runbook** — pickup proof (name, time, staff notes); Square dispute console.
-10. **Ops hardening** — Sentry, off-host Postgres backups, uptime on `/health/ready` ([LAUNCH.md Phase 5](../deploy/LAUNCH.md)).
-11. **Archidekt** — keep harvest off until written permission (`ARCHIDEKT_ENABLED`).
-12. **Analytics** — if you add a pixel, honor the cookie banner’s `all` vs `necessary` choice.
+6. **WCAG audit (still yours)** — we shipped skip-link, labeled forms, cookie dialog, ErrorBoundary. Hire a third party if you need ADA confidence.
+7. **Publisher (watch the queue)** — takedown form exists on `/fan-content`. You still follow retailer/fan-content programs and action tickets.
+8. **Privacy ops (staff it)** — 45-day due dates and `app:privacy:sla-remind` exist. A human still fulfills access/delete/DNS requests.
+9. **Chargebacks (Square)** — runbook + in-app checklist exist. You still upload pickup proof in Square’s console.
+10. **Ops hardening** — set `SENTRY_DSN`, off-host Postgres backups, uptime on `/health/ready` ([LAUNCH.md Phase 5](../deploy/LAUNCH.md)).
+11. **Archidekt** — default is **off**. Do not set `ARCHIDEKT_ENABLED=1` until written permission.
+12. **Analytics** — no pixel ships today. If you add one, call `analyticsAllowed()` and load it only when that is true.
 
 ---
 
@@ -352,7 +358,9 @@ Do these before you call the product “launch compliant.” None of them are fi
 | [OnboardingStoreTest.php](../backend/tests/Controller/OnboardingStoreTest.php) | US + license intake on submit |
 | [AdminActionsTest.php](../backend/tests/Controller/AdminActionsTest.php) | Approve refused without intake |
 | [AuthEmailVerificationTest.php](../backend/tests/Controller/AuthEmailVerificationTest.php) | DOB required; under-13 rejected |
-| [PrivacyRequestTest.php](../backend/tests/Controller/PrivacyRequestTest.php) | Public create + admin complete |
+| [PrivacyRequestTest.php](../backend/tests/Controller/PrivacyRequestTest.php) | Public create + takedown + admin complete + SLA fields |
+| [PrivacyRequestSlaTest.php](../backend/tests/Service/PrivacyRequestSlaTest.php) | 45-day due date / overdue / completed |
+
 | [SquareCheckoutTest.php](../backend/tests/Controller/SquareCheckoutTest.php) | CA + $0 tax → 422; AK/DE/MT/NH/OR + $0 tax → 201 card capture |
 | [GuestCheckoutTest.php](../backend/tests/Controller/GuestCheckoutTest.php) | Oregon guest card checkout completes at $0 tax |
 | [SquareWebhookTest.php](../backend/tests/Controller/SquareWebhookTest.php) | Dispute persists, no restock |
@@ -369,4 +377,5 @@ Do these before you call the product “launch compliant.” None of them are fi
 | [customers-and-orders.md](customers-and-orders.md) | Cart and order workflow |
 | [data-model.md](data-model.md) | Tables (see also the ER snippet above) |
 | [deploy/LAUNCH.md](../deploy/LAUNCH.md) | Production Square + operator compliance |
-| [deploy/prod.env.example](../deploy/prod.env.example) | `LEGAL_*` and Square env vars |
+| [deploy/CHARGEBACKS.md](../deploy/CHARGEBACKS.md) | Pickup-proof dispute steps |
+| [deploy/prod.env.example](../deploy/prod.env.example) | `LEGAL_*`, `ARCHIDEKT_ENABLED=0`, Square env vars |

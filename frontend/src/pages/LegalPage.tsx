@@ -345,13 +345,17 @@ function FanContent({ site }: { site: LegalSite }) {
           an image, we will.
         </p>
       </Section>
-      <Section title="Contact">
+      <Section title="Takedown mailbox">
         <p>
-          Rights holders:{' '}
+          Rights holders can submit a takedown below (queued for platform admins) or email{' '}
           <a className="font-semibold text-brand-600 hover:underline" href={`mailto:${site.contactEmail}`}>
             {site.contactEmail}
           </a>
+          . We still have to watch that queue — the form does not auto-remove listings.
         </p>
+        <div className="mt-4">
+          <PrivacyRequestForm variant="takedown" />
+        </div>
       </Section>
     </>
   )

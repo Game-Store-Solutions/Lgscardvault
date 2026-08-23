@@ -131,9 +131,11 @@ a marketplace facilitator for sales tax. In-app copy states that; it does not re
 5. City business license / pawn / secondhand-dealer: collected on the Licenses onboarding step when the owner buys/trades from the public. Local rules still sit with the store.
 6. Enable **Square location taxes** for every live store in a **sales-tax state** before taking card payments (see Phase 3). **AK, DE, MT, NH, and OR** have no statewide sales tax — shoppers can complete card checkout with $0 tax.
 7. Age gate is date of birth (13+), not ID verification. That is COPPA-shaped, not KYC.
-8. Keep **Archidekt harvest off** in production until you have written permission (`ARCHIDEKT_ENABLED`).
-9. Turn on Sentry, off-host Postgres backups, and an uptime check (`LAUNCH.md` Phase 5).
+8. Keep **Archidekt harvest off** in production until you have written permission (`ARCHIDEKT_ENABLED=0` is the default in `prod.env.example`).
+9. Turn on Sentry (`SENTRY_DSN`), off-host Postgres backups, and an uptime check on `/health/ready` (Phase 5).
 10. Walk Square’s production checklist (Phase 3). PCI: you tokenize via Square; you still own go-live.
+11. Staff **Platform admin → Privacy** (45-day SLA). Optional digest: `php bin/console app:privacy:sla-remind`.
+12. Chargebacks: follow [CHARGEBACKS.md](CHARGEBACKS.md) and respond in Square with pickup proof.
 
 **Permit APIs:** do not integrate a scraper. If a state later publishes a real permit API with a ToS that allows automated checks, we can add an optional verify button — it will not be the source of truth over the uploaded document.
 

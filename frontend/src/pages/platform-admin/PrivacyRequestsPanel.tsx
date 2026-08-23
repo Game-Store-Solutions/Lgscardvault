@@ -16,6 +16,21 @@ const TYPE_LABEL: Record<string, string> = {
   access: 'Access',
   delete: 'Delete',
   correct: 'Correct',
+  takedown: 'Publisher takedown',
+}
+
+function slaLabel(row: PrivacyRequest): string {
+  if (row.status === 'completed' || row.status === 'rejected') {
+    return 'Closed'
+  }
+  if (row.overdue) {
+    return 'Overdue — complete now'
+  }
+  const days = row.daysRemaining
+  if (typeof days === 'number') {
+    return days === 1 ? 'Due in 1 day' : `Due in ${days} days`
+  }
+  return '45-day SLA'
 }
 
 export function PrivacyRequestsPanel() {
@@ -43,19 +58,27 @@ export function PrivacyRequestsPanel() {
     return <ErrorState title="Could not load privacy requests" description={extractErrorMessage(query.error, '')} />
   }
 
-  const rows = query.data ?? []
+  const rows = [...(query.data ?? [])].sort((a, b) => Number(b.overdue) - Number(a.overdue))
+  const openCount = rows.filter((row) => row.open).length
+  const overdueCount = rows.filter((row) => row.overdue).length
+
   if (rows.length === 0) {
     return (
       <EmptyState
         icon={ShieldAlert}
         title="No privacy requests yet"
-        description="CCPA / Do Not Sell submissions from /privacy-request appear here."
+        description="CCPA / Do Not Sell and publisher takedowns from /privacy-request and /fan-content appear here."
       />
     )
   }
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-fg-muted">
+        {openCount} open · {overdueCount} overdue (45-day SLA). Run{' '}
+        <code className="rounded-btn bg-bg px-1.5 py-0.5 text-xs">php bin/console app:privacy:sla-remind</code> to
+        email a digest.
+      </p>
       {rows.map((row) => (
         <Card key={row.id}>
           <CardHeader
@@ -67,6 +90,7 @@ export function PrivacyRequestsPanel() {
               <Badge tone={row.status === 'completed' ? 'success' : row.status === 'rejected' ? 'danger' : 'brand'}>
                 {STATUS_LABEL[row.status] ?? row.status}
               </Badge>
+              <Badge tone={row.overdue ? 'danger' : row.open ? 'neutral' : 'success'}>{slaLabel(row)}</Badge>
               {row.californiaResident && <Badge tone="neutral">California resident</Badge>}
             </div>
             {row.details && <p className="whitespace-pre-wrap text-sm text-fg">{row.details}</p>}

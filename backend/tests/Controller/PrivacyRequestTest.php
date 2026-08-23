@@ -71,12 +71,33 @@ final class PrivacyRequestTest extends WebTestCase
         self::assertNotEmpty($list);
         $id = (int) $list[0]['id'];
 
+        self::assertArrayHasKey('dueAt', $list[0]);
+        self::assertArrayHasKey('overdue', $list[0]);
+        self::assertTrue($list[0]['open'] ?? false);
+
         $updated = $this->jsonRequest('PATCH', '/api/admin/privacy-requests/'.$id, [
             'status' => 'completed',
             'adminNotes' => 'Fulfilled.',
         ], $admin);
         self::assertSame(200, $this->client->getResponse()->getStatusCode(), json_encode($updated));
         self::assertSame('completed', $updated['status'] ?? null);
+        self::assertFalse($updated['open'] ?? true);
+        self::assertFalse($updated['overdue'] ?? true);
+    }
+
+    public function testPublicSubmitCreatesTakedownRequest(): void
+    {
+        $body = $this->jsonRequest('POST', '/api/privacy/requests', [
+            'type' => 'takedown',
+            'name' => 'Rights Holder',
+            'email' => 'legal@publisher.example',
+            'details' => 'Please remove the promotional art on /s/demo/cards/1',
+        ]);
+
+        self::assertSame(202, $this->client->getResponse()->getStatusCode(), json_encode($body));
+        $row = $this->em->getRepository(PrivacyRequest::class)->find($body['reference']);
+        self::assertInstanceOf(PrivacyRequest::class, $row);
+        self::assertSame('takedown', $row->getType());
     }
 
     public function testOwnerCannotListPrivacyRequests(): void

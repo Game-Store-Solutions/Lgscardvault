@@ -40,7 +40,7 @@ final class PrivacyRequestController extends AbstractController
         $details = mb_substr(trim((string) ($payload['details'] ?? '')), 0, 4000);
 
         if (!in_array($type, PrivacyRequest::TYPES, true)) {
-            return $this->json(['detail' => 'Choose access, delete, do_not_sell, or correct.'], 422);
+            return $this->json(['detail' => 'Choose access, delete, do_not_sell, correct, or takedown.'], 422);
         }
         if ('' === $name || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return $this->json(['detail' => 'Name and a valid email are required.'], 422);
@@ -57,10 +57,17 @@ final class PrivacyRequestController extends AbstractController
             try {
                 $this->mailer->sendHtml(
                     to: $recipient,
-                    subject: sprintf('Privacy request (%s) from %s', $type, $name),
+                    subject: sprintf(
+                        '%s (%s) from %s',
+                        PrivacyRequest::TYPE_TAKEDOWN === $type ? 'Publisher takedown' : 'Privacy request',
+                        $type,
+                        $name,
+                    ),
                     htmlTemplate: 'emails/platform/contact_enquiry.html.twig',
                     context: [
-                        'preheader' => 'A CCPA / privacy request was submitted.',
+                        'preheader' => PrivacyRequest::TYPE_TAKEDOWN === $type
+                            ? 'A publisher / rights-holder takedown was submitted.'
+                            : 'A CCPA / privacy request was submitted.',
                         'senderName' => $name,
                         'senderEmail' => $email,
                         'messageBody' => sprintf("Type: %s\nCalifornia resident: %s\n\n%s", $type, $row->isCaliforniaResident() ? 'yes' : 'no', $details),

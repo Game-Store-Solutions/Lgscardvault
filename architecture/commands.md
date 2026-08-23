@@ -48,6 +48,8 @@ Full setup narrative: [local-development.md](local-development.md). Feature deta
 |---------|----------------|
 | `app:subscriptions:charge --dry-run` | List subscriptions due without charging. |
 | `app:subscriptions:charge` | Charge vaulted Square cards for due renewals. |
+| `app:privacy:sla-remind --dry-run` | List open privacy / takedown requests past 45 days. |
+| `app:privacy:sla-remind` | Email `LEGAL_CONTACT_EMAIL` a digest of overdue privacy tickets. |
 
 In production this also runs from `BillingSchedule` (needs `messenger:consume scheduler_billing`).
 
