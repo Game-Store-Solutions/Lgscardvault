@@ -153,8 +153,9 @@ export default function App() {
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          {/* Must stay inside BrowserRouter — the banner uses <Link>. */}
+          <CookieConsentBanner />
         </BrowserRouter>
-        <CookieConsentBanner />
         </MotionRoot>
       </AuthProvider>
     </QueryClientProvider>

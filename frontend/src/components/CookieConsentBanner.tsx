@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from './ui'
 
@@ -22,11 +22,7 @@ function readConsent(): Consent | null {
  * the shopper opts in. California residents get a Do Not Sell path.
  */
 export function CookieConsentBanner() {
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    setOpen(readConsent() === null)
-  }, [])
+  const [open, setOpen] = useState(() => readConsent() === null)
 
   function choose(value: Consent) {
     try {
