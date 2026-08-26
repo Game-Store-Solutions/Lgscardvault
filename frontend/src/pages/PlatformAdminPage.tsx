@@ -548,7 +548,7 @@ export default function PlatformAdminPage() {
                 </Button>
               }
             />
-            <CardBody className="grid gap-3 sm:grid-cols-3">
+            <CardBody className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <IntegrationTile
                 title="Single sign-on"
                 detail={integrationsQuery.data?.sso.providerName ?? 'Google'}
@@ -569,6 +569,13 @@ export default function PlatformAdminPage() {
                 status={integrationsQuery.data?.subscriptionPayments}
                 setupUrl="https://developer.squareup.com/apps"
                 setupLabel="Open Square"
+              />
+              <IntegrationTile
+                title="PayPal"
+                detail={integrationsQuery.data?.paypal?.provider ?? 'PayPal'}
+                status={integrationsQuery.data?.paypal}
+                setupUrl="https://developer.paypal.com/dashboard/applications"
+                setupLabel="Open PayPal"
               />
             </CardBody>
           </Card>

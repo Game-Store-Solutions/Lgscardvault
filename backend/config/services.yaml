@@ -210,6 +210,13 @@ when@test:
                 $weights: '%commander_intelligence.weights%'
                 $stockBonus: '%commander_intelligence.stock_bonus%'
 
+        App\Tests\Support\FakePaypalCheckoutGateway:
+            autowire: true
+            public: true
+        App\Service\Payments\PaypalCheckoutGatewayInterface:
+            alias: App\Tests\Support\FakePaypalCheckoutGateway
+            public: true
+
         # Same idea for card checkout: exercise the money paths (capture,
         # decline, rollback) without reaching Square.
         App\Tests\Support\FakeCheckoutGateway:

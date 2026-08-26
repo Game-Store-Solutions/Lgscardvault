@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Service\Auth\OidcClient;
 use App\Service\Onboarding\AddressAutocompleteClient;
+use App\Service\Payments\PaypalCredentials;
+use App\Service\Payments\PaypalSubscriptionBilling;
 use App\Service\Payments\SquareCredentials;
 use App\Service\Payments\SubscriptionBillingInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,7 +26,9 @@ class AdminIntegrationsController extends AbstractController
         private readonly OidcClient $oidc,
         private readonly AddressAutocompleteClient $addressClient,
         private readonly SubscriptionBillingInterface $billing,
+        private readonly PaypalSubscriptionBilling $paypalBilling,
         private readonly SquareCredentials $credentials,
+        private readonly PaypalCredentials $paypalCredentials,
     ) {
     }
 
@@ -47,6 +51,12 @@ class AdminIntegrationsController extends AbstractController
                 'mode' => $this->billing->isLive() ? 'square' : 'mock',
                 'provider' => 'Square',
                 'envKeys' => $this->credentials->envKeys(),
+            ],
+            'paypal' => [
+                'configured' => $this->paypalBilling->isLive(),
+                'mode' => $this->paypalBilling->isLive() ? 'paypal' : 'mock',
+                'provider' => 'PayPal',
+                'envKeys' => $this->paypalCredentials->envKeys(),
             ],
         ]);
     }

@@ -90,8 +90,8 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
           data such as IP address and basic logs needed to run the service.
         </p>
         <p>
-          Payments are processed by Square. We do not store full card numbers. Square may receive the amount,
-          store location, and limited billing details needed to complete the charge.
+          Payments are processed by Square and PayPal. We do not store full card numbers. The processor you
+          pay with may receive the amount, store location, and limited billing details needed to complete the charge.
         </p>
       </Section>
       <Section title="How we use information">
@@ -103,7 +103,7 @@ function PrivacyPolicy({ site }: { site: LegalSite }) {
       </Section>
       <Section title="Sharing">
         <p>
-          We share information with the store you buy from (so they can fulfill pickup), with Square for
+          We share information with the store you buy from (so they can fulfill pickup), with Square and PayPal for
           payments, with email delivery providers, and if required by law. Stores see the order information
           needed to pull your cards and identify you at the counter.
         </p>
@@ -166,7 +166,7 @@ function TermsOfService({ site }: { site: LegalSite }) {
         <p>
           {site.entityName} is software for local game stores. When you buy cards or sealed product, you are
           buying from that store, not from us. The store sets prices, inventory, and pickup hours. Payment is
-          charged to the store’s Square account. We are not the seller, we do not take possession of inventory,
+          charged to the store’s connected Square or PayPal account. We are not the seller, we do not take possession of inventory,
           and we do not collect sales tax on the store’s behalf.
         </p>
       </Section>
@@ -178,9 +178,10 @@ function TermsOfService({ site }: { site: LegalSite }) {
       </Section>
       <Section title="Sales tax">
         <p>
-          Sales tax is charged at the store’s Square location when that location has tax configured. States
-          without statewide sales tax (Alaska, Delaware, Montana, New Hampshire, Oregon) may complete card
-          checkout at $0 tax. Tax appears on checkout before you pay when Square returns it.
+          Sales tax is charged using the store’s Square location tax when Square is connected. States
+          without statewide sales tax (Alaska, Delaware, Montana, New Hampshire, Oregon) may complete online
+          checkout at $0 tax. Tax appears on checkout before you pay when Square returns it. PayPal checkout uses
+          that same tax quote.
         </p>
       </Section>
       <Section title="Accounts">
@@ -224,7 +225,7 @@ function PickupPolicy({ site }: { site: LegalSite }) {
       </p>
       <Section title="Paying online">
         <p>
-          You can pay with a card or wallet through Square, then pick up at the counter. The store holds the
+          You can pay with a card or wallet through Square, or with PayPal when the store has connected it, then pick up at the counter. The store holds the
           items after a successful payment. Bring a photo ID or the name on the order.
         </p>
       </Section>
@@ -237,11 +238,11 @@ function PickupPolicy({ site }: { site: LegalSite }) {
       </Section>
       <Section title="Refunds, cancellations, and chargebacks">
         <p>
-          The selling store handles refunds. If staff cancel or refund a card-paid order in store admin, the
-          Square payment is refunded and stock is restocked. Contact the store first; {site.entityName} does not
-          hold your payment. Card-network disputes (chargebacks) are opened with Square against the store’s
-          seller account. The store should gather pickup proof (name, time, staff notes, ID if collected) and
-          respond in Square’s dispute console. The platform records the dispute on the order for staff; it does
+          The selling store handles refunds. If staff cancel or refund an online-paid order in store admin, the
+          Square or PayPal payment is refunded and stock is restocked. Contact the store first; {site.entityName} does not
+          hold your payment. Card-network disputes (chargebacks) are opened with Square or PayPal against the store’s
+          seller account, matching how you paid. The store should gather pickup proof (name, time, staff notes, ID if collected) and
+          respond in Square’s dispute console or PayPal’s Resolution Center. The platform records the dispute on the order for staff; it does
           not auto-restock, because the goods may already have left the counter.
         </p>
       </Section>
@@ -264,7 +265,7 @@ function MerchantTerms({ site }: { site: LegalSite }) {
       </p>
       <Section title="You are the merchant">
         <p>
-          You sell your own inventory. Shopper payments settle to your connected Square account. You are
+          You sell your own inventory. Shopper payments settle to your connected Square or PayPal account. You are
           responsible for pricing, stock accuracy, pickup, customer service, refunds, chargebacks, and all
           taxes on those sales. {site.entityName} provides the software and is not a party to the sale. You
           are solely responsible for your licenses, permits, and tax filings.
@@ -291,17 +292,18 @@ function MerchantTerms({ site }: { site: LegalSite }) {
           Disclose that activity during onboarding so reviewers can see your license intake.
         </p>
       </Section>
-      <Section title="Square and fees">
+      <Section title="Payment processors and fees">
         <p>
-          You must keep a valid Square connection to take card payments. Shoppers enter card details only in
-          Square’s payment form; {site.entityName} never stores full card numbers. Turn on sales tax for your
-          Square location before you take live cards. Square charges its own processing fees. Any{' '}
+          You must keep a valid Square and/or PayPal connection to take those payments. Shoppers enter payment
+          details only in Square’s or PayPal’s form; {site.entityName} never stores full card numbers. Turn on sales tax for your
+          Square location before you take live online payments (PayPal uses that tax quote). Square and PayPal
+          charge their own processing fees. Any{' '}
           {site.entityName} subscription is billed separately to you.
         </p>
       </Section>
       <Section title="Prohibited use">
         <p>
-          No illegal listings, counterfeit product, or use of the service to collect card data outside Square.
+          No illegal listings, counterfeit product, or use of the service to collect card data outside Square or PayPal.
           We may suspend a storefront that creates legal or fraud risk.
         </p>
       </Section>

@@ -210,6 +210,7 @@ export interface StorePaymentAccount {
 
 export interface StorePaymentStatus {
   square: StorePaymentAccount | null
+  paypal?: StorePaymentAccount | null
 }
 
 export interface SquareConnectResponse {
@@ -236,6 +237,7 @@ export interface AdminIntegrations {
   sso: IntegrationStatus & { providerName: string }
   addressAutocomplete: IntegrationStatus
   subscriptionPayments: IntegrationStatus
+  paypal?: IntegrationStatus
 }
 
 export interface Plan {
@@ -258,7 +260,16 @@ export interface GeocodeSuggestion {
   longitude: number | null
 }
 
-export type PaymentMethodType = 'card' | 'apple_pay' | 'google_pay'
+export type PaymentMethodType = 'card' | 'apple_pay' | 'google_pay' | 'paypal'
+
+export interface PaypalCheckoutConfig {
+  enabled: boolean
+  clientId: string
+  merchantId: string
+  environment: string
+  currency: string
+  message?: string | null
+}
 
 /** Store-scoped Square config for shopper checkout; contains no secrets. */
 export interface StoreCheckoutConfig {
@@ -272,6 +283,7 @@ export interface StoreCheckoutConfig {
   environment: string
   currency: string
   countryCode: string
+  paypal?: PaypalCheckoutConfig
 }
 
 /** Public Square Web Payments SDK configuration; contains no secrets. */
@@ -283,6 +295,12 @@ export interface PaymentClientConfig {
   methods: PaymentMethodType[]
   currency: string
   countryCode: string
+  paypal?: {
+    enabled: boolean
+    clientId: string
+    environment: string
+    currency: string
+  }
 }
 
 export interface StoreSubscriptionStatus extends PaymentClientConfig {
@@ -290,6 +308,7 @@ export interface StoreSubscriptionStatus extends PaymentClientConfig {
   planName?: string | null
   priceCents: number
   subscriptionStatus: string
+  billingProvider?: 'square' | 'paypal' | string | null
   paymentMethodType?: PaymentMethodType | null
   paymentLast4?: string | null
   paymentConfigured: boolean
@@ -847,13 +866,20 @@ export interface Order {
   totalCents: number
   /** Store credit spent on this order, in cents (0 = none). */
   creditAppliedCents?: number
-  /** Cash captured by Square, in cents. Zero for unpaid pay-in-store orders. */
+  /** Cash captured by the store processor, in cents. Zero for unpaid pay-in-store orders. */
   paidCents?: number
+  /** Extra still owed after staff add cards (merchandise − already captured). */
+  balanceDueCents?: number
+  /** Overpayment after staff remove cards — refund on PayPal/Square. */
+  creditOwedCents?: number
+  paymentProvider?: 'square' | 'paypal' | string | null
+  /** Processor capture ids for refunds and support (staff order detail). */
+  paymentCaptures?: Array<{ id: string; amountCents: number; refundedCents: number }>
   /** Sales tax collected at the store location, in cents. */
   taxCents?: number
   /** Staff-facing checkout note, e.g. "Paying in store". */
   notes?: string | null
-  /** Square chargeback / dispute, when a webhook recorded one. */
+  /** Square or PayPal chargeback / dispute, when a webhook recorded one. */
   disputeStatus?: string | null
   disputeReason?: string | null
   disputedAt?: string | null

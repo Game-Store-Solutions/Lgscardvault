@@ -78,6 +78,22 @@ Each **store** still completes **Connect Square** in admin (per-merchant OAuth);
 | `SQUARE_SANDBOX_*` | Same five keys as production, under `SQUARE_SANDBOX_` prefix. |
 | `SQUARE_ENVIRONMENT=sandbox` | Selects sandbox pair. |
 
+### PayPal (optional second processor)
+
+Same shape as Square: platform keys for SaaS billing, per-store Partner Connect for shopper checkout. Captures settle to the **store’s** PayPal account. Leave empty to hide PayPal.
+
+| Variable | Purpose |
+|----------|---------|
+| `PAYPAL_ENVIRONMENT` | `sandbox` or `live`. |
+| `PAYPAL_SANDBOX_CLIENT_ID` / `PAYPAL_LIVE_CLIENT_ID` | REST app client id (JS SDK + OAuth). |
+| `PAYPAL_SANDBOX_CLIENT_SECRET` / `PAYPAL_LIVE_CLIENT_SECRET` | REST secret. |
+| `PAYPAL_SANDBOX_BN_CODE` / `PAYPAL_LIVE_BN_CODE` | Partner attribution (BN code). `PAYPAL_*_PARTNER_ATTRIBUTION_ID` is an alias. |
+| `PAYPAL_SANDBOX_WEBHOOK_ID` / `PAYPAL_LIVE_WEBHOOK_ID` | Webhook id from PayPal dashboard. Tests use `test-paypal-webhook-id`. |
+| `PAYPAL_OAUTH_REDIRECT_URI` | Partner return URL, e.g. `https://your-domain/api/integrations/paypal/callback`. |
+| `PAYPAL_CURRENCY` | Default `USD`. |
+
+Register the webhook URL `https://your-domain/api/integrations/paypal/webhook`. Partner Connect requires Commerce Platform / Partner access on the app.
+
 ---
 
 ## Recommended (not third-party “apps”, but production hygiene)

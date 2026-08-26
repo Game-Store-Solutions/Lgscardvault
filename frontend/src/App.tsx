@@ -41,6 +41,7 @@ import PatchNotesTab from './pages/store-admin/PatchNotesTab'
 import SellTradePage from './pages/SellTradePage'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 import LegalPage from './pages/LegalPage'
+import GuestOrderBalancePage from './pages/GuestOrderBalancePage'
 import { CookieConsentBanner } from './components/CookieConsentBanner'
 
 const queryClient = new QueryClient({
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="s/:slug/cards/:id" element={<CardDetailsPage />} />
               <Route path="s/:slug/case-cards" element={<CaseCardsPage />} />
               <Route path="s/:slug/events" element={<StoreEventsPage />} />
+              <Route path="pay-order/:slug/:orderId" element={<GuestOrderBalancePage />} />
               <Route
                 path="s/:slug/account"
                 element={

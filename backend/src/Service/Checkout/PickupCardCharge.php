@@ -5,6 +5,8 @@ namespace App\Service\Checkout;
 use App\Entity\Order;
 use App\Entity\Store;
 use App\Service\Payments\CheckoutGatewayInterface;
+use App\Service\Payments\PaypalCheckoutGatewayInterface;
+use App\Entity\StorePaymentAccount;
 
 /**
  * Applies location sales tax and captures the card for a reserved pickup order.
@@ -13,6 +15,7 @@ final readonly class PickupCardCharge
 {
     public function __construct(
         private CheckoutGatewayInterface $checkoutGateway,
+        private PaypalCheckoutGatewayInterface $paypalCheckout,
         private PickupTaxPolicy $taxPolicy,
     ) {
     }
@@ -27,6 +30,7 @@ final readonly class PickupCardCharge
         ?string $verificationToken,
         ?string $buyerEmail,
         ?string $squareCustomerId,
+        string $provider = StorePaymentAccount::PROVIDER_SQUARE,
     ): array {
         $lineItems = SquareLineItems::fromOrder($order);
         $quote = $this->checkoutGateway->quotePickupTotals($store, $lineItems, $order->getCreditAppliedCents());
@@ -50,6 +54,28 @@ final readonly class PickupCardCharge
             throw new \RuntimeException('A payment method is required.');
         }
 
+        if (StorePaymentAccount::PROVIDER_PAYPAL === $provider) {
+            $payment = $this->paypalCheckout->charge(
+                $store,
+                $amountDue,
+                $sourceId,
+                $order->getReference(),
+                $order->getTaxCents(),
+            );
+            $charged = (int) ($payment['chargedCents'] ?? $amountDue);
+            $order
+                ->setTaxCents((int) ($payment['taxCents'] ?? $quote['taxCents']))
+                ->setPaidCents($charged)
+                ->setPaymentReference($payment['paymentId'])
+                ->setPaymentProvider(StorePaymentAccount::PROVIDER_PAYPAL)
+                ->recordPaymentCapture($payment['paymentId'], $charged);
+
+            return [
+                'charged' => true,
+                'receiptUrl' => $payment['receiptUrl'] ?? null,
+            ];
+        }
+
         $payment = $this->checkoutGateway->charge(
             $store,
             $merchandiseDue,
@@ -65,11 +91,14 @@ final readonly class PickupCardCharge
             Order::FULFILLMENT_PICKUP,
         );
 
+        $charged = (int) ($payment['chargedCents'] ?? $amountDue);
         $order
             ->setTaxCents((int) ($payment['taxCents'] ?? $quote['taxCents']))
-            ->setPaidCents((int) ($payment['chargedCents'] ?? $amountDue))
+            ->setPaidCents($charged)
             ->setPaymentReference($payment['paymentId'])
-            ->setSquareOrderId($payment['squareOrderId'] ?? null);
+            ->setPaymentProvider(StorePaymentAccount::PROVIDER_SQUARE)
+            ->setSquareOrderId($payment['squareOrderId'] ?? null)
+            ->recordPaymentCapture($payment['paymentId'], $charged);
 
         return [
             'charged' => true,

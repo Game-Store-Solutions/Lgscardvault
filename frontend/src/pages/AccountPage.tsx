@@ -83,6 +83,7 @@ export default function AccountPage() {
   const section: AccountSection =
     sectionParam && SECTIONS.includes(sectionParam) ? sectionParam : 'overview'
   const storeSlug = searchParams.get('store') || undefined
+  const highlightOrderId = Number(searchParams.get('order') || '') || null
   const [ordersPage, setOrdersPage] = useState(1)
   const [storesPage, setStoresPage] = useState(1)
 
@@ -324,6 +325,7 @@ export default function AccountPage() {
             page={ordersPage}
             onPageChange={setOrdersPage}
             compact
+            highlightOrderId={highlightOrderId}
             headerTitle={filteredStoreName ?? 'Marketplace-wide'}
             headerSubtitle={filteredStoreName ? `Newest first at ${filteredStoreName}.` : 'Newest first. Filter by store in the sidebar.'}
             emptyDescription="When you check out at any store on this account, your orders will appear here."

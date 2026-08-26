@@ -12,6 +12,7 @@ use App\Service\Compliance\StoreComplianceGate;
 use App\Service\Onboarding\AddressAutocompleteClient;
 use App\Service\Onboarding\PlanCatalog;
 use App\Service\Onboarding\UsRegion;
+use App\Service\Payments\PaypalSubscriptionBilling;
 use App\Service\Payments\SubscriptionBillingInterface;
 use App\Service\Store\StoreSettingsUpdater;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,6 +40,7 @@ class OnboardingController extends AbstractController
         private readonly PlanCatalog $planCatalog,
         private readonly AddressAutocompleteClient $addressClient,
         private readonly SubscriptionBillingInterface $billing,
+        private readonly PaypalSubscriptionBilling $paypalBilling,
         private readonly StoreSettingsUpdater $settingsUpdater,
     ) {
     }
@@ -59,7 +61,36 @@ class OnboardingController extends AbstractController
     #[IsGranted('ROLE_USER')]
     public function paymentConfig(): JsonResponse
     {
-        return $this->json($this->billing->clientConfig());
+        $config = $this->billing->clientConfig();
+        $config['paypal'] = $this->paypalBilling->clientConfig();
+
+        return $this->json($config);
+    }
+
+    #[Route('/payments/onboarding/paypal/order', name: 'api_onboarding_paypal_order', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function paypalOrder(Request $request): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Authentication required.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $plan = $this->planCatalog->find((string) ($payload['planKey'] ?? ''));
+        $priceCents = (int) ($plan['priceCents'] ?? 0);
+        if ($priceCents <= 0) {
+            return $this->json(['error' => 'This plan does not require PayPal.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $orderId = $this->paypalBilling->createOrder($priceCents, 'onboarding-'.($user->getId() ?? '0'), $user->getEmail());
+        } catch (\RuntimeException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
+        }
+
+        return $this->json(['orderId' => $orderId]);
     }
 
     #[Route('/onboarding/store', name: 'api_onboarding_store', methods: ['POST'])]
@@ -178,16 +209,30 @@ class OnboardingController extends AbstractController
 
         // --- Charge only after everything else validated ---
         try {
-            $subscription = $this->billing->startSubscription(
-                $sourceId,
-                $priceCents,
-                [
-                    'email' => $user->getEmail(),
-                    'name' => $user->getDisplayName(),
-                    'reference' => $slug,
-                ],
-                $verificationToken,
-            );
+            if ('paypal' === $methodType) {
+                $subscription = $this->paypalBilling->startSubscription(
+                    $sourceId,
+                    $priceCents,
+                    [
+                        'email' => $user->getEmail(),
+                        'name' => $user->getDisplayName(),
+                        'reference' => $slug,
+                    ],
+                );
+                $store->setBillingProvider(Store::BILLING_PAYPAL);
+            } else {
+                $subscription = $this->billing->startSubscription(
+                    $sourceId,
+                    $priceCents,
+                    [
+                        'email' => $user->getEmail(),
+                        'name' => $user->getDisplayName(),
+                        'reference' => $slug,
+                    ],
+                    $verificationToken,
+                );
+                $store->setBillingProvider(Store::BILLING_SQUARE);
+            }
         } catch (\RuntimeException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
         }

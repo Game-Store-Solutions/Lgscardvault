@@ -8,8 +8,10 @@ use App\Entity\Store;
 use App\Entity\StoreCreditTransaction;
 use App\Entity\User;
 use App\Service\Payments\CheckoutGatewayInterface;
+use App\Service\Payments\PaypalCheckoutGatewayInterface;
 use App\Tests\Support\CatalogFixtures;
 use App\Tests\Support\FakeCheckoutGateway;
+use App\Tests\Support\FakePaypalCheckoutGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -48,6 +50,14 @@ final class SquareCheckoutTest extends WebTestCase
         $this->gateway->addedTaxCents = 0;
         $this->gateway->declineWith = null;
         $this->gateway->charges = [];
+
+        $paypal = $container->get(PaypalCheckoutGatewayInterface::class);
+        if ($paypal instanceof FakePaypalCheckoutGateway) {
+            $paypal->ready = false;
+            $paypal->declineWith = null;
+            $paypal->charges = [];
+            $paypal->orders = [];
+        }
     }
 
     private function authenticate(User $user): void
@@ -418,7 +428,7 @@ final class SquareCheckoutTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertSame(
-            ['enabled', 'message', 'ownerMessage', 'applicationId', 'locationId', 'environment', 'currency', 'countryCode'],
+            ['enabled', 'message', 'ownerMessage', 'applicationId', 'locationId', 'environment', 'currency', 'countryCode', 'paypal'],
             array_keys($config),
         );
         // Public config may include shopper/owner status copy, never secrets.

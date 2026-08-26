@@ -39,6 +39,12 @@ enum OrderStatus: string
         return in_array($next, $this->allowedTransitions(), true);
     }
 
+    /** Staff can add or remove cards until the order is delivered or closed. */
+    public function allowsLineEdits(): bool
+    {
+        return !$this->returnsStock() && self::COMPLETED !== $this;
+    }
+
     /** Statuses whose stock should be returned to inventory. */
     public function returnsStock(): bool
     {

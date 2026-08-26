@@ -311,6 +311,68 @@ final class TransactionalMailer
         );
     }
 
+    /** Store-branded — staff added cards; shopper must approve the extra on PayPal. */
+    public function sendOrderBalanceDue(\App\Entity\Order $order, User $user, Store $store, int $dueCents): void
+    {
+        $email = $user->getEmail();
+        if (null === $email || '' === $email) {
+            return;
+        }
+
+        $storeName = $store->getName() ?? 'Store';
+        $ref = $order->getReference() ?? (string) $order->getId();
+        $amount = number_format(max(0, $dueCents) / 100, 2);
+        $slug = $store->getSlug() ?? '';
+        $orderUrl = $this->frontendUrl().'/account?section=orders&store='.rawurlencode($slug).'&order='.(string) $order->getId();
+        $customerName = $user->getDisplayName() ?: 'there';
+
+        $this->sendOrderBalanceDueToEmail($order, $email, $customerName, $store, $dueCents, $orderUrl);
+    }
+
+    public function orderBalanceDueGuestUrl(Store $store, \App\Entity\Order $order, string $token): string
+    {
+        $slug = rawurlencode((string) ($store->getSlug() ?? ''));
+        $id = (string) $order->getId();
+
+        return $this->frontendUrl().'/pay-order/'.$slug.'/'.$id.'?token='.rawurlencode($token);
+    }
+
+    public function sendOrderBalanceDueToEmail(
+        \App\Entity\Order $order,
+        string $email,
+        string $customerName,
+        Store $store,
+        int $dueCents,
+        string $orderUrl,
+    ): void {
+        $storeName = $store->getName() ?? 'Store';
+        $ref = $order->getReference() ?? (string) $order->getId();
+        $amount = number_format(max(0, $dueCents) / 100, 2);
+
+        $this->sendHtml(
+            to: $email,
+            subject: sprintf('Approve $%s on PayPal for %s', $amount, $ref),
+            htmlTemplate: 'emails/store/order_balance_due.html.twig',
+            context: [
+                'preheader' => sprintf('%s added cards to order %s. Approve $%s on PayPal.', $storeName, $ref, $amount),
+                'customerName' => $customerName,
+                'storeName' => $storeName,
+                'orderReference' => $ref,
+                'amountFormatted' => $amount,
+                'orderUrl' => $orderUrl,
+                'footerNote' => sprintf('Payment updates from %s.', $storeName),
+            ],
+            textBody: sprintf(
+                "%s added cards to your order %s.\n\nApprove $%s on PayPal:\n%s\n",
+                $storeName,
+                $ref,
+                $amount,
+                $orderUrl,
+            ),
+            store: $store,
+        );
+    }
+
     /** Store-branded — staff accepted the shopper's sell/trade offer. */
     public function sendSellTradeAccepted(SellSubmission $submission, User $user, Store $store): void
     {

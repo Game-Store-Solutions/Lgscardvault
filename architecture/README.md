@@ -115,7 +115,7 @@ flowchart LR
 - **Provider abstraction for external data** - community decklists sit behind `DeckDataProviderInterface`, so swapping or disabling a source never touches scoring or deck construction.
 - **Batched async import** - the CSV worker claims rows with `SELECT ... FOR UPDATE SKIP LOCKED`, processes 25 at a time, and self-dispatches the next batch.
 - **Persisted notifications** - customer notifications are stored in `customer_notifications`; Mailpit email is a delivery side effect. The frontend currently polls every 15 seconds.
-- **Two Square money paths** - the platform bills store owners with its own access token; each store charges shoppers through a connected OAuth account. See [payments-and-billing.md](payments-and-billing.md).
+- **Two payment money paths** - the platform bills store owners on its Square or PayPal app; each store charges shoppers through a connected Square and/or PayPal account. See [payments-and-billing.md](payments-and-billing.md).
 - **Launch compliance is mixed software + counsel** - pickup-only US stores, license intake, tax-ready card checkout, and privacy requests live in the app; facilitator analysis, entity formation, and Square production go-live do not. See [compliance.md](compliance.md).
 - **Provider-owned payments** - payment provider credentials belong to the store connection in `store_payment_accounts`; the API never returns provider tokens.
 

@@ -28,7 +28,8 @@ use App\Service\Checkout\OrderStockReleaser;
 
 use App\Service\Mail\TransactionalMailer;
 
-use App\Service\Payments\CheckoutGatewayInterface;
+use App\Service\Order\OrderBalanceDueNotifier;
+use App\Service\Order\OrderPaymentAdjuster;
 
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -56,7 +57,9 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
 
         private TransactionalMailer $mail,
 
-        private CheckoutGatewayInterface $checkoutGateway,
+        private OrderPaymentAdjuster $paymentAdjuster,
+
+        private OrderBalanceDueNotifier $balanceDueNotifier,
 
     ) {
 
@@ -78,6 +81,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
 
         $originalStatus = $this->entityManager->getUnitOfWork()->getOriginalEntityData($data)['status'] ?? null;
 
+        $this->assertCanFulfill($data, $originalStatus);
         $this->createFulfilledNotificationIfNeeded($data, $originalStatus);
 
         // Square refund first — if it fails, leave the order and stock alone.
@@ -85,6 +89,8 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         $this->refundSquarePaymentIfNeeded($data, $originalStatus);
 
         $this->releaseCasePoolsIfNeeded($data, $originalStatus);
+
+        $this->clearBalanceDueAlertsIfNeeded($data, $originalStatus);
 
 
 
@@ -160,43 +166,9 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
 
 
 
-        $paymentId = $order->getPaymentReference();
-
-        $paidCents = $order->getPaidCents();
-
-        if (null === $paymentId || '' === $paymentId || $paidCents < 1) {
-
-            return;
-
-        }
-
-
-
-        $store = $order->getStore();
-
-        if (!$store instanceof Store) {
-
-            throw new BadRequestHttpException('Order has no store.');
-
-        }
-
-
-
         try {
 
-            $result = $this->checkoutGateway->refund(
-
-                $store,
-
-                $paymentId,
-
-                $paidCents,
-
-                'refund-'.$order->getReference(),
-
-                sprintf('Order %s marked %s', $order->getReference(), $order->getStatus()->value),
-
-            );
+            $this->paymentAdjuster->refundRemaining($order, 'refund-'.$order->getReference());
 
         } catch (\RuntimeException $e) {
 
@@ -204,15 +176,59 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
 
         }
 
+    }
 
 
-        $status = strtoupper($result['status']);
 
-        if (in_array($status, ['FAILED', 'REJECTED'], true)) {
+    private function assertCanFulfill(Order $order, mixed $originalStatus): void
 
-            throw new BadRequestHttpException('Square could not refund this payment. Try again from the Square dashboard.');
+    {
+
+        if (!in_array($order->getStatus(), [OrderStatus::FULFILLED, OrderStatus::COMPLETED], true)) {
+
+            return;
 
         }
+
+        if ($originalStatus instanceof OrderStatus && $originalStatus === $order->getStatus()) {
+
+            return;
+
+        }
+
+        if ($order->getBalanceDueCents() > 0) {
+
+            throw new BadRequestHttpException(
+
+                'This order still has an unpaid balance. Collect payment or wait for PayPal approval before marking it ready.',
+
+            );
+
+        }
+
+    }
+
+
+
+    private function clearBalanceDueAlertsIfNeeded(Order $order, mixed $originalStatus): void
+
+    {
+
+        if (!$order->getStatus()->returnsStock()) {
+
+            return;
+
+        }
+
+        if ($originalStatus instanceof OrderStatus && $originalStatus->returnsStock()) {
+
+            return;
+
+        }
+
+
+
+        $this->balanceDueNotifier->sync($order);
 
     }
 

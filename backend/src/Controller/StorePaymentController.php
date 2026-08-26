@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\StorePaymentAccountRepository;
 use App\Repository\StoreRepository;
 use App\Repository\UserRepository;
+use App\Service\Payments\PaypalPartnerClient;
 use App\Service\Payments\SignedOAuthState;
 use App\Service\Payments\SquareOAuthClient;
 use App\Service\Payments\StoreCheckoutGateway;
@@ -30,6 +31,7 @@ final class StorePaymentController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly SignedOAuthState $oauthState,
         private readonly SquareOAuthClient $squareOAuthClient,
+        private readonly PaypalPartnerClient $paypalPartnerClient,
         private readonly StoreCheckoutGateway $checkoutGateway,
         private readonly SecretCipher $secretCipher,
         private readonly UserRepository $userRepository,
@@ -49,6 +51,9 @@ final class StorePaymentController extends AbstractController
         return $this->json([
             'square' => $this->serializeAccount(
                 $this->paymentAccountRepository->findOneForStoreAndProvider($store, StorePaymentAccount::PROVIDER_SQUARE),
+            ),
+            'paypal' => $this->serializeAccount(
+                $this->paymentAccountRepository->findOneForStoreAndProvider($store, StorePaymentAccount::PROVIDER_PAYPAL),
             ),
         ]);
     }
@@ -180,6 +185,115 @@ final class StorePaymentController extends AbstractController
         }
     }
 
+    #[Route('/api/stores/{slug}/payments/paypal/connect', name: 'api_store_payments_paypal_connect', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function paypalConnect(string $slug): JsonResponse
+    {
+        $store = $this->resolveManagedStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User || null === $user->getId()) {
+            return $this->json(['detail' => 'Authentication required.'], 401);
+        }
+
+        if (!$this->paypalPartnerClient->isConfigured()) {
+            return $this->json(['detail' => 'PayPal Connect is not configured.'], 422);
+        }
+
+        $redirectUri = $this->paypalOAuthRedirectUri();
+        $state = $this->oauthState->create(
+            StorePaymentAccount::PROVIDER_PAYPAL,
+            $store->getSlug() ?? $slug,
+            $user->getId(),
+            redirectUri: $redirectUri,
+        );
+        $returnUrl = $redirectUri.(str_contains($redirectUri, '?') ? '&' : '?').'state='.rawurlencode($state);
+
+        $referral = $this->paypalPartnerClient->createReferral($store->getSlug() ?? $slug, $returnUrl);
+
+        return $this->json([
+            'authorizationUrl' => $referral['authorizationUrl'],
+            'environment' => $this->paypalPartnerClient->environment(),
+            'scopes' => ['PAYMENT', 'REFUND'],
+        ]);
+    }
+
+    #[Route('/api/stores/{slug}/payments/paypal/disconnect', name: 'api_store_payments_paypal_disconnect', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function paypalDisconnect(string $slug): JsonResponse
+    {
+        $store = $this->resolveManagedStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $account = $this->paymentAccountRepository->findOneForStoreAndProvider($store, StorePaymentAccount::PROVIDER_PAYPAL);
+        if (!$account instanceof StorePaymentAccount) {
+            return $this->json(['paypal' => null]);
+        }
+
+        $account->markDisconnected();
+        $this->entityManager->flush();
+
+        return $this->json(['paypal' => $this->serializeAccount($account)]);
+    }
+
+    #[Route('/api/integrations/paypal/callback', name: 'api_paypal_oauth_callback', methods: ['GET'])]
+    public function paypalCallback(Request $request): RedirectResponse
+    {
+        $state = (string) $request->query->get('state', '');
+        $merchantId = trim((string) $request->query->get('merchantIdInPayPal', $request->query->get('merchantId', '')));
+        $permissionsGranted = strtolower((string) $request->query->get('permissionsGranted', 'true'));
+        $storeSlug = '';
+
+        try {
+            $payload = $this->oauthState->verify($state);
+            $storeSlug = $payload['storeSlug'];
+
+            if (StorePaymentAccount::PROVIDER_PAYPAL !== $payload['provider']) {
+                throw new \RuntimeException('Unexpected OAuth provider.');
+            }
+
+            if ('' === $merchantId || in_array($permissionsGranted, ['false', '0'], true)) {
+                throw new \RuntimeException('PayPal authorization was cancelled or denied.');
+            }
+
+            $store = $this->storeRepository->findOneBySlug($storeSlug);
+            if (!$store instanceof Store) {
+                throw new \RuntimeException('Store authorization could not be verified.');
+            }
+
+            $initiator = $this->userRepository->find($payload['userId']);
+            if (!$initiator instanceof User || !$this->canCompleteSquareOAuth($initiator, $store)) {
+                throw new \RuntimeException('Store authorization could not be verified.');
+            }
+
+            $account = $this->paymentAccountRepository->getOrCreateForStoreAndProvider($store, StorePaymentAccount::PROVIDER_PAYPAL);
+            $account
+                ->setEnvironment($this->paypalPartnerClient->environment())
+                ->setProviderMerchantId($merchantId)
+                ->setScopes(['PAYMENT', 'REFUND'])
+                ->markConnected();
+
+            if (null === $account->getId()) {
+                $this->entityManager->persist($account);
+            }
+            $this->entityManager->flush();
+
+            return $this->redirectToAdminPayments($storeSlug, 'connected', 'paypal');
+        } catch (\Throwable $e) {
+            $this->logger->warning('PayPal Connect callback failed', [
+                'storeSlug' => $storeSlug,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->redirectToAdminPayments($storeSlug, 'error', 'paypal');
+        }
+    }
+
     private function canCompleteSquareOAuth(User $user, Store $store): bool
     {
         if ($store->getOwner()?->getId() === $user->getId()) {
@@ -197,6 +311,16 @@ final class StorePaymentController extends AbstractController
         }
 
         return $this->generateUrl('api_square_oauth_callback', [], UrlGeneratorInterface::ABSOLUTE_URL);
+    }
+
+    private function paypalOAuthRedirectUri(): string
+    {
+        $configured = trim((string) ($_ENV['PAYPAL_OAUTH_REDIRECT_URI'] ?? $_SERVER['PAYPAL_OAUTH_REDIRECT_URI'] ?? ''));
+        if ('' !== $configured) {
+            return $configured;
+        }
+
+        return $this->generateUrl('api_paypal_oauth_callback', [], UrlGeneratorInterface::ABSOLUTE_URL);
     }
 
     private function resolveManagedStore(string $slug): ?Store
@@ -232,11 +356,12 @@ final class StorePaymentController extends AbstractController
         ];
     }
 
-    private function redirectToAdminPayments(string $storeSlug, string $status): RedirectResponse
+    private function redirectToAdminPayments(string $storeSlug, string $status, string $provider = 'square'): RedirectResponse
     {
+        $query = sprintf('%s=%s', rawurlencode($provider), rawurlencode($status));
         $path = '' !== $storeSlug
-            ? sprintf('/s/%s/admin/payments?square=%s', rawurlencode($storeSlug), rawurlencode($status))
-            : sprintf('/?square=%s', rawurlencode($status));
+            ? sprintf('/s/%s/admin/payments?%s', rawurlencode($storeSlug), $query)
+            : sprintf('/?%s', $query);
 
         return new RedirectResponse($this->frontendUrl().$path);
     }

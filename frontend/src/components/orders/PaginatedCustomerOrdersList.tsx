@@ -19,6 +19,7 @@ export function PaginatedCustomerOrdersList({
   headerTitle,
   headerSubtitle,
   wrapInCard = false,
+  highlightOrderId = null,
 }: {
   query: OrdersQuery
   page: number
@@ -30,12 +31,13 @@ export function PaginatedCustomerOrdersList({
   headerTitle: string
   headerSubtitle?: string
   wrapInCard?: boolean
+  highlightOrderId?: number | null
 }) {
-  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [expandedId, setExpandedId] = useState<number | null>(highlightOrderId)
 
   useEffect(() => {
-    setExpandedId(null)
-  }, [page])
+    setExpandedId(highlightOrderId)
+  }, [page, highlightOrderId])
 
   if (query.isLoading && !query.data) {
     return <LoadingPanel label="Loading orders…" />

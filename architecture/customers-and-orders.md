@@ -20,6 +20,11 @@ Customer routes are under `StoreCustomerController` at `/api/stores/{slug}/custo
 | Customer order history | `GET /orders` |
 | Customer notifications | `GET /notifications`, `PATCH /notifications/{id}/read` |
 | Owner orders | `GET /api/stores/{slug}/orders`, `POST /api/stores/{slug}/orders`, `GET /api/stores/{slug}/orders/{id}`, `PATCH /api/stores/{slug}/orders/{id}` |
+| Owner order lines | `POST /api/stores/{slug}/orders/{id}/lines`, `PATCH .../lines/{lineId}`, `DELETE .../lines/{lineId}` |
+| Owner payment adjustment | `POST /api/stores/{slug}/orders/{id}/payment-adjustment` (refund credit on PayPal/Square) |
+| Guest balance due | `GET /api/stores/{slug}/guest/orders/{id}/balance?token=…`, `POST .../paypal/order`, `POST .../paypal/capture` |
+| Customer balance due | `POST /api/stores/{slug}/customer/orders/{id}/paypal/order`, `POST .../paypal/capture` |
+| Shopper extra PayPal | `POST /api/stores/{slug}/customer/orders/{id}/paypal/order`, `POST .../paypal/capture` |
 
 ---
 
@@ -155,6 +160,15 @@ Legacy statuses are still accepted for existing data and reports: `paid`, `shipp
 
 The order detail panel includes a print sheet action. The print sheet renders order reference, date, customer, card name, set, collector number, quantity, unit price, line total, pre-tax total, tax (`orders.tax_cents` from Square location tax), and post-tax total. Disputed orders show a badge; Square `dispute.created` does not restock.
 
+Staff can add or remove cards on an open order from the order detail panel (search in-stock inventory, change quantity, or drop a line). Stock and case-section pools move the same way as checkout and cancel. After edits, staff settle the **net** difference once: PayPal/Square refunds the overpayment in one call (**Refund on PayPal** in the order detail), or the shopper approves one supplemental PayPal capture for extras from **Account → Orders** (bell + email notification). PayPal cannot increase a completed capture. Delivered, cancelled, refunded, and disputed orders cannot be edited. An order must keep at least one line.
+
+| Layer | Where |
+|-------|-------|
+| Frontend | `pages/store-admin/OrdersTab.tsx` (order detail), `components/orders/OrderLineList.tsx` |
+| Controller | `Controller/StoreOrderLineController.php`, `Controller/StoreOrderPaymentController.php` |
+| Service | `Service/Order/OrderLineEditor.php`, `Service/Order/OrderPaymentAdjuster.php` |
+| Stock | `SectionSaleAllocator`, `InventoryItem` / `SealedInventoryItem` quantity |
+
 ---
 
 ## Customer order history
@@ -199,6 +213,7 @@ sequenceDiagram
 ```
 
 - A notification is created when an order first transitions to `fulfilled` or legacy `completed`.
+- When staff add cards to a captured PayPal order, an `order_balance_due` notification and email ask the shopper to approve the extra. One row per order; the body updates if the amount changes. The bell stays until they pay (opening Orders does not auto-clear it). After they capture the extra, the notice is marked read.
 - The processor looks up the `User` by `orders.customer_email`. If no matching user exists, no customer notification is created.
 - Duplicate fulfilled notifications are prevented by checking `(user, order, type)`.
 - Mail delivery uses Symfony Mailer. Local development sends to Mailpit via `MAILER_DSN=smtp://127.0.0.1:1025`; the UI is at `http://localhost:8025`.
@@ -209,8 +224,8 @@ sequenceDiagram
 |-------|-------|
 | Backend entity | `Entity/CustomerNotification.php` |
 | Backend repo | `Repository/CustomerNotificationRepository.php` |
-| Fulfillment side effects | `State/StoreOrderStatusProcessor.php` |
-| Customer routes | `Controller/StoreCustomerController.php` |
+| Fulfillment side effects | `State/StoreOrderStatusProcessor.php`, `Service/Order/OrderBalanceDueNotifier.php` |
+| Customer routes | `Controller/StoreCustomerController.php`, `Controller/StoreCustomerOrderPaymentController.php` |
 | Frontend hooks | `hooks/useCustomer.ts` |
 | Frontend UI | `components/notifications/NotificationBell.tsx`, `NotificationList.tsx`, `pages/CustomerProfilePage.tsx` |
 | DB | `customer_notifications` |

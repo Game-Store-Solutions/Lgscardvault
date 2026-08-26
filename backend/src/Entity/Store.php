@@ -482,10 +482,17 @@ class Store
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $nextAttemptAt = null;
 
-    /** card | apple_pay | google_pay */
+    /** card | apple_pay | google_pay | paypal */
     #[ORM\Column(length: 32, nullable: true)]
     #[Groups(['store:admin'])]
     private ?string $paymentMethodType = null;
+
+    public const BILLING_SQUARE = 'square';
+    public const BILLING_PAYPAL = 'paypal';
+
+    /** Processor used for platform SaaS dues. */
+    #[ORM\Column(length: 16, options: ['default' => 'square'])]
+    private string $billingProvider = self::BILLING_SQUARE;
 
     /** Opaque reference from the payment processor (nonce / transaction id). */
     #[ORM\Column(length: 255, nullable: true)]
@@ -1449,6 +1456,18 @@ class Store
     public function getPaymentMethodType(): ?string
     {
         return $this->paymentMethodType;
+    }
+
+    public function getBillingProvider(): string
+    {
+        return $this->billingProvider;
+    }
+
+    public function setBillingProvider(string $billingProvider): static
+    {
+        $this->billingProvider = $billingProvider;
+
+        return $this;
     }
 
     public function setPaymentMethodType(?string $paymentMethodType): static

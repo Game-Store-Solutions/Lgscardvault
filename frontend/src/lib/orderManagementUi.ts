@@ -124,9 +124,17 @@ export function paymentSubtitle(order: Order): string {
   const credit = order.creditAppliedCents ?? 0
   const paid = order.paidCents ?? 0
 
+  if (order.status === 'refunded' || order.status === 'cancelled') {
+    if (order.paymentProvider === 'paypal') return 'Refunded on PayPal'
+    if (order.paymentProvider === 'square') return 'Refunded on Square'
+    return 'Cancelled'
+  }
+
   if (credit > 0 && credit >= order.totalCents) return 'Paid with store credit'
-  if (paid > 0 && credit > 0) return 'Paid online + store credit'
-  if (paid > 0) return 'Paid online'
+  if (paid > 0 && credit > 0) {
+    return order.paymentProvider === 'paypal' ? 'Paid with PayPal + store credit' : 'Paid online + store credit'
+  }
+  if (paid > 0) return order.paymentProvider === 'paypal' ? 'Paid with PayPal' : 'Paid online'
   if (order.notes === 'Paying in store' || (order.status === 'pending' && paid === 0)) return 'Pay in store'
 
   if (order.status === 'pending') return 'Awaiting payment'
@@ -185,6 +193,38 @@ const CLOSED_STORE_ORDER_STATUSES: OrderStatus[] = ['completed', 'cancelled', 'r
 export function isOpenStoreOrder(order: Pick<Order, 'status'>): boolean {
 
   return !CLOSED_STORE_ORDER_STATUSES.includes(order.status)
+
+}
+
+export function orderAllowsLineEdits(status: OrderStatus, disputed?: string | null): boolean {
+
+  if (disputed) return false
+
+  return !CLOSED_STORE_ORDER_STATUSES.includes(status)
+
+}
+
+/** Open orders only — cancelled/refunded must not look unpaid again after a full refund. */
+export function orderAllowsPaymentAdjustment(order: Pick<Order, 'status' | 'disputeStatus'>): boolean {
+  if (order.disputeStatus) return false
+  return !CLOSED_STORE_ORDER_STATUSES.includes(order.status)
+}
+
+export function orderAmountDueCents(order: Order): number {
+
+  return Math.max(0, order.totalCents + (order.taxCents ?? 0) - (order.creditAppliedCents ?? 0))
+
+}
+
+export function orderBalanceDueCents(order: Order): number {
+  if (!orderAllowsPaymentAdjustment(order)) return 0
+  return Math.max(0, orderAmountDueCents(order) - (order.paidCents ?? 0))
+
+}
+
+export function orderCreditOwedCents(order: Order): number {
+  if (!orderAllowsPaymentAdjustment(order)) return 0
+  return Math.max(0, (order.paidCents ?? 0) - orderAmountDueCents(order))
 
 }
 

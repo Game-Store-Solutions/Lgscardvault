@@ -142,7 +142,7 @@ final class SquareWebhookController extends AbstractController
         if ('COMPLETED' === $status && $order->getPaidCents() < 1) {
             $amount = (int) ($payment['amount_money']['amount'] ?? 0);
             if ($amount > 0) {
-                $order->setPaidCents($amount)->setPaymentReference($paymentId);
+                $order->setPaidCents($amount)->setPaymentReference($paymentId)->recordPaymentCapture($paymentId, $amount);
                 if (Order::NOTE_PAY_IN_STORE === $order->getNotes()) {
                     $order->setNotes(null);
                 }

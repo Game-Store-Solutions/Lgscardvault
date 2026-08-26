@@ -36,6 +36,7 @@ final readonly class SubscriptionRenewer
         private StoreRepository $storeRepository,
         private PlanCatalog $planCatalog,
         private SubscriptionBillingInterface $billing,
+        private PaypalSubscriptionBilling $paypalBilling,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
     ) {
@@ -96,12 +97,21 @@ final readonly class SubscriptionRenewer
         $attempt = $store->getBillingAttempts();
 
         try {
-            $result = $this->billing->chargeVaultedCard(
-                $customerId,
-                $cardId,
-                $priceCents,
-                $this->idempotencyKey($store),
-            );
+            if (Store::BILLING_PAYPAL === $store->getBillingProvider()) {
+                $result = $this->paypalBilling->chargeVaultedCard(
+                    $customerId,
+                    $cardId,
+                    $priceCents,
+                    $this->idempotencyKey($store),
+                );
+            } else {
+                $result = $this->billing->chargeVaultedCard(
+                    $customerId,
+                    $cardId,
+                    $priceCents,
+                    $this->idempotencyKey($store),
+                );
+            }
         } catch (\RuntimeException $e) {
             $this->fail($store, $now, $priceCents, $e->getMessage());
 

@@ -1,9 +1,11 @@
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import api, { extractErrorMessage, formatPrice } from '../../../api/client'
 import type { PaymentClientConfig, Plan } from '../../../api/types'
 import { Button } from '../../../components/ui'
 import { SquarePaymentPanel } from '../../../components/payments/SquarePaymentPanel'
+import { PaypalButtons } from '../../../components/payments/PaypalButtons'
 import { isDevBuild } from '../../../lib/runtimeEnv'
 import { METHOD_LABELS } from '../config'
 import type { OnboardingPayment, PatchPayment } from '../types'
@@ -29,6 +31,16 @@ export function PaymentStep({
     },
     enabled: required,
   })
+
+  const createPaypalOrder = useCallback(async () => {
+    const { data } = await api.post<{ orderId: string }>('/payments/onboarding/paypal/order', {
+      planKey: plan?.key ?? '',
+    })
+    if (!data.orderId) {
+      throw new Error('PayPal did not return an order.')
+    }
+    return data.orderId
+  }, [plan?.key])
 
   if (!required) {
     return (
@@ -63,6 +75,8 @@ export function PaymentStep({
 
   const config = configQuery.data
   const priceCents = plan?.priceCents ?? 0
+  const paypalEnabled = config.paypal?.enabled === true
+  const squareReady = config.mode === 'square'
 
   return (
     <div className="mx-auto w-full max-w-xl space-y-5">
@@ -77,7 +91,7 @@ export function PaymentStep({
         </p>
       </div>
 
-      {config.mode === 'square' ? (
+      {squareReady ? (
         <SquarePaymentPanel
           applicationId={config.applicationId}
           locationId={config.locationId}
@@ -110,11 +124,35 @@ export function PaymentStep({
             Use a simulated card
           </Button>
         </div>
-      ) : (
+      ) : paypalEnabled ? null : (
         <p className="rounded-btn border border-border bg-bg px-3 py-2 text-sm text-fg-muted">
           Payment verification is unavailable right now. Please try again later or contact support.
         </p>
       )}
+
+      {paypalEnabled && config.paypal ? (
+        <div className="space-y-2">
+          {squareReady || isDevBuild ? (
+            <p className="text-xs font-medium text-fg-muted">Or pay the first month with PayPal</p>
+          ) : null}
+          <PaypalButtons
+            clientId={config.paypal.clientId}
+            environment={config.paypal.environment}
+            currency={config.paypal.currency}
+            amountCents={priceCents}
+            wallets={!squareReady}
+            createOrder={createPaypalOrder}
+            onApproved={async (orderId) => {
+              patchPayment({
+                methodType: 'paypal',
+                token: orderId,
+                last4: '',
+                verificationToken: '',
+              })
+            }}
+          />
+        </div>
+      ) : null}
 
       {payment.methodType && payment.token && (
         <p className="flex items-center gap-2 text-sm font-medium text-success-700">
