@@ -208,7 +208,11 @@ export function PaypalButtons({
     }
 
     let cancelled = false
-    let buttons: { close?: () => Promise<void> } | null = null
+    let buttons: {
+      close?: () => Promise<void>
+      isEligible?: () => boolean
+      render?: (container: HTMLElement) => Promise<void>
+    } | null = null
     setError('')
     setLoading(true)
     const color = dark ? 'white' : 'black'
@@ -246,7 +250,7 @@ export function PaypalButtons({
         if (buttons.isEligible && !buttons.isEligible()) {
           buttons = paypal.Buttons({ ...options, fundingSource: undefined })
         }
-        await buttons.render(paypalRef.current)
+        await buttons.render?.(paypalRef.current)
 
         if (!cancelled && wallets && amountCentsRef.current > 0) {
           await mountWallets({

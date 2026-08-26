@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, ArrowRight } from 'lucide-react'
 import api, { formatPrice } from '../api/client'
 import type { Plan } from '../api/types'
-import { Button } from '../components/ui'
+import { buttonVariants } from '../components/ui'
+import { cx } from '../lib/cx'
 
 function planPriceLabel(plan: Plan): string {
   if (plan.billingModel === 'usage') {
@@ -76,12 +77,13 @@ export default function PricingPage() {
                     </li>
                   ))}
                 </ul>
-                <Button asChild className="mt-8 w-full" size="lg">
-                  <Link to="/register/owner">
-                    Get started
-                    <ArrowRight aria-hidden className="size-4" />
-                  </Link>
-                </Button>
+                <Link
+                  to="/register/owner"
+                  className={cx(buttonVariants({ variant: 'primary', size: 'lg' }), 'mt-8 w-full')}
+                >
+                  Get started
+                  <ArrowRight aria-hidden className="size-4" />
+                </Link>
               </div>
             ))}
           </div>

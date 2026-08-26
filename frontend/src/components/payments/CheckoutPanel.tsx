@@ -67,22 +67,25 @@ export function CheckoutPanel({
 
   const checkout = useMutation({
     mutationFn: async (payment: TokenizedPayment | { provider: 'paypal'; token: string } | null) => {
-      const body =
-        payment === null
-          ? checkoutBody
-          : 'provider' in payment && payment.provider === 'paypal'
-            ? {
-                ...checkoutBody,
-                provider: 'paypal',
-                token: payment.token,
-                methodType: 'paypal',
-              }
-            : {
-                ...checkoutBody,
-                token: payment.token,
-                verificationToken: payment.verificationToken,
-                methodType: payment.methodType,
-              }
+      let body: Record<string, unknown>
+      if (payment === null) {
+        body = checkoutBody
+      } else if ('provider' in payment && payment.provider === 'paypal') {
+        body = {
+          ...checkoutBody,
+          provider: 'paypal',
+          token: payment.token,
+          methodType: 'paypal',
+        }
+      } else {
+        const card = payment as TokenizedPayment
+        body = {
+          ...checkoutBody,
+          token: card.token,
+          verificationToken: card.verificationToken,
+          methodType: card.methodType,
+        }
+      }
       const { data } = await api.post<Order>(checkoutPath, body)
       return data
     },

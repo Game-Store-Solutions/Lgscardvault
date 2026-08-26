@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { formatPrice } from '../api/client'
 import type { StoreCheckoutConfig } from '../api/types'
 import { PaypalButtons } from '../components/payments/PaypalButtons'
-import { Button } from '../components/ui'
+import { buttonVariants } from '../components/ui'
+import { cx } from '../lib/cx'
 
 type GuestOrderBalance = {
   reference: string
@@ -84,9 +85,9 @@ export default function GuestOrderBalancePage() {
           It may have expired or already been used. You can also pay this extra at the counter with staff.
         </p>
         {slug ? (
-          <Button asChild className="mt-6">
-            <Link to={`/s/${slug}`}>Back to store</Link>
-          </Button>
+          <Link to={`/s/${slug}`} className={cx(buttonVariants({ variant: 'primary', size: 'md' }), 'mt-6')}>
+            Back to store
+          </Link>
         ) : null}
       </div>
     )
@@ -107,9 +108,12 @@ export default function GuestOrderBalancePage() {
           <p className="text-lg font-bold">Payment received</p>
           <p className="mt-1 text-sm">Thanks — this order is paid in full.</p>
           {slug ? (
-            <Button asChild variant="secondary" className="mt-4">
-              <Link to={`/s/${slug}`}>Back to store</Link>
-            </Button>
+            <Link
+              to={`/s/${slug}`}
+              className={cx(buttonVariants({ variant: 'secondary', size: 'md' }), 'mt-4')}
+            >
+              Back to store
+            </Link>
           ) : null}
         </div>
       ) : (

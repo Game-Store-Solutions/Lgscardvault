@@ -196,7 +196,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
 
         }
 
-        if ($order->getBalanceDueCents() > 0) {
+        if ($order->getBalanceDueCents() > 0 && $order->getPaidCents() > 0) {
 
             throw new BadRequestHttpException(
 
