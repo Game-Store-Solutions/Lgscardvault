@@ -20,7 +20,7 @@ function planPriceLabel(plan: Plan): string {
 function planPriceDetail(plan: Plan): string {
   const cap = formatPrice(plan.capCents ?? 45000)
   if (plan.billingModel === 'usage') {
-    return `Until ${cap} is paid — then no more platform fees.`
+    return `Until ${cap} is paid, then no more platform fees.`
   }
   if (plan.priceCents > 0) {
     return `One-time · full platform access`
@@ -46,7 +46,7 @@ export default function PricingPage() {
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-fg-muted">
           Open your verified storefront on LGS Card Vault for a flat $450, or pay 5% of each online sale until you reach
-          $450 — then keep every feature with no monthly bill and no sales fees.
+          $450. Then keep every feature with no monthly bill and no sales fees.
         </p>
 
         {isPending ? (
@@ -92,7 +92,7 @@ export default function PricingPage() {
         <div className="mt-16 rounded-card border border-border bg-surface p-6 text-sm text-fg-muted sm:p-8">
           <p className="font-semibold text-fg">What about shopper checkout fees?</p>
           <p className="mt-2 leading-relaxed">
-            Square and PayPal charge their normal card-processing rates on each sale — that is separate from the LGS Card
+            Square and PayPal charge their normal card-processing rates on each sale. That is separate from the LGS Card
             Vault platform fee. On the pay-as-you-sell plan, our 5% is only until you have paid $450 total to the
             platform.
           </p>
