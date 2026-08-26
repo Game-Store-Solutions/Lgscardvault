@@ -29,6 +29,7 @@ use App\Service\Checkout\CartQuoteLines;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
 use App\Service\Checkout\PayInStoreFinalizer;
+use App\Service\Checkout\PaypalOrderFactory;
 use App\Service\Checkout\PickupCardCharge;
 use App\Service\Checkout\PickupFulfillment;
 use App\Service\Checkout\PickupTaxNotReadyException;
@@ -37,6 +38,7 @@ use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CheckoutGatewayInterface;
 use App\Service\Payments\CustomerPaymentProfileSync;
+use App\Service\Payments\StoreCheckoutPresenter;
 use App\Service\Payments\SubscriptionBillingInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -67,6 +69,8 @@ final class StoreCustomerController extends AbstractController
         private readonly CartOrderBuilder $orderBuilder,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly CheckoutGatewayInterface $checkoutGateway,
+        private readonly StoreCheckoutPresenter $checkoutPresenter,
+        private readonly PaypalOrderFactory $paypalOrderFactory,
         private readonly PickupCardCharge $pickupCardCharge,
         private readonly PickupTaxPolicy $pickupTaxPolicy,
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
@@ -728,7 +732,7 @@ final class StoreCustomerController extends AbstractController
             return $fulfillment;
         }
 
-        if (!$this->checkoutGateway->isReady($store)) {
+        if (!$this->checkoutPresenter->acceptsOnlinePayment($store, StoreCheckoutPresenter::providerFromPayload($payload))) {
             return $this->json(['detail' => 'This store is not accepting online payments yet.'], 422);
         }
 
@@ -780,6 +784,7 @@ final class StoreCustomerController extends AbstractController
                 $verificationToken,
                 $user->getEmail(),
                 $customer->getPaymentCustomerId(),
+                StoreCheckoutPresenter::providerFromPayload($payload),
             );
         } catch (\RuntimeException $e) {
             $this->stockReleaser->release($order);
@@ -847,7 +852,48 @@ final class StoreCustomerController extends AbstractController
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        return $this->json($this->checkoutGateway->checkoutConfig($store));
+        return $this->json($this->checkoutPresenter->checkoutConfig($store));
+    }
+
+    #[Route('/checkout/paypal/order', name: 'api_store_customer_checkout_paypal_order', methods: ['POST'])]
+    public function createPaypalOrder(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $customer = $this->findCustomer($store);
+        $cartItems = $customer instanceof StoreCustomer ? $this->cartRepository->findForCustomer($customer) : [];
+        $preview = CartQuoteLines::fromCartItems($cartItems);
+        $credit = 0;
+        if ((bool) ($payload['useStoreCredit'] ?? false)) {
+            $credit = min($this->creditLedger->balance($user, $store), $preview['subtotalCents']);
+        }
+
+        try {
+            $created = $this->paypalOrderFactory->create(
+                $store,
+                $preview['lineItems'],
+                $preview['subtotalCents'],
+                $credit,
+                'cart-'.($store->getSlug() ?? 'store').'-'.($user->getId() ?? '0'),
+                $user->getEmail(),
+            );
+        } catch (PickupTaxNotReadyException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
+
+        return $this->json($created);
     }
 
     /** Vault Google Pay, Apple Pay, or card on the store's Square account for this shopper. */
@@ -1190,6 +1236,8 @@ final class StoreCustomerController extends AbstractController
             'orderReference' => $notification->getRelatedOrder()?->getReference(),
             'createdAt' => $notification->getCreatedAt()->format(DATE_ATOM),
             'readAt' => $notification->getReadAt()?->format(DATE_ATOM),
+            'storeSlug' => $notification->getStore()?->getSlug(),
+            'storeName' => $notification->getStore()?->getName(),
         ];
     }
 

@@ -64,6 +64,7 @@ erDiagram
         string card_display_style
         string plan_key
         string subscription_status
+        string billing_provider "square or paypal"
         timestamp current_period_end
         timestamp last_charged_at
         int billing_attempts
@@ -119,6 +120,8 @@ erDiagram
         int paid_cents
         int tax_cents
         string payment_reference
+        string payment_provider "square or paypal, nullable"
+        json payment_captures "original plus supplemental captures"
         string dispute_status "nullable"
         string dispute_reason "nullable"
         timestamp disputed_at "nullable"
@@ -272,11 +275,13 @@ See [auth-and-tenancy.md](auth-and-tenancy.md#multi-tenancy-filter) for request-
 | `CardCondition` | `inventory_items.condition` | `NM`, `LP`, `MP`, `HP`, `DMG` |
 | `OrderStatus` | `orders.status` | `pending`, `received`, `fulfilled`, `paid`, `shipped`, `completed`, `cancelled`, `refunded` |
 | Card display style | `stores.card_display_style` | `gallery`, `marketplace` |
-| Payment provider | `store_payment_accounts.provider` | `square` today |
+| Payment provider | `store_payment_accounts.provider` | `square`, `paypal` |
+| Order payment provider | `orders.payment_provider` | `square`, `paypal`, or null (pay-in-store / legacy) |
+| Platform billing provider | `stores.billing_provider` | `square`, `paypal` |
 | Payment status | `store_payment_accounts.status` | `connected`, `disconnected`, `error` |
 | Subscription status | `stores.subscription_status` | `inactive`, `payment_required`, `active`, `past_due`, `suspended` |
 | Subscription charge | `subscription_charges.status` | `paid`, `failed` |
-| Notification type | `customer_notifications.type` | `order_fulfilled` today |
+| Notification type | `customer_notifications.type` | `order_fulfilled`, `order_balance_due`, `want_list_match`, `sell_trade_accepted`, `sell_trade_declined`, `sell_trade_completed` |
 | Compliance document kind | `compliance_documents.kind` | `seller_permit`, `city_license`, `secondhand` |
 | Privacy request type | `privacy_requests.type` | `access`, `delete`, `do_not_sell`, `correct` |
 | Privacy request status | `privacy_requests.status` | `received`, `in_progress`, `completed`, `rejected` |

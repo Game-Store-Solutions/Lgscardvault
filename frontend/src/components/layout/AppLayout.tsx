@@ -23,6 +23,8 @@ const LANDING_SECTIONS = [
   { id: 'contact', label: 'Contact' },
 ] as const
 
+const LANDING_ROUTES = [{ to: '/pricing', label: 'Pricing' }] as const
+
 export default function AppLayout() {
   const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -90,16 +92,28 @@ export default function AppLayout() {
   const mobileLinkClass = 'block rounded-btn px-3 py-2.5 text-base font-medium text-fg hover:bg-bg'
   const closeMobile = () => setMobileOpen(false)
 
-  /** Landing-only in-page navigation. Smooth-scrolls to the real sections. */
-  const landingLinks = LANDING_SECTIONS.map(({ id, label }) => (
-    <a
-      key={id}
-      href={`#${id}`}
-      className="rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg"
-    >
-      {label}
-    </a>
-  ))
+  const landingLinks = (
+    <>
+      {LANDING_ROUTES.map(({ to, label }) => (
+        <Link
+          key={to}
+          to={to}
+          className="rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg"
+        >
+          {label}
+        </Link>
+      ))}
+      {LANDING_SECTIONS.map(({ id, label }) => (
+        <a
+          key={id}
+          href={`#${id}`}
+          className="rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg"
+        >
+          {label}
+        </a>
+      ))}
+    </>
+  )
 
   const themeToggle = (
     <button
@@ -393,12 +407,20 @@ export default function AppLayout() {
                 </div>
               )}
 
-              {onLandingPage &&
-                LANDING_SECTIONS.map(({ id, label }) => (
-                  <a key={id} href={`#${id}`} onClick={closeMobile} className={mobileLinkClass}>
-                    {label}
-                  </a>
-                ))}
+              {onLandingPage && (
+                <>
+                  {LANDING_ROUTES.map(({ to, label }) => (
+                    <Link key={to} to={to} onClick={closeMobile} className={mobileLinkClass}>
+                      {label}
+                    </Link>
+                  ))}
+                  {LANDING_SECTIONS.map(({ id, label }) => (
+                    <a key={id} href={`#${id}`} onClick={closeMobile} className={mobileLinkClass}>
+                      {label}
+                    </a>
+                  ))}
+                </>
+              )}
 
               {user && (
                 <NavLink to="/" end onClick={closeMobile} className={mobileLinkClass}>

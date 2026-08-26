@@ -373,7 +373,7 @@ Software for 6–10 and 12 is in the repo (forms, SLA, runbook, consent helper, 
 
 | Doc | Why |
 |-----|-----|
-| [payments-and-billing.md](payments-and-billing.md) | Two Square money paths; webhooks |
+| [payments-and-billing.md](payments-and-billing.md) | Square and PayPal money paths; webhooks |
 | [auth-and-tenancy.md](auth-and-tenancy.md) | Register / JWT / roles |
 | [stores-and-branding.md](stores-and-branding.md) | Store approval, public storefront |
 | [customers-and-orders.md](customers-and-orders.md) | Cart and order workflow |

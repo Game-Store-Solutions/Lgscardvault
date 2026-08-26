@@ -11,7 +11,7 @@ namespace App\Service\Payments;
 interface SubscriptionBillingInterface
 {
     /** Methods the Web Payments SDK tokenizes for us. */
-    public const METHODS = ['card', 'apple_pay', 'google_pay'];
+    public const METHODS = ['card', 'apple_pay', 'google_pay', 'paypal'];
 
     public function isLive(): bool;
 

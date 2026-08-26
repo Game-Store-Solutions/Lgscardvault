@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { cx } from '../../lib/cx'
 
 const LINKS = [
+  { to: '/pricing', label: 'Pricing' },
   { to: '/privacy', label: 'Privacy' },
   { to: '/privacy-request', label: 'Do Not Sell' },
   { to: '/terms', label: 'Terms' },

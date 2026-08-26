@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PackageCheck, ShieldCheck, Store } from 'lucide-react'
 import { Link } from 'react-router'
@@ -5,6 +6,7 @@ import api, { extractErrorMessage, formatPrice } from '../../api/client'
 import type { Order, OrderFulfillment, StoreCheckoutConfig } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { Button } from '../ui'
+import { PaypalButtons } from './PaypalButtons'
 import {
   checkoutPayButtonClass,
   PaymentDivider,
@@ -13,8 +15,8 @@ import {
 } from './SquarePaymentPanel'
 
 /**
- * Store checkout: Apple Pay / Google Pay when Square is connected, plus pay in
- * store for pickup.
+ * Store checkout: Square wallets when Square is connected, PayPal (including
+ * Apple Pay / Google Pay) when PayPal is connected, plus pay in store.
  */
 export function CheckoutPanel({
   slug,
@@ -64,16 +66,23 @@ export function CheckoutPanel({
   })
 
   const checkout = useMutation({
-    mutationFn: async (payment: TokenizedPayment | null) => {
+    mutationFn: async (payment: TokenizedPayment | { provider: 'paypal'; token: string } | null) => {
       const body =
         payment === null
           ? checkoutBody
-          : {
-              ...checkoutBody,
-              token: payment.token,
-              verificationToken: payment.verificationToken,
-              methodType: payment.methodType,
-            }
+          : 'provider' in payment && payment.provider === 'paypal'
+            ? {
+                ...checkoutBody,
+                provider: 'paypal',
+                token: payment.token,
+                methodType: 'paypal',
+              }
+            : {
+                ...checkoutBody,
+                token: payment.token,
+                verificationToken: payment.verificationToken,
+                methodType: payment.methodType,
+              }
       const { data } = await api.post<Order>(checkoutPath, body)
       return data
     },
@@ -90,6 +99,24 @@ export function CheckoutPanel({
     },
   })
 
+  const createPaypalOrder = useCallback(async () => {
+    const path = isGuest
+      ? `/stores/${slug}/guest/checkout/paypal/order`
+      : `/stores/${slug}/customer/checkout/paypal/order`
+    const { data } = await api.post<{ orderId: string }>(path, checkoutBody)
+    if (!data.orderId) {
+      throw new Error('PayPal did not return an order.')
+    }
+    return data.orderId
+  }, [checkoutBody, isGuest, slug])
+
+  const approvePaypal = useCallback(
+    async (orderId: string) => {
+      await checkout.mutateAsync({ provider: 'paypal', token: orderId })
+    },
+    [checkout],
+  )
+
   const payInStore = useMutation({
     mutationFn: async () => {
       const path = isGuest
@@ -104,6 +131,8 @@ export function CheckoutPanel({
   const config = configQuery.data
   const loadingConfig = configQuery.isLoading
   const squareEnabled = config?.enabled === true
+  const paypalEnabled = config?.paypal?.enabled === true
+  const onlineEnabled = squareEnabled || paypalEnabled
   const holdCents = reserveAmountCents ?? amountDueCents
 
   if (loadingConfig) {
@@ -146,11 +175,12 @@ export function CheckoutPanel({
     </p>
   )
 
-  if (!squareEnabled || !cardCheckoutReady) {
+  if (!onlineEnabled || !cardCheckoutReady) {
     const shopperMessage = !cardCheckoutReady
       ? cardCheckoutBlockedMessage?.trim() ||
-        'Online card checkout is paused until this store enables sales tax on Square. Reserve and pay in store.'
+        'Online checkout is paused until this store enables sales tax on Square. Reserve and pay in store.'
       : config?.message?.trim() ||
+        config?.paypal?.message?.trim() ||
         'Online wallets aren\'t available right now. Reserve your order and pay in store at pickup.'
     const ownerMessage = config?.ownerMessage?.trim()
 
@@ -199,22 +229,40 @@ export function CheckoutPanel({
           Place order with store credit
         </Button>
       ) : (
-        <div className="mt-3 min-w-0 space-y-1">
-          <SquarePaymentPanel
-            applicationId={config.applicationId}
-            locationId={config.locationId}
-            environment={config.environment}
-            priceCents={amountDueCents}
-            currency={config.currency}
-            countryCode={config.countryCode}
-            billingEmail={buyerEmail}
-            confirmLabel={`Pay ${formatPrice(amountDueCents)}`}
-            paymentRequestLabel="Order total"
-            layout="checkout"
-            payButtonPlacement="inline"
-            showCardForm={false}
-            onTokenized={(payment) => checkout.mutate(payment)}
-          />
+        <div className="mt-3 min-w-0 space-y-4">
+          {squareEnabled ? (
+            <SquarePaymentPanel
+              applicationId={config.applicationId}
+              locationId={config.locationId}
+              environment={config.environment}
+              priceCents={amountDueCents}
+              currency={config.currency}
+              countryCode={config.countryCode}
+              billingEmail={buyerEmail}
+              confirmLabel={`Pay ${formatPrice(amountDueCents)}`}
+              paymentRequestLabel="Order total"
+              layout="checkout"
+              payButtonPlacement="inline"
+              showCardForm={false}
+              onTokenized={(payment) => checkout.mutate(payment)}
+            />
+          ) : null}
+          {paypalEnabled && config.paypal ? (
+            <>
+              {squareEnabled ? <PaymentDivider label="Or pay with PayPal" /> : null}
+              <PaypalButtons
+                clientId={config.paypal.clientId}
+                merchantId={config.paypal.merchantId}
+                environment={config.paypal.environment}
+                currency={config.paypal.currency}
+                disabled={checkout.isPending}
+                amountCents={amountDueCents}
+                wallets={!squareEnabled}
+                createOrder={createPaypalOrder}
+                onApproved={approvePaypal}
+              />
+            </>
+          ) : null}
           {pickupAvailable ? <PaymentDivider label="Or pay in store" /> : null}
           {payInStoreBlock}
         </div>
@@ -237,7 +285,7 @@ export function CheckoutPanel({
 
       <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-muted">
         <ShieldCheck aria-hidden className="size-3.5 shrink-0 text-success-700" />
-        Wallet payments are processed by Square.
+        Wallet payments are processed by {[squareEnabled && 'Square', paypalEnabled && 'PayPal'].filter(Boolean).join(' and ')}.
       </p>
     </div>
   )

@@ -12,6 +12,7 @@ use App\Service\Compliance\StoreComplianceGate;
 use App\Service\Onboarding\AddressAutocompleteClient;
 use App\Service\Onboarding\PlanCatalog;
 use App\Service\Onboarding\UsRegion;
+use App\Service\Payments\PaypalSubscriptionBilling;
 use App\Service\Payments\SubscriptionBillingInterface;
 use App\Service\Store\StoreSettingsUpdater;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,6 +40,7 @@ class OnboardingController extends AbstractController
         private readonly PlanCatalog $planCatalog,
         private readonly AddressAutocompleteClient $addressClient,
         private readonly SubscriptionBillingInterface $billing,
+        private readonly PaypalSubscriptionBilling $paypalBilling,
         private readonly StoreSettingsUpdater $settingsUpdater,
     ) {
     }
@@ -59,7 +61,43 @@ class OnboardingController extends AbstractController
     #[IsGranted('ROLE_USER')]
     public function paymentConfig(): JsonResponse
     {
-        return $this->json($this->billing->clientConfig());
+        $config = $this->billing->clientConfig();
+        $config['paypal'] = $this->paypalBilling->clientConfig();
+
+        return $this->json($config);
+    }
+
+    #[Route('/payments/onboarding/paypal/order', name: 'api_onboarding_paypal_order', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function paypalOrder(Request $request): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Authentication required.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $planKey = (string) ($payload['planKey'] ?? '');
+        $plan = $this->planCatalog->find($planKey);
+        if (null === $plan) {
+            return $this->json(['error' => 'Select a valid plan.'], Response::HTTP_BAD_REQUEST);
+        }
+        $upfrontCents = $this->planCatalog->upfrontChargeCents($planKey);
+        if ($upfrontCents <= 0 && $this->planCatalog->isUsagePlan($planKey)) {
+            $upfrontCents = 100;
+        }
+        if ($upfrontCents <= 0) {
+            return $this->json(['error' => 'This plan does not require PayPal.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $orderId = $this->paypalBilling->createOrder($upfrontCents, 'onboarding-'.($user->getId() ?? '0'), $user->getEmail());
+        } catch (\RuntimeException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
+        }
+
+        return $this->json(['orderId' => $orderId]);
     }
 
     #[Route('/onboarding/store', name: 'api_onboarding_store', methods: ['POST'])]
@@ -122,13 +160,14 @@ class OnboardingController extends AbstractController
         $compliance = StoreComplianceGate::normalize($complianceRaw);
 
         // --- Payment input (paid tiers only) ---
-        $priceCents = (int) ($plan['priceCents'] ?? 0);
+        $upfrontCents = $this->planCatalog->upfrontChargeCents($planKey);
+        $requiresPayment = $this->planCatalog->requiresPaymentMethod($planKey);
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
         $methodType = (string) ($payment['methodType'] ?? '');
         $sourceId = (string) ($payment['token'] ?? '');
         $verificationToken = $this->nullableString($payment['verificationToken'] ?? null, 1024);
 
-        if ($priceCents > 0) {
+        if ($requiresPayment) {
             if (!in_array($methodType, SubscriptionBillingInterface::METHODS, true)) {
                 return $this->json(['error' => 'Choose a payment method to continue.'], Response::HTTP_BAD_REQUEST);
             }
@@ -145,7 +184,7 @@ class OnboardingController extends AbstractController
             ->setIsActive(false)
             ->setStatus(Store::STATUS_PENDING)
             ->setPlanKey($planKey)
-            ->setPaymentMethodType($priceCents > 0 ? $methodType : null)
+            ->setPaymentMethodType($requiresPayment ? $methodType : null)
             ->setPaymentLast4($this->nullableString($payment['last4'] ?? null, 8))
             ->setAddressLine1($this->nullableString($address['addressLine1'] ?? null))
             ->setAddressLine2($this->nullableString($address['addressLine2'] ?? null))
@@ -176,18 +215,51 @@ class OnboardingController extends AbstractController
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-        // --- Charge only after everything else validated ---
+        // --- Charge or vault only after everything else validated ---
         try {
-            $subscription = $this->billing->startSubscription(
-                $sourceId,
-                $priceCents,
-                [
-                    'email' => $user->getEmail(),
-                    'name' => $user->getDisplayName(),
-                    'reference' => $slug,
-                ],
-                $verificationToken,
-            );
+            if ($requiresPayment && $this->planCatalog->isUsagePlan($planKey) && 'paypal' !== $methodType) {
+                $vaulted = $this->billing->vaultShopperPaymentMethod(
+                    $sourceId,
+                    [
+                        'email' => $user->getEmail(),
+                        'name' => $user->getDisplayName(),
+                        'reference' => $slug,
+                    ],
+                    verificationToken: $verificationToken,
+                );
+                $subscription = [
+                    'reference' => 'vault-'.$slug,
+                    'customerId' => $vaulted['customerId'],
+                    'cardId' => $vaulted['cardId'],
+                    'last4' => $vaulted['last4'],
+                    'status' => Store::SUBSCRIPTION_ACTIVE,
+                ];
+                $store->setBillingProvider(Store::BILLING_SQUARE);
+            } elseif ('paypal' === $methodType) {
+                $chargeCents = $upfrontCents > 0 ? $upfrontCents : 100;
+                $subscription = $this->paypalBilling->startSubscription(
+                    $sourceId,
+                    $chargeCents,
+                    [
+                        'email' => $user->getEmail(),
+                        'name' => $user->getDisplayName(),
+                        'reference' => $slug,
+                    ],
+                );
+                $store->setBillingProvider(Store::BILLING_PAYPAL);
+            } else {
+                $subscription = $this->billing->startSubscription(
+                    $sourceId,
+                    $upfrontCents,
+                    [
+                        'email' => $user->getEmail(),
+                        'name' => $user->getDisplayName(),
+                        'reference' => $slug,
+                    ],
+                    $verificationToken,
+                );
+                $store->setBillingProvider(Store::BILLING_SQUARE);
+            }
         } catch (\RuntimeException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
         }
@@ -197,11 +269,18 @@ class OnboardingController extends AbstractController
             ->setPaymentCustomerId($subscription['customerId'])
             ->setPaymentCardId($subscription['cardId']);
 
-        // The first period is paid; renewals only become due once it lapses.
-        // Free tiers keep a null period end so the renewer never selects them.
-        if ($priceCents > 0) {
+        if ($this->planCatalog->isFlatPlan($planKey) && $upfrontCents > 0) {
+            $store->markPlatformCapReached();
+            $store->setLastChargedAt(new \DateTimeImmutable());
+            $this->entityManager->persist(SubscriptionCharge::paid($store, $upfrontCents, $subscription['reference']));
+        } elseif ($this->planCatalog->isUsagePlan($planKey)) {
+            $store->setSubscriptionStatus(Store::SUBSCRIPTION_ACTIVE);
+            if ($upfrontCents > 0 && 'paypal' === $methodType) {
+                $this->entityManager->persist(SubscriptionCharge::paid($store, min($upfrontCents, 100), $subscription['reference']));
+            }
+        } elseif ($upfrontCents > 0) {
             $store->markSubscriptionCharged(new \DateTimeImmutable());
-            $this->entityManager->persist(SubscriptionCharge::paid($store, $priceCents, $subscription['reference']));
+            $this->entityManager->persist(SubscriptionCharge::paid($store, $upfrontCents, $subscription['reference']));
         }
 
         // Prefer the processor's own card details over anything the browser sent.

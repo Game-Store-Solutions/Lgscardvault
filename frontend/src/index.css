@@ -776,6 +776,24 @@ textarea {
   color-scheme: light dark;
 }
 
+/*
+ * PayPal JS SDK buttons live in a light iframe. On color-scheme: dark the
+ * browser paints an opaque white canvas behind that iframe. Pin the host and
+ * iframe to light so the canvas stays transparent and the store surface shows.
+ */
+.paypal-checkout-host {
+  height: 48px;
+  overflow: hidden;
+  background: transparent;
+  line-height: 0;
+  color-scheme: light;
+}
+
+.paypal-checkout-host iframe {
+  color-scheme: light;
+  background-color: transparent !important;
+}
+
 .sq-card-host {
   min-height: 7.25rem;
 }

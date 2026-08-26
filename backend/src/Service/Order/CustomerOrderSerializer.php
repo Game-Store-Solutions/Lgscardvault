@@ -25,6 +25,7 @@ final class CustomerOrderSerializer
             'taxCents' => $order->getTaxCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
+            'paymentProvider' => $order->getPaymentProvider(),
             'notes' => $order->getNotes(),
             'disputeStatus' => $order->getDisputeStatus(),
             'disputeReason' => $order->getDisputeReason(),

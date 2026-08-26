@@ -17,11 +17,13 @@ use App\Service\Checkout\CartQuoteLines;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Checkout\OutOfStockException;
 use App\Service\Checkout\PayInStoreFinalizer;
+use App\Service\Checkout\PaypalOrderFactory;
 use App\Service\Checkout\PickupCardCharge;
 use App\Service\Checkout\PickupFulfillment;
 use App\Service\Checkout\PickupTaxNotReadyException;
 use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Payments\CheckoutGatewayInterface;
+use App\Service\Payments\StoreCheckoutPresenter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -38,6 +40,8 @@ final class StoreGuestCheckoutController extends AbstractController
         private readonly SealedInventoryItemRepository $sealedRepository,
         private readonly CartOrderBuilder $orderBuilder,
         private readonly CheckoutGatewayInterface $checkoutGateway,
+        private readonly StoreCheckoutPresenter $checkoutPresenter,
+        private readonly PaypalOrderFactory $paypalOrderFactory,
         private readonly PickupCardCharge $pickupCardCharge,
         private readonly PickupTaxPolicy $pickupTaxPolicy,
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
@@ -54,7 +58,38 @@ final class StoreGuestCheckoutController extends AbstractController
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        return $this->json($this->checkoutGateway->checkoutConfig($store));
+        return $this->json($this->checkoutPresenter->checkoutConfig($store));
+    }
+
+    #[Route('/checkout/paypal/order', name: 'api_store_guest_checkout_paypal_order', methods: ['POST'])]
+    public function createPaypalOrder(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $cartItems = $this->virtualCartFromPayload($store, $payload['lines'] ?? null);
+        $preview = CartQuoteLines::fromCartItems($cartItems);
+
+        try {
+            $created = $this->paypalOrderFactory->create(
+                $store,
+                $preview['lineItems'],
+                $preview['subtotalCents'],
+                0,
+                'guest-'.($store->getSlug() ?? 'store'),
+                $this->nullableEmail($payload['customerEmail'] ?? null),
+            );
+        } catch (PickupTaxNotReadyException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
+
+        return $this->json($created);
     }
 
     #[Route('/checkout/quote', name: 'api_store_guest_checkout_quote', methods: ['POST'])]
@@ -87,12 +122,12 @@ final class StoreGuestCheckoutController extends AbstractController
             return $this->json(['detail' => 'Store not found.'], 404);
         }
 
-        if (!$this->checkoutGateway->isReady($store)) {
-            return $this->json(['detail' => 'This store is not accepting online payments yet.'], 422);
-        }
-
         /** @var array<string, mixed> $payload */
         $payload = json_decode($request->getContent(), true) ?? [];
+
+        if (!$this->checkoutPresenter->acceptsOnlinePayment($store, StoreCheckoutPresenter::providerFromPayload($payload))) {
+            return $this->json(['detail' => 'This store is not accepting online payments yet.'], 422);
+        }
 
         $customerName = mb_substr(trim((string) ($payload['customerName'] ?? '')), 0, 255);
         if ('' === $customerName) {
@@ -137,6 +172,7 @@ final class StoreGuestCheckoutController extends AbstractController
                 trim((string) ($payload['verificationToken'] ?? '')) ?: null,
                 $customerEmail,
                 null,
+                StoreCheckoutPresenter::providerFromPayload($payload),
             );
         } catch (\RuntimeException $e) {
             $this->stockReleaser->release($order);
@@ -287,6 +323,7 @@ final class StoreGuestCheckoutController extends AbstractController
             'taxCents' => $order->getTaxCents(),
             'creditAppliedCents' => $order->getCreditAppliedCents(),
             'paidCents' => $order->getPaidCents(),
+            'paymentProvider' => $order->getPaymentProvider(),
             'notes' => $order->getNotes(),
             'disputeStatus' => $order->getDisputeStatus(),
             'disputeReason' => $order->getDisputeReason(),

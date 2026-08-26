@@ -157,6 +157,24 @@ class Order
     #[ORM\Column(length: 128, nullable: true)]
     private ?string $paymentReference = null;
 
+    /** square | paypal — which connected store account captured this order. */
+    #[ORM\Column(length: 16, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $paymentProvider = null;
+
+    /**
+     * Captures that still fund this order (original checkout plus later
+     * supplemental charges). Oldest first.
+     *
+     * @var list<array{id: string, amountCents: int, refundedCents: int}>
+     */
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    private array $paymentCaptures = [];
+
+    /** Last balance-due amount emailed to a guest (null when nothing is due). */
+    #[ORM\Column(nullable: true)]
+    private ?int $balanceDueNotifiedCents = null;
+
     /** Square Orders API id (itemized order linked to the payment). */
     #[ORM\Column(length: 128, nullable: true)]
     #[Groups(['order:read'])]
@@ -354,6 +372,51 @@ class Order
         return $this->paidCents;
     }
 
+    /**
+     * Merchandise + tax − store credit. Online tax stays as originally
+     * captured when staff later add or remove cards.
+     */
+    public function amountDueCents(): int
+    {
+        return max(0, $this->totalCents + $this->taxCents - $this->creditAppliedCents);
+    }
+
+    /** Extra still owed after a line edit (0 if already covered). */
+    #[Groups(['order:read'])]
+    public function getBalanceDueCents(): int
+    {
+        return max(0, $this->amountDueCents() - $this->paidCents);
+    }
+
+    /** Overpayment after removing cards — refund on the original processor. */
+    #[Groups(['order:read'])]
+    public function getCreditOwedCents(): int
+    {
+        return max(0, $this->paidCents - $this->amountDueCents());
+    }
+
+    public function getBalanceDueNotifiedCents(): ?int
+    {
+        return $this->balanceDueNotifiedCents;
+    }
+
+    public function setBalanceDueNotifiedCents(?int $balanceDueNotifiedCents): static
+    {
+        $this->balanceDueNotifiedCents = null === $balanceDueNotifiedCents ? null : max(0, $balanceDueNotifiedCents);
+
+        return $this;
+    }
+
+    public function recalculateTotalCents(): static
+    {
+        $total = 0;
+        foreach ($this->lines as $line) {
+            $total += $line->getQuantity() * $line->getPriceCents();
+        }
+
+        return $this->setTotalCents($total);
+    }
+
     public function setPaidCents(int $paidCents): static
     {
         $this->paidCents = max(0, $paidCents);
@@ -371,6 +434,134 @@ class Order
         $this->paymentReference = $paymentReference;
 
         return $this;
+    }
+
+    public function getPaymentProvider(): ?string
+    {
+        return $this->paymentProvider;
+    }
+
+    public function setPaymentProvider(?string $paymentProvider): static
+    {
+        $this->paymentProvider = $paymentProvider;
+
+        return $this;
+    }
+
+    /**
+     * @return list<array{id: string, amountCents: int, refundedCents: int}>
+     */
+    #[Groups(['order:read'])]
+    public function getPaymentCaptures(): array
+    {
+        return $this->normalizedPaymentCaptures();
+    }
+
+    public function recordPaymentCapture(string $id, int $amountCents): static
+    {
+        $id = trim($id);
+        $amountCents = max(0, $amountCents);
+        if ('' === $id || $amountCents < 1) {
+            return $this;
+        }
+
+        $this->paymentCaptures[] = [
+            'id' => $id,
+            'amountCents' => $amountCents,
+            'refundedCents' => 0,
+        ];
+        if (null === $this->paymentReference || '' === $this->paymentReference) {
+            $this->paymentReference = $id;
+        }
+
+        return $this;
+    }
+
+    public function ensurePaymentCaptureLedger(): static
+    {
+        $normalized = $this->normalizedPaymentCaptures();
+        if ([] !== $normalized) {
+            $this->paymentCaptures = $normalized;
+
+            return $this;
+        }
+
+        $ref = trim((string) $this->paymentReference);
+        if ('' !== $ref && $this->paidCents > 0) {
+            $this->paymentCaptures = [[
+                'id' => $ref,
+                'amountCents' => $this->paidCents,
+                'refundedCents' => 0,
+            ]];
+        }
+
+        return $this;
+    }
+
+    /**
+     * Newest capture first so a later extra charge is unwound before the original.
+     *
+     * @return list<array{id: string, amountCents: int}>
+     */
+    public function planCaptureRefunds(int $amountCents): array
+    {
+        $this->ensurePaymentCaptureLedger();
+        $remaining = max(0, $amountCents);
+        $plan = [];
+        $captures = $this->normalizedPaymentCaptures();
+        for ($i = count($captures) - 1; $i >= 0 && $remaining > 0; --$i) {
+            $available = max(0, $captures[$i]['amountCents'] - $captures[$i]['refundedCents']);
+            $take = min($available, $remaining);
+            if ($take < 1) {
+                continue;
+            }
+            $plan[] = ['id' => $captures[$i]['id'], 'amountCents' => $take];
+            $remaining -= $take;
+        }
+
+        return $plan;
+    }
+
+    public function applyCaptureRefund(string $id, int $amountCents): static
+    {
+        $this->ensurePaymentCaptureLedger();
+        $amountCents = max(0, $amountCents);
+        foreach ($this->paymentCaptures as $i => $cap) {
+            if (($cap['id'] ?? '') !== $id) {
+                continue;
+            }
+            $current = (int) ($cap['refundedCents'] ?? 0);
+            $total = (int) ($cap['amountCents'] ?? 0);
+            $this->paymentCaptures[$i]['refundedCents'] = min($total, $current + $amountCents);
+            break;
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return list<array{id: string, amountCents: int, refundedCents: int}>
+     */
+    private function normalizedPaymentCaptures(): array
+    {
+        $out = [];
+        foreach ($this->paymentCaptures as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = trim((string) ($row['id'] ?? ''));
+            $amount = (int) ($row['amountCents'] ?? 0);
+            if ('' === $id || $amount < 1) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'amountCents' => $amount,
+                'refundedCents' => max(0, (int) ($row['refundedCents'] ?? 0)),
+            ];
+        }
+
+        return $out;
     }
 
     public function getSquareOrderId(): ?string

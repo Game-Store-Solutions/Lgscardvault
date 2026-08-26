@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2,
   ChevronLeft,
@@ -12,6 +12,7 @@ import {
   PackageCheck,
   Plus,
   Printer,
+  Banknote,
   ReceiptText,
   RotateCcw,
   Search,
@@ -21,7 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
-import type { InventoryItem, Order, OrderChannel, OrderStatus } from '../../api/types'
+import type { InventoryItem, Order, OrderChannel, OrderLine, OrderStatus } from '../../api/types'
 import { inventoryKey, openStoreOrdersCountKey, ordersKey, resolveOrdersListTotal, useDebouncedValue, useInventoryPage, useOrders, useStoreOrderQueueCounts } from '../../hooks'
 import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal, Select } from '../../components/ui'
 import { OrderLineList } from '../../components/orders/OrderLineList'
@@ -32,6 +33,9 @@ import {
   countOrdersBetween,
   customerTierLabel,
   freshStatusPresentation,
+  orderAllowsLineEdits,
+  orderBalanceDueCents,
+  orderCreditOwedCents,
   orderPrimaryProductName,
   paymentSubtitle,
   percentChange,
@@ -416,10 +420,12 @@ export default function OrdersTab({ slug }: { slug: string }) {
       {kioskOpen && <KioskOrderModal slug={slug} onClose={() => setKioskOpen(false)} />}
       {detailOrder && (
         <OrderDetailModal
+          slug={slug}
           order={detailOrder}
           pendingStatus={updateStatus.variables?.order.id === detailOrder.id ? updateStatus.variables.status : null}
           error={updateStatus.error}
           onClose={() => setDetailOrder(null)}
+          onOrderChange={setDetailOrder}
           onUpdateStatus={(status) => updateStatus.mutate({ order: detailOrder, status })}
         />
       )}
@@ -707,20 +713,116 @@ function Pagination({ page, totalPages, onPageChange }: { page: number; totalPag
 }
 
 function OrderDetailModal({
+  slug,
   order,
   pendingStatus,
   error,
   onClose,
+  onOrderChange,
   onUpdateStatus,
 }: {
+  slug: string
   order: Order
   pendingStatus: OrderStatus | null
   error: unknown
   onClose: () => void
+  onOrderChange: (order: Order) => void
   onUpdateStatus: (status: OrderStatus) => void
 }) {
-  const actions = statusActions(order.status)
+  const queryClient = useQueryClient()
+  const balanceDue = orderBalanceDueCents(order)
+  const actions = statusActions(order.status).filter(
+    (action) => !(balanceDue > 0 && (action.status === 'fulfilled' || action.status === 'completed')),
+  )
   const statusUi = freshStatusPresentation(order.status)
+  const canEdit = orderAllowsLineEdits(order.status, order.disputeStatus)
+  const [addQuery, setAddQuery] = useState('')
+  const [lineError, setLineError] = useState('')
+  const [busyLineId, setBusyLineId] = useState<number | null>(null)
+  const addTerm = useDebouncedValue(addQuery, 200)
+  const { data: addSearch, isFetching: addSearching } = useInventoryPage(slug, {
+    q: addTerm.trim(),
+    inStockOnly: true,
+    itemsPerPage: 8,
+    enabled: canEdit && addTerm.trim() !== '',
+  })
+  const addResults = addTerm.trim() === '' ? [] : (addSearch?.items ?? [])
+  const creditOwed = orderCreditOwedCents(order)
+  const capturedOnline = (order.paidCents ?? 0) > 0
+  const paypalOrder = order.paymentProvider === 'paypal'
+  const awaitingShopperPayment = canEdit && paypalOrder && balanceDue > 0
+
+  const { data: liveOrder } = useQuery({
+    queryKey: ['store-order-detail', slug, order.id],
+    queryFn: async () => (await api.get<Order>(`/stores/${slug}/orders/${order.id}`)).data,
+    enabled: awaitingShopperPayment,
+    refetchInterval: awaitingShopperPayment ? 5000 : false,
+    refetchOnWindowFocus: true,
+  })
+
+  useEffect(() => {
+    if (!liveOrder) return
+    if (
+      liveOrder.paidCents !== order.paidCents
+      || liveOrder.totalCents !== order.totalCents
+      || orderBalanceDueCents(liveOrder) !== balanceDue
+    ) {
+      onOrderChange(liveOrder)
+      void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
+    }
+  }, [balanceDue, liveOrder, onOrderChange, order.paidCents, order.totalCents, queryClient, slug])
+
+  const persistOrder = (updated: Order) => {
+    onOrderChange(updated)
+    void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
+    void queryClient.invalidateQueries({ queryKey: inventoryKey(slug) })
+  }
+
+  const addLine = useMutation({
+    mutationFn: async (item: InventoryItem) => {
+      const { data } = await api.post<Order>(`/stores/${slug}/orders/${order.id}/lines`, {
+        inventoryItemId: item.id,
+        quantity: 1,
+      })
+      return data
+    },
+    onSuccess: (updated) => {
+      setLineError('')
+      setAddQuery('')
+      persistOrder(updated)
+    },
+    onError: (err) => setLineError(extractErrorMessage(err, 'Could not add that card.')),
+  })
+
+  const patchLine = useMutation({
+    mutationFn: async ({ line, quantity }: { line: OrderLine; quantity: number }) => {
+      setBusyLineId(line.id)
+      if (quantity < 1) {
+        const { data } = await api.delete<Order>(`/stores/${slug}/orders/${order.id}/lines/${line.id}`)
+        return data
+      }
+      const { data } = await api.patch<Order>(`/stores/${slug}/orders/${order.id}/lines/${line.id}`, { quantity })
+      return data
+    },
+    onSuccess: (updated) => {
+      setLineError('')
+      persistOrder(updated)
+    },
+    onError: (err) => setLineError(extractErrorMessage(err, 'Could not update that card.')),
+    onSettled: () => setBusyLineId(null),
+  })
+
+  const settleCredit = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<Order>(`/stores/${slug}/orders/${order.id}/payment-adjustment`)
+      return data
+    },
+    onSuccess: (updated) => {
+      setLineError('')
+      persistOrder(updated)
+    },
+    onError: (err) => setLineError(extractErrorMessage(err, 'Could not refund this payment.')),
+  })
 
   return (
     <Modal
@@ -749,6 +851,64 @@ function OrderDetailModal({
             {(order.taxCents ?? 0) > 0 && (
               <p className="mt-1 text-sm text-fg-muted">Tax {formatPrice(order.taxCents ?? 0)} · paid {formatPrice(order.paidCents ?? 0)}</p>
             )}
+            {creditOwed > 0 && capturedOnline && canEdit ? (
+              <div className="mt-2 space-y-2">
+                <p className="rounded-lg bg-success-50 px-3 py-2 text-sm font-semibold text-success-700">
+                  {formatPrice(creditOwed)} to return after card changes
+                </p>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  loading={settleCredit.isPending}
+                  onClick={() => settleCredit.mutate()}
+                >
+                  <Banknote aria-hidden className="size-4" />
+                  Refund {formatPrice(creditOwed)} on {paypalOrder ? 'PayPal' : 'Square'}
+                </Button>
+              </div>
+            ) : null}
+            {balanceDue > 0 && canEdit && paypalOrder ? (
+              <div className="mt-2 space-y-2 rounded-lg bg-warning-50 px-3 py-2 text-sm text-warning-800">
+                <p className="font-semibold">
+                  Waiting for {formatPrice(balanceDue)} on PayPal
+                </p>
+                <p className="text-warning-900/90">
+                  The shopper must approve this — we emailed them a secure PayPal link. Account holders can also pay from{' '}
+                  <span className="font-semibold">Account → Orders</span>.
+                </p>
+                <p className="text-xs text-warning-900/80">
+                  This screen updates automatically when they pay. Or collect {formatPrice(balanceDue)} at the counter.
+                </p>
+              </div>
+            ) : balanceDue > 0 && canEdit ? (
+              <p className="mt-2 rounded-lg bg-warning-50 px-3 py-2 text-sm font-semibold text-warning-700">
+                Collect {formatPrice(balanceDue)} at the counter
+              </p>
+            ) : (order.status === 'refunded' || order.status === 'cancelled') && paypalOrder ? (
+              <p className="mt-2 rounded-lg bg-bg px-3 py-2 text-sm text-fg-muted">
+                PayPal payment refunded. This order is closed and cannot be charged again.
+              </p>
+            ) : null}
+            {(order.creditAppliedCents ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-fg-muted">
+                Store credit applied: {formatPrice(order.creditAppliedCents ?? 0)}
+              </p>
+            )}
+            {order.paymentCaptures && order.paymentCaptures.length > 0 ? (
+              <div className="mt-3 space-y-1 rounded-lg bg-bg px-3 py-2 text-xs text-fg-muted">
+                <p className="font-bold uppercase tracking-wide">Payment captures</p>
+                {order.paymentCaptures.map((capture) => (
+                  <p key={capture.id} className="font-mono break-all">
+                    {capture.id}
+                    <span className="text-fg">
+                      {' '}
+                      · {formatPrice(capture.amountCents)}
+                      {capture.refundedCents > 0 ? ` (${formatPrice(capture.refundedCents)} refunded)` : ''}
+                    </span>
+                  </p>
+                ))}
+              </div>
+            ) : null}
             {order.fulfillment && (
               <p className="mt-2 text-sm text-fg-muted">
                 Fulfillment:{' '}
@@ -763,17 +923,22 @@ function OrderDetailModal({
             {order.disputeStatus ? (
               <div className="mt-3 space-y-2 rounded-xl border border-danger-500/30 bg-danger-50 p-3 text-sm text-danger-800">
                 <p className="font-bold">
-                  Square dispute ({order.disputeStatus}
+                  {order.paymentProvider === 'paypal' ? 'PayPal' : 'Square'} dispute ({order.disputeStatus}
                   {order.disputeReason ? ` · ${order.disputeReason}` : ''})
                 </p>
                 <p>
-                  Respond in Square Dashboard with pickup proof. Do not restock unless you lose or choose to
-                  refund. Runbook: <span className="font-semibold">deploy/CHARGEBACKS.md</span>
+                  {order.paymentProvider === 'paypal'
+                    ? 'Respond in PayPal Resolution Center with pickup proof. Do not restock unless you lose or choose to refund.'
+                    : 'Respond in Square Dashboard with pickup proof. Do not restock unless you lose or choose to refund.'}{' '}
+                  Runbook: <span className="font-semibold">deploy/CHARGEBACKS.md</span>
                 </p>
                 <ul className="list-disc space-y-1 pl-5">
                   <li>Shopper name: {order.customerName || '—'}</li>
                   <li>Order time: {formatOrderDate(order.createdAt)}</li>
-                  <li>Pickup / staff notes: write evidence in Square (name, time, who handed over the cards)</li>
+                  <li>
+                    Pickup / staff notes: write evidence in{' '}
+                    {order.paymentProvider === 'paypal' ? 'PayPal' : 'Square'} (name, time, who handed over the cards)
+                  </li>
                   <li>Do not restock from this screen because of the dispute</li>
                 </ul>
               </div>
@@ -783,7 +948,61 @@ function OrderDetailModal({
         </div>
         <div>
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Line items</p>
-          <OrderLineList lines={order.lines ?? []} />
+          <OrderLineList
+            lines={order.lines ?? []}
+            editing={canEdit}
+            busyLineId={busyLineId}
+            onQuantityChange={canEdit ? (line, quantity) => patchLine.mutate({ line, quantity }) : undefined}
+            onRemove={canEdit ? (line) => patchLine.mutate({ line, quantity: 0 }) : undefined}
+          />
+          {canEdit ? (
+            <div className="mt-4 space-y-2">
+              <Input
+                label="Add a card"
+                value={addQuery}
+                onChange={(e) => setAddQuery(e.target.value)}
+                placeholder="Search in-stock inventory…"
+              />
+              {addSearching ? <p className="text-xs text-fg-muted">Searching…</p> : null}
+              {addResults.length > 0 ? (
+                <ul className="max-h-48 space-y-1 overflow-y-auto">
+                  {addResults.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        disabled={addLine.isPending}
+                        onClick={() => addLine.mutate(item)}
+                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-2 text-left transition-colors hover:border-brand-300 disabled:opacity-50"
+                      >
+                        {cardImage(item.card) && (
+                          <img src={cardImage(item.card)} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-fg">{item.card.name}</span>
+                          <span className="block text-xs text-fg-muted">
+                            {item.card.setCode?.toUpperCase()} · {item.condition}
+                            {item.isFoil ? ` · ${item.finish}` : ''} · {item.quantity} in stock
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-sm font-bold text-fg">{formatPrice(item.priceCents)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : addQuery.trim() && !addSearching ? (
+                <p className="text-xs text-fg-muted">No in-stock matches.</p>
+              ) : (
+                <p className="text-xs text-fg-muted">Search inventory to add a card. Stock is pulled from the listing immediately.</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-fg-muted">Cards can be added or removed until the order is delivered, cancelled, or refunded.</p>
+          )}
+          {(lineError || addLine.isError || patchLine.isError) && (
+            <p role="alert" className="mt-3 rounded-xl bg-danger-50 px-4 py-3 text-sm text-danger-700">
+              {lineError || extractErrorMessage(addLine.error ?? patchLine.error, 'Could not update this order.')}
+            </p>
+          )}
         </div>
         {actions.length > 0 ? (
           <div className="grid gap-2 sm:grid-cols-2">

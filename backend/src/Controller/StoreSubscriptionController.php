@@ -6,6 +6,7 @@ use App\Entity\Store;
 use App\Entity\User;
 use App\Repository\StoreRepository;
 use App\Service\Onboarding\PlanCatalog;
+use App\Service\Payments\PaypalSubscriptionBilling;
 use App\Service\Payments\SubscriptionBillingInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +28,7 @@ final class StoreSubscriptionController extends AbstractController
         private readonly StoreRepository $storeRepository,
         private readonly PlanCatalog $planCatalog,
         private readonly SubscriptionBillingInterface $billing,
+        private readonly PaypalSubscriptionBilling $paypalBilling,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -55,7 +57,8 @@ final class StoreSubscriptionController extends AbstractController
             'lastChargedAt' => $store->getLastChargedAt()?->format(\DATE_ATOM),
             'failedAttempts' => $store->getBillingAttempts(),
             'nextAttemptAt' => $store->getNextAttemptAt()?->format(\DATE_ATOM),
-        ] + $this->billing->clientConfig());
+            'billingProvider' => $store->getBillingProvider(),
+        ] + $this->billing->clientConfig() + ['paypal' => $this->paypalBilling->clientConfig()]);
     }
 
     #[Route('/payment-method', name: 'api_store_subscription_payment_method', methods: ['POST'])]
@@ -89,12 +92,23 @@ final class StoreSubscriptionController extends AbstractController
         }
 
         try {
-            $card = $this->billing->replaceVaultedCard(
-                (string) $customerId,
-                $store->getPaymentCardId(),
-                $sourceId,
-                $verificationToken,
-            );
+            if ('paypal' === $methodType) {
+                $card = $this->paypalBilling->replaceVaultedCard(
+                    (string) $customerId,
+                    $store->getPaymentCardId(),
+                    $sourceId,
+                    $verificationToken,
+                );
+                $store->setBillingProvider(Store::BILLING_PAYPAL);
+            } else {
+                $card = $this->billing->replaceVaultedCard(
+                    (string) $customerId,
+                    $store->getPaymentCardId(),
+                    $sourceId,
+                    $verificationToken,
+                );
+                $store->setBillingProvider(Store::BILLING_SQUARE);
+            }
         } catch (\RuntimeException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
         }
@@ -119,6 +133,34 @@ final class StoreSubscriptionController extends AbstractController
             'paymentLast4' => $store->getPaymentLast4(),
             'subscriptionStatus' => $store->getSubscriptionStatus(),
         ]);
+    }
+
+    #[Route('/paypal/order', name: 'api_store_subscription_paypal_order', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function paypalOrder(string $slug): JsonResponse
+    {
+        $store = $this->resolveManagedStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $plan = $store->getPlanKey() ? $this->planCatalog->find($store->getPlanKey()) : null;
+        $priceCents = (int) ($plan['priceCents'] ?? 0);
+        if ($priceCents <= 0) {
+            return $this->json(['error' => 'This plan does not require PayPal.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $user = $this->getUser();
+        $email = $user instanceof User ? $user->getEmail() : null;
+
+        try {
+            // $0.01 capture vaults PayPal for renewals without collecting a full period early.
+            $orderId = $this->paypalBilling->createOrder(1, 'sub-'.($store->getSlug() ?? 'store'), $email);
+        } catch (\RuntimeException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_GATEWAY);
+        }
+
+        return $this->json(['orderId' => $orderId]);
     }
 
     private function resolveManagedStore(string $slug): ?Store

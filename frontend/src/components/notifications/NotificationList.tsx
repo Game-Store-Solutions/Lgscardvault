@@ -1,4 +1,4 @@
-import { Bell, Check, Coins, ShoppingBag } from 'lucide-react'
+import { Bell, Check, Coins, CreditCard, ShoppingBag } from 'lucide-react'
 import { Link } from 'react-router'
 import type { CustomerNotification } from '../../api/types'
 import { Button } from '../ui'
@@ -6,6 +6,7 @@ import { cx } from '../../lib/cx'
 
 function notificationHref(notification: CustomerNotification): string {
   const store = notification.storeSlug ? `&store=${notification.storeSlug}` : ''
+  const order = notification.orderId ? `&order=${notification.orderId}` : ''
   if (
     notification.type === 'sell_trade_completed'
     || notification.type === 'sell_trade_accepted'
@@ -18,7 +19,7 @@ function notificationHref(notification: CustomerNotification): string {
   if (notification.type === 'want_list_match') {
     return `/account?section=wantlist${store}`
   }
-  return `/account?section=orders${store}`
+  return `/account?section=orders${store}${order}`
 }
 
 function isSellTrade(notification: CustomerNotification): boolean {
@@ -44,7 +45,13 @@ export function NotificationList({
     <div className={cx('grid gap-2', compact && 'max-h-80 overflow-y-auto')}>
       {notifications.map((notification) => {
         const sellTrade = isSellTrade(notification)
-        const Icon = sellTrade ? Coins : notification.type === 'want_list_match' ? ShoppingBag : Bell
+        const Icon = sellTrade
+          ? Coins
+          : notification.type === 'want_list_match'
+            ? ShoppingBag
+            : notification.type === 'order_balance_due'
+              ? CreditCard
+              : Bell
         return (
           <div
             key={notification.id}
@@ -60,7 +67,9 @@ export function NotificationList({
             <Link
               to={notificationHref(notification)}
               className="flex min-w-0 gap-2"
-              onClick={() => onMarkRead(notification.id)}
+              onClick={() => {
+                if (notification.type !== 'order_balance_due') onMarkRead(notification.id)
+              }}
             >
               {!compact && (
                 <span

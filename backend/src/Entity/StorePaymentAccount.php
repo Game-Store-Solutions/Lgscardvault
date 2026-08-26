@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 class StorePaymentAccount
 {
     public const PROVIDER_SQUARE = 'square';
+    public const PROVIDER_PAYPAL = 'paypal';
     public const STATUS_CONNECTED = 'connected';
     public const STATUS_DISCONNECTED = 'disconnected';
     public const STATUS_ERROR = 'error';

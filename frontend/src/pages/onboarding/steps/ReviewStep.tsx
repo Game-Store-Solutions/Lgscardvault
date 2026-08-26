@@ -33,7 +33,13 @@ export function ReviewStep({
         {data.storeName} · /s/{data.slug}
       </ReviewRow>
       <ReviewRow title="Plan" onEdit={() => onJump(stepIndex('plan'))}>
-        {plan ? `${plan.name} · ${plan.priceCents === 0 ? 'Free' : `${formatPrice(plan.priceCents)}/mo`}` : '—'}
+        {plan ? `${plan.name} · ${
+          plan.billingModel === 'usage'
+            ? `${(plan.feePercentBps ?? 500) / 100}% per sale until ${formatPrice(plan.capCents ?? 45000)}`
+            : plan.priceCents === 0
+              ? 'Free'
+              : `${formatPrice(plan.priceCents)} one-time`
+        }` : '—'}
       </ReviewRow>
       <ReviewRow title="Payment" onEdit={() => onJump(stepIndex('payment'))}>
         {paymentRequired

@@ -482,10 +482,22 @@ class Store
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $nextAttemptAt = null;
 
-    /** card | apple_pay | google_pay */
+    /** Usage-plan progress toward the $450 platform cap (flat plans set this to the cap upfront). */
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['store:admin'])]
+    private int $platformFeesPaidCents = 0;
+
+    /** card | apple_pay | google_pay | paypal */
     #[ORM\Column(length: 32, nullable: true)]
     #[Groups(['store:admin'])]
     private ?string $paymentMethodType = null;
+
+    public const BILLING_SQUARE = 'square';
+    public const BILLING_PAYPAL = 'paypal';
+
+    /** Processor used for platform SaaS dues. */
+    #[ORM\Column(length: 16, options: ['default' => 'square'])]
+    private string $billingProvider = self::BILLING_SQUARE;
 
     /** Opaque reference from the payment processor (nonce / transaction id). */
     #[ORM\Column(length: 255, nullable: true)]
@@ -1446,9 +1458,60 @@ class Store
         return $this;
     }
 
+    public function getPlatformFeesPaidCents(): int
+    {
+        return $this->platformFeesPaidCents;
+    }
+
+    public function addPlatformFeesPaid(int $amountCents): static
+    {
+        if ($amountCents > 0) {
+            $this->platformFeesPaidCents += $amountCents;
+        }
+
+        return $this;
+    }
+
+    public function hasMetPlatformCap(): bool
+    {
+        return $this->platformFeesPaidCents >= 45000;
+    }
+
+    /** Flat upfront payment or usage plan hit the $450 cap — no further platform fees. */
+    public function markPlatformCapReached(): static
+    {
+        $this->platformFeesPaidCents = 45000;
+        $this->markLifetimeAccess();
+
+        return $this;
+    }
+
+    /** Paid-in-full or cap reached — skip monthly renewal forever. */
+    public function markLifetimeAccess(): static
+    {
+        $this->currentPeriodEnd = (new \DateTimeImmutable())->modify('+50 years');
+        $this->subscriptionStatus = self::SUBSCRIPTION_ACTIVE;
+        $this->billingAttempts = 0;
+        $this->nextAttemptAt = null;
+
+        return $this;
+    }
+
     public function getPaymentMethodType(): ?string
     {
         return $this->paymentMethodType;
+    }
+
+    public function getBillingProvider(): string
+    {
+        return $this->billingProvider;
+    }
+
+    public function setBillingProvider(string $billingProvider): static
+    {
+        $this->billingProvider = $billingProvider;
+
+        return $this;
     }
 
     public function setPaymentMethodType(?string $paymentMethodType): static

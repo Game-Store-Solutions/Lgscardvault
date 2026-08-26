@@ -30,7 +30,7 @@ export interface OnboardingAddress {
 
 export interface OnboardingPayment {
   methodType: PaymentMethodType | ''
-  /** Single-use Square payment token from the Web Payments SDK. */
+  /** Square payment token or PayPal order id, depending on methodType. */
   token: string
   last4: string
   /** Optional Strong Customer Authentication token from verifyBuyer(). */

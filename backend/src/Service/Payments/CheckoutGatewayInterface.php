@@ -35,7 +35,7 @@ interface CheckoutGatewayInterface
      * @param string                                                              $idempotencyKey stable per order, so a retry cannot double-charge
      * @param list<array{name: string, quantity: int, priceCents: int}>|null       $lineItems      when set, creates a Square Order then pays it
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int, platformFeeCents: int}
      *
      * @throws \RuntimeException when the store is not connected or the payment is declined
      */
@@ -57,7 +57,7 @@ interface CheckoutGatewayInterface
     /**
      * @param list<array{name: string, quantity: int, priceCents: int}>|null $lineItems
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int, platformFeeCents: int}
      */
     public function chargeVaultedCard(
         Store $store,

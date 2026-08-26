@@ -5,6 +5,7 @@ import type { Order, OrderLine } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { formatOrderShortDate, orderItemCount } from '../../lib/orders'
 import { OrderLineList } from './OrderLineList'
+import { OrderBalanceDuePaypal } from './OrderBalanceDuePaypal'
 import { OrderStatusBadge } from './OrderStatusBadge'
 import { OrderWorkflow } from './OrderWorkflow'
 
@@ -13,12 +14,14 @@ export function CustomerOrderCard({
   expanded,
   onToggle,
   compact = false,
+  onPaid,
 }: {
   order: Order
   expanded: boolean
   onToggle: () => void
   /** Dense row for long cross-store lists (e.g. /account orders). */
   compact?: boolean
+  onPaid?: (order: Order) => void
 }) {
   const itemCount = orderItemCount(order)
   const previewLines = (order.lines ?? []).slice(0, 3)
@@ -66,6 +69,7 @@ export function CustomerOrderCard({
         {expanded && (
           <div className="border-t border-border bg-bg/50 px-3 py-2.5 sm:px-4">
             <OrderLineList lines={order.lines ?? []} compact />
+            <OrderBalanceDuePaypal order={order} onPaid={onPaid ?? (() => undefined)} />
           </div>
         )}
       </article>
@@ -115,6 +119,7 @@ export function CustomerOrderCard({
       {expanded && (
         <div className="border-t border-border bg-bg/60 p-4">
           <OrderLineList lines={order.lines ?? []} />
+          <OrderBalanceDuePaypal order={order} onPaid={onPaid ?? (() => undefined)} />
         </div>
       )}
     </article>

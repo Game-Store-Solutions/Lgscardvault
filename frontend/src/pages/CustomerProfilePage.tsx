@@ -19,9 +19,11 @@ export default function CustomerProfilePage() {
   const [params] = useSearchParams()
   const tab = params.get('tab') ?? ''
   const section = TAB_TO_SECTION[tab] ?? 'overview'
+  const order = params.get('order') ?? ''
   const search = new URLSearchParams()
   if (section !== 'overview') search.set('section', section)
   if (slug) search.set('store', slug)
+  if (order) search.set('order', order)
   const qs = search.toString()
 
   return <Navigate to={qs ? `/account?${qs}` : '/account'} replace />

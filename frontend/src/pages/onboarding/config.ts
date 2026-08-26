@@ -47,6 +47,7 @@ export const METHOD_LABELS: Record<PaymentMethodType, string> = {
   card: 'Credit / debit card',
   apple_pay: 'Apple Pay',
   google_pay: 'Google Pay',
+  paypal: 'PayPal',
 }
 
 export const SLUG_RE = /^[a-z0-9-]+$/

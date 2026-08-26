@@ -1,9 +1,11 @@
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import api, { extractErrorMessage, formatPrice } from '../../../api/client'
 import type { PaymentClientConfig, Plan } from '../../../api/types'
 import { Button } from '../../../components/ui'
 import { SquarePaymentPanel } from '../../../components/payments/SquarePaymentPanel'
+import { PaypalButtons } from '../../../components/payments/PaypalButtons'
 import { isDevBuild } from '../../../lib/runtimeEnv'
 import { METHOD_LABELS } from '../config'
 import type { OnboardingPayment, PatchPayment } from '../types'
@@ -29,6 +31,16 @@ export function PaymentStep({
     },
     enabled: required,
   })
+
+  const createPaypalOrder = useCallback(async () => {
+    const { data } = await api.post<{ orderId: string }>('/payments/onboarding/paypal/order', {
+      planKey: plan?.key ?? '',
+    })
+    if (!data.orderId) {
+      throw new Error('PayPal did not return an order.')
+    }
+    return data.orderId
+  }, [plan?.key])
 
   if (!required) {
     return (
@@ -63,32 +75,53 @@ export function PaymentStep({
 
   const config = configQuery.data
   const priceCents = plan?.priceCents ?? 0
+  const isUsage = plan?.billingModel === 'usage'
+  const squareChargeCents = isUsage ? 0 : priceCents
+  const paypalChargeCents = isUsage ? 100 : priceCents
+  const paypalEnabled = config.paypal?.enabled === true
+  const squareReady = config.mode === 'square'
 
   return (
     <div className="mx-auto w-full max-w-xl space-y-5">
       <div className="flex items-center justify-between rounded-card border border-border bg-bg p-4">
         <div>
-          <p className="text-sm text-fg-muted">You're subscribing to</p>
+          <p className="text-sm text-fg-muted">You're choosing</p>
           <p className="font-display text-lg font-bold text-fg">{plan?.name}</p>
         </div>
-        <p className="font-display text-2xl font-bold text-fg">
-          {plan ? formatPrice(plan.priceCents) : ''}
-          <span className="text-sm font-medium text-fg-muted">/mo</span>
+        <p className="text-right font-display text-2xl font-bold text-fg">
+          {isUsage ? (
+            <span className="text-lg">
+              {(plan?.feePercentBps ?? 500) / 100}%
+              <span className="block text-sm font-medium text-fg-muted">per sale</span>
+            </span>
+          ) : (
+            <>
+              {plan ? formatPrice(plan.priceCents) : ''}
+              <span className="text-sm font-medium text-fg-muted"> one-time</span>
+            </>
+          )}
         </p>
       </div>
+      {isUsage ? (
+        <p className="rounded-btn bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          Link a payment method so we can collect 5% of each sale until {formatPrice(plan?.capCents ?? 45000)}. PayPal
+          may show a $1 verification charge.
+        </p>
+      ) : null}
 
-      {config.mode === 'square' ? (
+      {squareReady ? (
         <SquarePaymentPanel
           applicationId={config.applicationId}
           locationId={config.locationId}
           environment={config.environment}
-          priceCents={priceCents}
+          priceCents={squareChargeCents}
           currency={config.currency}
           countryCode={config.countryCode}
           billingEmail={billingEmail}
-          confirmLabel="Verify payment method"
-          paymentRequestLabel="Platform subscription"
+          confirmLabel={isUsage ? 'Save payment method' : 'Pay and continue'}
+          paymentRequestLabel={isUsage ? 'Save payment method' : 'Platform subscription'}
           layout="checkout"
+          saveOnly={isUsage}
           onTokenized={patchPayment}
         />
       ) : isDevBuild ? (
@@ -110,11 +143,35 @@ export function PaymentStep({
             Use a simulated card
           </Button>
         </div>
-      ) : (
+      ) : paypalEnabled ? null : (
         <p className="rounded-btn border border-border bg-bg px-3 py-2 text-sm text-fg-muted">
           Payment verification is unavailable right now. Please try again later or contact support.
         </p>
       )}
+
+      {paypalEnabled && config.paypal ? (
+        <div className="space-y-2">
+          {squareReady || isDevBuild ? (
+            <p className="text-xs font-medium text-fg-muted">Or pay with PayPal</p>
+          ) : null}
+          <PaypalButtons
+            clientId={config.paypal.clientId}
+            environment={config.paypal.environment}
+            currency={config.paypal.currency}
+            amountCents={paypalChargeCents}
+            wallets={!squareReady}
+            createOrder={createPaypalOrder}
+            onApproved={async (orderId) => {
+              patchPayment({
+                methodType: 'paypal',
+                token: orderId,
+                last4: '',
+                verificationToken: '',
+              })
+            }}
+          />
+        </div>
+      ) : null}
 
       {payment.methodType && payment.token && (
         <p className="flex items-center gap-2 text-sm font-medium text-success-700">

@@ -91,7 +91,9 @@ Square handles both money flows, but through **two separate integrations**:
 | Flow | Merchant | Credentials |
 |------|----------|-------------|
 | Owner pays the platform for a tier | The platform | Access token + location id |
-| Shopper pays a store at checkout | Each store | Square OAuth (application secret) |
+| Shopper pays a store at checkout | Each store | Square OAuth and/or PayPal Partner Connect |
+
+PayPal is optional. Copy sandbox client id/secret into `PAYPAL_SANDBOX_*` and set `PAYPAL_ENVIRONMENT=sandbox`. Connect PayPal on **Store admin → Payments** the same way as Square. Shopper captures go to that store’s PayPal account, not the platform.
 
 Sandbox and production credentials live side by side under separate names, and `SQUARE_ENVIRONMENT` picks the set. Deploying is therefore a one-variable change, and a half-finished switch cannot quietly send sandbox keys to the live API: each environment reads only its own pair, so a missing production token falls back to mock mode instead of failing against real money.
 
