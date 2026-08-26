@@ -15,7 +15,8 @@
     "training:test-coords": "tsx src/pages/store-admin/training/targetCoordinate.test.ts",
     "training:test-mutations": "tsx src/pages/store-admin/training/trainingMutations.test.ts",
     "training:test-workflow": "tsx src/pages/store-admin/training/workflowController.test.ts",
-    "training:test": "npm run training:test-coords && npm run training:test-mutations && npm run training:test-workflow",
+    "training:test-progress": "tsx src/pages/store-admin/training/trainingProgress.test.ts",
+    "training:test": "npm run training:test-coords && npm run training:test-mutations && npm run training:test-workflow && npm run training:test-progress",
     "training:assets": "npm run training:capture && npm run training:audio"
   },
   "dependencies": {
@@ -53,7 +54,6 @@
     "@vitejs/plugin-react": "^6.0.2",
     "oxlint": "^1.69.0",
     "playwright": "^1.55.0",
-    "kokoro-js": "^1.2.1",
     "tailwindcss": "^4.3.1",
     "tsx": "^4.23.12",
     "typescript": "~6.0.2",

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { GraduationCap } from 'lucide-react'
 import { Badge } from '../../components/ui'
+import { useStore } from '../../hooks'
 import GuidedLesson from './training/GuidedLesson'
 import TrainingModuleCard from './training/TrainingModuleCard'
 import { TRAINING_CATEGORIES, TRAINING_MODULES } from './training/modules'
+import { resumeBeatIndex } from './training/trainingProgress'
 import type { TrainingModule } from './training/types'
 import { unlockTrainingVoice } from './training/useNarrator'
 
@@ -31,6 +33,7 @@ function beatCount(module: TrainingModule): number {
 export default function TrainingTab({ slug }: { slug: string }) {
   const [progress, setProgress] = useState<Progress>({})
   const [activeId, setActiveId] = useState<string | null>(null)
+  const { data: store } = useStore(slug)
 
   useEffect(() => {
     setProgress(loadProgress(slug))
@@ -54,13 +57,17 @@ export default function TrainingTab({ slug }: { slug: string }) {
     [progress],
   )
 
+  const storeLabel = store?.name ?? slug
+
   if (active) {
+    const total = beatCount(active)
+    const doneBeats = Math.min(progress[active.id] ?? 0, total)
     return (
       <GuidedLesson
-        key={active.id}
+        key={`${active.id}-${doneBeats}`}
         module={active}
         slug={slug}
-        startIndex={0}
+        startIndex={resumeBeatIndex(doneBeats, total)}
         onBeat={(index) => markBeat(active, index)}
         onClose={() => setActiveId(null)}
       />
@@ -76,7 +83,7 @@ export default function TrainingTab({ slug }: { slug: string }) {
           </span>
           <div>
             <h2 className="text-lg font-bold text-fg">Training</h2>
-            <p className="text-sm text-fg-muted">Interactive lessons on the live Acme Store admin</p>
+            <p className="text-sm text-fg-muted">Interactive lessons on the live {storeLabel} admin</p>
           </div>
         </div>
         <p className="max-w-3xl text-sm leading-relaxed text-fg-muted">

@@ -1,6 +1,11 @@
 /**
  * Enforces co-located mutation markers on store-admin controls that call APIs.
  * Run: npm run training:test-mutations
+ *
+ * Scope: only flags `.mutate()` lines that have `data-guide` within a 14-line
+ * lookback (walkthrough-reachable controls). This is a textual heuristic, not an
+ * AST pass — a handler farther than ~14 lines below its `data-guide` tag would
+ * not be caught. Tighten the window or add AST parsing if that becomes common.
  */
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
