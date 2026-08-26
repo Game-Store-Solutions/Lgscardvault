@@ -29,7 +29,7 @@ interface PaypalCheckoutGatewayInterface
     ): string;
 
     /**
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: null, taxCents: int, chargedCents: int}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: null, taxCents: int, chargedCents: int, platformFeeCents: int}
      */
     public function charge(
         Store $store,

@@ -95,6 +95,9 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
 
         $taxCents = max(0, $this->addedTaxCents);
         $chargedCents = $amountCents + $taxCents;
+        $platformFeeCents = 'usage' === $store->getPlanKey()
+            ? (int) round($chargedCents * 500 / 10000)
+            : 0;
 
         $this->charges[] = [
             'amount' => $chargedCents,
@@ -102,6 +105,7 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
             'idempotencyKey' => $idempotencyKey,
             'lineItems' => $lineItems,
             'taxCents' => $taxCents,
+            'platformFeeCents' => $platformFeeCents,
         ];
 
         $n = count($this->charges);
@@ -113,6 +117,7 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
             'squareOrderId' => null !== $lineItems && [] !== $lineItems ? 'sqord_'.$n : null,
             'taxCents' => $taxCents,
             'chargedCents' => $chargedCents,
+            'platformFeeCents' => $platformFeeCents,
         ];
     }
 

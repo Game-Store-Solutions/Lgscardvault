@@ -71,7 +71,7 @@ final readonly class PickupCardCharge
                 ->setPaymentReference($payment['paymentId'])
                 ->setPaymentProvider(StorePaymentAccount::PROVIDER_PAYPAL)
                 ->recordPaymentCapture($payment['paymentId'], $charged);
-            $this->platformFees->recordFromOrder($order);
+            $this->platformFees->recordCollectedFee($store, (int) ($payment['platformFeeCents'] ?? 0));
 
             return [
                 'charged' => true,
@@ -102,7 +102,7 @@ final readonly class PickupCardCharge
             ->setPaymentProvider(StorePaymentAccount::PROVIDER_SQUARE)
             ->setSquareOrderId($payment['squareOrderId'] ?? null)
             ->recordPaymentCapture($payment['paymentId'], $charged);
-        $this->platformFees->recordFromOrder($order);
+        $this->platformFees->recordCollectedFee($store, (int) ($payment['platformFeeCents'] ?? 0));
 
         return [
             'charged' => true,

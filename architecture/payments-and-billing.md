@@ -113,6 +113,8 @@ sequenceDiagram
 
 PayPal checkout creates a Orders v2 order with `payee.merchant_id` set to the connected store, then captures that order id on `POST .../checkout`. Tax is quoted via Square when Square is connected; **$0 tax in a sales-tax state blocks PayPal the same as cards**. PayPal-only stores in a tax state cannot capture online (pay-in-store remains). No-tax states (AK / DE / MT / NH / OR) can complete at $0 tax.
 
+**Usage-plan platform fees (5% until $450):** collected automatically on each shopper capture when the store is on the `usage` plan and has not met the cap. Square charges include `app_fee_money` on `CreatePayment` (routed to the platform Square application). PayPal orders include `payment_instruction.platform_fees` paid to `PAYPAL_*_PARTNER_MERCHANT_ID` (your platform PayPal merchant id). Progress is tracked on `stores.platform_fees_paid_cents`. Pay-in-store Square payment links do not currently support application fees — card checkout and PayPal are the fee-bearing paths.
+
 Staff line edits do not touch PayPal until **Settle** (`POST .../payment-adjustment`). Removing cards issues one partial refund for the net credit. Adding cards cannot increase the original capture — the shopper approves one supplemental PayPal order from **Account → Orders** (registered) or the signed **email link** (`GET/POST .../guest/orders/{id}/…?token=…`). `orders.payment_captures` keeps every capture so a later full refund unwinds them all. Orders cannot move to ready/delivered while `balanceDueCents > 0`. Shrinking an order returns excess store credit to the customer's ledger automatically.
 
 | Layer | Where |

@@ -5,6 +5,7 @@ namespace App\Service\Payments;
 use App\Entity\Store;
 use App\Entity\StorePaymentAccount;
 use App\Repository\StorePaymentAccountRepository;
+use App\Service\Billing\PlatformFeeCalculator;
 use App\Service\Checkout\PickupTaxNotReadyException;
 use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Security\SecretCipher;
@@ -18,7 +19,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * The counterpart to {@see SubscriptionBillingClient}: there the platform is
  * the merchant, here the store is, so every call authenticates with that
  * store's OAuth access token and settles into that store's own bank account.
- * The platform never touches the funds.
+ * Usage-plan stores include an application fee routed to the platform.
  */
 final class StoreCheckoutGateway implements CheckoutGatewayInterface
 {
@@ -38,6 +39,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
         private readonly PickupTaxPolicy $taxPolicy,
+        private readonly PlatformFeeCalculator $platformFees,
     ) {
     }
 
@@ -199,7 +201,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      *
      * @param list<array{name: string, quantity: int, priceCents: int}>|null $lineItems
      *
-     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int}
+     * @return array{paymentId: string, status: string, receiptUrl: string|null, squareOrderId: string|null, taxCents: int, chargedCents: int, platformFeeCents: int}
      *
      * @throws \RuntimeException when the store is not connected or Square declines
      */
@@ -306,6 +308,14 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             $payload['customer_id'] = $customerId;
         }
 
+        $platformFeeCents = $this->platformFees->feeDueForCapture($store, $chargedCents);
+        if ($platformFeeCents > 0) {
+            $payload['app_fee_money'] = [
+                'amount' => $platformFeeCents,
+                'currency' => $this->credentials->currency(),
+            ];
+        }
+
         $response = $this->request($account, 'POST', '/v2/payments', $payload);
         $paymentId = $response['payment']['id'] ?? null;
 
@@ -320,6 +330,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
             'squareOrderId' => $squareOrderId,
             'taxCents' => $taxCents,
             'chargedCents' => $chargedCents,
+            'platformFeeCents' => $platformFeeCents,
         ];
     }
 

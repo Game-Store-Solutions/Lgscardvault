@@ -45,6 +45,17 @@ final class PaypalCredentials
         return $this->scoped('WEBHOOK_ID', $environment);
     }
 
+    /** Platform merchant id that receives usage-plan fees on connected seller checkouts. */
+    public function partnerMerchantId(?string $environment = null): string
+    {
+        return $this->scoped('PARTNER_MERCHANT_ID', $environment);
+    }
+
+    public function hasPartnerMerchantId(?string $environment = null): bool
+    {
+        return '' !== $this->partnerMerchantId($environment);
+    }
+
     public function apiBaseUrl(?string $environment = null): string
     {
         return self::LIVE === $this->normalize($environment)
@@ -69,7 +80,7 @@ final class PaypalCredentials
     {
         $prefix = 'PAYPAL_'.strtoupper($this->environment()).'_';
 
-        return [$prefix.'CLIENT_ID', $prefix.'CLIENT_SECRET'];
+        return [$prefix.'CLIENT_ID', $prefix.'CLIENT_SECRET', $prefix.'PARTNER_MERCHANT_ID'];
     }
 
     public function isConfigured(?string $environment = null): bool

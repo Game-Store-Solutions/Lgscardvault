@@ -115,7 +115,7 @@ final readonly class OrderPaymentAdjuster
         $order->ensurePaymentCaptureLedger();
         $order->recordPaymentCapture($captureId, $charged);
         $order->setPaidCents($order->getPaidCents() + $charged);
-        $this->platformFees->recordFromOrder($order);
+        $this->platformFees->recordCollectedFee($store, (int) ($payment['platformFeeCents'] ?? 0));
 
         return $order;
     }

@@ -13,7 +13,7 @@ final class FakePaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
 
     public ?string $refundDeclineWith = null;
 
-    /** @var list<array{amount: int, referenceId: string}> */
+    /** @var list<array{amount: int, referenceId: string, platformFeeCents: int}> */
     public array $orders = [];
 
     /** @var list<array{amount: int, paypalOrderId: string, idempotencyKey: string}> */
@@ -56,7 +56,15 @@ final class FakePaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
             throw new \RuntimeException('This store has not connected PayPal yet.');
         }
 
-        $this->orders[] = ['amount' => $amountCents, 'referenceId' => $referenceId];
+        $platformFeeCents = 'usage' === $store->getPlanKey()
+            ? (int) round($amountCents * 500 / 10000)
+            : 0;
+
+        $this->orders[] = [
+            'amount' => $amountCents,
+            'referenceId' => $referenceId,
+            'platformFeeCents' => $platformFeeCents,
+        ];
 
         return 'PAYPAL-ORDER-'.count($this->orders);
     }
@@ -81,6 +89,9 @@ final class FakePaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
             'idempotencyKey' => $idempotencyKey,
         ];
 
+        $orderIndex = max(0, count($this->orders) - 1);
+        $platformFeeCents = (int) ($this->orders[$orderIndex]['platformFeeCents'] ?? 0);
+
         $n = count($this->charges);
 
         return [
@@ -90,6 +101,7 @@ final class FakePaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
             'squareOrderId' => null,
             'taxCents' => $taxCents,
             'chargedCents' => $amountCents,
+            'platformFeeCents' => $platformFeeCents,
         ];
     }
 

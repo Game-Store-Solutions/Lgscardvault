@@ -4,11 +4,13 @@ namespace App\Controller;
 
 use App\Entity\Order;
 use App\Entity\SquareWebhookEvent;
+use App\Entity\Store;
 use App\Entity\StorePaymentAccount;
 use App\Enum\OrderStatus;
 use App\Repository\OrderRepository;
 use App\Repository\SquareWebhookEventRepository;
 use App\Repository\StorePaymentAccountRepository;
+use App\Service\Billing\PlatformFeeRecorder;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Payments\SquareWebhookVerifier;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -40,6 +42,7 @@ final class SquareWebhookController extends AbstractController
         private readonly StorePaymentAccountRepository $accounts,
         private readonly OrderRepository $orders,
         private readonly OrderStockReleaser $stockReleaser,
+        private readonly PlatformFeeRecorder $platformFees,
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
     ) {
@@ -145,6 +148,12 @@ final class SquareWebhookController extends AbstractController
                 $order->setPaidCents($amount)->setPaymentReference($paymentId)->recordPaymentCapture($paymentId, $amount);
                 if (Order::NOTE_PAY_IN_STORE === $order->getNotes()) {
                     $order->setNotes(null);
+                }
+
+                $store = $order->getStore();
+                $appFee = (int) ($payment['app_fee_money']['amount'] ?? $payment['application_fee_money']['amount'] ?? 0);
+                if ($appFee > 0 && $store instanceof Store) {
+                    $this->platformFees->recordCollectedFee($store, $appFee);
                 }
             }
         }

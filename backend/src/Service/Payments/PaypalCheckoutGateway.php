@@ -4,11 +4,12 @@ namespace App\Service\Payments;
 
 use App\Entity\Store;
 use App\Entity\StorePaymentAccount;
+use App\Service\Billing\PlatformFeeCalculator;
 use App\Repository\StorePaymentAccountRepository;
 
 /**
  * Captures shopper PayPal payments on the STORE's connected merchant account.
- * The platform never holds the funds.
+ * Usage-plan checkouts include a platform fee paid to the partner merchant.
  */
 final class PaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
 {
@@ -17,6 +18,7 @@ final class PaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
         private readonly PaypalCredentials $credentials,
         private readonly PaypalPartnerClient $partner,
         private readonly StorePaymentAccountRepository $accounts,
+        private readonly PlatformFeeCalculator $platformFees,
     ) {
     }
 
@@ -58,20 +60,36 @@ final class PaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
         $account = $this->requireAccount($store);
         $amount = $this->formatAmount($amountCents);
         $uniqueRef = $this->uniqueReference($referenceId);
+        $platformFeeCents = $this->platformFees->feeDueForCapture($store, $amountCents);
+        $purchaseUnit = [
+            'reference_id' => mb_substr($uniqueRef, 0, 256),
+            'invoice_id' => mb_substr($uniqueRef, 0, 127),
+            'custom_id' => mb_substr($referenceId, 0, 127),
+            'amount' => [
+                'currency_code' => $this->credentials->currency(),
+                'value' => $amount,
+            ],
+            'payee' => [
+                'merchant_id' => $account->getProviderMerchantId(),
+            ],
+        ];
+        if ($platformFeeCents > 0 && $this->credentials->hasPartnerMerchantId()) {
+            $purchaseUnit['payment_instruction'] = [
+                'platform_fees' => [[
+                    'amount' => [
+                        'currency_code' => $this->credentials->currency(),
+                        'value' => $this->formatAmount($platformFeeCents),
+                    ],
+                    'payee' => [
+                        'merchant_id' => $this->credentials->partnerMerchantId(),
+                    ],
+                ]],
+            ];
+        }
+
         $payload = [
             'intent' => 'CAPTURE',
-            'purchase_units' => [[
-                'reference_id' => mb_substr($uniqueRef, 0, 256),
-                'invoice_id' => mb_substr($uniqueRef, 0, 127),
-                'custom_id' => mb_substr($referenceId, 0, 127),
-                'amount' => [
-                    'currency_code' => $this->credentials->currency(),
-                    'value' => $amount,
-                ],
-                'payee' => [
-                    'merchant_id' => $account->getProviderMerchantId(),
-                ],
-            ]],
+            'purchase_units' => [$purchaseUnit],
         ];
 
         $data = $this->client->request('POST', '/v2/checkout/orders', $payload, $uniqueRef.'-create');
@@ -118,6 +136,8 @@ final class PaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
             throw new \RuntimeException('PayPal could not complete this payment.');
         }
 
+        $platformFeeCents = $this->extractPlatformFeeCents($existing);
+
         return [
             'paymentId' => $captureId,
             'status' => $captureStatus,
@@ -125,6 +145,7 @@ final class PaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
             'squareOrderId' => null,
             'taxCents' => $taxCents,
             'chargedCents' => $amountCents,
+            'platformFeeCents' => $platformFeeCents,
         ];
     }
 
@@ -188,5 +209,21 @@ final class PaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
     private function formatAmount(int $cents): string
     {
         return number_format(max(0, $cents) / 100, 2, '.', '');
+    }
+
+    /** @param array<string, mixed> $order */
+    private function extractPlatformFeeCents(array $order): int
+    {
+        $units = is_array($order['purchase_units'] ?? null) ? $order['purchase_units'] : [];
+        $unit = is_array($units[0] ?? null) ? $units[0] : [];
+        $instruction = is_array($unit['payment_instruction'] ?? null) ? $unit['payment_instruction'] : [];
+        $fees = is_array($instruction['platform_fees'] ?? null) ? $instruction['platform_fees'] : [];
+        $fee = is_array($fees[0] ?? null) ? $fees[0] : [];
+        $value = $fee['amount']['value'] ?? null;
+        if (!is_string($value) && !is_numeric($value)) {
+            return 0;
+        }
+
+        return (int) round((float) $value * 100);
     }
 }
