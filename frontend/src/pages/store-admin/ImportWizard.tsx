@@ -333,7 +333,7 @@ export default function ImportWizard({
         {/* Step 5. Import */}
         {preview && (
           <div className="flex flex-wrap items-center gap-3">
-            <Button data-guide="Import" onClick={() => importMutation.mutate()} disabled={busy || importMutation.isPending}>
+            <Button data-guide="Import" data-training-mutation onClick={() => importMutation.mutate()} disabled={busy || importMutation.isPending}>
               <FileSpreadsheet aria-hidden className="size-4" />
               {importMutation.isPending ? 'Starting import…' : `Import ${preview.totalRows} rows`}
             </Button>

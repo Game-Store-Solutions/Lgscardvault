@@ -116,7 +116,7 @@ export function SelectedCardEditor({
       </div>
 
       <div className="mt-4">
-        <Button onClick={onAdd} loading={pending}>
+        <Button data-training-mutation onClick={onAdd} loading={pending}>
           <Plus className="size-4" aria-hidden />
           Add {card.name}
         </Button>

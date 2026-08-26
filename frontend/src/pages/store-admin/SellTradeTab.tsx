@@ -528,7 +528,7 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button data-guide="Save rates" loading={save.isPending} onClick={() => save.mutate()}>
+          <Button data-guide="Save rates" data-training-mutation loading={save.isPending} onClick={() => save.mutate()}>
             Save rates
           </Button>
           {save.isSuccess && <span className="text-sm font-medium text-success-700">Saved.</span>}

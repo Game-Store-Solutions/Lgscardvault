@@ -255,7 +255,7 @@ export default function EventsTab({ slug }: { slug: string }) {
                 Pin to top of board
               </label>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" data-guide="Add to board" onClick={commitDraft} disabled={!draft.title.trim()}>
+                <Button type="button" data-guide="Add to board" data-training-mutation onClick={commitDraft} disabled={!draft.title.trim()}>
                   <Plus aria-hidden className="size-4" />
                   {editingId ? 'Update event' : 'Add to board'}
                 </Button>
@@ -277,7 +277,7 @@ export default function EventsTab({ slug }: { slug: string }) {
         </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button data-guide="Save events & board" onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
+          <Button data-guide="Save events & board" data-training-mutation onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
             <Calendar aria-hidden className="size-4" />
             Save events & board
           </Button>

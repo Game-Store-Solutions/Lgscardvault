@@ -650,6 +650,7 @@ function OrderActionsMenu({
           key={status}
           type="button"
           data-guide={label}
+          data-training-mutation
           role="menuitem"
           disabled={updatePending}
           className="block w-full px-3 py-2 text-left text-sm text-fg hover:bg-bg disabled:opacity-50"

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Training audio generator</title>
+  </head>
+  <body>
+    <p id="status">Loading Kokoro…</p>
+    <script type="module">
+      import { KokoroTTS } from 'https://esm.sh/kokoro-js@1.2.1'
+
+      globalThis.__loadKokoro = async () => {
+        document.getElementById('status').textContent = 'Downloading model…'
+        globalThis.__kokoroTts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
+          dtype: 'q8',
+          device: 'wasm',
+          progress_callback: (info) => {
+            if (info.progress) {
+              document.getElementById('status').textContent = `Model ${Math.round(info.progress)}%`
+            }
+          },
+        })
+        document.getElementById('status').textContent = 'Ready'
+      }
+
+      globalThis.__synthesize = async (text) => {
+        const raw = await globalThis.__kokoroTts.generate(text, { voice: 'af_heart', speed: 0.94 })
+        return { samples: Array.from(raw.audio), rate: raw.sampling_rate }
+      }
+    </script>
+  </body>
+</html>

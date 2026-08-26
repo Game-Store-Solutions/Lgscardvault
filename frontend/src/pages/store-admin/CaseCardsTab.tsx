@@ -80,6 +80,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
         <CardBody>
           <form
             className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
+            data-training-mutation
             onSubmit={(e) => {
               e.preventDefault()
               if (caseName.trim()) createCase.mutate()
@@ -93,7 +94,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
               placeholder="Front counter case, wall case…"
               maxLength={120}
             />
-            <Button type="submit" data-guide="Add case" loading={createCase.isPending} disabled={!caseName.trim()}>
+            <Button type="submit" data-guide="Add case" data-training-mutation loading={createCase.isPending} disabled={!caseName.trim()}>
               <Plus className="size-4" aria-hidden />
               Add case
             </Button>

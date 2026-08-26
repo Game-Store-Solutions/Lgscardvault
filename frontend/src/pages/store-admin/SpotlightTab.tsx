@@ -208,7 +208,7 @@ export default function SpotlightTab({ slug }: { slug: string }) {
             }
             subtitle="Pin individual singles, set how many cards the rail shows, and keep a price floor for the automatic picks."
             actions={
-              <Button data-guide="Save spotlight" onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
+              <Button data-guide="Save spotlight" data-training-mutation onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
                 <Sparkles className="size-4" aria-hidden />
                 Save spotlight
               </Button>

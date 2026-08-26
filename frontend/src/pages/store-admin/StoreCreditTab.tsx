@@ -138,7 +138,7 @@ export default function StoreCreditTab({ slug }: { slug: string }) {
                           placeholder="Optional"
                           className="w-40"
                         />
-                        <Button type="submit" size="sm" loading={adjust.isPending}>
+                        <Button type="submit" size="sm" data-training-mutation loading={adjust.isPending}>
                           Save
                         </Button>
                         <Button type="button" size="sm" variant="ghost" onClick={() => setAdjustingId(null)}>

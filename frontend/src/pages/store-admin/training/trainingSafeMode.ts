@@ -1,20 +1,6 @@
 import { ensureTrainingScroll, guideKeys } from './trainingTargetUtils'
 import type { TrainingInteractionMode } from './trainingInteraction'
-
-/** Guide targets that must never fire real side effects during a training walkthrough. */
-const BLOCKED_GUIDE_TARGETS = new Set([
-  'Connect Square',
-  'Reconnect',
-  'Save spotlight',
-  'Save events & board',
-  'Save events',
-  'Import',
-  'Add',
-  'Add to board',
-  'Mark delivered',
-  'Accept order',
-  'Ready for pickup',
-])
+import { isTrainingMutationControl } from './trainingMutations'
 
 function guideKeyForNode(node: EventTarget | null): string | null {
   if (!node || !(node instanceof Element)) return null
@@ -113,17 +99,17 @@ export function attachTrainingInteraction(
   markAllowedTargets()
 
   const blockIfNeeded = (event: Event) => {
-    if (isTrainingPrepareActive(doc)) return
-    if (mode === 'free') return
-    const key = guideKeyForNode(event.target)
-
-    if (key && BLOCKED_GUIDE_TARGETS.has(key)) {
+    if (isTrainingMutationControl(event.target)) {
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
       return
     }
 
+    if (isTrainingPrepareActive(doc)) return
+    if (mode === 'free') return
+
+    const key = guideKeyForNode(event.target)
     const allowed = isAllowedKey(key)
 
     if (mode === 'target-only') {

@@ -1,6 +1,7 @@
 import type { TrainingBeat, TrainingBeatPrepare, TrainingDemo } from './types'
 import { bringTargetIntoView, findGuideElement } from './trainingTargetUtils'
 import { setTrainingPrepareActive } from './trainingSafeMode'
+import { assertSafeTrainingClick } from './trainingMutations'
 import { waitForTrainingState } from './trainingWaitFor'
 
 export interface BeatUIPrep {
@@ -12,38 +13,6 @@ export interface BeatUIPrep {
   demo?: TrainingDemo
 
 }
-
-
-
-const BLOCKED_CLICK_GUIDES = new Set([
-
-  'Connect Square',
-
-  'Reconnect',
-
-  'Import',
-
-  'Add case',
-
-  'Add',
-
-  'Add to board',
-
-  'Save rates',
-
-  'Save events & board',
-
-  'Save events',
-
-  'Save spotlight',
-
-  'Mark delivered',
-
-  'Accept order',
-
-  'Ready for pickup',
-
-])
 
 
 
@@ -83,10 +52,6 @@ async function safeTrainingClick(doc: Document, target: string): Promise<boolean
 
     if (!el) continue
 
-    if (BLOCKED_CLICK_GUIDES.has(key)) return false
-
-
-
     const clickEl =
 
       el.matches('button, a, input[type="button"], [role="button"], [role="tab"], [role="link"]')
@@ -96,6 +61,8 @@ async function safeTrainingClick(doc: Document, target: string): Promise<boolean
         : el.querySelector('button, a, [role="button"], [role="tab"]') ??
 
           el.parentElement?.querySelector('button[aria-expanded]')
+
+    if (!assertSafeTrainingClick(clickEl instanceof HTMLElement ? clickEl : el)) return false
 
 
 

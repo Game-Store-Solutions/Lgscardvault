@@ -351,17 +351,17 @@ export default function PaymentsTab({ slug }: { slug: string }) {
               <div className="flex shrink-0 flex-wrap gap-2">
                 {connected ? (
                   <>
-                    <Button data-guide="Reconnect" variant="secondary" size="sm" loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
+                    <Button data-guide="Reconnect" data-training-mutation variant="secondary" size="sm" loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
                       <ExternalLink aria-hidden className="size-4" />
                       Reconnect
                     </Button>
-                    <Button variant="danger" size="sm" loading={disconnectMutation.isPending} onClick={() => disconnectMutation.mutate()}>
+                    <Button variant="danger" size="sm" data-training-mutation loading={disconnectMutation.isPending} onClick={() => disconnectMutation.mutate()}>
                       <Unplug aria-hidden className="size-4" />
                       Disconnect
                     </Button>
                   </>
                 ) : (
-                  <Button data-guide="Connect Square" loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
+                  <Button data-guide="Connect Square" data-training-mutation loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
                     <CheckCircle2 aria-hidden className="size-4" />
                     Connect Square
                   </Button>

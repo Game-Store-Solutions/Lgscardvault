@@ -114,6 +114,7 @@ export default function TeamTab({ slug }: { slug: string }) {
           <CardBody>
             <form
               className="grid gap-3 sm:grid-cols-2 sm:items-end"
+              data-training-mutation
               onSubmit={(event) => {
                 event.preventDefault()
                 if (email.trim()) add.mutate()
@@ -155,7 +156,7 @@ export default function TeamTab({ slug }: { slug: string }) {
                   <option value="admin">Admin</option>
                   <option value="member">Member</option>
                 </Select>
-                <Button type="submit" data-guide="Add" loading={add.isPending} disabled={!email.trim()}>
+                <Button type="submit" data-guide="Add" data-training-mutation loading={add.isPending} disabled={!email.trim()}>
                   <UserPlus aria-hidden className="size-4" />
                   Add
                 </Button>
@@ -194,6 +195,8 @@ export default function TeamTab({ slug }: { slug: string }) {
                     ) : canEdit ? (
                       <Select
                         aria-label={`Access for ${member.user.displayName}`}
+                        data-guide="Access"
+                        data-training-mutation
                         value={member.role}
                         onChange={(event) => {
                           if (member.id) {
