@@ -247,6 +247,10 @@ export interface Plan {
   tagline: string
   popular?: boolean
   features: string[]
+  billingModel?: 'flat' | 'usage' | 'legacy_monthly' | string
+  capCents?: number
+  feePercentBps?: number
+  requiresVault?: boolean
 }
 
 export interface GeocodeSuggestion {

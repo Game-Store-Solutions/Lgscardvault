@@ -42,6 +42,7 @@ import SellTradePage from './pages/SellTradePage'
 import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 import LegalPage from './pages/LegalPage'
 import GuestOrderBalancePage from './pages/GuestOrderBalancePage'
+import PricingPage from './pages/PricingPage'
 import { CookieConsentBanner } from './components/CookieConsentBanner'
 
 const queryClient = new QueryClient({
@@ -85,6 +86,7 @@ export default function App() {
 
             <Route element={<AppLayout />}>
               <Route index element={<HomePage />} />
+              <Route path="pricing" element={<PricingPage />} />
               <Route path="stores" element={<StoreDirectoryPage />} />
               {/* Global identity settings + "your stores". One account across the marketplace */}
               <Route

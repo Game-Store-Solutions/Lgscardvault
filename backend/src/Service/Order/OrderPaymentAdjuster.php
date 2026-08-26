@@ -5,6 +5,7 @@ namespace App\Service\Order;
 use App\Entity\Order;
 use App\Entity\Store;
 use App\Entity\StorePaymentAccount;
+use App\Service\Billing\PlatformFeeRecorder;
 use App\Service\Payments\CheckoutGatewayInterface;
 use App\Service\Payments\PaypalCheckoutGatewayInterface;
 
@@ -18,6 +19,7 @@ final readonly class OrderPaymentAdjuster
     public function __construct(
         private CheckoutGatewayInterface $square,
         private PaypalCheckoutGatewayInterface $paypal,
+        private PlatformFeeRecorder $platformFees,
     ) {
     }
 
@@ -113,6 +115,7 @@ final readonly class OrderPaymentAdjuster
         $order->ensurePaymentCaptureLedger();
         $order->recordPaymentCapture($captureId, $charged);
         $order->setPaidCents($order->getPaidCents() + $charged);
+        $this->platformFees->recordFromOrder($order);
 
         return $order;
     }

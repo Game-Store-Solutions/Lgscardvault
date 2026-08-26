@@ -3,6 +3,27 @@ import { formatPrice } from '../../../api/client'
 import type { Plan } from '../../../api/types'
 import { Badge } from '../../../components/ui'
 
+function planHeadline(plan: Plan): string {
+  if (plan.billingModel === 'usage') {
+    const pct = (plan.feePercentBps ?? 500) / 100
+    return `${pct}% per sale`
+  }
+  if (plan.priceCents > 0) {
+    return formatPrice(plan.priceCents)
+  }
+  return 'Free'
+}
+
+function planSubline(plan: Plan): string {
+  if (plan.billingModel === 'usage') {
+    return `until ${formatPrice(plan.capCents ?? 45000)}`
+  }
+  if (plan.priceCents > 0) {
+    return 'one-time'
+  }
+  return ''
+}
+
 export function PlanStep({
   plans,
   loading,
@@ -18,7 +39,7 @@ export function PlanStep({
     return <p className="text-sm text-fg-muted">Loading plans…</p>
   }
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2">
       {plans.map((plan) => {
         const active = plan.key === selected
         return (
@@ -37,8 +58,10 @@ export function PlanStep({
             </div>
             <p className="mt-1 text-sm text-fg-muted">{plan.tagline}</p>
             <p className="mt-4 font-display text-3xl font-bold text-fg">
-              {plan.priceCents === 0 ? 'Free' : formatPrice(plan.priceCents)}
-              {plan.priceCents > 0 && <span className="text-sm font-medium text-fg-muted">/mo</span>}
+              {planHeadline(plan)}
+              {planSubline(plan) ? (
+                <span className="ml-2 text-sm font-medium text-fg-muted">{planSubline(plan)}</span>
+              ) : null}
             </p>
             <ul className="mt-4 space-y-2 text-sm text-fg">
               {plan.features.map((f) => (

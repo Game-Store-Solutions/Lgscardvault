@@ -67,7 +67,7 @@ final readonly class SubscriptionRenewer
     private function renew(Store $store, \DateTimeImmutable $now, bool $dryRun): array
     {
         $slug = (string) $store->getSlug();
-        $priceCents = $this->priceCents($store);
+        $priceCents = $this->monthlyRenewalCents($store);
 
         // A store moved onto the free tier still has a period end; carry it
         // forward instead of charging or endlessly re-selecting it.
@@ -157,13 +157,13 @@ final readonly class SubscriptionRenewer
         );
     }
 
-    private function priceCents(Store $store): int
+    private function monthlyRenewalCents(Store $store): int
     {
         $planKey = $store->getPlanKey();
         if (null === $planKey || '' === $planKey) {
             return 0;
         }
 
-        return (int) ($this->planCatalog->find($planKey)['priceCents'] ?? 0);
+        return $this->planCatalog->monthlyRenewalCents($planKey);
     }
 }

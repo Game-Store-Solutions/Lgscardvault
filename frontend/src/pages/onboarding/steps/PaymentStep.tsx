@@ -75,6 +75,9 @@ export function PaymentStep({
 
   const config = configQuery.data
   const priceCents = plan?.priceCents ?? 0
+  const isUsage = plan?.billingModel === 'usage'
+  const squareChargeCents = isUsage ? 0 : priceCents
+  const paypalChargeCents = isUsage ? 100 : priceCents
   const paypalEnabled = config.paypal?.enabled === true
   const squareReady = config.mode === 'square'
 
@@ -82,27 +85,43 @@ export function PaymentStep({
     <div className="mx-auto w-full max-w-xl space-y-5">
       <div className="flex items-center justify-between rounded-card border border-border bg-bg p-4">
         <div>
-          <p className="text-sm text-fg-muted">You're subscribing to</p>
+          <p className="text-sm text-fg-muted">You're choosing</p>
           <p className="font-display text-lg font-bold text-fg">{plan?.name}</p>
         </div>
-        <p className="font-display text-2xl font-bold text-fg">
-          {plan ? formatPrice(plan.priceCents) : ''}
-          <span className="text-sm font-medium text-fg-muted">/mo</span>
+        <p className="text-right font-display text-2xl font-bold text-fg">
+          {isUsage ? (
+            <span className="text-lg">
+              {(plan?.feePercentBps ?? 500) / 100}%
+              <span className="block text-sm font-medium text-fg-muted">per sale</span>
+            </span>
+          ) : (
+            <>
+              {plan ? formatPrice(plan.priceCents) : ''}
+              <span className="text-sm font-medium text-fg-muted"> one-time</span>
+            </>
+          )}
         </p>
       </div>
+      {isUsage ? (
+        <p className="rounded-btn bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          Link a payment method so we can collect 5% of each sale until {formatPrice(plan?.capCents ?? 45000)}. PayPal
+          may show a $1 verification charge.
+        </p>
+      ) : null}
 
       {squareReady ? (
         <SquarePaymentPanel
           applicationId={config.applicationId}
           locationId={config.locationId}
           environment={config.environment}
-          priceCents={priceCents}
+          priceCents={squareChargeCents}
           currency={config.currency}
           countryCode={config.countryCode}
           billingEmail={billingEmail}
-          confirmLabel="Verify payment method"
-          paymentRequestLabel="Platform subscription"
+          confirmLabel={isUsage ? 'Save payment method' : 'Pay and continue'}
+          paymentRequestLabel={isUsage ? 'Save payment method' : 'Platform subscription'}
           layout="checkout"
+          saveOnly={isUsage}
           onTokenized={patchPayment}
         />
       ) : isDevBuild ? (
@@ -133,13 +152,13 @@ export function PaymentStep({
       {paypalEnabled && config.paypal ? (
         <div className="space-y-2">
           {squareReady || isDevBuild ? (
-            <p className="text-xs font-medium text-fg-muted">Or pay the first month with PayPal</p>
+            <p className="text-xs font-medium text-fg-muted">Or pay with PayPal</p>
           ) : null}
           <PaypalButtons
             clientId={config.paypal.clientId}
             environment={config.paypal.environment}
             currency={config.paypal.currency}
-            amountCents={priceCents}
+            amountCents={paypalChargeCents}
             wallets={!squareReady}
             createOrder={createPaypalOrder}
             onApproved={async (orderId) => {

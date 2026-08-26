@@ -21,6 +21,7 @@ Customer routes are under `StoreCustomerController` at `/api/stores/{slug}/custo
 | Customer notifications | `GET /notifications`, `PATCH /notifications/{id}/read` |
 | Owner orders | `GET /api/stores/{slug}/orders`, `POST /api/stores/{slug}/orders`, `GET /api/stores/{slug}/orders/{id}`, `PATCH /api/stores/{slug}/orders/{id}` |
 | Owner order lines | `POST /api/stores/{slug}/orders/{id}/lines`, `PATCH .../lines/{lineId}`, `DELETE .../lines/{lineId}` |
+| Platform pricing | `GET /api/plans` (public) — flat $450 or 5% per sale until $450 |
 | Owner payment adjustment | `POST /api/stores/{slug}/orders/{id}/payment-adjustment` (refund credit on PayPal/Square) |
 | Guest balance due | `GET /api/stores/{slug}/guest/orders/{id}/balance?token=…`, `POST .../paypal/order`, `POST .../paypal/capture` |
 | Customer balance due | `POST /api/stores/{slug}/customer/orders/{id}/paypal/order`, `POST .../paypal/capture` |

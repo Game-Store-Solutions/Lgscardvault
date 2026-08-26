@@ -60,7 +60,9 @@ export function useOnboarding() {
   })
   const plans = plansQuery.data ?? []
   const selectedPlan = plans.find((p) => p.key === data.planKey)
-  const paymentRequired = (selectedPlan?.priceCents ?? 0) > 0
+  const paymentRequired = Boolean(
+    selectedPlan && (selectedPlan.priceCents > 0 || selectedPlan.requiresVault || selectedPlan.billingModel === 'usage'),
+  )
 
   const patch = (partial: Partial<OnboardingData>) => setData((d) => ({ ...d, ...partial }))
   const patchAddress = (partial: Partial<OnboardingAddress>) =>

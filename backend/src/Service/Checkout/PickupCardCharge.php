@@ -7,6 +7,7 @@ use App\Entity\Store;
 use App\Service\Payments\CheckoutGatewayInterface;
 use App\Service\Payments\PaypalCheckoutGatewayInterface;
 use App\Entity\StorePaymentAccount;
+use App\Service\Billing\PlatformFeeRecorder;
 
 /**
  * Applies location sales tax and captures the card for a reserved pickup order.
@@ -17,6 +18,7 @@ final readonly class PickupCardCharge
         private CheckoutGatewayInterface $checkoutGateway,
         private PaypalCheckoutGatewayInterface $paypalCheckout,
         private PickupTaxPolicy $taxPolicy,
+        private PlatformFeeRecorder $platformFees,
     ) {
     }
 
@@ -69,6 +71,7 @@ final readonly class PickupCardCharge
                 ->setPaymentReference($payment['paymentId'])
                 ->setPaymentProvider(StorePaymentAccount::PROVIDER_PAYPAL)
                 ->recordPaymentCapture($payment['paymentId'], $charged);
+            $this->platformFees->recordFromOrder($order);
 
             return [
                 'charged' => true,
@@ -99,6 +102,7 @@ final readonly class PickupCardCharge
             ->setPaymentProvider(StorePaymentAccount::PROVIDER_SQUARE)
             ->setSquareOrderId($payment['squareOrderId'] ?? null)
             ->recordPaymentCapture($payment['paymentId'], $charged);
+        $this->platformFees->recordFromOrder($order);
 
         return [
             'charged' => true,

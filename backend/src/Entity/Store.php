@@ -482,6 +482,11 @@ class Store
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $nextAttemptAt = null;
 
+    /** Usage-plan progress toward the $450 platform cap (flat plans set this to the cap upfront). */
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['store:admin'])]
+    private int $platformFeesPaidCents = 0;
+
     /** card | apple_pay | google_pay | paypal */
     #[ORM\Column(length: 32, nullable: true)]
     #[Groups(['store:admin'])]
@@ -1449,6 +1454,45 @@ class Store
         $this->subscriptionStatus = null === $retryAt
             ? self::SUBSCRIPTION_SUSPENDED
             : self::SUBSCRIPTION_PAST_DUE;
+
+        return $this;
+    }
+
+    public function getPlatformFeesPaidCents(): int
+    {
+        return $this->platformFeesPaidCents;
+    }
+
+    public function addPlatformFeesPaid(int $amountCents): static
+    {
+        if ($amountCents > 0) {
+            $this->platformFeesPaidCents += $amountCents;
+        }
+
+        return $this;
+    }
+
+    public function hasMetPlatformCap(): bool
+    {
+        return $this->platformFeesPaidCents >= 45000;
+    }
+
+    /** Flat upfront payment or usage plan hit the $450 cap — no further platform fees. */
+    public function markPlatformCapReached(): static
+    {
+        $this->platformFeesPaidCents = 45000;
+        $this->markLifetimeAccess();
+
+        return $this;
+    }
+
+    /** Paid-in-full or cap reached — skip monthly renewal forever. */
+    public function markLifetimeAccess(): static
+    {
+        $this->currentPeriodEnd = (new \DateTimeImmutable())->modify('+50 years');
+        $this->subscriptionStatus = self::SUBSCRIPTION_ACTIVE;
+        $this->billingAttempts = 0;
+        $this->nextAttemptAt = null;
 
         return $this;
     }
