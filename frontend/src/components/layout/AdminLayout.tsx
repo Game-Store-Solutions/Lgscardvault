@@ -377,6 +377,8 @@ export default function AdminLayout() {
 
                       end={item.end}
 
+                      data-guide={item.label}
+
                       onClick={() => setSidebarOpen(false)}
 
                       className={navLinkClass}
@@ -459,7 +461,7 @@ export default function AdminLayout() {
 
           <div className="flex items-center gap-3">
 
-            <Link to="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            <Link to="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })} data-guide="View storefront">
 
               <ExternalLink aria-hidden className="size-4" />
 

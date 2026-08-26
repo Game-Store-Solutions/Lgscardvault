@@ -70,7 +70,7 @@ export function ImportStat({
 }) {
   const valueTone = tone === 'success' ? 'text-success-700' : tone === 'danger' ? 'text-danger-700' : 'text-fg'
   return (
-    <div className="rounded-card border border-border bg-bg p-3">
+    <div data-guide={label} className="rounded-card border border-border bg-bg p-3">
       <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{label}</p>
       <p className={`mt-1 text-xl font-bold ${valueTone}`}>{value}</p>
     </div>

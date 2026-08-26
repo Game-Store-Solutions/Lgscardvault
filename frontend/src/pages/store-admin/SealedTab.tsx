@@ -120,6 +120,7 @@ export default function SealedTab({ slug }: { slug: string }) {
       {/* The store's sealed stock */}
       <Card>
         <CardHeader
+          data-guide="sealed in stock"
           title={`${activeGameName} sealed in stock`}
           subtitle="Boxes, bundles, and decks this store carries. Prices default to the TCGplayer market snapshot."
         />
@@ -168,6 +169,7 @@ export default function SealedTab({ slug }: { slug: string }) {
         <CardBody className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
+              data-guide="Search sealed"
               placeholder={`Search ${activeGameName} sealed products…`}
               value={search}
               onChange={(event) => { setSearch(event.target.value); setPage(1) }}

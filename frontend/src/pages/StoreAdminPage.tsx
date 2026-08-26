@@ -1,5 +1,6 @@
+import { lazy, Suspense } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
-import { buttonVariants, PageHeader } from '../components/ui'
+import { buttonVariants, LoadingPanel, PageHeader } from '../components/ui'
 import { useStore } from '../hooks'
 import SearchTab from './store-admin/SearchTab'
 import OrdersTab from './store-admin/OrdersTab'
@@ -15,7 +16,8 @@ import StoreCreditTab from './store-admin/StoreCreditTab'
 import SealedTab from './store-admin/SealedTab'
 import EventsTab from './store-admin/EventsTab'
 import TeamTab from './store-admin/TeamTab'
-import TrainingTab from './store-admin/TrainingTab'
+
+const TrainingTab = lazy(() => import('./store-admin/TrainingTab'))
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
 type Section = 'inventory' | 'sealed' | 'branding' | 'spotlight' | 'case-cards' | 'payments' | 'orders' | 'reports' | 'csv' | 'patch-notes' | 'sell-trade' | 'store-credit' | 'events' | 'users' | 'training'
@@ -35,7 +37,14 @@ const SECTIONS: Record<Section, { label: string; render: (slug: string) => React
   'patch-notes': { label: 'Patch notes', render: () => <PatchNotesTab /> },
   events: { label: 'Events', render: (slug) => <EventsTab slug={slug} /> },
   users: { label: 'Users', render: (slug) => <TeamTab slug={slug} /> },
-  training: { label: 'Training', render: (slug) => <TrainingTab slug={slug} /> },
+  training: {
+    label: 'Training',
+    render: (slug) => (
+      <Suspense fallback={<LoadingPanel label="Loading training…" />}>
+        <TrainingTab slug={slug} />
+      </Suspense>
+    ),
+  },
 }
 
 function resolveSection(value?: string): Section {

@@ -77,7 +77,7 @@ export function SelectedCardEditor({
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div>
+        <div data-guide="Quantity">
           <p className="mb-1.5 text-sm font-bold text-fg">Quantity</p>
           <QuantityStepper value={quantity} onChange={onQuantityChange} />
         </div>
@@ -91,6 +91,7 @@ export function SelectedCardEditor({
         </div>
         <div>
           <Input
+            data-guide="Sell price ($)"
             label="Sell price ($)"
             value={priceText}
             onChange={(e) => onPriceChange(e.target.value)}

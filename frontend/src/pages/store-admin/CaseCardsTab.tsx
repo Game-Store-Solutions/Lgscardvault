@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
@@ -44,6 +44,20 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
   const { data: cases, isLoading } = useStoreCases(slug)
   const queryClient = useQueryClient()
   const [caseName, setCaseName] = useState('')
+  const trainingMode = useMemo(
+    () => new URLSearchParams(window.location.search).get('training') === '1',
+    [],
+  )
+
+  useEffect(() => {
+    if (!trainingMode) return
+    const onFill = (event: Event) => {
+      const detail = (event as CustomEvent<{ guide?: string; value?: string }>).detail
+      if (detail?.guide === 'New case name' && detail.value != null) setCaseName(detail.value)
+    }
+    document.addEventListener('training:fill-guide', onFill as EventListener)
+    return () => document.removeEventListener('training:fill-guide', onFill as EventListener)
+  }, [trainingMode])
 
   const createCase = useMutation({
     mutationFn: async () => {
@@ -59,6 +73,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
     <div className="space-y-6">
       <Card>
         <CardHeader
+          data-guide="Display cases"
           title="Display cases"
           subtitle="A case is a physical display in your store. Divide each one into sections. Every section tracks its own cards, quantities, and pull sheet."
         />
@@ -71,13 +86,14 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
             }}
           >
             <Input
+              data-guide="New case name"
               label="New case name"
               value={caseName}
               onChange={(e) => setCaseName(e.target.value)}
               placeholder="Front counter case, wall case…"
               maxLength={120}
             />
-            <Button type="submit" loading={createCase.isPending} disabled={!caseName.trim()}>
+            <Button type="submit" data-guide="Add case" loading={createCase.isPending} disabled={!caseName.trim()}>
               <Plus className="size-4" aria-hidden />
               Add case
             </Button>

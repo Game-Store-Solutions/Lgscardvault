@@ -44,6 +44,7 @@ export function Tabs({ tabs, value, onChange, children, className, ...rest }: Ta
               key={tab.id}
               role="tab"
               type="button"
+              data-guide={typeof tab.label === 'string' ? tab.label : tab.id}
               id={`tab-${tab.id}`}
               aria-selected={selected}
               aria-controls={`tabpanel-${tab.id}`}

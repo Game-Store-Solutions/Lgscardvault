@@ -256,7 +256,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
               {oauthReturnMessage.text}
             </p>
           )}
-          <div className="rounded-card border border-border bg-bg p-4">
+          <div className="rounded-card border border-border bg-bg p-4" data-guide="Square">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex gap-4">
                 <span className="grid size-12 shrink-0 place-items-center rounded-card bg-surface text-fg shadow-card">
@@ -265,7 +265,10 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-display text-xl font-bold text-fg">Square</h3>
-                    <Badge tone={connected ? 'success' : square?.status === 'error' ? 'danger' : 'neutral'}>
+                    <Badge
+                      data-guide="Square status"
+                      tone={connected ? 'success' : square?.status === 'error' ? 'danger' : 'neutral'}
+                    >
                       {connected ? 'Connected' : square?.status === 'error' ? 'Needs attention' : 'Not connected'}
                     </Badge>
                     {square?.environment && (
@@ -348,7 +351,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
               <div className="flex shrink-0 flex-wrap gap-2">
                 {connected ? (
                   <>
-                    <Button variant="secondary" size="sm" loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
+                    <Button data-guide="Reconnect" variant="secondary" size="sm" loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
                       <ExternalLink aria-hidden className="size-4" />
                       Reconnect
                     </Button>
@@ -358,7 +361,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
                     </Button>
                   </>
                 ) : (
-                  <Button loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
+                  <Button data-guide="Connect Square" loading={connectMutation.isPending} onClick={() => connectMutation.mutate()}>
                     <CheckCircle2 aria-hidden className="size-4" />
                     Connect Square
                   </Button>
@@ -369,7 +372,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
         </CardBody>
       </Card>
 
-      <Card>
+      <Card data-guide="Go-live checklist">
         <CardHeader
           title="Before you take live card payments"
           subtitle="Shoppers enter card details only in Square’s form. Finish these steps for this store in Square."

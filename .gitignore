@@ -6,4 +6,5 @@ composer.phar
 /frontend/node_modules/
 /frontend/dist/
 /.dev-logs/
+/.tools/
 .DS_Store

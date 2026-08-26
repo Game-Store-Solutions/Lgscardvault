@@ -240,7 +240,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
 
   return (
     <div className="-mt-4 w-full min-w-0 space-y-6 pb-10 pt-2">
-      <header>
+      <header data-guide="Order Management">
         <h1 className="font-display text-3xl font-bold tracking-tight text-fg">Order Management</h1>
         <p className="mt-1 text-sm text-fg-muted">Track and manage all store orders in real time.</p>
       </header>
@@ -279,7 +279,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
 
       <section className="rounded-card border border-border bg-surface shadow-card">
         <div className="flex flex-col gap-4 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-bold text-fg">Orders List</h2>
+          <h2 className="text-lg font-bold text-fg" data-guide="Orders List">Orders List</h2>
           <Button size="sm" onClick={() => setKioskOpen(true)}>
             <Plus aria-hidden className="size-4" />
             Add Order
@@ -295,6 +295,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
               <button
                 key={item.id}
                 type="button"
+                data-guide={`${item.label} tab`}
                 onClick={() => selectTab(item.id)}
                 className={cx(
                   'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
@@ -456,7 +457,9 @@ function StatCard({
         <Icon aria-hidden className="size-6" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-fg-muted">{label}</p>
+        <p className="text-sm font-medium text-fg-muted" data-guide={label}>
+          {label}
+        </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <p className="font-display text-2xl font-bold text-fg">{value}</p>
           {showTrend && (
@@ -543,6 +546,7 @@ function OrderRow({
         <button
           ref={triggerRef}
           type="button"
+          data-guide="Order actions"
           aria-label="Order actions"
           aria-expanded={menuOpen}
           aria-haspopup="menu"
@@ -645,6 +649,7 @@ function OrderActionsMenu({
         <button
           key={status}
           type="button"
+          data-guide={label}
           role="menuitem"
           disabled={updatePending}
           className="block w-full px-3 py-2 text-left text-sm text-fg hover:bg-bg disabled:opacity-50"

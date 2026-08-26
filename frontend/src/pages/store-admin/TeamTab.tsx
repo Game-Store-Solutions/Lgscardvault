@@ -107,6 +107,7 @@ export default function TeamTab({ slug }: { slug: string }) {
       {canEdit && (
         <Card>
           <CardHeader
+            data-guide="Add an employee"
             title="Add an employee"
             subtitle="Set a password for new accounts. Admin access opens the store dashboard."
           />
@@ -119,6 +120,7 @@ export default function TeamTab({ slug }: { slug: string }) {
               }}
             >
               <Input
+                data-guide="Employee email"
                 label="Email"
                 type="email"
                 value={email}
@@ -144,6 +146,7 @@ export default function TeamTab({ slug }: { slug: string }) {
               />
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <Select
+                  data-guide="Access"
                   label="Access"
                   value={role}
                   onChange={(event) => setRole(event.target.value as 'admin' | 'member')}
@@ -152,7 +155,7 @@ export default function TeamTab({ slug }: { slug: string }) {
                   <option value="admin">Admin</option>
                   <option value="member">Member</option>
                 </Select>
-                <Button type="submit" loading={add.isPending} disabled={!email.trim()}>
+                <Button type="submit" data-guide="Add" loading={add.isPending} disabled={!email.trim()}>
                   <UserPlus aria-hidden className="size-4" />
                   Add
                 </Button>
@@ -187,7 +190,7 @@ export default function TeamTab({ slug }: { slug: string }) {
                   <TD className="text-fg-muted">{member.user.email}</TD>
                   <TD>
                     {member.isOwner ? (
-                      <Badge tone="brand">Owner</Badge>
+                      <Badge tone="brand" data-guide="Owner">Owner</Badge>
                     ) : canEdit ? (
                       <Select
                         aria-label={`Access for ${member.user.displayName}`}

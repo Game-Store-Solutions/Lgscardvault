@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Image, LayoutGrid, Layers, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
 import { HeroLayoutPicker } from '../../components/store/hero/HeroLayoutPicker'
@@ -237,6 +237,22 @@ export default function BrandingTab({ slug }: { slug: string }) {
   const [section, setSection] = useState<BrandingSection>('colors')
   const formRef = useRef(form)
   formRef.current = form
+  const trainingMode = useMemo(
+    () => new URLSearchParams(window.location.search).get('training') === '1',
+    [],
+  )
+
+  useEffect(() => {
+    if (!trainingMode) return
+    const onOpenTab = (event: Event) => {
+      const label = (event as CustomEvent<{ label?: string }>).detail?.label?.trim()
+      if (!label) return
+      const match = BRANDING_SECTIONS.find((item) => item.label === label)
+      if (match) setSection(match.id)
+    }
+    document.addEventListener('training:open-tab', onOpenTab as EventListener)
+    return () => document.removeEventListener('training:open-tab', onOpenTab as EventListener)
+  }, [trainingMode])
 
   useEffect(() => {
     if (isLoading || !store?.slug) return
@@ -476,6 +492,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         <TabPanel when="colors" value={section} className="space-y-6 pt-5">
           <Card>
             <CardHeader
+              data-guide="Theme library"
               title={previewMode === 'dark' ? 'Dark theme library' : 'Theme library'}
               subtitle={
                 previewMode === 'dark'
@@ -1157,6 +1174,7 @@ function DisplayChoice({
   return (
     <button
       type="button"
+      data-guide={title}
       onClick={onClick}
       aria-pressed={selected}
       disabled={disabled}

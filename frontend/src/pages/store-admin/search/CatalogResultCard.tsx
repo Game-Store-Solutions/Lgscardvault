@@ -19,6 +19,7 @@ export function CatalogResultCard({ card, selected, onSelect }: CatalogResultCar
   return (
     <button
       type="button"
+      data-guide={card.name}
       onClick={onSelect}
       className={`flex min-h-28 items-start gap-3 rounded-card border px-3 py-3 text-left transition-colors ${
         selected ? 'border-brand-500 bg-brand-50' : 'border-border bg-surface hover:bg-bg'

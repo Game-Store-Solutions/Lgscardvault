@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router'
 import { CheckCircle2, Download, FileSpreadsheet, Layers, Package, Upload, XCircle } from 'lucide-react'
 import api, { extractErrorMessage, formatPrice } from '../../api/client'
 import type { CsvImportJob, ImportPreview, ImportPreviewRow } from '../../api/types'
@@ -44,6 +45,8 @@ export default function ImportWizard({
   onImported: () => void
 }) {
   const { data: games = [] } = useCatalogGames()
+  const [searchParams] = useSearchParams()
+  const trainingMode = searchParams.get('training') === '1'
   const [gameCode, setGameCode] = useState('')
   const [importType, setImportType] = useState<ImportType | ''>('')
   const [file, setFile] = useState<File | null>(null)
@@ -106,9 +109,57 @@ export default function ImportWizard({
 
   const sealed = 'sealed' === importType
 
+  useEffect(() => {
+    if (!trainingMode || gameCode || games.length === 0) return
+    setGameCode(games[0]!.code)
+  }, [trainingMode, gameCode, games])
+
+  useEffect(() => {
+    if (!trainingMode) return
+    const seedTrainingImport = () => {
+      const code = gameCode || games[0]?.code || 'mtg'
+      if (!gameCode) setGameCode(code)
+      setImportType('cards')
+      setFile(new File(['name,quantity\nLightning Bolt,4'], 'training-sample.csv', { type: 'text/csv' }))
+      setPreview({
+        importType: 'cards',
+        gameCode: code,
+        totalRows: 12,
+        matchedRows: 10,
+        invalidRows: 2,
+        unmatchedRows: 0,
+        sampleSize: 2,
+        totalQuantity: 48,
+        sample: [
+          {
+            rowIndex: 1,
+            name: 'Lightning Bolt',
+            set: 'M21',
+            quantity: 4,
+            match: 'matched',
+            matchedName: 'Lightning Bolt',
+          },
+          {
+            rowIndex: 2,
+            name: 'Unknown Card',
+            set: '',
+            quantity: 1,
+            match: 'invalid',
+            error: 'Not found in catalog',
+          },
+        ],
+        warnings: [],
+      })
+      setError(null)
+    }
+    document.addEventListener('training:seed-import', seedTrainingImport)
+    return () => document.removeEventListener('training:seed-import', seedTrainingImport)
+  }, [trainingMode, gameCode, games])
+
   return (
     <Card>
       <CardHeader
+        data-guide="Import inventory"
         title="Import inventory"
         subtitle="Pick a game and what you're importing, upload the sheet, review the preview, then import."
       />
@@ -137,7 +188,7 @@ export default function ImportWizard({
 
         {/* Step 1. Game */}
         <section className="space-y-2">
-          <h3 className="text-sm font-bold text-fg">1. Which game?</h3>
+          <h3 data-guide="Which game" className="text-sm font-bold text-fg">1. Which game?</h3>
           <GameSelector
             games={games.map((game) => ({ code: game.code, name: game.name }))}
             value={gameCode}
@@ -151,7 +202,7 @@ export default function ImportWizard({
 
         {/* Step 2. Type */}
         {gameCode && (
-          <section className="space-y-2">
+          <section className="space-y-2" data-guide="Type">
             <h3 className="text-sm font-bold text-fg">2. What are you importing?</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <TypeCard
@@ -161,7 +212,7 @@ export default function ImportWizard({
                 active={'cards' === importType}
                 onClick={() => {
                   setImportType('cards')
-                  reset()
+                  if (!trainingMode) reset()
                 }}
               />
               <TypeCard
@@ -180,7 +231,7 @@ export default function ImportWizard({
 
         {/* Step 3. Upload */}
         {gameCode && importType && (
-          <section className="space-y-2">
+          <section className="space-y-2" data-guide="Upload">
             <h3 className="text-sm font-bold text-fg">3. Upload your CSV</h3>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-fg-muted">
@@ -225,7 +276,7 @@ export default function ImportWizard({
         {/* Step 4. Preview */}
         {previewMutation.isPending && <LoadingPanel label="Validating your sheet…" />}
         {preview && (
-          <section className="space-y-3">
+          <section className="space-y-3" data-guide="Preview">
             <h3 className="text-sm font-bold text-fg">4. Preview</h3>
             <div className="grid gap-3 sm:grid-cols-4">
               <PreviewStat label="Rows" value={String(preview.totalRows)} />
@@ -282,7 +333,7 @@ export default function ImportWizard({
         {/* Step 5. Import */}
         {preview && (
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={() => importMutation.mutate()} disabled={busy || importMutation.isPending}>
+            <Button data-guide="Import" onClick={() => importMutation.mutate()} disabled={busy || importMutation.isPending}>
               <FileSpreadsheet aria-hidden className="size-4" />
               {importMutation.isPending ? 'Starting import…' : `Import ${preview.totalRows} rows`}
             </Button>
@@ -313,6 +364,7 @@ function TypeCard({
   return (
     <button
       type="button"
+      data-guide={title}
       onClick={onClick}
       aria-pressed={active}
       className={cx(

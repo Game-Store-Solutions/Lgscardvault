@@ -133,6 +133,21 @@ export default function AppLayout() {
   // Kiosk mode: locked-down storefront chrome. No navigation, no account
   // controls — just the store pages and the cart. Only the store owner (or a
   // platform admin) can leave it; the terminal stays signed in as the owner.
+  const guideMode = new URLSearchParams(location.search).get('guide') === '1'
+
+  if (guideMode && storeSlug) {
+    return (
+      <AppShellLayoutProvider>
+        <div className={cx(STORE_THEME_CLASS, 'min-h-screen bg-bg text-fg')}>
+          <StorefrontBackground slug={storeSlug} />
+          <div className="relative z-[1] flex min-h-screen flex-col">
+            <AppMain contentShell={STOREFRONT_SHELL} />
+          </div>
+        </div>
+      </AppShellLayoutProvider>
+    )
+  }
+
   if (kioskMode) {
     return (
       <AppShellLayoutProvider>

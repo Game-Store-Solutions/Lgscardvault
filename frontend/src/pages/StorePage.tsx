@@ -484,7 +484,11 @@ export default function StorePage() {
               </Link>
             )}
             {canManage && (
-              <Link to={`/s/${slug}/admin`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Link
+                to={`/s/${slug}/admin`}
+                data-guide="Admin workspace"
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
                 <StoreIcon aria-hidden className="size-4" />
                 Admin workspace
               </Link>
@@ -526,13 +530,14 @@ export default function StorePage() {
               </>
             )
             return path ? (
-              <Link key={label} to={`/s/${slug}/${path}`} className={tileClass}>
+              <Link key={label} to={`/s/${slug}/${path}`} data-guide={label} className={tileClass}>
                 {content}
               </Link>
             ) : (
               <button
                 key={label}
                 type="button"
+                data-guide={label}
                 className={tileClass}
                 onClick={action === 'search' ? scrollToSearchSection : undefined}
               >

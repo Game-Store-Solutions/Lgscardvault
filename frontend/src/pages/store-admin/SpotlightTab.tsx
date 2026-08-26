@@ -208,7 +208,7 @@ export default function SpotlightTab({ slug }: { slug: string }) {
             }
             subtitle="Pin individual singles, set how many cards the rail shows, and keep a price floor for the automatic picks."
             actions={
-              <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
+              <Button data-guide="Save spotlight" onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
                 <Sparkles className="size-4" aria-hidden />
                 Save spotlight
               </Button>
@@ -217,7 +217,7 @@ export default function SpotlightTab({ slug }: { slug: string }) {
         </div>
       </div>
 
-      <Card>
+      <Card data-guide="Live storefront rail">
         <CardHeader
           title={
             <span className="inline-flex flex-wrap items-center gap-2">
@@ -522,7 +522,7 @@ function SettingCard({
   children: ReactNode
 }) {
   return (
-    <Card>
+    <Card data-guide={title}>
       <CardBody className="space-y-4">
         <div>
           <p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-brand-600">{kicker}</p>

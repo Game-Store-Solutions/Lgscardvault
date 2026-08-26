@@ -44,6 +44,7 @@ export interface SelectProps {
   children?: ReactNode
   autoFocus?: boolean
   'aria-label'?: string
+  'data-guide'?: string
 }
 
 const SEARCH_AFTER = 8
@@ -141,6 +142,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     name,
     autoFocus,
     'aria-label': ariaLabel,
+    'data-guide': dataGuide,
   },
   ref,
 ) {
@@ -311,6 +313,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         aria-invalid={error ? true : undefined}
         aria-required={required || undefined}
         aria-label={ariaLabel}
+        data-guide={dataGuide}
         onClick={() => {
           if (!disabled) setOpen((currentOpen) => !currentOpen)
         }}

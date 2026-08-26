@@ -30,8 +30,24 @@ import {
 /** Inventory cards shown per page in the admin grid. */
 const INVENTORY_PAGE_SIZE = 24
 
+const TRAINING_LIGHTNING_BOLT: CardSummary = {
+  id: 'training-lightning-bolt',
+  name: 'Lightning Bolt',
+  gameCode: 'mtg',
+  setCode: 'LEA',
+  setName: 'Limited Edition Alpha',
+  collectorNumber: '161',
+  rarity: 'common',
+  prices: { usd: '1.50' },
+  finishes: ['nonfoil'],
+}
+
 export default function SearchTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
+  const trainingMode = useMemo(
+    () => new URLSearchParams(window.location.search).get('training') === '1',
+    [],
+  )
 
   const [filter, setFilter] = useState('')
   const [inventorySetFilter, setInventorySetFilter] = useState('')
@@ -78,10 +94,18 @@ export default function SearchTab({ slug }: { slug: string }) {
   const { data: catalogResults = [], refetch: runCatalogSearch } = useQuery({
     queryKey: ['card-search', catalogSearch, catalogSetFilter, catalogFinishFilter, gameFilter],
     queryFn: async () => {
-      if (!catalogSearch.trim()) return []
+      let query = catalogSearch.trim()
+      if (!query && trainingMode) {
+        const field = document.querySelector('[data-guide="Card name"]')
+        if (field instanceof HTMLInputElement) query = field.value.trim()
+      }
+      if (!query) return []
+      if (trainingMode && query.toLowerCase().includes('lightning')) {
+        return [TRAINING_LIGHTNING_BOLT]
+      }
       const { data } = await api.get<CardSummary[]>('/catalog/search', {
         params: {
-          q: catalogSearch,
+          q: query,
           // Scoped to the game being managed, so a Pokémon search never
           // returns Magic printings (and never hits Scryfall for them).
           ...(gameFilter ? { game: gameFilter } : {}),
@@ -89,10 +113,24 @@ export default function SearchTab({ slug }: { slug: string }) {
           ...(catalogFinishFilter !== 'all' ? { finish: catalogFinishFilter } : {}),
         },
       })
-      return data
+      const rows = data ?? []
+      return rows
     },
     enabled: false,
   })
+
+  const effectiveCatalogResults = useMemo(() => {
+    if (!trainingMode) return catalogResults
+    let query = catalogSearch.trim()
+    if (!query) {
+      const field = document.querySelector('[data-guide="Card name"]')
+      if (field instanceof HTMLInputElement) query = field.value.trim()
+    }
+    if (query.toLowerCase().includes('lightning')) {
+      return catalogResults.length > 0 ? catalogResults : [TRAINING_LIGHTNING_BOLT]
+    }
+    return catalogResults
+  }, [trainingMode, catalogSearch, catalogResults])
 
   function selectCatalogCard(card: CardSummary) {
     setSelectedCard(card)
@@ -109,6 +147,57 @@ export default function SearchTab({ slug }: { slug: string }) {
     setFinish(nextFinish)
     applyScryfallPrice(card, nextFinish)
   }
+
+  useEffect(() => {
+    if (!trainingMode) return
+    const onSearch = () => {
+      const field = document.querySelector('[data-guide="Card name"]')
+      const query =
+        field instanceof HTMLInputElement && field.value.trim()
+          ? field.value.trim()
+          : catalogSearch.trim()
+      if (query && query !== catalogSearch) setCatalogSearch(query)
+      if (trainingMode && query.toLowerCase().includes('lightning')) {
+        queryClient.setQueryData(
+          ['card-search', query, catalogSetFilter, catalogFinishFilter, gameFilter],
+          [TRAINING_LIGHTNING_BOLT],
+        )
+      }
+      void runCatalogSearch()
+    }
+    const onSelect = (event: Event) => {
+      const name = (event as CustomEvent<{ name?: string }>).detail?.name ?? 'Lightning Bolt'
+      selectCatalogCard(name === 'Lightning Bolt' ? TRAINING_LIGHTNING_BOLT : (catalogResults.find((row) => row.name === name) ?? TRAINING_LIGHTNING_BOLT))
+    }
+    const syncCardName = (value: string) => {
+      const trimmed = value.trim()
+      if (!trimmed) return
+      setCatalogSearch(trimmed)
+      if (trainingMode && trimmed.toLowerCase().includes('lightning')) {
+        queryClient.setQueryData(
+          ['card-search', trimmed, catalogSetFilter, catalogFinishFilter, gameFilter],
+          [TRAINING_LIGHTNING_BOLT],
+        )
+      }
+    }
+    const onFillCardName = (event: Event) => {
+      syncCardName((event as CustomEvent<{ value?: string }>).detail?.value ?? '')
+    }
+    const onFillGuide = (event: Event) => {
+      const detail = (event as CustomEvent<{ guide?: string; value?: string }>).detail
+      if (detail?.guide === 'Card name') syncCardName(detail.value ?? '')
+    }
+    document.addEventListener('training:fill-card-name', onFillCardName as EventListener)
+    document.addEventListener('training:fill-guide', onFillGuide as EventListener)
+    document.addEventListener('training:search-catalog', onSearch)
+    document.addEventListener('training:select-catalog-card', onSelect as EventListener)
+    return () => {
+      document.removeEventListener('training:fill-card-name', onFillCardName as EventListener)
+      document.removeEventListener('training:fill-guide', onFillGuide as EventListener)
+      document.removeEventListener('training:search-catalog', onSearch)
+      document.removeEventListener('training:select-catalog-card', onSelect as EventListener)
+    }
+  }, [trainingMode, runCatalogSearch, catalogResults, catalogSearch, catalogSetFilter, catalogFinishFilter, gameFilter, queryClient])
 
   useEffect(() => {
     if (!selectedCard) return
@@ -253,6 +342,7 @@ export default function SearchTab({ slug }: { slug: string }) {
               {({ id }) => (
                 <Input
                   id={id}
+                  data-guide="Card name"
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void runCatalogSearch()}
@@ -264,6 +354,7 @@ export default function SearchTab({ slug }: { slug: string }) {
               {({ id }) => (
                 <Input
                   id={id}
+                  data-guide="Set"
                   value={catalogSetFilter}
                   onChange={(e) => setCatalogSetFilter(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void runCatalogSearch()}
@@ -285,15 +376,15 @@ export default function SearchTab({ slug }: { slug: string }) {
                 </Select>
               )}
             </Field>
-            <Button onClick={() => void runCatalogSearch()}>
+            <Button data-guide="Search catalog" onClick={() => void runCatalogSearch()}>
               <Search className="size-4" aria-hidden />
               Search
             </Button>
           </div>
 
-          {catalogResults.length > 0 && (
+          {effectiveCatalogResults.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {catalogResults.map((card) => (
+              {effectiveCatalogResults.map((card) => (
                 <CatalogResultCard
                   key={card.id}
                   card={card}
@@ -343,6 +434,7 @@ export default function SearchTab({ slug }: { slug: string }) {
               {({ id }) => (
                 <Input
                   id={id}
+                  data-guide="Search stock"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                   placeholder={`Search ${activeGameName} by name, type…`}

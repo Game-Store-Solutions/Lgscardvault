@@ -59,7 +59,7 @@ export function GameSelector({
       </label>
 
       {/* Desktop: pills, so switching games is one click. */}
-      <div role="group" aria-label={label} className="hidden flex-wrap gap-2 sm:flex">
+      <div role="group" aria-label={label} data-guide={label} className="hidden flex-wrap gap-2 sm:flex">
         {includeAll && (
           <FilterPill active={'' === value} onClick={() => onChange('')}>
             {allLabel}

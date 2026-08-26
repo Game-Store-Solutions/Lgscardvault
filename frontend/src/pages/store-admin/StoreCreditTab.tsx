@@ -65,7 +65,7 @@ export default function StoreCreditTab({ slug }: { slug: string }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardBody>
-            <p className="text-sm text-fg-muted">Outstanding credit</p>
+            <p data-guide="Outstanding credit" className="text-sm text-fg-muted">Outstanding credit</p>
             <p className="mt-1 font-display text-3xl font-extrabold text-fg">
               {formatPrice(ledger?.outstandingCents ?? 0)}
             </p>
@@ -81,6 +81,7 @@ export default function StoreCreditTab({ slug }: { slug: string }) {
 
       <Card>
         <CardHeader
+          data-guide="Customer balances"
           title="Customer balances"
           subtitle="Credit stays at this store. Adjustments are for counter corrections and goodwill."
         />
@@ -145,7 +146,7 @@ export default function StoreCreditTab({ slug }: { slug: string }) {
                         </Button>
                       </form>
                     ) : (
-                      <Button size="sm" variant="secondary" onClick={() => setAdjustingId(row.userId)}>
+                      <Button data-guide="Adjust" size="sm" variant="secondary" onClick={() => setAdjustingId(row.userId)}>
                         Adjust
                       </Button>
                     )}

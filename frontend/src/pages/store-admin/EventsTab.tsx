@@ -37,6 +37,22 @@ export default function EventsTab({ slug }: { slug: string }) {
   const [draft, setDraft] = useState<StoreCommunityEventItem>(() => emptyDraft())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const trainingMode = useMemo(
+    () => new URLSearchParams(window.location.search).get('training') === '1',
+    [],
+  )
+
+  useEffect(() => {
+    if (!trainingMode) return
+    const onFill = (event: Event) => {
+      const detail = (event as CustomEvent<{ guide?: string; value?: string }>).detail
+      if (detail?.guide === 'Event title' && detail.value != null) {
+        setDraft((current) => ({ ...current, title: detail.value ?? '' }))
+      }
+    }
+    document.addEventListener('training:fill-guide', onFill as EventListener)
+    return () => document.removeEventListener('training:fill-guide', onFill as EventListener)
+  }, [trainingMode])
 
   useEffect(() => {
     if (store) {
@@ -106,10 +122,11 @@ export default function EventsTab({ slug }: { slug: string }) {
             subtitle="Headings and copy appear on the Event board hero layout and on your public event calendar page."
           />
           <CardBody className="space-y-4">
-            <Field label="Board heading">
+            <Field label="Board heading" className="[&]:contents">
               {({ id }) => (
                 <Input
                   id={id}
+                  data-guide="Board heading"
                   value={form.boardHeading ?? ''}
                   onChange={(e) => updateBoard({ boardHeading: e.target.value })}
                   placeholder="Community board"
@@ -120,6 +137,7 @@ export default function EventsTab({ slug }: { slug: string }) {
               {({ id }) => (
                 <Textarea
                   id={id}
+                  data-guide="Intro blurb"
                   rows={3}
                   value={form.boardIntro ?? ''}
                   onChange={(e) => updateBoard({ boardIntro: e.target.value })}
@@ -172,11 +190,12 @@ export default function EventsTab({ slug }: { slug: string }) {
             </ul>
 
             <div className="rounded-card border border-dashed border-border bg-bg/50 p-4 space-y-3">
-              <p className="text-sm font-bold text-fg">{editingId ? 'Edit event' : 'Add event'}</p>
+              <p data-guide="Add event" className="text-sm font-bold text-fg">{editingId ? 'Edit event' : 'Add event'}</p>
               <Field label="Title">
                 {({ id }) => (
                   <Input
                     id={id}
+                    data-guide="Event title"
                     value={draft.title}
                     onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
                     placeholder="Friday Night Magic"
@@ -236,7 +255,7 @@ export default function EventsTab({ slug }: { slug: string }) {
                 Pin to top of board
               </label>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" onClick={commitDraft} disabled={!draft.title.trim()}>
+                <Button type="button" data-guide="Add to board" onClick={commitDraft} disabled={!draft.title.trim()}>
                   <Plus aria-hidden className="size-4" />
                   {editingId ? 'Update event' : 'Add to board'}
                 </Button>
@@ -258,7 +277,7 @@ export default function EventsTab({ slug }: { slug: string }) {
         </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
+          <Button data-guide="Save events & board" onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
             <Calendar aria-hidden className="size-4" />
             Save events & board
           </Button>

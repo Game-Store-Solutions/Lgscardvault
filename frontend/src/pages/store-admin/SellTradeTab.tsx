@@ -29,8 +29,20 @@ function AccordionPanel({
   defaultOpen?: boolean
   children: ReactNode
 }) {
-  const [open, setOpen] = useState(defaultOpen)
+  const trainingMode =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('training') === '1'
+  const trainingDefaultOpen = trainingMode && (id === 'buy-list' || id === 'trade-rates')
+  const [open, setOpen] = useState(defaultOpen || trainingDefaultOpen)
   const panelId = `${id}-panel`
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const panel = (event as CustomEvent<{ id?: string }>).detail?.id
+      if (panel === id) setOpen(true)
+    }
+    document.addEventListener('training:open-accordion', onOpen as EventListener)
+    return () => document.removeEventListener('training:open-accordion', onOpen as EventListener)
+  }, [id])
 
   return (
     <Card>
@@ -44,7 +56,7 @@ function AccordionPanel({
         >
           <ChevronDown aria-hidden className={cx('size-5 transition-transform', open ? 'rotate-0' : '-rotate-90')} />
         </button>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1" data-guide={id}>
           <h3 className="font-display text-lg font-bold text-fg">{title}</h3>
           {subtitle != null ? <p className="mt-0.5 text-sm text-fg-muted">{subtitle}</p> : null}
         </div>
@@ -231,6 +243,7 @@ export default function SellTradeTab({ slug }: { slug: string }) {
                     <button
                       key={item.id}
                       type="button"
+                      data-guide={item.label}
                       onClick={() => setQueueTab(item.id)}
                       className={cx(
                         'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
@@ -433,8 +446,9 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
     },
   })
 
-  const percentField = (key: string, label: string, placeholder: string) => (
+  const percentField = (key: string, guide: string, label: string, placeholder: string) => (
     <Input
+      data-guide={guide}
       label={label}
       value={form[key] ?? ''}
       onChange={(e) => set(key, e.target.value.replace(/\D/g, '').slice(0, 3))}
@@ -467,18 +481,18 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-3">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Base rates</p>
-            {percentField('creditRatePercent', 'Store credit %', '60')}
-            {percentField('cashRatePercent', 'Cash %', '45')}
+            {percentField('creditRatePercent', 'Store credit %', 'Store credit %', '60')}
+            {percentField('cashRatePercent', 'Cash %', 'Cash %', '45')}
           </div>
           <div className="space-y-3">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Buy-list premium</p>
-            {percentField('buylistCreditRatePercent', 'Credit %', 'base')}
-            {percentField('buylistCashRatePercent', 'Cash %', 'base')}
+            {percentField('buylistCreditRatePercent', 'Buy-list credit %', 'Credit %', 'base')}
+            {percentField('buylistCashRatePercent', 'Buy-list cash %', 'Cash %', 'base')}
           </div>
           <div className="space-y-3">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Promo window</p>
-            {percentField('promoCreditRatePercent', 'Promo credit %', 'off')}
-            {percentField('promoCashRatePercent', 'Promo cash %', 'off')}
+            {percentField('promoCreditRatePercent', 'Promo credit %', 'Promo credit %', 'off')}
+            {percentField('promoCashRatePercent', 'Promo cash %', 'Promo cash %', 'off')}
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <Input label="Starts on" type="date" value={form.promoStartDate ?? ''} onChange={(e) => set('promoStartDate', e.target.value)} />
               <Select label="At" value={form.promoStartTime ?? '00:00'} onChange={(e) => set('promoStartTime', e.target.value)} className="w-28">
@@ -514,7 +528,7 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button loading={save.isPending} onClick={() => save.mutate()}>
+          <Button data-guide="Save rates" loading={save.isPending} onClick={() => save.mutate()}>
             Save rates
           </Button>
           {save.isSuccess && <span className="text-sm font-medium text-success-700">Saved.</span>}
@@ -613,7 +627,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
     >
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_7rem_auto] sm:items-end">
-          <Input label="Add a card" value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null) }} placeholder="Search the catalog…" />
+          <Input data-guide="Add a card" label="Add a card" value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null) }} placeholder="Search the catalog…" />
           <Input label="Pinned offer ($)" value={offerText} onChange={(e) => setOfferText(e.target.value)} inputMode="decimal" placeholder="Premium rate" />
           <Input label="Max copies" value={maxQty} onChange={(e) => setMaxQty(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="Any" />
           <label className="flex h-10 items-center gap-2 text-sm font-medium text-fg">

@@ -7,9 +7,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "training:audio": "tsx ../.tools/playwright/generate-training-audio.mjs",
+    "training:validate-targets": "tsx ../.tools/playwright/validate-training-targets.mjs",
+    "training:test-coords": "tsx src/pages/store-admin/training/targetCoordinate.test.ts",
+    "training:capture": "tsx ../.tools/playwright/capture-beat-screenshots.mjs",
+    "training:assets": "npm run training:capture && npm run training:audio"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@fullcalendar/core": "^6.1.21",
@@ -23,6 +29,7 @@
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
     "framer-motion": "^13.1.0",
+    "kokoro-js": "^1.2.1",
     "lucide-react": "^0.563.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",
@@ -43,6 +50,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "oxlint": "^1.69.0",
     "tailwindcss": "^4.3.1",
+    "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "vite": "^8.1.0"
   }
