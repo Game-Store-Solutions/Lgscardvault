@@ -3,16 +3,14 @@ import { Link } from 'react-router'
 import { ChevronDown } from 'lucide-react'
 import { formatPrice } from '../../api/client'
 import type { AssembledDeckResponse } from '../../hooks'
+import type { DeckBuilderGroupBy, DeckBuilderLayout } from '../../lib/deckBuilder'
 import { buttonVariants, LoadingPanel } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
-import {
-  PublicFloatingCard,
-  PUBLIC_FLOATING_CARD_GRID_CLASS,
-  previewFromDeckRow,
-  type CardArtPreview,
-} from '../../components/cards'
+import { type CardArtPreview } from '../../components/cards'
 import { cx } from '../../lib/cx'
+import { DeckListBody } from './deck/DeckListBody'
 import { DeckBuildConstraintsFields } from './DeckBuildConstraintsFields'
+import { ListLayoutSwitcher } from './ListLayoutSwitcher'
 import type { DeckBracket } from './utils'
 
 export function PublicDeckPanel({
@@ -26,6 +24,10 @@ export function PublicDeckPanel({
   setBracket,
   constraintsOpen = false,
   setConstraintsOpen,
+  layout,
+  setLayout,
+  groupBy,
+  setGroupBy,
   onOpenCardPreview,
 }: {
   loading: boolean
@@ -38,6 +40,10 @@ export function PublicDeckPanel({
   setBracket: Dispatch<SetStateAction<DeckBracket>>
   constraintsOpen?: boolean
   setConstraintsOpen: Dispatch<SetStateAction<boolean>>
+  layout: DeckBuilderLayout
+  setLayout: Dispatch<SetStateAction<DeckBuilderLayout>>
+  groupBy: DeckBuilderGroupBy
+  setGroupBy: Dispatch<SetStateAction<DeckBuilderGroupBy>>
   onOpenCardPreview: (cards: CardArtPreview[], oracleId: string) => void
 }) {
   if (loading || !deck) {
@@ -50,7 +56,6 @@ export function PublicDeckPanel({
   const structure = deck.structure?.actual ?? {}
   const targets = deck.structure?.targets ?? {}
   const visibleCards = deck.cards
-  const previewCards: CardArtPreview[] = visibleCards.map((row) => previewFromDeckRow(row))
   const structureBits = (['lands', 'ramp', 'draw', 'removal'] as const)
     .map((role) => `${role} ${structure[role] ?? 0}/${targets[role] ?? 0}`)
     .join(' · ')
@@ -179,25 +184,22 @@ export function PublicDeckPanel({
         </details>
       </div>
 
-      <ul className={PUBLIC_FLOATING_CARD_GRID_CLASS}>
-        {visibleCards.map((row) => {
-          const preview = previewFromDeckRow(row)
-          const badge =
-            row.quantity > 1
-              ? `${row.quantity}×`
-              : row.gameChanger
-                ? 'GC'
-                : undefined
-          return (
-            <PublicFloatingCard
-              key={row.card.oracleId}
-              preview={preview}
-              onPreview={() => onOpenCardPreview(previewCards, row.card.oracleId)}
-              badge={badge}
-            />
-          )
-        })}
-      </ul>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-fg-muted">{visibleCards.length} cards in list</p>
+        <ListLayoutSwitcher
+          layout={layout}
+          groupBy={groupBy}
+          onLayoutChange={setLayout}
+          onGroupByChange={setGroupBy}
+        />
+      </div>
+
+      <DeckListBody
+        cards={visibleCards}
+        layout={layout}
+        groupBy={groupBy}
+        onOpenCardPreview={onOpenCardPreview}
+      />
     </div>
   )
 }

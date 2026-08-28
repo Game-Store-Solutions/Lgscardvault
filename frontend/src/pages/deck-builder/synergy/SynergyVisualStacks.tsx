@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { Check, ShoppingCart } from 'lucide-react'
-import { cardImage } from '../../../api/client'
+import { CardStackLayers } from '../CardStackLayers'
+import { previewFromRecommendation, type CardArtPreview } from '../../../components/cards'
 import type { CommanderRecommendation } from '../../../hooks'
-import { CardImage, previewFromRecommendation, type CardArtPreview } from '../../../components/cards'
 import { Stagger, StaggerItem } from '../../../components/motion'
 import { priceLabelForCard } from '../../../lib/cardPreview'
 import { MANA_COLORS } from '../../../lib/mtg'
@@ -11,7 +11,6 @@ import { cx } from '../../../lib/cx'
 import type { SynergySection, SynergyViewProps } from './types'
 
 const STACK_DEPTH = 4
-const STACK_OFFSET_PX = 26
 
 function identityAccent(colors: string[] | undefined): string {
   if (!colors?.length) return MANA_COLORS.C
@@ -176,27 +175,10 @@ function SynergyStackColumn({
         </ul>
       )}
 
-      <div className="relative mt-auto min-h-[11rem] flex-1">
-        {stackRows.map((row, index) => {
-          const item = row.inventoryItem
-          const name = item?.card.name ?? row.card.name
-          const image = cardImage(item?.card ?? row.card)
-          const offset = (stackRows.length - 1 - index) * STACK_OFFSET_PX
-          return (
-            <button
-              key={row.card.oracleId}
-              type="button"
-              onClick={() => openCardPreview(previewCards, row.card.oracleId)}
-              className="absolute left-1/2 w-[88%] -translate-x-1/2 overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-lg ring-1 ring-black/15 transition-transform hover:z-20 hover:scale-[1.03]"
-              style={{ bottom: offset, zIndex: index }}
-              title={name}
-              aria-label={`View ${name}`}
-            >
-              <CardImage src={image} alt={name} className="aspect-5/7 w-full" fit="contain" showLabel={false} />
-            </button>
-          )
-        })}
-      </div>
+      <CardStackLayers
+        rows={stackRows}
+        onOpen={(row) => openCardPreview(previewCards, row.card.oracleId)}
+      />
     </div>
   )
 }

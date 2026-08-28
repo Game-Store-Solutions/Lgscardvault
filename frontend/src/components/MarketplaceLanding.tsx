@@ -13,6 +13,8 @@ import { NewsletterSignup } from './NewsletterSignup'
 import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
 import { GameShowcaseReel, warmupShowcaseCards } from './GameShowcaseReel'
 import { GameTile } from './GameTile'
+import { buttonVariants } from './ui'
+import { cx } from '../lib/cx'
 
 const TRUST_POINTS = [
   {
@@ -69,8 +71,15 @@ export default function MarketplaceLanding() {
     warmupShowcaseCards(showcaseCards)
   }, [showcaseCards])
 
-  const primaryCta =
-    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn bg-brand-500 px-6 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-600 sm:w-auto'
+  const heroCtaSize = 'h-12 w-full px-6 text-sm sm:w-auto'
+  const primaryCta = cx(
+    buttonVariants({ variant: 'primary', size: 'lg' }),
+    heroCtaSize,
+  )
+  const deckBuilderCta = cx(
+    buttonVariants({ variant: 'secondary', size: 'lg' }),
+    heroCtaSize,
+  )
   const secondaryCta =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn border border-border bg-surface px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-bg sm:w-auto dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]'
 
@@ -136,7 +145,7 @@ export default function MarketplaceLanding() {
               Explore stores
               <ArrowRight aria-hidden className="size-4" />
             </Link>
-            <Link to="/tools/deck-builder" className={secondaryCta}>
+            <Link to="/tools/deck-builder" className={deckBuilderCta}>
               <Wand2 aria-hidden className="size-4" />
               Deck builder
             </Link>
