@@ -21,6 +21,8 @@ function partitionDeckGaps(gaps: string[]) {
   for (const gap of gaps) {
     if (gap.startsWith('Short ') || gap.startsWith('Deck short')) {
       structural.push(gap)
+    } else if (gap.startsWith('Deck exceeds')) {
+      structural.push(gap)
     } else {
       advisory.push(gap)
     }
@@ -76,9 +78,18 @@ export function PublicDeckPanel({
   const { structural: structuralGaps, advisory: advisoryGaps } = partitionDeckGaps(deck.gaps)
   const priceCents = catalogDeckTotalCents ?? deck.budget.spentCents
   const budgetLimitCents = deck.budget.limitCents
+  const backendOverBudget =
+    budgetLimitCents != null && deck.budget.spentCents > budgetLimitCents
   const isOverBudget =
-    budgetLimitCents != null && priceCents != null && priceCents > budgetLimitCents
-  const overBudgetCents = isOverBudget ? priceCents - budgetLimitCents : 0
+    budgetLimitCents != null &&
+    priceCents != null &&
+    (priceCents > budgetLimitCents || backendOverBudget)
+  const overBudgetCents =
+    budgetLimitCents != null && priceCents != null
+      ? Math.max(0, priceCents - budgetLimitCents)
+      : backendOverBudget
+        ? deck.budget.spentCents - budgetLimitCents
+        : 0
   const structureRoles = ['lands', 'ramp', 'draw', 'removal'] as const
 
   return (

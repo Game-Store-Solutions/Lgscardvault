@@ -177,6 +177,17 @@ final class CommanderDeckAssembler
                     continue;
                 }
 
+                if ($this->deferForBudgetGuidance(
+                    $pickContext['budgetCents'],
+                    $spentCents,
+                    $totalCards,
+                    $targetNonCommander,
+                    $candidate,
+                )) {
+                    $stillRemaining[] = $candidate;
+                    continue;
+                }
+
                 $this->recordPick(
                     $candidate,
                     $scored,
@@ -522,7 +533,6 @@ final class CommanderDeckAssembler
         int $spentCents,
         int $landCount,
         int $nonLandCount,
-        bool $ignoreBudget = false,
     ): bool {
         $commander = $pickContext['commander'];
         $profile = $candidate->profile;
@@ -543,7 +553,7 @@ final class CommanderDeckAssembler
         if (null !== $pickContext['maxCardCents'] && !$profile->isBasicLand && $price > $pickContext['maxCardCents']) {
             return false;
         }
-        if (!$ignoreBudget && null !== $pickContext['budgetCents'] && ($spentCents + $price) > $pickContext['budgetCents']) {
+        if (null !== $pickContext['budgetCents'] && ($spentCents + $price) > $pickContext['budgetCents']) {
             return false;
         }
         if ($profile->isGameChanger && count($includedGameChangers) >= $pickContext['maxGameChangers']) {
@@ -551,6 +561,37 @@ final class CommanderDeckAssembler
         }
 
         return true;
+    }
+
+    /**
+     * When a deck budget is set, defer expensive picks during the scored greedy
+     * phase so enough room remains to fill land slots and cheap singletons.
+     */
+    private function deferForBudgetGuidance(
+        ?int $budgetCents,
+        int $spentCents,
+        int $totalCards,
+        int $targetNonCommander,
+        PreparedCandidate $candidate,
+    ): bool {
+        if (null === $budgetCents || $candidate->profile->isBasicLand) {
+            return false;
+        }
+
+        $remainingSlots = $targetNonCommander - $totalCards;
+        if ($remainingSlots < 1) {
+            return false;
+        }
+
+        $remainingBudget = $budgetCents - $spentCents;
+        if ($remainingBudget < 1) {
+            return false;
+        }
+
+        $avgPerSlot = intdiv($remainingBudget, $remainingSlots);
+        $price = $candidate->priceCents ?? 0;
+
+        return $price > max($avgPerSlot * 2, 500);
     }
 
     /**
@@ -643,7 +684,6 @@ final class CommanderDeckAssembler
                     $spentCents,
                     $landCount,
                     $nonLandCount,
-                    ignoreBudget: true,
                 )) {
                     $next = $candidate;
                     break;
@@ -665,7 +705,6 @@ final class CommanderDeckAssembler
                 $nonLandCount,
                 $spentCents,
                 $includedGameChangers,
-                ignoreBudget: true,
             );
         }
 
@@ -685,7 +724,6 @@ final class CommanderDeckAssembler
                     $spentCents,
                     $landCount,
                     $nonLandCount,
-                    ignoreBudget: true,
                 )) {
                     $affordable[] = $candidate;
                 }
@@ -720,7 +758,6 @@ final class CommanderDeckAssembler
                 $nonLandCount,
                 $spentCents,
                 $includedGameChangers,
-                ignoreBudget: true,
             );
         }
     }
@@ -751,7 +788,6 @@ final class CommanderDeckAssembler
         int &$nonLandCount,
         int &$spentCents,
         array &$includedGameChangers,
-        bool $ignoreBudget = false,
     ): void {
         $deckContext = $this->deckAnalyzer->analyze($this->flatten($quantities), $strategyId);
         $scored = $this->engine->rescore($commander, $strategyId, $intelligence, $deckContext, [$candidate])[0] ?? null;
@@ -767,7 +803,6 @@ final class CommanderDeckAssembler
             $spentCents,
             $landCount,
             $nonLandCount,
-            $ignoreBudget,
         )) {
             return;
         }
