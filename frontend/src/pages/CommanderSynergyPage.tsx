@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import {
   Check,
   CheckCircle2,
@@ -69,7 +69,6 @@ import {
   type DeckBuilderNavState,
 } from '../lib/deckBuilder'
 import { usePageMeta } from '../hooks/usePageMeta'
-import { formatCardsForMassSearch, queueMassSearchPrefill } from '../lib/massSearchPrefill'
 
 const ROLE_META: Record<DeckRole, { label: string; blurb: string; icon: typeof Zap }> = {
   enabler: {
@@ -279,15 +278,6 @@ function RecRow({
               )}
             </>
           )}
-          {publicMode && (
-            <Link
-              to="/stores"
-              onClick={() => queueMassSearchPrefill(name)}
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
-              Find at store
-            </Link>
-          )}
         </div>
       </div>
     </li>
@@ -350,7 +340,6 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
   const { slug: routeSlug = '' } = useParams()
   const apiScope = isPublic ? PUBLIC_RECOMMEND_SCOPE : routeSlug
   const sessionScope = isPublic ? PUBLIC_DECK_BUILDER_SCOPE : routeSlug
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const signedIn = Boolean(user)
@@ -1176,24 +1165,6 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                               )}
                             </>
                           )}
-                          {isPublic && picked.size > 0 && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                const names = recommendations
-                                  .filter((row) => picked.has(row.card.oracleId))
-                                  .map((row) => ({ name: row.card.name }))
-                                queueMassSearchPrefill(
-                                  formatCardsForMassSearch(names, selected?.name),
-                                )
-                                navigate('/stores')
-                              }}
-                            >
-                              Find {picked.size} at stores
-                            </Button>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -1358,7 +1329,7 @@ function CombosPanel({
         </p>
         <p className="mt-1 text-xs text-fg-muted">
           {publicMode
-            ? 'Combos come from Commander Spellbook and are filtered to this commander’s color identity. Find a local store to buy the pieces.'
+            ? 'Combos come from Commander Spellbook and are filtered to this commander’s color identity.'
             : 'Only pieces this store actually has on the shelf count as in stock (any printing of the same card). Colorless cards are always allowed. Combos are ranked complete-in-store first, then by coverage.'}
           {filteredOutCount ? ` Hidden ${filteredOutCount} off-identity combo${filteredOutCount === 1 ? '' : 's'}.` : ''}
         </p>
@@ -1453,19 +1424,7 @@ function DeckPanel({
   onAddAll: () => void
   linkState?: DeckBuilderNavState
 }) {
-  const navigate = useNavigate()
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
-
-  function findDeckAtStores() {
-    if (!deck) return
-    queueMassSearchPrefill(
-      formatCardsForMassSearch(
-        deck.cards.map((row) => ({ name: row.card.name, quantity: row.quantity })),
-        deck.commander.name,
-      ),
-    )
-    navigate('/stores')
-  }
 
   if (loading || !deck) {
     return (
@@ -1539,14 +1498,9 @@ function DeckPanel({
               </>
             )}
             {publicMode && (
-              <>
-                <Button size="sm" disabled={deck.cards.length === 0} onClick={findDeckAtStores}>
-                  Search deck at stores
-                </Button>
-                <Link to="/stores" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                  Browse stores
-                </Link>
-              </>
+              <Link to="/stores" className={buttonVariants({ size: 'sm' })}>
+                Browse stores
+              </Link>
             )}
           </div>
         </div>
@@ -1686,15 +1640,6 @@ function DeckPanel({
                           .join(' · ')
                       : meta}
                   </p>
-                  {publicMode && (
-                    <Link
-                      to="/stores"
-                      onClick={() => queueMassSearchPrefill(row.quantity > 1 ? `${row.quantity} ${name}` : name)}
-                      className="mt-1 inline-block text-xs font-semibold text-brand-600 hover:text-brand-500"
-                    >
-                      Find at a store
-                    </Link>
-                  )}
                 </div>
               </li>
             )

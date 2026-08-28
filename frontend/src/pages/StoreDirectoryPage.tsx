@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { ArrowRight, ClipboardList, Search, Store } from 'lucide-react'
+import { ArrowRight, Search, Store } from 'lucide-react'
 import type { Store as StoreType } from '../api/types'
 import { BackButton, EmptyState, ErrorState, PageHeader, Select } from '../components/ui'
 import { StoreHero, StoreCard, StoreCardSkeleton } from '../components/store'
 import { BrandLogo } from '../components/BrandLogo'
 import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
 import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../lib/heroImageOpacity'
-import { hasMassSearchPrefill } from '../lib/massSearchPrefill'
 import { useActiveStores, useDebouncedValue, useIsDarkTheme } from '../hooks'
 import { useAuth } from '../context/AuthContext'
 
@@ -51,7 +50,6 @@ export default function StoreDirectoryPage() {
   const [sort, setSort] = useState<SortKey>('featured')
   const debouncedQuery = useDebouncedValue(query, 200)
   const searching = debouncedQuery.trim() !== ''
-  const deckSearchPending = hasMassSearchPrefill()
 
   const featured = useMemo(() => stores.find((s) => s.featured), [stores])
 
@@ -99,18 +97,6 @@ export default function StoreDirectoryPage() {
       )}
 
       <div className="space-y-12">
-      {deckSearchPending && (
-        <div className="rounded-card border border-brand-400/50 bg-brand-50/60 px-5 py-4 dark:border-brand-500/30 dark:bg-brand-500/10">
-          <p className="flex items-center gap-2 font-display text-base font-bold text-fg">
-            <ClipboardList aria-hidden className="size-4 text-brand-600" />
-            Your deck list is ready to search
-          </p>
-          <p className="mt-1 text-sm text-fg-muted">
-            Pick a store below and open <span className="font-semibold text-fg">Mass Search</span> to see which
-            cards they have in stock.
-          </p>
-        </div>
-      )}
       <section className="relative overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-black/[0.04] dark:ring-white/10">
         <div
           aria-hidden
@@ -181,24 +167,13 @@ export default function StoreDirectoryPage() {
             primaryColor={featured.primaryColor}
             accentColor={featured.accentColor}
             actions={
-              <>
-                <Link
-                  to={`/s/${featured.slug}`}
-                  className="inline-flex h-10 items-center gap-2 rounded-btn bg-white px-5 text-sm font-bold text-slate-900 shadow-sm transition-transform hover:-translate-y-0.5"
-                >
-                  Visit store
-                  <ArrowRight aria-hidden className="size-4" />
-                </Link>
-                {deckSearchPending ? (
-                  <Link
-                    to={`/s/${featured.slug}/mass-search`}
-                    className="inline-flex h-10 items-center gap-2 rounded-btn border border-white/30 bg-white/10 px-5 text-sm font-bold text-white backdrop-blur-sm transition-transform hover:-translate-y-0.5"
-                  >
-                    <ClipboardList aria-hidden className="size-4" />
-                    Search my deck
-                  </Link>
-                ) : null}
-              </>
+              <Link
+                to={`/s/${featured.slug}`}
+                className="inline-flex h-10 items-center gap-2 rounded-btn bg-white px-5 text-sm font-bold text-slate-900 shadow-sm transition-transform hover:-translate-y-0.5"
+              >
+                Visit store
+                <ArrowRight aria-hidden className="size-4" />
+              </Link>
             }
           />
         </section>
@@ -237,18 +212,7 @@ export default function StoreDirectoryPage() {
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {results.map((store, i) => (
-              <div key={store.id} className="flex h-full flex-col gap-2">
-                <StoreCard store={store} index={i} className="flex-1" />
-                {deckSearchPending ? (
-                  <Link
-                    to={`/s/${store.slug}/mass-search`}
-                    className="inline-flex items-center gap-1.5 px-1 text-sm font-semibold text-brand-600 hover:text-brand-500"
-                  >
-                    <ClipboardList aria-hidden className="size-3.5" />
-                    Search my deck list
-                  </Link>
-                ) : null}
-              </div>
+              <StoreCard key={store.id} store={store} index={i} />
             ))}
           </div>
         )}
