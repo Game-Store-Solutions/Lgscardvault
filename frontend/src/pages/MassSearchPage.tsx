@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { Badge, BackButton, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Skeleton, Textarea } from '../components/ui'
 import { CardImage } from '../components/cards'
 import { finishName } from '../lib/finishes'
+import { MASS_SEARCH_PREFILL_KEY } from '../lib/massSearchPrefill'
 
 /** One parsed request line: how many copies of which card name. */
 interface RequestLine {
@@ -159,9 +160,9 @@ export default function MassSearchPage() {
 
   const [text, setText] = useState(() => {
     try {
-      const prefill = sessionStorage.getItem('mass-search-prefill')
+      const prefill = sessionStorage.getItem(MASS_SEARCH_PREFILL_KEY)
       if (prefill) {
-        sessionStorage.removeItem('mass-search-prefill')
+        sessionStorage.removeItem(MASS_SEARCH_PREFILL_KEY)
         return prefill
       }
     } catch {

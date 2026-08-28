@@ -74,7 +74,7 @@ final class CommanderDeckAssembler
      *
      * @return array<string, mixed>
      */
-    public function assemble(Store $store, Card $commander, array $options = []): array
+    public function assemble(?Store $store, Card $commander, array $options = []): array
     {
         $budgetCents = $this->positiveCents($options['budgetCents'] ?? null);
         $maxCardCents = $this->positiveCents($options['maxCardCents'] ?? null);

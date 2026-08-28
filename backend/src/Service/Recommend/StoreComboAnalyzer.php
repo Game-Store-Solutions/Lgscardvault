@@ -42,7 +42,7 @@ final class StoreComboAnalyzer
      *   source: string
      * }
      */
-    public function analyzeForCommander(Store $store, Card $commander, array $extraCardNames = [], int $limit = 20): array
+    public function analyzeForCommander(?Store $store, Card $commander, array $extraCardNames = [], int $limit = 20): array
     {
         $limit = max(1, min(40, $limit));
         $commanderName = $this->frontFace($commander->getName());
@@ -130,8 +130,16 @@ final class StoreComboAnalyzer
      *   byNormalized: array<string, string>
      * }
      */
-    private function buildStockIndexForComboPieces(Store $store, array $variants, array $extraNames): array
+    private function buildStockIndexForComboPieces(?Store $store, array $variants, array $extraNames): array
     {
+        if (!$store instanceof Store) {
+            return [
+                'byOracle' => [],
+                'byName' => [],
+                'byNormalized' => [],
+            ];
+        }
+
         $names = [];
         $oracles = [];
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   Check,
   CheckCircle2,
@@ -28,6 +28,7 @@ import {
   useStore,
   useStoreTheme,
   useDebouncedValue,
+  PUBLIC_RECOMMEND_SCOPE,
 } from '../hooks'
 import type {
   CommanderRecommendation,
@@ -64,8 +65,11 @@ import {
   parseDeckBuilderPanel,
   parseDeckBuilderView,
   saveDeckBuilderSession,
+  PUBLIC_DECK_BUILDER_SCOPE,
   type DeckBuilderNavState,
 } from '../lib/deckBuilder'
+import { usePageMeta } from '../hooks/usePageMeta'
+import { formatCardsForMassSearch, queueMassSearchPrefill } from '../lib/massSearchPrefill'
 
 const ROLE_META: Record<DeckRole, { label: string; blurb: string; icon: typeof Zap }> = {
   enabler: {
@@ -143,6 +147,7 @@ function RecRow({
   disabledPick,
   adding,
   linkState,
+  publicMode = false,
   onToggle,
   onAdd,
 }: {
@@ -154,18 +159,17 @@ function RecRow({
   disabledPick: boolean
   adding: boolean
   linkState?: DeckBuilderNavState
+  publicMode?: boolean
   onToggle: () => void
   onAdd: () => void
 }) {
   const item = row.inventoryItem
   const match = Math.round(row.score * 100)
   const roleLabel = ROLE_META[row.role]?.label ?? row.role
-  // Stock is a scoring signal rather than a filter, so a card the store does
-  // not carry is still worth recommending — it just cannot be added to a cart.
   const name = item?.card.name ?? row.card.name
   const typeLine = item?.card.typeLine ?? row.card.typeLine
   const image = cardImage(item?.card ?? row.card)
-  const detailPath = item ? `/s/${slug}/cards/${item.id}` : null
+  const detailPath = item && !publicMode ? `/s/${slug}/cards/${item.id}` : null
 
   const title = detailPath ? (
     <Link
@@ -194,7 +198,7 @@ function RecRow({
           type="checkbox"
           className="size-4 rounded border-border text-brand-600 focus:ring-brand-500"
           checked={checked}
-          disabled={disabledPick || !item}
+          disabled={disabledPick || (!publicMode && !item)}
           onChange={onToggle}
           aria-label={`Select ${name}`}
         />
@@ -224,6 +228,8 @@ function RecRow({
                 {' · '}
                 {item.quantity} in stock
               </>
+            ) : publicMode ? (
+              ' · Magic catalog'
             ) : (
               ' · not in stock here'
             )}
@@ -250,24 +256,37 @@ function RecRow({
               {roleLabel} · {match}% match
             </p>
           </div>
-          {!item ? (
-            <span className="rounded-full border border-border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-fg-muted">
-              Not stocked
-            </span>
-          ) : !signedIn ? (
-            <Link to="/login" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-              Sign in
+          {!publicMode && (
+            <>
+              {!item ? (
+                <span className="rounded-full border border-border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-fg-muted">
+                  Not stocked
+                </span>
+              ) : !signedIn ? (
+                <Link to="/login" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                  Sign in
+                </Link>
+              ) : inCart > 0 ? (
+                <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  <Check aria-hidden className="size-3.5" />
+                  In cart
+                </Link>
+              ) : (
+                <Button size="sm" variant="secondary" loading={adding} onClick={onAdd}>
+                  <ShoppingCart aria-hidden className="size-3.5" />
+                  Add
+                </Button>
+              )}
+            </>
+          )}
+          {publicMode && (
+            <Link
+              to="/stores"
+              onClick={() => queueMassSearchPrefill(name)}
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              Find at store
             </Link>
-          ) : inCart > 0 ? (
-            <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-              <Check aria-hidden className="size-3.5" />
-              In cart
-            </Link>
-          ) : (
-            <Button size="sm" variant="secondary" loading={adding} onClick={onAdd}>
-              <ShoppingCart aria-hidden className="size-3.5" />
-              Add
-            </Button>
           )}
         </div>
       </div>
@@ -326,26 +345,39 @@ function CommanderSearchField({
   )
 }
 
-export default function CommanderSynergyPage() {
-  const { slug = '' } = useParams()
+export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 'store' | 'public' }) {
+  const isPublic = variant === 'public'
+  const { slug: routeSlug = '' } = useParams()
+  const apiScope = isPublic ? PUBLIC_RECOMMEND_SCOPE : routeSlug
+  const sessionScope = isPublic ? PUBLIC_DECK_BUILDER_SCOPE : routeSlug
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const signedIn = Boolean(user)
-  const { data: store, isLoading: storeLoading } = useStore(slug)
-  useStoreTheme(store)
+
+  usePageMeta({
+    title: isPublic ? 'Free Commander Deck Builder' : 'Deck Builder',
+    description: isPublic
+      ? 'Build a 100-card Commander deck with strategy-aware recommendations, Spellbook combos, and mana-curve analysis. No store login required.'
+      : 'Search commanders, pick a strategy, and fill your deck from this store\'s in-stock singles.',
+    path: isPublic ? '/tools/deck-builder' : `/s/${routeSlug}/deck-builder`,
+  })
+
+  const { data: store, isLoading: storeLoading } = useStore(isPublic ? undefined : routeSlug)
+  useStoreTheme(isPublic ? undefined : store)
   useAppShellFlush(true)
 
   const [selected, setSelected] = useState<CommanderSummary | null>(() => {
     const commanderId = searchParams.get('commander')
     if (!commanderId) return null
-    const stored = loadDeckBuilderSession(slug)
+    const stored = loadDeckBuilderSession(sessionScope)
     if (stored?.commander.id === commanderId) return stored.commander
     return { id: commanderId, oracleId: '', name: '' }
   })
   const [strategyId, setStrategyId] = useState<string | null>(() => searchParams.get('strategy'))
   const [view, setView] = useState<'roles' | 'types'>(() => parseDeckBuilderView(searchParams.get('view')))
   /** inventory item id → oracle + item snapshot for checked cards */
-  const [picked, setPicked] = useState<Map<number, { oracleId: string; item: InventoryItem }>>(
+  const [picked, setPicked] = useState<Map<string, { oracleId: string; item: InventoryItem | null }>>(
     () => new Map(),
   )
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -367,10 +399,10 @@ export default function CommanderSynergyPage() {
   const budgetCents = dollarsToCents(debouncedBudgetDollars)
   const maxCardCents = dollarsToCents(debouncedMaxCardDollars)
 
-  const search = useCommanderSearch(slug, query)
-  const strategiesQuery = useCommanderStrategies(slug, selected?.id ?? null)
-  const recommend = useCommanderRecommendations(slug, selected?.id ?? null, strategyId, true, {
-    includeOutOfStock,
+  const search = useCommanderSearch(apiScope, query)
+  const strategiesQuery = useCommanderStrategies(apiScope, selected?.id ?? null)
+  const recommend = useCommanderRecommendations(apiScope, selected?.id ?? null, strategyId, true, {
+    includeOutOfStock: isPublic ? true : includeOutOfStock,
   })
 
   // Oracle ids for cards the shopper has already checked — drives adaptive
@@ -381,15 +413,15 @@ export default function CommanderSynergyPage() {
   )
 
   const nextCards = useCommanderNextCards(
-    slug,
+    apiScope,
     selected?.id ?? null,
     strategyId,
     pickedOracleIds,
     panel === 'synergy' && pickedOracleIds.length > 0,
-    { includeOutOfStock },
+    { includeOutOfStock: isPublic ? true : includeOutOfStock },
   )
-  const combos = useCommanderCombos(slug, selected?.id ?? null, panel === 'combos' || panel === 'deck')
-  const deck = useCommanderDeck(slug, selected?.id ?? null, panel === 'deck', {
+  const combos = useCommanderCombos(apiScope, selected?.id ?? null, panel === 'combos' || panel === 'deck')
+  const deck = useCommanderDeck(apiScope, selected?.id ?? null, panel === 'deck', {
     // The strategy is what makes this an "Anim Pakal Tokens deck" rather than 99
     // popular cards in the right colors, so it has to reach the builder.
     strategy: strategyId,
@@ -397,7 +429,7 @@ export default function CommanderSynergyPage() {
     maxCardCents,
     bracket,
   })
-  const cart = useCart(slug, signedIn)
+  const cart = useCart(isPublic ? '' : routeSlug, signedIn && !isPublic)
   const cartLines = cart.query.data ?? []
   const packageData = nextCards.data ?? recommend.data
   const recommendations = packageData?.recommendations ?? []
@@ -450,12 +482,12 @@ export default function CommanderSynergyPage() {
   }, [bracket, budgetDollars, maxCardDollars, panel, searchParams, selected?.id, setSearchParams, strategyId, view])
 
   useEffect(() => {
-    if (!slug) return
+    if (!sessionScope) return
     if (!selected?.id || !selected.name) {
-      if (!selected) saveDeckBuilderSession(slug, null)
+      if (!selected) saveDeckBuilderSession(sessionScope, null)
       return
     }
-    saveDeckBuilderSession(slug, {
+    saveDeckBuilderSession(sessionScope, {
       commander: selected,
       strategyId,
       panel,
@@ -464,7 +496,7 @@ export default function CommanderSynergyPage() {
       maxCardDollars,
       bracket,
     })
-  }, [bracket, budgetDollars, maxCardDollars, panel, selected, slug, strategyId, view])
+  }, [bracket, budgetDollars, maxCardDollars, panel, selected, sessionScope, strategyId, view])
 
   const cartQtyByInventoryId = new Map<number, number>()
   for (const line of cartLines) {
@@ -473,13 +505,15 @@ export default function CommanderSynergyPage() {
     }
   }
 
-  // Only stocked cards are selectable; out-of-stock recommendations are shown
-  // for deck-building value but there is nothing to put in a cart.
-  const selectableIds = recommendations
-    .map((row) => row.inventoryItem?.id)
-    .filter((id): id is number => typeof id === 'number' && !cartQtyByInventoryId.has(id))
+  const selectableOracleIds = recommendations
+    .filter((row) => {
+      if (isPublic) return true
+      const item = row.inventoryItem
+      return Boolean(item && !cartQtyByInventoryId.has(item.id))
+    })
+    .map((row) => row.card.oracleId)
 
-  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => picked.has(id))
+  const allSelected = selectableOracleIds.length > 0 && selectableOracleIds.every((id) => picked.has(id))
 
   function resetPicks() {
     setPicked(new Map())
@@ -495,11 +529,11 @@ export default function CommanderSynergyPage() {
     }
   }
 
-  function togglePick(id: number, oracleId: string, item: InventoryItem) {
+  function togglePick(oracleId: string, item: InventoryItem | null) {
     setPicked((current) => {
       const next = new Map(current)
-      if (next.has(id)) next.delete(id)
-      else next.set(id, { oracleId, item })
+      if (next.has(oracleId)) next.delete(oracleId)
+      else next.set(oracleId, { oracleId, item })
       return next
     })
     setBulkDone(false)
@@ -507,12 +541,12 @@ export default function CommanderSynergyPage() {
 
   function toggleSelectAll() {
     setPicked((current) => {
-      if (selectableIds.every((id) => current.has(id))) return new Map()
+      if (selectableOracleIds.every((id) => current.has(id))) return new Map()
       const next = new Map(current)
       for (const row of recommendations) {
         const item = row.inventoryItem
-        if (!item || cartQtyByInventoryId.has(item.id)) continue
-        next.set(item.id, { oracleId: row.card.oracleId, item })
+        if (!isPublic && (!item || cartQtyByInventoryId.has(item.id))) continue
+        next.set(row.card.oracleId, { oracleId: row.card.oracleId, item })
       }
       return next
     })
@@ -526,12 +560,12 @@ export default function CommanderSynergyPage() {
   }
 
   async function addSelectedEnMasse() {
-    if (!signedIn || picked.size === 0) return
+    if (isPublic || !signedIn || picked.size === 0) return
     setBulkBusy(true)
     setBulkDone(false)
     try {
       for (const { item } of picked.values()) {
-        if (cartQtyByInventoryId.has(item.id)) continue
+        if (!item || cartQtyByInventoryId.has(item.id)) continue
         const inCart = cartQtyByInventoryId.get(item.id) ?? 0
         const take = Math.min(item.quantity, Math.max(1, inCart + 1))
         await cart.setItem.mutateAsync({ item, quantity: take })
@@ -544,7 +578,7 @@ export default function CommanderSynergyPage() {
   }
 
   async function addDeckToCart() {
-    if (!signedIn || !deck.data?.cards.length) return
+    if (isPublic || !signedIn || !deck.data?.cards.length) return
     setDeckBusy(true)
     try {
       for (const row of deck.data.cards) {
@@ -559,7 +593,7 @@ export default function CommanderSynergyPage() {
     }
   }
 
-  if (storeLoading || !store) {
+  if (!isPublic && (storeLoading || !store)) {
     return <StorePageLoader />
   }
 
@@ -581,7 +615,7 @@ export default function CommanderSynergyPage() {
     setStrategiesOpen(true)
     resetPicks()
     setQuery('')
-    saveDeckBuilderSession(slug, null)
+    saveDeckBuilderSession(sessionScope, null)
   }
 
   const cardLinkState: DeckBuilderNavState | undefined = selected
@@ -606,13 +640,14 @@ export default function CommanderSynergyPage() {
               // both addressable; inventory ids only exist for the former.
               key={row.card.oracleId}
               row={row}
-              slug={slug}
+              slug={routeSlug}
               signedIn={signedIn}
               inCart={inCart}
-              checked={item ? picked.has(item.id) : false}
-              disabledPick={inCart > 0}
+              checked={picked.has(row.card.oracleId)}
+              disabledPick={!isPublic && inCart > 0}
               adding={cart.setItem.isPending}
-              onToggle={() => item && togglePick(item.id, row.card.oracleId, item)}
+              publicMode={isPublic}
+              onToggle={() => togglePick(row.card.oracleId, item)}
               onAdd={() => item && void addOne(item)}
               linkState={cardLinkState}
             />
@@ -628,7 +663,9 @@ export default function CommanderSynergyPage() {
         <header className="sticky top-0 z-20 border-b border-border/60 bg-bg/85 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <BackButton to={`/s/${slug}`}>Back</BackButton>
+              <BackButton to={isPublic ? '/' : `/s/${routeSlug}`}>
+                {isPublic ? 'Home' : 'Back'}
+              </BackButton>
               <div className="min-w-0">
                 <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-brand-600">
                   Deck builder
@@ -653,18 +690,30 @@ export default function CommanderSynergyPage() {
             className="pointer-events-none absolute inset-x-0 -top-8 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_srgb,var(--color-brand-500)_18%,transparent),transparent_62%)]"
           />
           <header className="relative">
-            <BackButton to={`/s/${slug}`}>Back to store</BackButton>
+            <BackButton to={isPublic ? '/' : `/s/${routeSlug}`}>
+              {isPublic ? 'Home' : 'Back to store'}
+            </BackButton>
             <p className="mt-8 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-[0.2em] text-brand-600">
               <Crown aria-hidden className="size-3.5" />
               Commander
             </p>
             <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-fg sm:text-5xl">
-              Deck Builder
+              {isPublic ? 'Free Commander Deck Builder' : 'Deck Builder'}
             </h1>
             <p className="mt-3 max-w-lg text-base leading-7 text-fg-muted">
-              Search a legal commander, pick a strategy, then add this store&apos;s in-stock cards
-              grouped by role or type.
+              {isPublic
+                ? 'Search any legal commander, pick a strategy, and build a full 100-card list with synergy picks and Spellbook combos. No store login required.'
+                : 'Search a legal commander, pick a strategy, then add this store\'s in-stock cards grouped by role or type.'}
             </p>
+            {isPublic && (
+              <p className="mt-2 text-sm text-fg-muted">
+                Want to buy cards too?{' '}
+                <Link to="/stores" className="font-semibold text-brand-600 hover:text-brand-500">
+                  Browse local game stores
+                </Link>
+                .
+              </p>
+            )}
             <div className="mt-8">
               <CommanderSearchField
                 value={query}
@@ -740,11 +789,19 @@ export default function CommanderSynergyPage() {
           </div>
         ) : !selected ? (
           <div className="grid gap-5 sm:grid-cols-3">
-            {[
-              { step: '01', title: 'Find a commander', body: 'Search the full legal catalog, not just what is on the shelf.' },
-              { step: '02', title: 'Pick a strategy', body: 'We detect the builds that commander actually supports.' },
-              { step: '03', title: 'Fill from stock', body: 'Add enablers, fuel, and payoffs that this store has in stock.' },
-            ].map((item) => (
+            {(
+              isPublic
+                ? [
+                    { step: '01', title: 'Find a commander', body: 'Search the full legal catalog, not just what one store stocks.' },
+                    { step: '02', title: 'Pick a strategy', body: 'We detect the builds that commander actually supports.' },
+                    { step: '03', title: 'Build your list', body: 'Get synergy picks, Spellbook combos, and a full 100-card deck.' },
+                  ]
+                : [
+                    { step: '01', title: 'Find a commander', body: 'Search the full legal catalog, not just what is on the shelf.' },
+                    { step: '02', title: 'Pick a strategy', body: 'We detect the builds that commander actually supports.' },
+                    { step: '03', title: 'Fill from stock', body: 'Add enablers, fuel, and payoffs that this store has in stock.' },
+                  ]
+            ).map((item) => (
               <div
                 key={item.step}
                 className="rounded-card border border-border/80 bg-surface/80 px-6 py-7 dark:glass-card"
@@ -844,6 +901,7 @@ export default function CommanderSynergyPage() {
                             Caps apply to the 100-card list. Combos stay legal in this
                             commander&apos;s colors.
                           </p>
+                          {!isPublic && (
                           <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-bg px-3 py-2.5">
                             <input
                               type="checkbox"
@@ -864,6 +922,7 @@ export default function CommanderSynergyPage() {
                               </span>
                             </span>
                           </label>
+                          )}
                           <div className="grid grid-cols-2 gap-3">
                             <Input
                               label="Deck budget"
@@ -1089,35 +1148,57 @@ export default function CommanderSynergyPage() {
                           <Button type="button" variant="ghost" size="sm" onClick={toggleSelectAll}>
                             {allSelected ? 'Clear' : 'Select all'}
                           </Button>
-                          {!signedIn ? (
-                            <Link to="/login" className={buttonVariants({ size: 'sm' })}>
-                              Sign in to add
-                            </Link>
-                          ) : (
+                          {!isPublic && (
+                            <>
+                              {!signedIn ? (
+                                <Link to="/login" className={buttonVariants({ size: 'sm' })}>
+                                  Sign in to add
+                                </Link>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  loading={bulkBusy}
+                                  disabled={bulkBusy || picked.size === 0}
+                                  onClick={() => void addSelectedEnMasse()}
+                                >
+                                  <ShoppingCart aria-hidden className="size-4" />
+                                  Add{picked.size > 0 ? ` ${picked.size}` : ''} to cart
+                                </Button>
+                              )}
+                              {signedIn && (
+                                <Link
+                                  to={`/s/${routeSlug}/cart`}
+                                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                                >
+                                  Cart
+                                </Link>
+                              )}
+                            </>
+                          )}
+                          {isPublic && picked.size > 0 && (
                             <Button
                               type="button"
                               size="sm"
-                              loading={bulkBusy}
-                              disabled={bulkBusy || picked.size === 0}
-                              onClick={() => void addSelectedEnMasse()}
+                              variant="secondary"
+                              onClick={() => {
+                                const names = recommendations
+                                  .filter((row) => picked.has(row.card.oracleId))
+                                  .map((row) => ({ name: row.card.name }))
+                                queueMassSearchPrefill(
+                                  formatCardsForMassSearch(names, selected?.name),
+                                )
+                                navigate('/stores')
+                              }}
                             >
-                              <ShoppingCart aria-hidden className="size-4" />
-                              Add{picked.size > 0 ? ` ${picked.size}` : ''} to cart
+                              Find {picked.size} at stores
                             </Button>
-                          )}
-                          {signedIn && (
-                            <Link
-                              to={`/s/${slug}/cart`}
-                              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                            >
-                              Cart
-                            </Link>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    {bulkDone && (
+                    {bulkDone && !isPublic && (
                       <p className="mb-4 flex items-center gap-1.5 text-sm font-medium text-success-700">
                         <Check aria-hidden className="size-4" />
                         Selected cards added to your cart.
@@ -1181,7 +1262,8 @@ export default function CommanderSynergyPage() {
 
               <TabPanel when="combos" value={panel} className="pt-5">
                 <CombosPanel
-                  slug={slug}
+                  slug={routeSlug}
+                  publicMode={isPublic}
                   loading={combos.isLoading}
                   combos={combos.data?.combos ?? []}
                   identityCode={combos.data?.identityCode ?? recommend.data?.identityCode}
@@ -1197,7 +1279,8 @@ export default function CommanderSynergyPage() {
 
               <TabPanel when="deck" value={panel} className="pt-5">
                 <DeckPanel
-                  slug={slug}
+                  slug={routeSlug}
+                  publicMode={isPublic}
                   loading={deck.isLoading}
                   deck={deck.data}
                   signedIn={signedIn}
@@ -1216,6 +1299,7 @@ export default function CommanderSynergyPage() {
 
 function CombosPanel({
   slug,
+  publicMode = false,
   loading,
   combos,
   identityCode,
@@ -1228,6 +1312,7 @@ function CombosPanel({
   linkState,
 }: {
   slug: string
+  publicMode?: boolean
   loading: boolean
   combos: SpellbookCombo[]
   identityCode?: string
@@ -1240,14 +1325,26 @@ function CombosPanel({
   linkState?: DeckBuilderNavState
 }) {
   if (loading) {
-    return <LoadingPanel label="Checking Commander Spellbook against store stock…" />
+    return (
+      <LoadingPanel
+        label={
+          publicMode
+            ? 'Checking Commander Spellbook combos…'
+            : 'Checking Commander Spellbook against store stock…'
+        }
+      />
+    )
   }
   if (combos.length === 0) {
     return (
       <EmptyState
         icon={Wand2}
         title="No combos found yet"
-        description="Commander Spellbook did not return combos legal in this commander’s color identity, or the store has none of the pieces in stock."
+        description={
+          publicMode
+            ? 'Commander Spellbook did not return combos legal in this commander’s color identity.'
+            : 'Commander Spellbook did not return combos legal in this commander’s color identity, or the store has none of the pieces in stock.'
+        }
       />
     )
   }
@@ -1260,9 +1357,9 @@ function CombosPanel({
           <span className="ml-2 inline-flex align-middle">{colorPips(colorIdentity)}</span>
         </p>
         <p className="mt-1 text-xs text-fg-muted">
-          Only pieces this store actually has on the shelf count as in stock (any printing of the
-          same card). Colorless cards are always allowed. Combos are ranked complete-in-store first,
-          then by coverage.
+          {publicMode
+            ? 'Combos come from Commander Spellbook and are filtered to this commander’s color identity. Find a local store to buy the pieces.'
+            : 'Only pieces this store actually has on the shelf count as in stock (any printing of the same card). Colorless cards are always allowed. Combos are ranked complete-in-store first, then by coverage.'}
           {filteredOutCount ? ` Hidden ${filteredOutCount} off-identity combo${filteredOutCount === 1 ? '' : 's'}.` : ''}
         </p>
       </div>
@@ -1272,14 +1369,16 @@ function CombosPanel({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-fg">
-                {combo.inStockCount} of {combo.cards.length} pieces in stock here
-                {combo.completeInStore ? ' · all available here' : ''}
+                {publicMode
+                  ? `${combo.cards.length} piece${combo.cards.length === 1 ? '' : 's'}`
+                  : `${combo.inStockCount} of ${combo.cards.length} pieces in stock here`}
+                {!publicMode && combo.completeInStore ? ' · all available here' : ''}
               </p>
               {combo.produces.length > 0 && (
                 <p className="mt-1 text-xs text-fg-muted">{combo.produces.slice(0, 3).join(' · ')}</p>
               )}
             </div>
-            {combo.completeInStore && <Badge tone="success">Buyable here</Badge>}
+            {!publicMode && combo.completeInStore && <Badge tone="success">Buyable here</Badge>}
           </div>
           {combo.description && (
             <p className="mt-2 text-sm leading-relaxed text-fg-muted">{combo.description}</p>
@@ -1292,14 +1391,14 @@ function CombosPanel({
               >
                 <span className={piece.inStock ? 'font-medium text-fg' : 'text-fg-muted'}>
                   {piece.name}
-                  {piece.isCommander && !piece.inStock ? ' · commander (not in stock here)' : ''}
-                  {piece.isCommander && piece.inStock ? ' · commander' : ''}
-                  {!piece.inStock && !piece.isCommander && ' · missing here'}
+                  {piece.isCommander && !publicMode && !piece.inStock ? ' · commander (not in stock here)' : ''}
+                  {piece.isCommander && (publicMode || piece.inStock) ? ' · commander' : ''}
+                  {!publicMode && !piece.inStock && !piece.isCommander && ' · missing here'}
                   {piece.inStock && piece.stockQuantity != null && piece.stockQuantity > piece.quantity
                     ? ` · ${piece.stockQuantity} available`
                     : ''}
                 </span>
-                {piece.inventoryItem && (
+                {!publicMode && piece.inventoryItem && (
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-fg">
                       {formatPrice(piece.inventoryItem.priceCents)}
@@ -1337,6 +1436,7 @@ function CombosPanel({
 
 function DeckPanel({
   slug,
+  publicMode = false,
   loading,
   deck,
   signedIn,
@@ -1345,6 +1445,7 @@ function DeckPanel({
   linkState,
 }: {
   slug: string
+  publicMode?: boolean
   loading: boolean
   deck: import('../hooks').AssembledDeckResponse | undefined
   signedIn: boolean
@@ -1352,10 +1453,26 @@ function DeckPanel({
   onAddAll: () => void
   linkState?: DeckBuilderNavState
 }) {
+  const navigate = useNavigate()
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
 
+  function findDeckAtStores() {
+    if (!deck) return
+    queueMassSearchPrefill(
+      formatCardsForMassSearch(
+        deck.cards.map((row) => ({ name: row.card.name, quantity: row.quantity })),
+        deck.commander.name,
+      ),
+    )
+    navigate('/stores')
+  }
+
   if (loading || !deck) {
-    return <LoadingPanel label="Assembling a deck from store inventory…" />
+    return (
+      <LoadingPanel
+        label={publicMode ? 'Assembling your Commander deck…' : 'Assembling a deck from store inventory…'}
+      />
+    )
   }
 
   const slotEntries = Object.entries(deck.slots).filter(
@@ -1392,7 +1509,9 @@ function DeckPanel({
                 ? `${formatPrice(deck.budget.spentCents)} of ${formatPrice(deck.budget.limitCents)}`
                 : formatPrice(deck.budget.spentCents)}
               {' · '}
-              {inStockCount}/{deck.cards.length} in stock
+              {publicMode
+                ? `${deck.cards.length} cards in list`
+                : `${inStockCount}/${deck.cards.length} in stock`}
             </p>
             <p className="mt-1 text-xs text-fg-muted">
               {structureBits} · avg MV {deck.averageManaValue}
@@ -1402,19 +1521,33 @@ function DeckPanel({
             )}
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            {!signedIn ? (
-              <Link to="/login" className={buttonVariants({ size: 'sm' })}>
-                Sign in to add deck
-              </Link>
-            ) : (
-              <Button size="sm" loading={busy} disabled={busy || deck.cards.length === 0} onClick={onAddAll}>
-                <ShoppingCart aria-hidden className="size-4" />
-                Add available
-              </Button>
+            {!publicMode && (
+              <>
+                {!signedIn ? (
+                  <Link to="/login" className={buttonVariants({ size: 'sm' })}>
+                    Sign in to add deck
+                  </Link>
+                ) : (
+                  <Button size="sm" loading={busy} disabled={busy || deck.cards.length === 0} onClick={onAddAll}>
+                    <ShoppingCart aria-hidden className="size-4" />
+                    Add available
+                  </Button>
+                )}
+                <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  Cart
+                </Link>
+              </>
             )}
-            <Link to={`/s/${slug}/cart`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-              Cart
-            </Link>
+            {publicMode && (
+              <>
+                <Button size="sm" disabled={deck.cards.length === 0} onClick={findDeckAtStores}>
+                  Search deck at stores
+                </Button>
+                <Link to="/stores" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  Browse stores
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -1455,6 +1588,7 @@ function DeckPanel({
         </details>
       </div>
 
+      {!publicMode && (
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex rounded-btn border border-border bg-bg p-0.5">
           {(
@@ -1483,6 +1617,7 @@ function DeckPanel({
           Showing {visibleCards.length} of {deck.cards.length}
         </p>
       </div>
+      )}
 
       {visibleCards.length === 0 ? (
         <EmptyState
@@ -1500,7 +1635,7 @@ function DeckPanel({
             const item = row.inventoryItem
             const name = item?.card.name ?? row.card.name
             const image = cardImage(item?.card ?? row.card)
-            const detailPath = item ? `/s/${slug}/cards/${item.id}` : null
+            const detailPath = item && !publicMode ? `/s/${slug}/cards/${item.id}` : null
             const meta = [
               row.quantity > 1 ? `${row.quantity}×` : null,
               row.slot.replaceAll('_', ' '),
@@ -1545,8 +1680,21 @@ function DeckPanel({
                     <span className="block truncate text-sm font-semibold text-fg">{name}</span>
                   )}
                   <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-muted">
-                    {meta}
+                    {publicMode
+                      ? [row.quantity > 1 ? `${row.quantity}×` : null, row.slot.replaceAll('_', ' ')]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : meta}
                   </p>
+                  {publicMode && (
+                    <Link
+                      to="/stores"
+                      onClick={() => queueMassSearchPrefill(row.quantity > 1 ? `${row.quantity} ${name}` : name)}
+                      className="mt-1 inline-block text-xs font-semibold text-brand-600 hover:text-brand-500"
+                    >
+                      Find at a store
+                    </Link>
+                  )}
                 </div>
               </li>
             )
