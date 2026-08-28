@@ -67,8 +67,34 @@ export function deckBuilderPath(
   return query ? `/s/${slug}/deck-builder?${query}` : `/s/${slug}/deck-builder`
 }
 
+/** Public catalog deck builder (no store inventory). */
+export function publicDeckBuilderPath(
+  opts?: {
+    commanderId?: string | null
+    strategy?: string | null
+    panel?: DeckBuilderPanel
+    view?: DeckBuilderView
+    budgetDollars?: string | null
+    maxCardDollars?: string | null
+    bracket?: string | null
+  },
+): string {
+  const params = new URLSearchParams()
+  if (opts?.commanderId) params.set('commander', opts.commanderId)
+  if (opts?.commanderId && opts.strategy) params.set('strategy', opts.strategy)
+  if (opts?.commanderId && opts.panel && opts.panel !== 'synergy') params.set('panel', opts.panel)
+  if (opts?.commanderId && opts.view && opts.view !== 'roles') params.set('view', opts.view)
+  if (opts?.commanderId && opts.budgetDollars) params.set('budget', opts.budgetDollars)
+  if (opts?.commanderId && opts.maxCardDollars) params.set('maxCard', opts.maxCardDollars)
+  if (opts?.commanderId && opts.bracket && opts.bracket !== 'auto') params.set('bracket', opts.bracket)
+  const query = params.toString()
+  return query ? `/tools/deck-builder?${query}` : '/tools/deck-builder'
+}
+
+export const PUBLIC_DECK_BUILDER_SCOPE = 'public'
+
 function storageKey(slug: string) {
-  return `lgs.deck-builder.${slug}`
+  return slug === PUBLIC_DECK_BUILDER_SCOPE ? 'lgs.deck-builder.public' : `lgs.deck-builder.${slug}`
 }
 
 export function saveDeckBuilderSession(slug: string, session: DeckBuilderSession | null): void {

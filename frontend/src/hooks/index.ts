@@ -45,6 +45,7 @@ export {
   commanderCombosKey,
   commanderDeckKey,
   commanderNextCardsKey,
+  PUBLIC_RECOMMEND_SCOPE,
 } from './useCommanderRecommend'
 export type {
   CommanderSummary,

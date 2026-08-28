@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-react'
+import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet, Wand2 } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +9,7 @@ import { useGameShowcase, useShowcaseCards } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { ContactForm } from './ContactForm'
+import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
 import { GameShowcaseReel, warmupShowcaseCards } from './GameShowcaseReel'
 import { GameTile } from './GameTile'
 
@@ -40,6 +41,27 @@ export default function MarketplaceLanding() {
     .map((card) => card.imageUrl)
     .filter((url): url is string => Boolean(url))
   useAppShellFlush(true)
+
+  usePageMeta({
+    title: 'Shop Local Game Stores Online',
+    description:
+      'Browse real inventory from verified local game stores. Free Commander deck builder, online checkout, and sell/trade your collection.',
+    path: '/',
+  })
+
+  useJsonLd('website', {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'LGS Card Vault',
+    url: 'https://lgscardvault.com/',
+    description:
+      'Marketplace for Magic, Pokémon, One Piece, and Flesh & Blood from trusted local game stores.',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://lgscardvault.com/stores?q={search_term_string}',
+      'query-input': 'required name=search_term_string',
+    },
+  })
 
   useEffect(() => {
     if (showcaseCards.length === 0) return
@@ -112,6 +134,10 @@ export default function MarketplaceLanding() {
             <Link to="/stores" className={primaryCta}>
               Explore stores
               <ArrowRight aria-hidden className="size-4" />
+            </Link>
+            <Link to="/tools/deck-builder" className={secondaryCta}>
+              <Wand2 aria-hidden className="size-4" />
+              Deck builder
             </Link>
             {isSuperAdmin ? (
               <Link to="/platform/admin" className={secondaryCta}>

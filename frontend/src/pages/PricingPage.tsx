@@ -5,6 +5,7 @@ import api, { formatPrice } from '../api/client'
 import type { Plan } from '../api/types'
 import { buttonVariants } from '../components/ui'
 import { cx } from '../lib/cx'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 function planPriceLabel(plan: Plan): string {
   if (plan.billingModel === 'usage') {
@@ -29,6 +30,13 @@ function planPriceDetail(plan: Plan): string {
 }
 
 export default function PricingPage() {
+  usePageMeta({
+    title: 'Store Pricing',
+    description:
+      'Open your verified storefront on LGS Card Vault for $450 flat or 5% per sale until $450. Full platform access with no monthly fees after the cap.',
+    path: '/pricing',
+  })
+
   const { data: plans = [], isPending } = useQuery({
     queryKey: ['plans-public'],
     queryFn: async () => {

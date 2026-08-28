@@ -122,7 +122,7 @@ final class CommanderRecommender
      * @return array<string, mixed>
      */
     public function recommendForStore(
-        Store $store,
+        ?Store $store,
         Card $commander,
         ?string $strategyId = null,
         int $limit = self::DEFAULT_LIMIT,

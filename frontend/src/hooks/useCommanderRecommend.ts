@@ -237,6 +237,14 @@ export interface CommanderRecommendResponse {
   byType: Record<DeckCardType, CommanderRecommendation[]>
 }
 
+export const PUBLIC_RECOMMEND_SCOPE = '__public__'
+
+function recommendBase(scope: string): string {
+  return scope === PUBLIC_RECOMMEND_SCOPE
+    ? '/recommend'
+    : `/stores/${encodeURIComponent(scope)}/recommend`
+}
+
 export function commanderSearchKey(slug: string, q: string) {
   return ['commander-search', slug, q] as const
 }
@@ -260,7 +268,7 @@ export function useCommanderSearch(slug: string, query: string, enabled = true) 
   return useQuery({
     queryKey: commanderSearchKey(slug, debounced),
     queryFn: async () => {
-      const { data } = await api.get<CommanderSummary[]>(`/stores/${slug}/recommend/commanders`, {
+      const { data } = await api.get<CommanderSummary[]>(`${recommendBase(slug)}/commanders`, {
         params: { q: debounced, limit: 24 },
       })
       return data
@@ -275,7 +283,7 @@ export function useCommanderStrategies(slug: string, cardId: string | null, enab
     queryKey: commanderStrategiesKey(slug, cardId ?? ''),
     queryFn: async () => {
       const { data } = await api.get<{ strategies: CommanderStrategy[] }>(
-        `/stores/${slug}/recommend/commander/${cardId}/strategies`,
+        `${recommendBase(slug)}/commander/${cardId}/strategies`,
       )
       return data.strategies
     },
@@ -296,7 +304,7 @@ export function useCommanderRecommendations(
     queryKey: commanderRecommendKey(slug, cardId ?? '', strategy ?? '', includeOutOfStock),
     queryFn: async () => {
       const { data } = await api.get<CommanderRecommendResponse>(
-        `/stores/${slug}/recommend/commander/${cardId}`,
+        `${recommendBase(slug)}/commander/${cardId}`,
         {
           params: {
             strategy: strategy || undefined,
@@ -351,7 +359,7 @@ export function useCommanderCombos(slug: string, cardId: string | null, enabled 
     queryKey: commanderCombosKey(slug, cardId ?? ''),
     queryFn: async () => {
       const { data } = await api.get<CommanderCombosResponse>(
-        `/stores/${slug}/recommend/commander/${cardId}/combos`,
+        `${recommendBase(slug)}/commander/${cardId}/combos`,
         { params: { limit: 24 } },
       )
       return data
@@ -385,7 +393,7 @@ export function useCommanderDeck(
     queryKey: commanderDeckKey(slug, cardId ?? '', strategy, budgetCents, maxCardCents, bracket),
     queryFn: async () => {
       const { data } = await api.get<AssembledDeckResponse>(
-        `/stores/${slug}/recommend/commander/${cardId}/deck`,
+        `${recommendBase(slug)}/commander/${cardId}/deck`,
         {
           params: {
             strategy: strategy || undefined,
@@ -426,7 +434,7 @@ export function useCommanderNextCards(
     ),
     queryFn: async () => {
       const { data } = await api.post<CommanderRecommendResponse>(
-        `/stores/${slug}/recommend/commander/${cardId}/next-cards`,
+        `${recommendBase(slug)}/commander/${cardId}/next-cards`,
         {
           deck: deckOracleIds,
           strategy: strategy || undefined,

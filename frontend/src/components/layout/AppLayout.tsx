@@ -23,7 +23,10 @@ const LANDING_SECTIONS = [
   { id: 'contact', label: 'Contact' },
 ] as const
 
-const LANDING_ROUTES = [{ to: '/pricing', label: 'Pricing' }] as const
+const LANDING_ROUTES = [
+  { to: '/tools/deck-builder', label: 'Deck Builder' },
+  { to: '/pricing', label: 'Pricing' },
+] as const
 
 export default function AppLayout() {
   const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
