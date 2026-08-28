@@ -1,4 +1,4 @@
-import { cardImageUrl, formatPrice } from '../api/client'
+import { cardImageUrl, formatPrice, scryfallNamedImageUrl } from '../api/client'
 import type { InventoryItem } from '../api/types'
 import type { CardArtPreview } from '../components/cards'
 import { finishName } from './finishes'
@@ -88,15 +88,18 @@ export function buildComboArtPreview(
   opts?: { storeSlug?: string },
 ): CardArtPreview {
   const catalog = piece.inventoryItem?.card
-  const rawUrl = piece.imageUrl ?? catalog?.imageUrl
   const oracleId = piece.oracleId ?? catalog?.oracleId ?? piece.name
   const options = piece.inventoryOptions ?? (piece.inventoryItem ? [piece.inventoryItem] : [])
+
+  const fromCatalog = catalog ? cardImageUrl(catalog) : ''
+  const fromApi = piece.imageUrl ? cardImageUrl({ imageUrl: piece.imageUrl }) : ''
+  const imageUrl = fromCatalog || fromApi || scryfallNamedImageUrl(piece.name)
 
   return {
     oracleId,
     name: piece.name,
     typeLine: catalog?.typeLine,
-    imageUrl: rawUrl ? (catalog ? cardImageUrl(catalog) : cardImageUrl({ imageUrl: rawUrl })) : '',
+    imageUrl,
     priceCents: cheapestPriceCents(piece.inventoryItem?.priceCents, options),
     priceLabel: priceLabelForCard(piece.inventoryItem?.priceCents, options),
     inventoryOptions: options,

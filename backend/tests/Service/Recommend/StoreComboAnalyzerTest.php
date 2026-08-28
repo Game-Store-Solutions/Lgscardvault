@@ -122,6 +122,45 @@ final class StoreComboAnalyzerTest extends KernelTestCase
         self::assertFalse($byName['Sol Ring']['inStock']);
     }
 
+    public function testPublicComboPieceGetsCatalogImageWithoutStoreStock(): void
+    {
+        $commander = $this->fixtures->card(930, [
+            'name' => 'Tidespout Combo Test',
+            'type_line' => 'Legendary Creature',
+            'color_identity' => ['U'],
+            'legalities' => ['commander' => 'legal'],
+        ]);
+        $ring = $this->fixtures->card(931, [
+            'name' => 'Sol Ring',
+            'type_line' => 'Artifact',
+            'color_identity' => [],
+        ]);
+        $ring->setImageUris(['normal' => 'https://cards.scryfall.io/normal/front/1/1/ring.jpg']);
+        $this->em->flush();
+
+        $result = $this->analyzer->analyzeForCommander(null, $commander, limit: 5);
+        $combo = null;
+        foreach ($result['combos'] as $row) {
+            if ('test-combo-tidespout-ring' === $row['id']) {
+                $combo = $row;
+                break;
+            }
+        }
+        self::assertNotNull($combo);
+
+        $ringPiece = null;
+        foreach ($combo['cards'] as $piece) {
+            if ('Sol Ring' === $piece['name']) {
+                $ringPiece = $piece;
+                break;
+            }
+        }
+        self::assertNotNull($ringPiece);
+        self::assertFalse($ringPiece['inStock']);
+        self::assertNotNull($ringPiece['oracleId']);
+        self::assertSame('https://cards.scryfall.io/normal/front/1/1/ring.jpg', $ringPiece['imageUrl']);
+    }
+
     private function makePrinting(Uuid $oracleId, int $seed, string $name, string $set, string $number): Card
     {
         $hex = str_pad(dechex($seed), 8, '0', STR_PAD_LEFT);

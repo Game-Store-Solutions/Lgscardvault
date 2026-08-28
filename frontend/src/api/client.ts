@@ -128,6 +128,17 @@ function scryfallSize(url: string, size: 'small' | 'normal' | 'large'): string {
   return url.replace(/cards\.scryfall\.io\/(?:small|normal|large|png)\//, `cards.scryfall.io/${size}/`)
 }
 
+/** Catalog fallback when our DB has no art URL for a card name. */
+export function scryfallNamedImageUrl(cardName: string): string {
+  const face = cardName.includes(' // ') ? cardName.split(' // ')[0]! : cardName
+  const params = new URLSearchParams({
+    exact: face.trim(),
+    format: 'image',
+    version: 'normal',
+  })
+  return `https://api.scryfall.com/cards/named?${params}`
+}
+
 function pickImageUri(
   uris: { png?: string; large?: string; normal?: string; small?: string } | null | undefined,
   hq: boolean,

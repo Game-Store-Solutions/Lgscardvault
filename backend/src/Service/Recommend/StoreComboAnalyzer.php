@@ -282,9 +282,6 @@ final class StoreComboAnalyzer
                     continue;
                 }
                 $key = strtolower($this->frontFace($name));
-                if (null !== $this->resolveOracleKey($use, $key, $stockIndex, [])) {
-                    continue;
-                }
                 $needLookup[$key] = $key;
             }
         }
@@ -645,18 +642,12 @@ final class StoreComboAnalyzer
         foreach (['oracleId', 'oracle_id', 'scryfallOracleId'] as $field) {
             $raw = $card[$field] ?? null;
             if (is_string($raw) && '' !== trim($raw)) {
-                $key = strtolower(trim($raw));
-                if (isset($stockIndex['byOracle'][$key])) {
-                    return $key;
-                }
+                return strtolower(trim($raw));
             }
         }
 
         if (isset($catalogOracleByName[$nameKey])) {
-            $key = $catalogOracleByName[$nameKey];
-            if (isset($stockIndex['byOracle'][$key])) {
-                return $key;
-            }
+            return $catalogOracleByName[$nameKey];
         }
 
         return null;
