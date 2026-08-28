@@ -7,6 +7,8 @@ import AuthMarketingAside from '../components/AuthMarketingAside'
 import { BrandLogo } from '../components/BrandLogo'
 import { SsoOption, useSsoStatus } from '../components/SsoOption'
 import { useAuth } from '../context/AuthContext'
+import { trackEvent } from '../lib/analytics'
+import { readReferralAttribution, clearReferralAttribution } from '../lib/referral'
 
 interface RegisterPageProps {
   accountType: 'owner' | 'customer'
@@ -68,6 +70,17 @@ export default function RegisterPage({ accountType }: RegisterPageProps) {
     try {
       sessionStorage.setItem('verify-next', from)
       await register(email, password, displayName, accountType, acceptedTerms, dateOfBirth)
+      const referral = readReferralAttribution()
+      if (referral) {
+        trackEvent('sign_up', {
+          account_type: accountType,
+          referral_source: referral.source ?? '',
+          referral_store: referral.storeSlug ?? '',
+        })
+        clearReferralAttribution()
+      } else {
+        trackEvent('sign_up', { account_type: accountType })
+      }
       const sent = new URLSearchParams({ email })
       if (storeSlug) sent.set('store', storeSlug)
       navigate(`/verify-email/sent?${sent.toString()}`)

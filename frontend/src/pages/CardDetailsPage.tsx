@@ -48,6 +48,8 @@ import { setBrowsePath } from '../lib/setBrowse'
 import { artistBrowsePath, resolveCardArtist } from '../lib/artistBrowse'
 import { deckBuilderPath, isDeckBuilderNav } from '../lib/deckBuilder'
 import { storeSearchFromNavState, storeSearchPath, withStoreSearchNav } from '../lib/storeSearch'
+import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
+import { ShareButton } from '../components/ShareButton'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -152,6 +154,37 @@ export default function CardDetailsPage() {
       return data
     },
   })
+
+  usePageMeta({
+    title: item?.card.name
+      ? `${item.card.name}${store?.name ? ` at ${store.name}` : ''}`
+      : 'Card listing',
+    description:
+      item && store
+        ? `Buy ${item.card.name} for ${formatPrice(item.priceCents)} at ${store.name}.`
+        : 'Browse TCG singles from trusted local game stores.',
+    path: slug && id ? `/s/${slug}/cards/${id}` : undefined,
+    image: item ? cardImage(item.card) ?? undefined : undefined,
+  })
+
+  useJsonLd(
+    'product',
+    item && store
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name: item.card.name,
+          image: cardImage(item.card) ?? undefined,
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: 'USD',
+            price: (item.priceCents / 100).toFixed(2),
+            availability: item.quantity > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            url: `https://lgscardvault.com/s/${slug}/cards/${id}`,
+          },
+        }
+      : {},
+  )
 
   // The full-catalog walk pages the entire store 500 rows at a time, so only
   // staff opening the edit modal pay for it. Shoppers get the two targeted
@@ -506,6 +539,13 @@ export default function CardDetailsPage() {
           {/* Title + set. Sits beside the card on tablets; left of the buy box on desktop. */}
           <header className={cx(colPad, 'xl:col-start-2 xl:row-start-1')}>
             <h1 className="text-xl font-bold leading-snug text-fg sm:text-2xl xl:text-[1.65rem]">{productTitle}</h1>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ShareButton
+                url={`/s/${slug}/cards/${item.id}`}
+                title={`${productTitle} at ${store?.name ?? 'store'}`}
+                label="Share card"
+              />
+            </div>
             {setDisplay && setPageUrl && (
               <Link
                 to={setPageUrl}

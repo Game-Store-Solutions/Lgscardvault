@@ -42,6 +42,7 @@ import {
   clampHeroImagePosition,
 } from '../../lib/heroImageOpacity'
 import { BackgroundPresetPicker } from '../../components/store/backgrounds'
+import { StoreMarketingToolkit } from '../../components/store/StoreMarketingToolkit'
 import {
   PAGE_BACKGROUND_DEFAULTS,
   getSavedBackgroundColors,
@@ -949,6 +950,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
               </div>
             </CardBody>
           </Card>
+          <StoreMarketingToolkit slug={slug} storeName={store?.name ?? slug} />
         </TabPanel>
 
         <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-4 rounded-card border border-border bg-surface/95 px-4 py-3 shadow-card backdrop-blur-md">
