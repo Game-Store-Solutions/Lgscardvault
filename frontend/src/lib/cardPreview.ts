@@ -1,7 +1,53 @@
-import { cardImageUrl, formatPrice, scryfallNamedImageUrl } from '../api/client'
-import type { InventoryItem } from '../api/types'
+import { cardImageUrl, formatPrice, scryfallNamedImageUrl, scryfallPriceCents } from '../api/client'
+import type { CardSummary, InventoryItem } from '../api/types'
 import type { CardArtPreview } from '../components/cards'
 import { finishName } from './finishes'
+
+export type CardPrintingSelection = {
+  printingId: string
+  imageUrl: string
+  priceCents: number | null
+  priceLabel?: string
+  setName?: string | null
+}
+
+function marketFinish(card: CardSummary): 'nonfoil' | 'foil' | 'etched' {
+  const finishes = card.finishes ?? []
+  if (finishes.includes('nonfoil')) return 'nonfoil'
+  if (finishes.includes('foil')) return 'foil'
+  if (finishes.includes('etched')) return 'etched'
+  return 'nonfoil'
+}
+
+export function selectionFromCatalogPrinting(card: CardSummary): CardPrintingSelection {
+  const priceCents = scryfallPriceCents(card, marketFinish(card))
+
+  return {
+    printingId: card.id,
+    imageUrl: cardImageUrl(card),
+    priceCents,
+    priceLabel: priceCents == null ? undefined : formatPrice(priceCents),
+    setName: card.setName,
+  }
+}
+
+export function applyPrintingSelection(
+  preview: CardArtPreview,
+  selection?: CardPrintingSelection | null,
+): CardArtPreview {
+  if (!selection) {
+    return preview
+  }
+
+  return {
+    ...preview,
+    imageUrl: selection.imageUrl,
+    priceCents: selection.priceCents,
+    priceLabel: selection.priceLabel,
+    catalogCardId: selection.printingId,
+    selectedPrintingId: selection.printingId,
+  }
+}
 
 export function listingLabel(item: InventoryItem): string {
   const set = item.card.setCode ? item.card.setCode.toUpperCase() : null
@@ -47,6 +93,7 @@ export function priceLabelForCard(
 
 type PreviewSource = {
   card: {
+    id?: string
     oracleId: string
     name: string
     typeLine?: string | null
@@ -57,16 +104,22 @@ type PreviewSource = {
   inventoryOptions?: InventoryItem[] | null
 }
 
+export type BuildCardArtPreviewOptions = {
+  storeSlug?: string
+  printingSelection?: CardPrintingSelection | null
+}
+
 export function buildCardArtPreview(
   row: PreviewSource,
-  opts?: { storeSlug?: string },
+  opts?: BuildCardArtPreviewOptions,
 ): CardArtPreview {
   const catalog = row.inventoryItem?.card ?? row.card
   const options = row.inventoryOptions ?? (row.inventoryItem ? [row.inventoryItem] : [])
   const priceCents = cheapestPriceCents(row.priceCents ?? row.inventoryItem?.priceCents, options)
 
-  return {
+  const base: CardArtPreview = {
     oracleId: row.card.oracleId,
+    catalogCardId: row.card.id,
     name: row.inventoryItem?.card.name ?? row.card.name,
     typeLine: row.inventoryItem?.card.typeLine ?? row.card.typeLine,
     imageUrl: cardImageUrl(catalog),
@@ -75,6 +128,41 @@ export function buildCardArtPreview(
     inventoryOptions: options,
     storeSlug: opts?.storeSlug,
   }
+
+  return applyPrintingSelection(base, opts?.printingSelection)
+}
+
+type CommanderPreviewSource = {
+  id: string
+  oracleId: string
+  name: string
+  typeLine?: string | null
+  imageUrl?: string | null
+  inventoryItem?: InventoryItem | null
+  inventoryOptions?: InventoryItem[] | null
+}
+
+export function buildCommanderArtPreview(
+  commander: CommanderPreviewSource,
+  opts?: BuildCardArtPreviewOptions,
+): CardArtPreview {
+  const oracleId = commander.oracleId || commander.id
+
+  return buildCardArtPreview(
+    {
+      card: {
+        id: commander.id,
+        oracleId,
+        name: commander.name,
+        typeLine: commander.typeLine,
+        imageUrl: commander.imageUrl,
+      },
+      inventoryItem: commander.inventoryItem ?? null,
+      inventoryOptions: commander.inventoryOptions,
+      priceCents: commander.inventoryItem?.priceCents,
+    },
+    opts,
+  )
 }
 
 export function buildComboArtPreview(
@@ -85,7 +173,7 @@ export function buildComboArtPreview(
     inventoryItem: InventoryItem | null
     inventoryOptions?: InventoryItem[] | null
   },
-  opts?: { storeSlug?: string },
+  opts?: BuildCardArtPreviewOptions,
 ): CardArtPreview {
   const catalog = piece.inventoryItem?.card
   const oracleId = piece.oracleId ?? catalog?.oracleId ?? piece.name
@@ -95,8 +183,9 @@ export function buildComboArtPreview(
   const fromApi = piece.imageUrl ? cardImageUrl({ imageUrl: piece.imageUrl }) : ''
   const imageUrl = fromCatalog || fromApi || scryfallNamedImageUrl(piece.name)
 
-  return {
+  const base: CardArtPreview = {
     oracleId,
+    catalogCardId: catalog?.id,
     name: piece.name,
     typeLine: catalog?.typeLine,
     imageUrl,
@@ -105,4 +194,6 @@ export function buildComboArtPreview(
     inventoryOptions: options,
     storeSlug: opts?.storeSlug,
   }
+
+  return applyPrintingSelection(base, opts?.printingSelection)
 }

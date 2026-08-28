@@ -27,6 +27,7 @@ import {
   type DeckBuilderGroupBy,
 } from '../../lib/deckBuilder'
 import type { CardArtPreview } from '../../components/cards'
+import type { CardPrintingSelection } from '../../lib/cardPreview'
 import { intelligenceSummary } from './utils'
 
 export type DeckBuilderMode = 'public' | 'store'
@@ -71,6 +72,9 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
   const [deckConstraintsOpen, setDeckConstraintsOpen] = useState(false)
   const [strategiesOpen, setStrategiesOpen] = useState(true)
   const [cardPreview, setCardPreview] = useState<{ cards: CardArtPreview[]; index: number } | null>(null)
+  const [printingByOracle, setPrintingByOracle] = useState<Map<string, CardPrintingSelection>>(
+    () => new Map(),
+  )
 
   const debouncedBudgetDollars = useDebouncedValue(budgetDollars, 400)
   const debouncedMaxCardDollars = useDebouncedValue(maxCardDollars, 400)
@@ -299,6 +303,18 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
     setCardPreview({ cards, index })
   }
 
+  function selectCatalogPrinting(oracleId: string, selection: CardPrintingSelection) {
+    setPrintingByOracle((prev) => {
+      const next = new Map(prev)
+      next.set(oracleId, selection)
+      return next
+    })
+  }
+
+  function getPrintingSelection(oracleId: string) {
+    return printingByOracle.get(oracleId)
+  }
+
   const searchResults = search.data ?? []
   const showSearchGrid = !selected && query.trim().length >= 2
 
@@ -363,6 +379,9 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
     clearCommander,
     cardLinkState,
     openCardPreview,
+    printingByOracle,
+    selectCatalogPrinting,
+    getPrintingSelection,
     searchResults,
     showSearchGrid,
   }

@@ -161,6 +161,9 @@ final class CommanderRecommender
 
         $this->listingCatalog->attachInventoryOptions($store, $rows);
 
+        $commanderKey = strtolower((string) $commander->getOracleId());
+        $commanderOptions = $this->listingCatalog->optionsByOracle($store, [$commanderKey])[$commanderKey] ?? [];
+
         return [
             'commander' => [
                 'id' => (string) $commander->getId(),
@@ -172,6 +175,8 @@ final class CommanderRecommender
                 'colorIdentity' => $commander->getColorIdentity() ?? [],
                 'imageUrl' => $commander->getImageUrl(),
                 'themes' => $this->tokenizer->tokenize($commander),
+                'inventoryItem' => $commanderOptions[0] ?? null,
+                'inventoryOptions' => $commanderOptions,
             ],
             'colorIdentity' => $commander->getColorIdentity() ?? [],
             'identityCode' => $this->colorIdentity->identityCode($commander->getColorIdentity()),

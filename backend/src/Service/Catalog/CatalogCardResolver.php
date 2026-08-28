@@ -224,6 +224,22 @@ final readonly class CatalogCardResolver
     }
 
     /**
+     * Deck-builder printing picker: art, set, and market price only.
+     *
+     * @return array<string, mixed>
+     */
+    public function serializePrintingPicker(Card $card): array
+    {
+        $preview = $this->serializeCardPreview($card);
+
+        return [
+            ...$preview,
+            'prices' => $card->getPrices(),
+            'lang' => $card->getLang(),
+        ];
+    }
+
+    /**
      * Keep the renditions the storefront actually displays. Scryfall also
      * ships art_crop / border_crop which only inflate the case-cards JSON.
      *

@@ -6,6 +6,7 @@ import {
 } from '../../components/cards'
 import { Stagger, StaggerItem } from '../../components/motion'
 import type { SpellbookComboCard } from '../../hooks'
+import type { CardPrintingSelection } from '../../lib/cardPreview'
 import { buildComboArtPreview } from '../../lib/cardPreview'
 import { cx } from '../../lib/cx'
 
@@ -18,22 +19,34 @@ function pieceBadge(piece: SpellbookComboCard, storeSlug?: string): string | und
 
 /** Sized for combo pieces (2–4 cards), not full deck grids. */
 export const COMBO_PIECE_GRID_CLASS =
-  'mt-3 grid grid-cols-[repeat(auto-fill,minmax(4.75rem,1fr))] gap-2 sm:grid-cols-[repeat(auto-fill,minmax(5.25rem,1fr))] max-w-xl'
+  'mt-3 grid max-w-xl grid-cols-3 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(4.75rem,1fr))] sm:gap-2 md:grid-cols-[repeat(auto-fill,minmax(5.25rem,1fr))]'
 
 export function ComboPieceGrid({
   pieces,
   storeSlug,
+  catalogMode = false,
+  getPrintingSelection,
+  onSelectPrinting,
 }: {
   pieces: SpellbookComboCard[]
   storeSlug?: string
+  catalogMode?: boolean
+  getPrintingSelection?: (oracleId: string) => CardPrintingSelection | undefined
+  onSelectPrinting?: (oracleId: string, selection: CardPrintingSelection) => void
 }) {
   const entries = useMemo(
     () =>
-      pieces.map((piece) => ({
-        piece,
-        preview: buildComboArtPreview(piece, { storeSlug }),
-      })),
-    [pieces, storeSlug],
+      pieces.map((piece) => {
+        const oracleId = piece.oracleId ?? piece.inventoryItem?.card.oracleId ?? piece.name
+        return {
+          piece,
+          preview: buildComboArtPreview(piece, {
+            storeSlug,
+            printingSelection: getPrintingSelection?.(oracleId),
+          }),
+        }
+      }),
+    [pieces, storeSlug, getPrintingSelection],
   )
 
   const [lightbox, setLightbox] = useState<{ index: number } | null>(null)
@@ -57,8 +70,11 @@ export function ComboPieceGrid({
         <CardArtLightbox
           cards={cards}
           index={lightbox.index}
+          catalogMode={catalogMode}
           onClose={() => setLightbox(null)}
           onIndexChange={(index) => setLightbox({ index })}
+          onSelectPrinting={onSelectPrinting}
+          selectedPrintingId={(oracleId) => getPrintingSelection?.(oracleId)?.printingId}
         />
       )}
     </>

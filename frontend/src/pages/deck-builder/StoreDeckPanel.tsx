@@ -135,34 +135,39 @@ export function StoreDeckPanel({
         </details>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-btn border border-border bg-bg p-0.5">
-          {(
-            [
-              { id: 'all', label: `All (${deck.cards.length})` },
-              { id: 'in_stock', label: `In stock (${inStockCount})` },
-              { id: 'out_of_stock', label: `Not stocked (${outOfStockCount})` },
-            ] as const
-          ).map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setStockFilter(option.id)}
-              className={cx(
-                'rounded-btn px-2.5 py-1 text-xs font-bold transition-colors',
-                stockFilter === option.id
-                  ? 'bg-brand-500 text-white'
-                  : 'text-fg-muted hover:text-fg',
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
+      <div className="flex flex-col gap-3">
+        <div className="-mx-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="inline-flex min-w-max rounded-btn border border-border bg-bg p-0.5">
+            {(
+              [
+                { id: 'all', short: 'All', label: `All (${deck.cards.length})` },
+                { id: 'in_stock', short: 'In stock', label: `In stock (${inStockCount})` },
+                { id: 'out_of_stock', short: 'Not stocked', label: `Not stocked (${outOfStockCount})` },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setStockFilter(option.id)}
+                className={cx(
+                  'min-h-9 touch-manipulation rounded-btn px-2.5 py-2 text-xs font-bold transition-colors sm:min-h-0 sm:py-1',
+                  stockFilter === option.id
+                    ? 'bg-brand-500 text-white'
+                    : 'text-fg-muted hover:text-fg',
+                )}
+              >
+                <span className="sm:hidden">{option.short}</span>
+                <span className="hidden sm:inline">{option.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="text-xs text-fg-muted">
-          Showing {visibleCards.length} of {deck.cards.length}
-        </p>
-        <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-fg-muted">
+            Showing {visibleCards.length} of {deck.cards.length}
+          </p>
+          <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} className="sm:max-w-xs" />
+        </div>
       </div>
 
       {visibleCards.length === 0 ? (

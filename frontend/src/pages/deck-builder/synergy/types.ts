@@ -1,6 +1,7 @@
 import type { InventoryItem } from '../../../api/types'
 import type { CardArtPreview } from '../../../components/cards'
 import type { CommanderRecommendation } from '../../../hooks'
+import type { CardPrintingSelection } from '../../../lib/cardPreview'
 
 export interface SynergySection<TRow = CommanderRecommendation> {
   id: string
@@ -14,6 +15,7 @@ export interface SynergyViewProps {
   picked: Map<string, { oracleId: string; item: InventoryItem | null }>
   togglePick: (oracleId: string, item: InventoryItem | null) => void
   openCardPreview: (cards: CardArtPreview[], oracleId: string) => void
+  getPrintingSelection?: (oracleId: string) => CardPrintingSelection | undefined
   signedIn?: boolean
   cartQtyByInventoryId?: Map<number, number>
   onAdd?: (item: InventoryItem) => void

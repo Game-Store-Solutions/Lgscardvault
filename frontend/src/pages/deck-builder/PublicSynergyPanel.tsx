@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react'
 import { EmptyState, LoadingPanel } from '../../components/ui'
 import { GroupBySwitcher } from './GroupBySwitcher'
+import { DECK_BUILDER_STICKY_TOOLBAR } from './layoutClasses'
 import { SynergyPanelBody } from './synergy/SynergyPanelBody'
 import type { DeckBuilderState } from './useDeckBuilderState'
 
@@ -18,6 +19,7 @@ type PublicSynergyPanelProps = Pick<
   | 'picked'
   | 'togglePick'
   | 'openCardPreview'
+  | 'getPrintingSelection'
   | 'byRole'
   | 'byType'
 >
@@ -35,6 +37,7 @@ export function PublicSynergyPanel({
   picked,
   togglePick,
   openCardPreview,
+  getPrintingSelection,
   byRole,
   byType,
 }: PublicSynergyPanelProps) {
@@ -58,8 +61,8 @@ export function PublicSynergyPanel({
 
   return (
     <>
-      <div className="sticky top-[4.25rem] z-10 mb-5 rounded-card border border-border/80 bg-surface/90 p-3 shadow-sm backdrop-blur-md">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className={DECK_BUILDER_STICKY_TOOLBAR}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="font-display text-base font-extrabold text-fg">
               {packageData?.strategy.label}
@@ -75,7 +78,7 @@ export function PublicSynergyPanel({
               {nextCards.isFetching ? ' · updating…' : ''}
             </p>
           </div>
-          <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
+          <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} className="sm:max-w-xs" />
         </div>
       </div>
 
@@ -86,6 +89,7 @@ export function PublicSynergyPanel({
         picked={picked}
         togglePick={togglePick}
         openCardPreview={openCardPreview}
+        getPrintingSelection={getPrintingSelection}
       />
     </>
   )

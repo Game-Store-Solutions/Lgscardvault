@@ -227,7 +227,11 @@ export interface DeckContextSummary {
 }
 
 export interface CommanderRecommendResponse {
-  commander: CommanderSummary & { themes?: string[] }
+  commander: CommanderSummary & {
+    themes?: string[]
+    inventoryItem?: InventoryItem | null
+    inventoryOptions?: InventoryItem[]
+  }
   colorIdentity: string[]
   identityCode: string
   strategies: CommanderStrategy[]
@@ -450,5 +454,24 @@ export function useCommanderNextCards(
       return data
     },
     enabled: enabled && Boolean(slug) && Boolean(cardId) && Boolean(strategy) && deckOracleIds.length > 0,
+  })
+}
+
+export function publicCardPrintingsKey(cardId: string) {
+  return ['public-recommend-printings', cardId] as const
+}
+
+/** Catalog printings for the public deck-builder lightbox. */
+export function usePublicCardPrintings(cardId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: publicCardPrintingsKey(cardId ?? ''),
+    enabled: enabled && Boolean(cardId),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await api.get<{ items: import('../api/types').CardSummary[] }>(
+        `/recommend/cards/${cardId}/printings`,
+      )
+      return data.items
+    },
   })
 }

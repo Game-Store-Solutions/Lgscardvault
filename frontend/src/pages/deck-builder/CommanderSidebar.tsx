@@ -1,9 +1,14 @@
+import { useMemo } from 'react'
 import { CheckCircle2, ChevronDown } from 'lucide-react'
-import { CardImage } from '../../components/cards'
+import {
+  PublicFloatingCard,
+} from '../../components/cards'
 import { Skeleton } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
+import { buildCommanderArtPreview } from '../../lib/cardPreview'
 import { cx } from '../../lib/cx'
 import { DeckBuildConstraintsFields } from './DeckBuildConstraintsFields'
+import { COMMANDER_SIDEBAR_CARD_GRID } from './layoutClasses'
 import { colorPips } from './utils'
 import type { DeckBuilderState } from './useDeckBuilderState'
 
@@ -28,6 +33,9 @@ type CommanderSidebarProps = Pick<
   | 'setStrategyId'
   | 'strategiesOpen'
   | 'setStrategiesOpen'
+  | 'openCardPreview'
+  | 'getPrintingSelection'
+  | 'routeSlug'
 > & {
   showStoreConstraints: boolean
 }
@@ -52,42 +60,71 @@ export function CommanderSidebar({
   setStrategyId,
   strategiesOpen,
   setStrategiesOpen,
+  openCardPreview,
+  getPrintingSelection,
+  routeSlug,
   showStoreConstraints,
 }: CommanderSidebarProps) {
-  if (!selected) return null
+  const enrichedCommander = recommend.data?.commander
+
+  const commanderPreview = useMemo(() => {
+    if (!selected) {
+      return null
+    }
+
+    return buildCommanderArtPreview(
+        {
+          ...selected,
+          oracleId: selected.oracleId || enrichedCommander?.oracleId || selected.id,
+          inventoryItem: enrichedCommander?.inventoryItem,
+          inventoryOptions: enrichedCommander?.inventoryOptions,
+        },
+        {
+          storeSlug: showStoreConstraints ? routeSlug : undefined,
+          printingSelection: getPrintingSelection?.(selected.oracleId || selected.id),
+        },
+      )
+  }, [selected, enrichedCommander, showStoreConstraints, routeSlug, getPrintingSelection])
+
+  if (!selected || !commanderPreview) return null
+
+  const themes = enrichedCommander?.themes ?? []
 
   return (
-    <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-24 xl:w-[22rem] xl:max-h-[calc(100vh-7rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-[calc(5.5rem+env(safe-area-inset-top,0px))] xl:w-[22rem] xl:max-h-[calc(100dvh-7rem-env(safe-area-inset-top,0px))] xl:self-start xl:overflow-y-auto xl:overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
-        <div className="flex gap-3.5 p-4">
-          <div className="relative aspect-5/7 w-28 shrink-0 overflow-hidden rounded-md bg-bg shadow-sm sm:w-32">
-            <CardImage
-              src={selected.imageUrl}
-              alt={selected.name}
-              fit="contain"
-              className="absolute inset-0 size-full"
-              showLabel={false}
+        <div className="p-4">
+          <ul className={COMMANDER_SIDEBAR_CARD_GRID}>
+            <PublicFloatingCard
+              tag="li"
+              className="col-start-2"
+              showCaption={false}
+              preview={commanderPreview}
+              onPreview={() => openCardPreview([commanderPreview], commanderPreview.oracleId)}
             />
-          </div>
-          <div className="min-w-0 flex-1">
+          </ul>
+          <div className="mt-3 text-center">
             <p className="font-display text-base font-extrabold leading-snug text-fg sm:text-lg">
               {selected.name}
             </p>
-            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-muted">
-              {selected.typeLine}
-            </p>
-            <div className="mt-2.5">{colorPips(selected.colorIdentity)}</div>
-            {recommend.data?.commander.themes && recommend.data.commander.themes.length > 0 && (
-              <p className="mt-2 line-clamp-1 text-[0.7rem] font-medium capitalize text-fg-muted">
-                {recommend.data.commander.themes
+            {selected.typeLine && (
+              <p className="mt-1 text-xs leading-relaxed text-fg-muted">{selected.typeLine}</p>
+            )}
+            <div className="mt-2.5 flex justify-center">{colorPips(selected.colorIdentity)}</div>
+            {themes.length > 0 && (
+              <p className="mt-2 line-clamp-2 text-[0.7rem] font-medium capitalize text-fg-muted">
+                {themes
                   .slice(0, 3)
                   .map((tag) => tag.replaceAll('_', ' '))
                   .join(' · ')}
               </p>
             )}
+            {commanderPreview.priceLabel && (
+              <p className="mt-2 text-sm font-bold text-brand-600">{commanderPreview.priceLabel}</p>
+            )}
             <button
               type="button"
-              className="mt-2.5 text-sm font-semibold text-brand-600 underline-offset-2 transition-colors hover:text-brand-500 hover:underline"
+              className="mt-3 min-h-10 touch-manipulation text-sm font-semibold text-brand-600 underline-offset-2 transition-colors hover:text-brand-500 hover:underline"
               onClick={clearCommander}
             >
               Change commander

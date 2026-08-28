@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { Check, Search, ShoppingCart } from 'lucide-react'
 import { Button, buttonVariants, EmptyState, LoadingPanel } from '../../components/ui'
 import { GroupBySwitcher } from './GroupBySwitcher'
+import { DECK_BUILDER_STICKY_TOOLBAR } from './layoutClasses'
 import { SynergyPanelBody } from './synergy/SynergyPanelBody'
 import type { DeckBuilderState } from './useDeckBuilderState'
 
@@ -87,8 +88,8 @@ export function StoreSynergyPanel({
 
   return (
     <>
-      <div className="sticky top-[4.25rem] z-10 mb-5 rounded-card border border-border/80 bg-surface/90 p-3 shadow-sm backdrop-blur-md">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className={DECK_BUILDER_STICKY_TOOLBAR}>
+        <div className="flex flex-col gap-3">
           <div className="min-w-0">
             <p className="font-display text-base font-extrabold text-fg">
               {packageData?.strategy.label}
@@ -108,19 +109,29 @@ export function StoreSynergyPanel({
               <p className="mt-1 text-[0.7rem] font-medium text-fg-muted">{intelLine}</p>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
-            <Button type="button" variant="ghost" size="sm" onClick={toggleSelectAll}>
+          <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="min-h-10 touch-manipulation"
+              onClick={toggleSelectAll}
+            >
               {allSelected ? 'Clear' : 'Select all'}
             </Button>
             {!signedIn ? (
-              <Link to="/login" className={buttonVariants({ size: 'sm' })}>
+              <Link
+                to="/login"
+                className={buttonVariants({ size: 'sm', className: 'min-h-10 touch-manipulation justify-center' })}
+              >
                 Sign in to add
               </Link>
             ) : (
               <Button
                 type="button"
                 size="sm"
+                className="col-span-2 min-h-10 touch-manipulation sm:col-span-1"
                 loading={bulkBusy}
                 disabled={bulkBusy || picked.size === 0}
                 onClick={() => void addSelectedEnMasse()}
@@ -132,7 +143,11 @@ export function StoreSynergyPanel({
             {signedIn && (
               <Link
                 to={`/s/${routeSlug}/cart`}
-                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                className={buttonVariants({
+                  variant: 'secondary',
+                  size: 'sm',
+                  className: 'min-h-10 touch-manipulation justify-center',
+                })}
               >
                 Cart
               </Link>

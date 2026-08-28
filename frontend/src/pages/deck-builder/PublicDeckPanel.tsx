@@ -8,6 +8,7 @@ import { buttonVariants, LoadingPanel } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
 import { type CardArtPreview } from '../../components/cards'
 import { cx } from '../../lib/cx'
+import type { CardPrintingSelection } from '../../lib/cardPreview'
 import { DeckListBody } from './deck/DeckListBody'
 import { DeckBuildConstraintsFields } from './DeckBuildConstraintsFields'
 import { GroupBySwitcher } from './GroupBySwitcher'
@@ -27,6 +28,7 @@ export function PublicDeckPanel({
   groupBy,
   setGroupBy,
   onOpenCardPreview,
+  getPrintingSelection,
 }: {
   loading: boolean
   deck: AssembledDeckResponse | undefined
@@ -41,6 +43,7 @@ export function PublicDeckPanel({
   groupBy: DeckBuilderGroupBy
   setGroupBy: Dispatch<SetStateAction<DeckBuilderGroupBy>>
   onOpenCardPreview: (cards: CardArtPreview[], oracleId: string) => void
+  getPrintingSelection?: (oracleId: string) => CardPrintingSelection | undefined
 }) {
   if (loading || !deck) {
     return <LoadingPanel label="Assembling your Commander deck…" />
@@ -170,14 +173,15 @@ export function PublicDeckPanel({
         </details>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-fg-muted">{visibleCards.length} cards in list</p>
-        <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
+        <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} className="sm:max-w-xs" />
       </div>
 
       <DeckListBody
         cards={visibleCards}
         groupBy={groupBy}
+        getPrintingSelection={getPrintingSelection}
         onOpenCardPreview={onOpenCardPreview}
       />
     </div>

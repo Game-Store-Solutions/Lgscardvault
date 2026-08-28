@@ -6,6 +6,8 @@ use App\Entity\Card;
 use App\Entity\Commander;
 use App\Repository\CardRepository;
 use App\Repository\CommanderRepository;
+use App\Service\Catalog\CardPrintingsFinder;
+use App\Service\Catalog\CatalogCardResolver;
 use App\Service\Recommend\CommanderDeckAssembler;
 use App\Service\Recommend\CommanderRecommender;
 use App\Service\Recommend\StoreComboAnalyzer;
@@ -30,6 +32,8 @@ final class PublicCommanderRecommendController extends AbstractController
         private readonly CommanderRecommender $recommender,
         private readonly StoreComboAnalyzer $comboAnalyzer,
         private readonly CommanderDeckAssembler $deckAssembler,
+        private readonly CardPrintingsFinder $cardPrintingsFinder,
+        private readonly CatalogCardResolver $catalogCardResolver,
     ) {
     }
 
@@ -169,6 +173,23 @@ final class PublicCommanderRecommendController extends AbstractController
         }
     }
 
+    /** Paper printings for the public deck-builder printing picker. */
+    #[Route('/cards/{cardId}/printings', name: 'api_public_recommend_card_printings', methods: ['GET'])]
+    public function cardPrintings(string $cardId): JsonResponse
+    {
+        $card = $this->resolveCatalogCard($cardId);
+        if ($card instanceof JsonResponse) {
+            return $card;
+        }
+
+        return $this->json([
+            'items' => array_map(
+                $this->catalogCardResolver->serializePrintingPicker(...),
+                $this->cardPrintingsFinder->find($card),
+            ),
+        ]);
+    }
+
     private function optionalPositiveInt(mixed $value): ?int
     {
         if (null === $value || '' === $value) {
@@ -232,6 +253,30 @@ final class PublicCommanderRecommendController extends AbstractController
         }
 
         return $commanderCard;
+    }
+
+    private function resolveCatalogCard(string $cardId): Card|JsonResponse
+    {
+        $card = $this->cards->findOneMagicById($cardId);
+        if ($card instanceof Card) {
+            return $card;
+        }
+
+        if (!Uuid::isValid($cardId)) {
+            return $this->json(['detail' => 'Card not found.'], 404);
+        }
+
+        try {
+            $printings = $this->cards->findPrintingsByOracleId(Uuid::fromString($cardId), 1);
+        } catch (\InvalidArgumentException) {
+            return $this->json(['detail' => 'Card not found.'], 404);
+        }
+
+        if ([] === $printings) {
+            return $this->json(['detail' => 'Card not found.'], 404);
+        }
+
+        return $printings[0];
     }
 
     private function looksLikeCommander(Card $card): bool

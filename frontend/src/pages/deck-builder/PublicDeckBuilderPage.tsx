@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { Crown, Layers, Sparkles, Wand2 } from 'lucide-react'
+import { Crown } from 'lucide-react'
 import { BackButton, Tabs, TabPanel } from '../../components/ui'
 import { CardArtLightbox } from '../../components/cards'
 import { useAppShellFlush } from '../../components/layout/AppShellLayout'
@@ -10,6 +10,14 @@ import { CommanderSearchField } from './CommanderSearchField'
 import { CommanderSearchGrid } from './CommanderSearchGrid'
 import { CommanderSidebar } from './CommanderSidebar'
 import { PUBLIC_ONBOARDING_STEPS } from './constants'
+import { DECK_BUILDER_TABS } from './deckBuilderTabs'
+import {
+  DECK_BUILDER_CONTENT_SHELL,
+  DECK_BUILDER_HEADER,
+  DECK_BUILDER_LANDING_SHELL,
+  DECK_BUILDER_ONBOARDING_SHELL,
+  DECK_BUILDER_PAGE,
+} from './layoutClasses'
 import { PublicCombosPanel } from './PublicCombosPanel'
 import { PublicDeckPanel } from './PublicDeckPanel'
 import { PublicSynergyPanel } from './PublicSynergyPanel'
@@ -75,12 +83,14 @@ export default function PublicDeckBuilderPage() {
     setGroupBy,
     deck,
     openCardPreview,
+    getPrintingSelection,
+    selectCatalogPrinting,
   } = state
 
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] flex-col">
+    <div className={DECK_BUILDER_PAGE}>
       {selected ? (
-        <header className="sticky top-0 z-20 border-b border-border/60 bg-bg/85 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8">
+        <header className={DECK_BUILDER_HEADER}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <BackButton to="/">Home</BackButton>
@@ -102,7 +112,7 @@ export default function PublicDeckBuilderPage() {
           </div>
         </header>
       ) : (
-        <div className="relative mx-auto w-full max-w-5xl px-6 pt-4 sm:px-8 sm:pt-6 lg:px-10">
+        <div className={DECK_BUILDER_LANDING_SHELL}>
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 -top-8 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_srgb,var(--color-brand-500)_18%,transparent),transparent_62%)]"
@@ -113,7 +123,7 @@ export default function PublicDeckBuilderPage() {
               <Crown aria-hidden className="size-3.5" />
               Commander
             </p>
-            <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-fg sm:text-5xl">
+            <h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-fg sm:text-5xl">
               Commander Deck Builder
             </h1>
             <p className="mt-2 text-sm text-fg-muted">
@@ -146,9 +156,7 @@ export default function PublicDeckBuilderPage() {
       <section
         className={cx(
           'flex flex-1 flex-col',
-          selected
-            ? 'gap-6 px-4 py-6 sm:px-6 lg:px-8 xl:flex-row xl:items-start'
-            : 'mx-auto w-full max-w-5xl px-6 pb-16 pt-10 sm:px-8 lg:px-10',
+          selected ? DECK_BUILDER_CONTENT_SHELL : DECK_BUILDER_ONBOARDING_SHELL,
         )}
       >
         {showSearchGrid ? (
@@ -162,7 +170,7 @@ export default function PublicDeckBuilderPage() {
             {PUBLIC_ONBOARDING_STEPS.map((item) => (
               <div
                 key={item.step}
-                className="rounded-card border border-border/80 bg-surface/80 px-6 py-7 dark:glass-card"
+                className="rounded-card border border-border/80 bg-surface/80 px-4 py-6 dark:glass-card sm:px-6 sm:py-7"
               >
                 <p className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-brand-600">
                   {item.step}
@@ -180,11 +188,7 @@ export default function PublicDeckBuilderPage() {
                 aria-label="Deck builder views"
                 value={panel}
                 onChange={(id) => setPanel(id as typeof panel)}
-                tabs={[
-                  { id: 'synergy', label: 'Synergies', icon: Sparkles },
-                  { id: 'combos', label: 'Combos', icon: Wand2 },
-                  { id: 'deck', label: '100-card deck', icon: Layers },
-                ]}
+                tabs={DECK_BUILDER_TABS}
               />
               <TabPanel when="synergy" value={panel} className="pt-5">
                 <PublicSynergyPanel {...state} />
@@ -196,6 +200,8 @@ export default function PublicDeckBuilderPage() {
                   identityCode={combos.data?.identityCode ?? recommend.data?.identityCode}
                   colorIdentity={combos.data?.colorIdentity ?? selected.colorIdentity}
                   filteredOutCount={combos.data?.filteredOutCount ?? 0}
+                  getPrintingSelection={getPrintingSelection}
+                  selectCatalogPrinting={selectCatalogPrinting}
                 />
               </TabPanel>
               <TabPanel when="deck" value={panel} className="pt-5">
@@ -213,6 +219,7 @@ export default function PublicDeckBuilderPage() {
                   groupBy={groupBy}
                   setGroupBy={setGroupBy}
                   onOpenCardPreview={openCardPreview}
+                  getPrintingSelection={getPrintingSelection}
                 />
               </TabPanel>
             </div>
@@ -224,8 +231,11 @@ export default function PublicDeckBuilderPage() {
         <CardArtLightbox
           cards={cardPreview.cards}
           index={cardPreview.index}
+          catalogMode
           onClose={() => setCardPreview(null)}
           onIndexChange={(index) => setCardPreview((prev) => (prev ? { ...prev, index } : null))}
+          onSelectPrinting={selectCatalogPrinting}
+          selectedPrintingId={(oracleId) => getPrintingSelection(oracleId)?.printingId}
         />
       )}
     </div>

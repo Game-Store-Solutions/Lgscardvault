@@ -50,7 +50,7 @@ export function Tabs({ tabs, value, onChange, children, className, ...rest }: Ta
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(tab.id)}
               className={cx(
-                'relative inline-flex shrink-0 items-center gap-2 px-3.5 py-2.5 text-sm font-bold -mb-px sm:px-4',
+                'relative inline-flex min-h-11 shrink-0 touch-manipulation items-center gap-2 px-3.5 py-2.5 text-sm font-bold -mb-px sm:min-h-0 sm:px-4',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:ring-inset',
                 selected ? 'text-fg' : 'text-fg-muted hover:text-fg',
               )}

@@ -65,7 +65,7 @@ export function StoreCombosPanel({
       <Stagger immediate gap={0.08} className="space-y-3">
         {combos.map((combo) => (
           <StaggerItem key={combo.id || combo.description}>
-            <article className="rounded-card border border-border bg-surface p-4 shadow-sm">
+            <article className="rounded-card border border-border bg-surface p-3 shadow-sm sm:p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-bold text-fg">

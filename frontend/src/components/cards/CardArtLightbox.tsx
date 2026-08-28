@@ -1,15 +1,20 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useMemo } from 'react'
 import { Link } from 'react-router'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { AnimatePresence, motion } from '../motion'
 import { cardImageUrl, formatPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
-import { listingLabel, buildCardArtPreview } from '../../lib/cardPreview'
+import { usePublicCardPrintings } from '../../hooks'
+import { listingLabel, buildCardArtPreview, selectionFromCatalogPrinting, type CardPrintingSelection } from '../../lib/cardPreview'
 import { CardImage } from './CardImage'
 import { cx } from '../../lib/cx'
+import { CatalogPrintingStrip } from './CatalogPrintingStrip'
 
 export interface CardArtPreview {
   oracleId: string
+  /** Catalog printing id used to load sibling printings. */
+  catalogCardId?: string
+  selectedPrintingId?: string
   name: string
   imageUrl: string
   typeLine?: string | null
@@ -24,20 +29,51 @@ export function CardArtLightbox({
   index,
   onClose,
   onIndexChange,
+  catalogMode = false,
+  onSelectPrinting,
+  selectedPrintingId,
 }: {
   cards: CardArtPreview[]
   index: number
   onClose: () => void
   onIndexChange: (next: number) => void
+  /** Public deck builder: show catalog printings instead of store stock. */
+  catalogMode?: boolean
+  onSelectPrinting?: (oracleId: string, selection: CardPrintingSelection) => void
+  selectedPrintingId?: (oracleId: string) => string | undefined
 }) {
   const card = cards[index]
   const hasPrev = index > 0
   const hasNext = index < cards.length - 1
   const [selectedListingId, setSelectedListingId] = useState<number | null>(null)
+  const [activePrintingId, setActivePrintingId] = useState<string | null>(null)
+
+  const isCatalogCard = catalogMode && !card?.storeSlug
+  const printingsLookupId =
+    card?.selectedPrintingId ?? card?.catalogCardId ?? card?.oracleId ?? undefined
+  const printingsQuery = usePublicCardPrintings(printingsLookupId, isCatalogCard)
+  const catalogPrintings = printingsQuery.data ?? []
 
   useEffect(() => {
     setSelectedListingId(null)
+    setActivePrintingId(null)
   }, [index, card?.oracleId])
+
+  useEffect(() => {
+    if (!card || !isCatalogCard) return
+    const preferred =
+      selectedPrintingId?.(card.oracleId) ??
+      card.selectedPrintingId ??
+      card.catalogCardId ??
+      catalogPrintings[0]?.id ??
+      null
+    setActivePrintingId(preferred)
+  }, [card, isCatalogCard, selectedPrintingId, catalogPrintings])
+
+  const activeCatalogPrinting = useMemo(
+    () => catalogPrintings.find((printing) => printing.id === activePrintingId) ?? null,
+    [catalogPrintings, activePrintingId],
+  )
 
   const goPrev = useCallback(() => {
     if (hasPrev) onIndexChange(index - 1)
@@ -67,15 +103,25 @@ export function CardArtLightbox({
   const listings = card.inventoryOptions ?? []
   const selectedListing =
     listings.find((item) => item.id === selectedListingId) ?? listings[0] ?? card.inventoryOptions?.[0] ?? null
-  const displayImage =
-    selectedListing?.card != null ? cardImageUrl(selectedListing.card) : card.imageUrl
-  const displayPrice =
-    selectedListing?.priceCents ?? card.priceCents ?? (listings[0]?.priceCents ?? null)
+  const displayImage = isCatalogCard
+    ? activeCatalogPrinting
+      ? cardImageUrl(activeCatalogPrinting)
+      : card.imageUrl
+    : selectedListing?.card != null
+      ? cardImageUrl(selectedListing.card)
+      : card.imageUrl
+  const displayPrice = isCatalogCard
+    ? activeCatalogPrinting
+      ? selectionFromCatalogPrinting(activeCatalogPrinting).priceCents
+      : card.priceCents
+    : selectedListing?.priceCents ?? card.priceCents ?? listings[0]?.priceCents ?? null
+  const displayPriceLabel =
+    displayPrice != null ? formatPrice(displayPrice) : card.priceLabel
 
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-sm sm:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -86,7 +132,7 @@ export function CardArtLightbox({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] grid size-11 touch-manipulation place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:right-4 sm:top-4 sm:size-10"
           aria-label="Close card preview"
         >
           <X aria-hidden className="size-5" />
@@ -96,7 +142,7 @@ export function CardArtLightbox({
           <button
             type="button"
             onClick={goPrev}
-            className="absolute left-3 top-1/2 z-10 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:left-6"
+            className="absolute left-2 top-1/2 z-10 grid size-11 -translate-y-1/2 touch-manipulation place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:left-6"
             aria-label="Previous card"
           >
             <ChevronLeft aria-hidden className="size-6" />
@@ -104,30 +150,45 @@ export function CardArtLightbox({
         )}
 
         <motion.div
-          key={`${card.oracleId}-${selectedListingId ?? 'default'}`}
+          key={`${card.oracleId}-${activePrintingId ?? selectedListingId ?? 'default'}`}
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.2 }}
           className={cx(
             'flex max-h-[calc(100dvh-2rem)] w-full flex-col items-center',
-            listings.length > 0 ? 'max-w-lg' : 'max-w-md',
+            listings.length > 0 || (isCatalogCard && catalogPrintings.length > 0) ? 'max-w-lg' : 'max-w-md',
           )}
         >
-          <div className="w-full max-w-[min(100%,18rem)] overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15">
+          <div className="w-full max-w-[min(100%,14rem)] overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 sm:max-w-[min(100%,18rem)]">
             <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-bg" fit="contain" />
           </div>
           <div className="mt-4 w-full max-w-md text-center">
             <p className="font-display text-lg font-bold text-white">{card.name}</p>
             {card.typeLine && <p className="mt-1 text-sm text-white/75">{card.typeLine}</p>}
-            {displayPrice != null && (
-              <p className="mt-2 text-base font-bold text-brand-300">{formatPrice(displayPrice)}</p>
+            {displayPriceLabel && (
+              <p className="mt-2 text-base font-bold text-brand-300">{displayPriceLabel}</p>
             )}
             <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-white/50">
               {index + 1} of {cards.length}
             </p>
 
-            {listings.length > 0 && (
+            {isCatalogCard && (
+              <div className="mt-5 w-full">
+                <CatalogPrintingStrip
+                  items={catalogPrintings}
+                  selectedId={activePrintingId}
+                  loading={printingsQuery.isLoading}
+                  variant="lightbox"
+                  onSelect={(printing) => {
+                    setActivePrintingId(printing.id)
+                    onSelectPrinting?.(card.oracleId, selectionFromCatalogPrinting(printing))
+                  }}
+                />
+              </div>
+            )}
+
+            {!isCatalogCard && listings.length > 0 && (
               <div className="mt-4 text-left">
                 <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/45">
                   {listings.length === 1 ? 'In stock here' : 'Variants in stock'}
@@ -194,7 +255,7 @@ export function CardArtLightbox({
           <button
             type="button"
             onClick={goNext}
-            className="absolute right-3 top-1/2 z-10 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:right-6"
+            className="absolute right-2 top-1/2 z-10 grid size-11 -translate-y-1/2 touch-manipulation place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:right-6"
             aria-label="Next card"
           >
             <ChevronRight aria-hidden className="size-6" />
@@ -207,24 +268,24 @@ export function CardArtLightbox({
 
 export function previewFromRecommendation(
   row: {
-    card: { oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
+    card: { id?: string; oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
     inventoryItem?: InventoryItem | null
     priceCents?: number | null
     inventoryOptions?: InventoryItem[] | null
   },
-  opts?: { storeSlug?: string },
+  opts?: import('../../lib/cardPreview').BuildCardArtPreviewOptions,
 ): CardArtPreview {
   return buildCardArtPreview(row, opts)
 }
 
 export function previewFromDeckRow(
   row: {
-    card: { oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
+    card: { id?: string; oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
     inventoryItem?: InventoryItem | null
     priceCents?: number | null
     inventoryOptions?: InventoryItem[] | null
   },
-  opts?: { storeSlug?: string },
+  opts?: import('../../lib/cardPreview').BuildCardArtPreviewOptions,
 ): CardArtPreview {
   return buildCardArtPreview(row, opts)
 }
@@ -238,7 +299,7 @@ export function cardArtButtonClassName(compact = false) {
 
 /** Responsive grid that reaches 10 columns on large screens. */
 export const PUBLIC_FLOATING_CARD_GRID_CLASS =
-  'grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 xl:grid-cols-10'
+  'grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10'
 
 export function PublicFloatingCard({
   preview,
@@ -249,6 +310,8 @@ export function PublicFloatingCard({
   onPreview,
   badge,
   tag: Tag = 'li',
+  showCaption = true,
+  className,
 }: {
   preview: CardArtPreview
   selected?: boolean
@@ -258,9 +321,11 @@ export function PublicFloatingCard({
   onPreview: () => void
   badge?: string
   tag?: 'li' | 'div'
+  showCaption?: boolean
+  className?: string
 }) {
   return (
-    <Tag className="group min-w-0">
+    <Tag className={cx('group min-w-0', className)}>
       <div
         className={cx(
           'relative',
@@ -269,7 +334,7 @@ export function PublicFloatingCard({
       >
         {selectable && onToggle && (
           <label
-            className="absolute left-1 top-1 z-20 grid size-6 cursor-pointer place-items-center rounded-md bg-black/60 shadow-sm backdrop-blur-sm transition-colors hover:bg-black/75"
+            className="absolute left-1 top-1 z-20 grid size-8 cursor-pointer touch-manipulation place-items-center rounded-md bg-black/60 shadow-sm backdrop-blur-sm transition-colors hover:bg-black/75 sm:size-6"
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}
           >
@@ -288,9 +353,9 @@ export function PublicFloatingCard({
           title={preview.name}
           aria-label={`View ${preview.name}`}
           className={cx(
-            'relative block w-full overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-md ring-1 ring-black/10',
-            'transition duration-200 hover:-translate-y-1 hover:shadow-xl hover:ring-brand-400/70',
-            'active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
+            'relative block w-full touch-manipulation overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-md ring-1 ring-black/10',
+            'transition duration-200 active:scale-[0.98] [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-xl [@media(hover:hover)]:hover:ring-brand-400/70',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
             'cursor-zoom-in',
           )}
         >
@@ -308,13 +373,17 @@ export function PublicFloatingCard({
           )}
         </button>
       </div>
-      <p className="mt-1 truncate px-0.5 text-center text-[0.58rem] font-semibold leading-tight text-fg-muted sm:text-[0.62rem]">
-        {preview.name}
-      </p>
-      {preview.priceLabel && (
-        <p className="truncate px-0.5 text-center text-[0.58rem] font-bold leading-tight text-brand-600 sm:text-[0.62rem]">
-          {preview.priceLabel}
-        </p>
+      {showCaption && (
+        <>
+          <p className="mt-1 truncate px-0.5 text-center text-[0.58rem] font-semibold leading-tight text-fg-muted sm:text-[0.62rem]">
+            {preview.name}
+          </p>
+          {preview.priceLabel && (
+            <p className="truncate px-0.5 text-center text-[0.58rem] font-bold leading-tight text-brand-600 sm:text-[0.62rem]">
+              {preview.priceLabel}
+            </p>
+          )}
+        </>
       )}
     </Tag>
   )

@@ -39,6 +39,7 @@ export {
   useCommanderCombos,
   useCommanderDeck,
   useCommanderNextCards,
+  usePublicCardPrintings,
   commanderSearchKey,
   commanderRecommendKey,
   commanderStrategiesKey,

@@ -37,8 +37,8 @@ export function CommanderSearchField({
             'w-full border border-border bg-surface text-fg shadow-sm placeholder:text-fg-muted',
             'focus-visible:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
             compact
-              ? 'h-10 rounded-[var(--radius-input)] pl-10 pr-3 text-sm'
-              : 'h-14 rounded-full pl-12 pr-5 text-base font-medium',
+              ? 'h-11 min-h-11 rounded-[var(--radius-input)] pl-10 pr-3 text-base sm:h-10 sm:min-h-0 sm:text-sm'
+              : 'h-14 min-h-14 rounded-full pl-12 pr-5 text-base font-medium',
           )}
           autoComplete="off"
           autoFocus={autoFocus}
