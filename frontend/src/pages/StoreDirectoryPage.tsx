@@ -9,6 +9,7 @@ import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
 import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../lib/heroImageOpacity'
 import { useActiveStores, useDebouncedValue, useIsDarkTheme } from '../hooks'
 import { useAuth } from '../context/AuthContext'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 type SortKey = 'featured' | 'newest' | 'name'
 
@@ -32,7 +33,13 @@ export function StoreDirectorySkeleton() {
 }
 
 function sortStores(list: StoreType[], sort: SortKey): StoreType[] {
-  if (sort === 'newest') {
+  if (sort === 'featured') {
+    list.sort((a, b) => {
+      const featuredDelta = Number(Boolean(b.featured)) - Number(Boolean(a.featured))
+      if (featuredDelta !== 0) return featuredDelta
+      return a.name.localeCompare(b.name)
+    })
+  } else if (sort === 'newest') {
     list.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
   } else if (sort === 'name') {
     list.sort((a, b) => a.name.localeCompare(b.name))
@@ -50,6 +57,13 @@ export default function StoreDirectoryPage() {
   const [sort, setSort] = useState<SortKey>('featured')
   const debouncedQuery = useDebouncedValue(query, 200)
   const searching = debouncedQuery.trim() !== ''
+
+  usePageMeta({
+    title: 'Find local game stores',
+    description:
+      'Browse verified Magic, Pokémon, One Piece, and Flesh & Blood storefronts on LGS Card Vault. Shop real in-store inventory online.',
+    path: '/stores',
+  })
 
   const featured = useMemo(() => stores.find((s) => s.featured), [stores])
 

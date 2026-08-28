@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 
 const SITE_NAME = 'LGS Card Vault'
+export const DEFAULT_OG_IMAGE = 'https://lgscardvault.com/brand/android-chrome-512.png'
 const DEFAULT_DESCRIPTION =
   'LGS Card Vault — Magic, Pokémon, One Piece, and Flesh & Blood from trusted local game stores.'
 
@@ -42,6 +43,7 @@ function upsertLink(rel: string, href: string) {
 /** Sets document title and common SEO / Open Graph tags for the current route. */
 export function usePageMeta(meta: PageMeta) {
   const description = meta.description ?? DEFAULT_DESCRIPTION
+  const image = meta.image ?? DEFAULT_OG_IMAGE
   const url = meta.path ? `${ORIGIN}${meta.path}` : undefined
   const title = meta.title.includes(SITE_NAME) ? meta.title : `${meta.title} | ${SITE_NAME}`
 
@@ -61,10 +63,8 @@ export function usePageMeta(meta: PageMeta) {
       upsertLink('canonical', url)
     }
 
-    if (meta.image) {
-      upsertMeta('meta[property="og:image"]', { content: meta.image })
-      upsertMeta('meta[name="twitter:image"]', { content: meta.image })
-    }
+    upsertMeta('meta[property="og:image"]', { content: image })
+    upsertMeta('meta[name="twitter:image"]', { content: image })
 
     if (meta.noIndex) {
       upsertMeta('meta[name="robots"]', { content: 'noindex, nofollow' })
@@ -72,7 +72,7 @@ export function usePageMeta(meta: PageMeta) {
       const robots = document.head.querySelector('meta[name="robots"]')
       robots?.remove()
     }
-  }, [description, meta.image, meta.noIndex, meta.type, title, url])
+  }, [description, image, meta.noIndex, meta.type, title, url])
 }
 
 export function useJsonLd(id: string, data: Record<string, unknown>) {

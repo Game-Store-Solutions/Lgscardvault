@@ -8,7 +8,9 @@ use App\Entity\Store;
 use App\Entity\User;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\CustomerWantListEntryRepository;
+use App\Service\Mail\TransactionalMailer;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
  * Cross-store want-list fulfillment alerts: whenever a store lists a card,
@@ -23,6 +25,7 @@ final class WantListNotifier
     public function __construct(
         private readonly CustomerWantListEntryRepository $wantListEntries,
         private readonly CustomerNotificationRepository $notifications,
+        private readonly TransactionalMailer $mail,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -84,7 +87,13 @@ final class WantListNotifier
                 ->setBody($body);
 
             $this->entityManager->persist($notification);
-            $notified[$user->getId()] = true;
+            $notified[$user->getId()] = $user;
+
+            try {
+                $this->mail->sendWantListMatch($user, $store, $cardName);
+            } catch (TransportExceptionInterface) {
+                // In-app notification still saved if mail is down.
+            }
         }
     }
 }

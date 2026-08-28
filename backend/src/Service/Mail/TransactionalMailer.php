@@ -373,6 +373,41 @@ final class TransactionalMailer
         );
     }
 
+    /** Store-branded — a card on the shopper's want list is now in stock. */
+    public function sendWantListMatch(User $user, Store $store, string $cardName): void
+    {
+        $email = $user->getEmail();
+        if (null === $email || '' === $email) {
+            return;
+        }
+
+        $storeName = $store->getName() ?? 'Store';
+        $slug = (string) ($store->getSlug() ?? '');
+        $cardUrl = $this->frontendUrl().'/s/'.rawurlencode($slug).'?q='.rawurlencode($cardName);
+        $customerName = $user->getDisplayName() ?: 'there';
+
+        $this->sendHtml(
+            to: $email,
+            subject: sprintf('%s is in stock at %s', $cardName, $storeName),
+            htmlTemplate: 'emails/store/want_list_match.html.twig',
+            context: [
+                'preheader' => sprintf('%s is available at %s.', $cardName, $storeName),
+                'customerName' => $customerName,
+                'storeName' => $storeName,
+                'cardName' => $cardName,
+                'cardUrl' => $cardUrl,
+                'footerNote' => sprintf('Want-list alerts from %s.', $storeName),
+            ],
+            textBody: sprintf(
+                "%s is in stock at %s.\n\nView: %s\n",
+                $cardName,
+                $storeName,
+                $cardUrl,
+            ),
+            store: $store,
+        );
+    }
+
     /** Store-branded — staff accepted the shopper's sell/trade offer. */
     public function sendSellTradeAccepted(SellSubmission $submission, User $user, Store $store): void
     {

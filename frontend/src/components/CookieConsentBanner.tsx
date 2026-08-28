@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from './ui'
 import { hasGlobalPrivacyControl, readCookieConsent, writeCookieConsent } from '../lib/cookieConsent'
+import { notifyCookieConsentChanged } from './AnalyticsLoader'
 
 /**
  * Necessary-cookies notice. The app does not load advertising or analytics
@@ -15,6 +16,7 @@ export function CookieConsentBanner() {
 
   function choose(value: 'necessary' | 'all') {
     writeCookieConsent(value)
+    notifyCookieConsentChanged()
     setOpen(false)
   }
 

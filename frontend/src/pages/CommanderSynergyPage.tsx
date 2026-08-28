@@ -68,7 +68,8 @@ import {
   PUBLIC_DECK_BUILDER_SCOPE,
   type DeckBuilderNavState,
 } from '../lib/deckBuilder'
-import { usePageMeta } from '../hooks/usePageMeta'
+import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
+import { ShareButton } from '../components/ShareButton'
 
 const ROLE_META: Record<DeckRole, { label: string; blurb: string; icon: typeof Zap }> = {
   enabler: {
@@ -351,6 +352,34 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
       : 'Search commanders, pick a strategy, and fill your deck from this store\'s in-stock singles.',
     path: isPublic ? '/tools/deck-builder' : `/s/${routeSlug}/deck-builder`,
   })
+
+  useJsonLd(
+    'deck-builder-faq',
+    isPublic
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: [
+            {
+              '@type': 'Question',
+              name: 'Is the Commander deck builder free?',
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: 'Yes. The public deck builder on LGS Card Vault is free and does not require a store account.',
+              },
+            },
+            {
+              '@type': 'Question',
+              name: 'Does it work without a local game store?',
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: 'Yes. Recommendations come from the full Magic catalog. Visit a store on LGS Card Vault when you are ready to buy cards.',
+              },
+            },
+          ],
+        }
+      : {},
+  )
 
   const { data: store, isLoading: storeLoading } = useStore(isPublic ? undefined : routeSlug)
   useStoreTheme(isPublic ? undefined : store)
@@ -703,6 +732,16 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                 .
               </p>
             )}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {isPublic && (
+                <ShareButton
+                  url="/tools/deck-builder"
+                  title="Free Commander Deck Builder"
+                  text="Build a strategy-aware Commander deck with combos on LGS Card Vault."
+                  label="Share deck builder"
+                />
+              )}
+            </div>
             <div className="mt-8">
               <CommanderSearchField
                 value={query}

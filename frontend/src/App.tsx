@@ -45,6 +45,7 @@ import GuestOrderBalancePage from './pages/GuestOrderBalancePage'
 import PricingPage from './pages/PricingPage'
 import PublicDeckBuilderPage from './pages/PublicDeckBuilderPage'
 import { CookieConsentBanner } from './components/CookieConsentBanner'
+import { AnalyticsLoader } from './components/AnalyticsLoader'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +72,7 @@ export default function App() {
         <MotionRoot>
         <BrowserRouter>
           <ScrollToTop />
+          <AnalyticsLoader />
           <Routes>
             {/* Full-screen auth flow (no app navbar) */}
             <Route element={<AuthLayout />}>
