@@ -57,6 +57,7 @@ import {
   CardImage,
   cardArtButtonClassName,
   previewFromRecommendation,
+  previewFromDeckRow,
   type CardArtPreview,
 } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
@@ -1618,12 +1619,7 @@ function DeckPanel({
     if (stockFilter === 'out_of_stock') return !row.inventoryItem
     return true
   })
-  const previewCards: CardArtPreview[] = visibleCards.map((row) => ({
-    oracleId: row.card.oracleId,
-    name: row.inventoryItem?.card.name ?? row.card.name,
-    typeLine: row.inventoryItem?.card.typeLine ?? row.card.typeLine,
-    imageUrl: cardImage(row.inventoryItem?.card ?? row.card),
-  }))
+  const previewCards: CardArtPreview[] = visibleCards.map((row) => previewFromDeckRow(row))
   const intel = deck.intelligence
   const intelLine = intelligenceSummary(intel)
   const structureBits = (['lands', 'ramp', 'draw', 'removal'] as const)

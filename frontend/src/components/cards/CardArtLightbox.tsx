@@ -1,13 +1,14 @@
 import { useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { AnimatePresence, motion } from '../motion'
+import { cardImageUrl } from '../../api/client'
 import { CardImage } from './CardImage'
 import { cx } from '../../lib/cx'
 
 export interface CardArtPreview {
   oracleId: string
   name: string
-  imageUrl: string | null
+  imageUrl: string
   typeLine?: string | null
 }
 
@@ -126,7 +127,20 @@ export function previewFromRecommendation(row: {
     oracleId: row.card.oracleId,
     name: row.card.name,
     typeLine: row.card.typeLine,
-    imageUrl: catalogCard.imageUrl ?? row.card.imageUrl ?? null,
+    imageUrl: cardImageUrl(catalogCard),
+  }
+}
+
+export function previewFromDeckRow(row: {
+  card: { oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
+  inventoryItem?: { card: { name?: string; typeLine?: string | null; imageUrl?: string | null } } | null
+}): CardArtPreview {
+  const catalogCard = row.inventoryItem?.card ?? row.card
+  return {
+    oracleId: row.card.oracleId,
+    name: row.inventoryItem?.card.name ?? row.card.name,
+    typeLine: row.inventoryItem?.card.typeLine ?? row.card.typeLine,
+    imageUrl: cardImageUrl(catalogCard),
   }
 }
 

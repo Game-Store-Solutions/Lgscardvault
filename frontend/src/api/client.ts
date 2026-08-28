@@ -93,6 +93,16 @@ export function cardImage(
   )
 }
 
+export type CardImageSource = Parameters<typeof cardImage>[0]
+
+/** Resolved catalog art URL; empty string lets CardImage render its placeholder. */
+export function cardImageUrl(
+  card: CardImageSource,
+  opts?: Parameters<typeof cardImage>[1],
+): string {
+  return cardImage(card, opts) ?? ''
+}
+
 /**
  * Fast first paint + sharp display: use `normal` as `src` (1x), and offer
  * `large` as the 2x candidate so retina tiles look sharp without forcing PNG
