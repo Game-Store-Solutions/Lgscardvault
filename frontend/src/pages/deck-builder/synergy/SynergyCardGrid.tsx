@@ -22,7 +22,7 @@ export function SynergyCardGrid({
   picked,
   togglePick,
   openCardPreview,
-  selectable = true,
+  selectable = Boolean(storeSlug),
 }: SynergyCardGridProps) {
   const previewCards = rows.map((row) => previewFromRecommendation(row, { storeSlug }))
 

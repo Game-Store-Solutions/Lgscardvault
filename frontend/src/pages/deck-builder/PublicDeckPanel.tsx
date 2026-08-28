@@ -125,16 +125,6 @@ export function PublicDeckPanel({
               {deck.filledSize} / {deck.targetSize} · {deck.strategy.label}
             </p>
             <p className="mt-1 text-xs text-fg-muted">
-              {deck.bracket.label}
-              {deck.bracket.auto ? ' · auto' : ''}
-              {' · '}
-              {deck.budget.limitCents != null
-                ? `${formatPrice(deck.budget.spentCents)} of ${formatPrice(deck.budget.limitCents)}`
-                : formatPrice(deck.budget.spentCents)}
-              {' · '}
-              {deck.cards.length} cards in list
-            </p>
-            <p className="mt-1 text-xs text-fg-muted">
               {structureBits} · avg MV {deck.averageManaValue}
             </p>
             {deck.gaps.length > 0 && (

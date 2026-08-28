@@ -33,7 +33,7 @@ export function SynergyGroupedGrid({
                 {roleMeta?.blurb && <p className="text-xs text-fg-muted">{roleMeta.blurb}</p>}
               </div>
             </div>
-            <SynergyCardGrid {...gridProps} rows={section.rows} selectable />
+            <SynergyCardGrid {...gridProps} rows={section.rows} selectable={Boolean(gridProps.storeSlug)} />
           </section>
         )
       })}
