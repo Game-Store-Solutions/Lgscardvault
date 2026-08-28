@@ -44,6 +44,8 @@ import LegalPage from './pages/LegalPage'
 import GuestOrderBalancePage from './pages/GuestOrderBalancePage'
 import PricingPage from './pages/PricingPage'
 import PublicDeckBuilderPage from './pages/PublicDeckBuilderPage'
+import NewsletterAdminPage from './pages/platform-admin/NewsletterAdminPage'
+import NewsletterUnsubscribePage from './pages/NewsletterUnsubscribePage'
 import { CookieConsentBanner } from './components/CookieConsentBanner'
 import { AnalyticsLoader } from './components/AnalyticsLoader'
 
@@ -90,6 +92,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route index element={<HomePage />} />
               <Route path="pricing" element={<PricingPage />} />
+              <Route path="newsletter/unsubscribe" element={<NewsletterUnsubscribePage />} />
               <Route path="tools/deck-builder" element={<PublicDeckBuilderPage />} />
               <Route path="stores" element={<StoreDirectoryPage />} />
               {/* Global identity settings + "your stores". One account across the marketplace */}
@@ -156,6 +159,7 @@ export default function App() {
               <Route path="users" element={<PlatformUsersPage />} />
               <Route path="reports" element={<PlatformReportsPage />} />
               <Route path="patch-notes" element={<PatchNotesTab />} />
+              <Route path="newsletter" element={<NewsletterAdminPage />} />
               <Route path="sync-jobs" element={<SyncJobsPage />} />
               <Route path="stores/:slug/imports" element={<PlatformStoreImportsPage />} />
             </Route>

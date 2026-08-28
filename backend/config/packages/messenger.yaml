@@ -43,3 +43,4 @@ framework:
             App\Message\RefreshCommanderIntelligenceMessage: async
             App\Message\RefreshStaleCommanderIntelligenceMessage: async
             App\Message\PruneReferenceDecksMessage: async
+            App\Message\SendNewsletterCampaignMessage: async

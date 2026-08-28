@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\NewsletterSubscriber;
+use App\Repository\NewsletterSubscriberRepository;
 use App\Security\ApiRateLimit;
 use App\Service\Mail\TransactionalMailer;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -21,6 +22,7 @@ final class NewsletterController extends AbstractController
 
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly NewsletterSubscriberRepository $subscribers,
         private readonly TransactionalMailer $mailer,
         #[Autowire(service: 'limiter.newsletter_signup')]
         private readonly RateLimiterFactoryInterface $newsletterLimiter,
@@ -53,12 +55,21 @@ final class NewsletterController extends AbstractController
         $source = '' === $source ? 'landing' : mb_substr($source, 0, 32);
 
         $created = false;
-        try {
-            $this->em->persist(new NewsletterSubscriber($email, $source));
-            $this->em->flush();
-            $created = true;
-        } catch (UniqueConstraintViolationException) {
-            // Already subscribed — respond the same so we do not leak addresses.
+        $existing = $this->subscribers->findOneByEmail($email);
+        if ($existing instanceof NewsletterSubscriber) {
+            if (!$existing->isActive()) {
+                $existing->resubscribe($source);
+                $this->em->flush();
+                $created = true;
+            }
+        } else {
+            try {
+                $this->em->persist(new NewsletterSubscriber($email, $source));
+                $this->em->flush();
+                $created = true;
+            } catch (UniqueConstraintViolationException) {
+                // Race — treat as already subscribed.
+            }
         }
 
         if ($created) {
@@ -66,6 +77,29 @@ final class NewsletterController extends AbstractController
         }
 
         return $this->json(['status' => 'subscribed'], 202);
+    }
+
+    #[Route('/newsletter/unsubscribe', name: 'api_newsletter_unsubscribe', methods: ['POST'])]
+    public function unsubscribe(Request $request): JsonResponse
+    {
+        $payload = $request->toArray();
+        $token = trim((string) ($payload['token'] ?? $request->query->get('token', '')));
+
+        if ('' === $token) {
+            return $this->json(['detail' => 'Unsubscribe token is required.'], 422);
+        }
+
+        $subscriber = $this->subscribers->findOneByToken($token);
+        if (!$subscriber instanceof NewsletterSubscriber) {
+            return $this->json(['detail' => 'This unsubscribe link is invalid or has expired.'], 404);
+        }
+
+        if ($subscriber->isActive()) {
+            $subscriber->unsubscribe();
+            $this->em->flush();
+        }
+
+        return $this->json(['status' => 'unsubscribed']);
     }
 
     private function notifyTeam(string $email, string $source): void

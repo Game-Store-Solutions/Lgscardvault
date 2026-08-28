@@ -27,6 +27,11 @@ Optional backend var: `APP_NEWSLETTER_RECIPIENTS` — comma-separated inboxes th
 receive new newsletter signups (`POST /api/newsletter`). Unset, it falls back to
 `APP_CONTACT_RECIPIENTS`, then the platform owners.
 
+Newsletter **broadcasts** are composed at `/platform/admin/newsletter` and queued
+on the `async` messenger transport (`SendNewsletterCampaignMessage`). The worker
+must be running (`messenger:consume async`) or sends will stay stuck in `sending`.
+Run migration `Version20260828020000` before using campaigns.
+
 JWT **key files** (`config/jwt/*.pem`) are not env vars — generate once on the
 server (`lexik:jwt:generate-keypair`); see [`LAUNCH.md`](LAUNCH.md).
 
