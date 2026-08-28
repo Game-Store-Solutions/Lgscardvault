@@ -176,7 +176,7 @@ export function CardArtLightbox({
                 : 'max-w-[min(100%,14rem)] sm:max-w-[min(100%,18rem)]',
             )}
           >
-            <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-bg" fit="contain" />
+            <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-transparent" fit="contain" />
           </motion.div>
           <div
             className={cx(
@@ -194,7 +194,7 @@ export function CardArtLightbox({
             </p>
 
             {isCatalogCard && (
-              <div className="mt-5 w-full text-left">
+              <div className="mt-5 w-full text-center">
                 <CatalogPrintingStrip
                   items={catalogPrintings}
                   selectedId={activePrintingId}

@@ -47,75 +47,77 @@ export function CatalogPrintingStrip({
     <div className="w-full">
       <p
         className={cx(
-          'text-[0.65rem] font-bold uppercase tracking-[0.14em]',
+          'text-center text-[0.65rem] font-bold uppercase tracking-[0.14em]',
           isLightbox ? 'text-white/45' : 'text-fg-muted',
         )}
       >
         {items.length === 1 ? 'Printing' : 'Available printings'}
       </p>
-      <ul
-        className={cx(
-          'mt-3 flex w-full snap-none justify-start gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/25 [&::-webkit-scrollbar-track]:bg-transparent',
-        )}
-      >
+      <ul className="mt-4 flex flex-wrap items-start justify-center gap-x-4 gap-y-5">
         {items.map((printing) => {
           const active = printing.id === selectedId
           const priceLabel = catalogPrintingPriceLabel(printing)
           const lang = printing.lang?.toLowerCase()
 
           return (
-            <li key={printing.id} className="w-[7.25rem] shrink-0 sm:w-[8.5rem]">
+            <li key={printing.id} className="w-[5.75rem] sm:w-24">
               <button
                 type="button"
                 onClick={() => onSelect(printing)}
-                className={cx(
-                  'w-full touch-manipulation overflow-hidden rounded-lg text-left transition-[box-shadow,ring-color] duration-200',
-                  isLightbox
-                    ? active
-                      ? 'ring-2 ring-brand-400'
-                      : 'ring-1 ring-white/20 hover:ring-white/40'
-                    : active
-                      ? 'ring-2 ring-brand-500 ring-offset-1 ring-offset-bg'
-                      : 'ring-1 ring-border hover:ring-brand-300',
-                )}
+                className="group flex w-full touch-manipulation flex-col items-center gap-1.5 text-center"
               >
-                <CardImage
-                  src={cardImageUrl(printing)}
-                  alt={printing.name}
-                  fit="contain"
-                  showLabel={false}
-                  className="aspect-5/7 w-full bg-bg"
-                />
-                <span
+                <div
                   className={cx(
-                    'block px-2 py-2',
-                    isLightbox ? 'text-white' : 'text-fg',
+                    'w-full overflow-hidden rounded-xl shadow-2xl transition-[box-shadow,ring-color] duration-200',
+                    isLightbox
+                      ? active
+                        ? 'shadow-brand-500/20 ring-2 ring-brand-400'
+                        : 'ring-1 ring-white/15 group-hover:ring-white/35'
+                      : active
+                        ? 'ring-2 ring-brand-500 shadow-md'
+                        : 'ring-1 ring-border shadow-sm group-hover:ring-brand-300',
                   )}
                 >
+                  <CardImage
+                    src={cardImageUrl(printing)}
+                    alt={printing.name}
+                    fit="contain"
+                    showLabel={false}
+                    className="aspect-5/7 w-full bg-transparent"
+                  />
+                </div>
+                <span
+                  className={cx(
+                    'line-clamp-2 w-full px-0.5 text-[0.62rem] font-medium leading-snug sm:text-xs',
+                    isLightbox
+                      ? 'text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]'
+                      : 'text-fg-muted',
+                  )}
+                >
+                  {printing.setName ?? printing.setCode?.toUpperCase() ?? 'Unknown set'}
+                </span>
+                {priceLabel ? (
                   <span
                     className={cx(
-                      'line-clamp-2 text-[0.65rem] font-semibold leading-snug sm:text-xs',
-                      isLightbox && 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]',
+                      'text-xs font-bold leading-none sm:text-sm',
+                      isLightbox ? 'text-brand-300' : 'text-brand-600',
                     )}
                   >
-                    {printing.setName ?? printing.setCode?.toUpperCase() ?? 'Unknown set'}
+                    {priceLabel}
                   </span>
-                  {priceLabel ? (
-                    <span
-                      className={cx(
-                        'mt-1 block text-xs font-bold leading-tight sm:text-sm',
-                        isLightbox ? 'text-brand-300' : 'text-brand-600',
-                      )}
-                    >
-                      {priceLabel}
-                    </span>
-                  ) : (
-                    <span className="mt-1 block text-xs text-fg-muted">—</span>
-                  )}
-                  {lang && lang !== 'en' && (
-                    <span className="mt-0.5 block text-[0.6rem] font-bold uppercase text-fg-muted">{lang}</span>
-                  )}
-                </span>
+                ) : (
+                  <span className={cx('text-xs', isLightbox ? 'text-white/50' : 'text-fg-muted')}>—</span>
+                )}
+                {lang && lang !== 'en' && (
+                  <span
+                    className={cx(
+                      'text-[0.6rem] font-bold uppercase',
+                      isLightbox ? 'text-white/45' : 'text-fg-muted',
+                    )}
+                  >
+                    {lang}
+                  </span>
+                )}
               </button>
             </li>
           )
