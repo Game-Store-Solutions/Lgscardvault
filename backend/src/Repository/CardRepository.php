@@ -968,6 +968,68 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Oracle ids for commander-legal filler, ordered by EDHREC rank.
+     *
+     * Used when assembling public decks from the full catalog rather than a
+     * store shelf. Legality is still checked during candidate generation;
+     * this query only narrows by color identity and popularity.
+     *
+     * @param list<string>|null $commanderColorIdentity
+     *
+     * @return list<string>
+     */
+    public function findCommanderLegalFillerOracleIds(?array $commanderColorIdentity, int $limit = 1200): array
+    {
+        $limit = max(1, min(3000, $limit));
+        $fetchLimit = min($limit * 3, 5000);
+
+        $qb = $this->magicScoped()
+            ->addSelect('COALESCE(c.edhrecRank, 2147483647) AS HIDDEN edhrecSort')
+            ->orderBy('edhrecSort', 'ASC')
+            ->addOrderBy('c.id', 'ASC')
+            ->setMaxResults($fetchLimit);
+
+        $this->applyColorIdentitySubset($qb, $commanderColorIdentity);
+
+        /** @var list<Card> $rows */
+        $rows = $qb->getQuery()->getResult();
+
+        $out = [];
+        foreach ($rows as $card) {
+            $key = strtolower((string) $card->getOracleId());
+            if (isset($out[$key])) {
+                continue;
+            }
+            $out[$key] = $key;
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return array_values($out);
+    }
+
+    /**
+     * @param list<string>|null $commanderColorIdentity
+     */
+    private function applyColorIdentitySubset(QueryBuilder $qb, ?array $commanderColorIdentity): void
+    {
+        if (null === $commanderColorIdentity) {
+            return;
+        }
+
+        $allowed = array_map('strval', $commanderColorIdentity);
+        foreach (['W', 'U', 'B', 'R', 'G'] as $letter) {
+            if (in_array($letter, $allowed, true)) {
+                continue;
+            }
+            $param = 'ciExclude'.$letter;
+            $qb->andWhere('(c.colorIdentity IS NULL OR CAST_AS_TEXT(c.colorIdentity) NOT LIKE :'.$param.')')
+                ->setParameter($param, '%"'.$letter.'"%');
+        }
+    }
+
+    /**
      * Base query for the LEGACY helpers above (name search, exact name,
      * natural key, set-code lookups). Those all predate the multi-game
      * catalog and back Magic-only surfaces — deck imports, CSV resolution,

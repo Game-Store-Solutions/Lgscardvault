@@ -14,6 +14,21 @@ import { DeckBuildConstraintsFields } from './DeckBuildConstraintsFields'
 import { GroupBySwitcher } from './GroupBySwitcher'
 import type { DeckBracket } from './utils'
 
+function partitionDeckGaps(gaps: string[]) {
+  const structural: string[] = []
+  const advisory: string[] = []
+
+  for (const gap of gaps) {
+    if (gap.startsWith('Short ') || gap.startsWith('Deck short')) {
+      structural.push(gap)
+    } else {
+      advisory.push(gap)
+    }
+  }
+
+  return { structural, advisory }
+}
+
 export function PublicDeckPanel({
   loading,
   deck,
@@ -57,9 +72,14 @@ export function PublicDeckPanel({
   const structure = deck.structure?.actual ?? {}
   const targets = deck.structure?.targets ?? {}
   const visibleCards = deck.cards
-  const structureBits = (['lands', 'ramp', 'draw', 'removal'] as const)
-    .map((role) => `${role} ${structure[role] ?? 0}/${targets[role] ?? 0}`)
-    .join(' · ')
+  const isDeckComplete = deck.filledSize >= deck.targetSize
+  const { structural: structuralGaps, advisory: advisoryGaps } = partitionDeckGaps(deck.gaps)
+  const priceCents = catalogDeckTotalCents ?? deck.budget.spentCents
+  const budgetLimitCents = deck.budget.limitCents
+  const isOverBudget =
+    budgetLimitCents != null && priceCents != null && priceCents > budgetLimitCents
+  const overBudgetCents = isOverBudget ? priceCents - budgetLimitCents : 0
+  const structureRoles = ['lands', 'ramp', 'draw', 'removal'] as const
 
   return (
     <div className="space-y-4">
@@ -126,17 +146,27 @@ export function PublicDeckPanel({
       <div className="rounded-card border border-border bg-surface p-4 shadow-sm">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            <p className="font-display text-base font-extrabold text-fg">
+            <p
+              className={cx(
+                'font-display font-extrabold text-fg',
+                isDeckComplete ? 'text-lg sm:text-xl' : 'text-base',
+              )}
+            >
               {deck.filledSize} / {deck.targetSize} · {deck.strategy.label}
             </p>
-            {catalogDeckTotalCents != null && (
+            {priceCents != null && (
               <div className="text-left sm:text-right">
                 <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-fg-muted">
                   Est. deck price
                 </p>
                 <p className="font-display text-2xl font-extrabold leading-none text-brand-600 tabular-nums sm:text-3xl">
-                  {formatPrice(catalogDeckTotalCents)}
+                  {formatPrice(priceCents)}
                 </p>
+                {isOverBudget && (
+                  <p className="mt-1 text-xs font-semibold text-warning-700">
+                    Over budget by {formatPrice(overBudgetCents)}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -144,10 +174,28 @@ export function PublicDeckPanel({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs text-fg-muted">
-                {structureBits} · avg MV {deck.averageManaValue}
+                {structureRoles.map((role, index) => {
+                  const have = structure[role] ?? 0
+                  const want = targets[role] ?? 0
+                  const met = want <= 0 || have >= want
+
+                  return (
+                    <span key={role}>
+                      {index > 0 && ' · '}
+                      <span className={met ? undefined : 'font-medium text-warning-700'}>
+                        {role} {have}/{want}
+                      </span>
+                    </span>
+                  )
+                })}
+                {' · '}avg MV {deck.averageManaValue}
               </p>
-              {deck.gaps.length > 0 && (
-                <p className="mt-1.5 text-xs font-medium text-warning-700">{deck.gaps[0]}</p>
+              {isDeckComplete ? (
+                <p className="mt-1.5 text-xs font-medium text-success-700">100-card list ready</p>
+              ) : (
+                structuralGaps.length > 0 && (
+                  <p className="mt-1.5 text-xs font-medium text-warning-700">{structuralGaps[0]}</p>
+                )
               )}
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -166,6 +214,13 @@ export function PublicDeckPanel({
               : ''}
           </summary>
           <div className="mt-2 space-y-1.5 text-xs text-fg-muted">
+            {advisoryGaps.length > 0 && (
+              <ul className="space-y-1">
+                {advisoryGaps.map((gap) => (
+                  <li key={gap}>{gap}</li>
+                ))}
+              </ul>
+            )}
             {deck.budget.maxCardCents != null && (
               <p>Max {formatPrice(deck.budget.maxCardCents)} per card</p>
             )}

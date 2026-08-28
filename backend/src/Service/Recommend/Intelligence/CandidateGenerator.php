@@ -5,6 +5,7 @@ namespace App\Service\Recommend\Intelligence;
 use App\Entity\Card;
 use App\Entity\InventoryItem;
 use App\Entity\Store;
+use App\Repository\CardRepository;
 use App\Repository\InventoryItemRepository;
 
 /**
@@ -35,17 +36,30 @@ use App\Repository\InventoryItemRepository;
 final class CandidateGenerator
 {
     /**
-     * Ceiling on cards handed to the scorer. Reference samples contribute a few
+     * Ceiling on nonbasic cards handed to the scorer. Reference samples contribute a few
      * hundred distinct cards; the rest is stock. Well above what any deck needs
      * and far below "score every card in Magic".
      */
     private const MAX_CANDIDATES = 900;
 
+    /** Extra catalog cards for public (non-store) deck assembly. */
+    private const CATALOG_FILLER_LIMIT = 1200;
+
     /** Inventory rows pulled per request; the repository already caps at 4000. */
     private const STOCK_LIMIT = 4000;
 
+    /** @var array<string, string> */
+    private const BASIC_LAND_NAMES = [
+        'W' => 'Plains',
+        'U' => 'Island',
+        'B' => 'Swamp',
+        'R' => 'Mountain',
+        'G' => 'Forest',
+    ];
+
     public function __construct(
         private readonly InventoryItemRepository $inventoryItems,
+        private readonly CardRepository $cards,
         private readonly CardProfileIndex $profiles,
         private readonly CommanderLegalityValidator $legality,
     ) {
@@ -76,19 +90,14 @@ final class CandidateGenerator
             $excluded[strtolower((string) $oracleId)] = true;
         }
 
-        // Union of the two sources, reference cards first so the ordering below
-        // favours cards the archetype actually plays.
-        $pool = [];
-        foreach ($this->orderedReferenceOracleIds($intelligence) as $oracleId) {
-            $pool[$oracleId] = true;
-        }
-        if ($includeOutOfStock || null !== $store) {
-            foreach (array_keys($stockByOracle) as $oracleId) {
-                $pool[$oracleId] = true;
-            }
-        }
-
-        $poolIds = array_keys($pool);
+        $poolIds = $this->buildPoolOracleIds(
+            $store,
+            $commander,
+            $intelligence,
+            $stockByOracle,
+            $includeOutOfStock,
+            $includeBasicLands,
+        );
         $considered = count($poolIds);
 
         // One bulk query for every card we might score.
@@ -96,6 +105,7 @@ final class CandidateGenerator
 
         $candidates = [];
         $rejected = [];
+        $nonBasicCount = 0;
         foreach ($poolIds as $oracleId) {
             if (isset($excluded[$oracleId])) {
                 continue;
@@ -117,7 +127,8 @@ final class CandidateGenerator
             // most likely to appear in every reference deck, so leaving them in
             // a browsing list would push them to the top on frequency alone.
             // Deck assembly opts back in, because it does have to build a mana
-            // base.
+            // base. Basics are always included when requested and do not count
+            // toward the nonbasic candidate cap.
             if (!$includeBasicLands && $profile->isBasicLand) {
                 continue;
             }
@@ -128,9 +139,13 @@ final class CandidateGenerator
                 continue;
             }
 
+            if (!$profile->isBasicLand && $nonBasicCount >= self::MAX_CANDIDATES) {
+                continue;
+            }
+
             $candidates[$oracleId] = $profile;
-            if (count($candidates) >= self::MAX_CANDIDATES) {
-                break;
+            if (!$profile->isBasicLand) {
+                ++$nonBasicCount;
             }
         }
 
@@ -140,6 +155,83 @@ final class CandidateGenerator
             'rejected' => $rejected,
             'consideredCount' => $considered,
         ];
+    }
+
+    /**
+     * @param array<string, InventoryItem> $stockByOracle
+     *
+     * @return list<string>
+     */
+    private function buildPoolOracleIds(
+        ?Store $store,
+        Card $commander,
+        CommanderIntelligence $intelligence,
+        array $stockByOracle,
+        bool $includeOutOfStock,
+        bool $includeBasicLands,
+    ): array {
+        $seen = [];
+        $ordered = [];
+
+        $add = function (string $oracleId) use (&$seen, &$ordered): void {
+            $key = strtolower(trim($oracleId));
+            if ('' === $key || isset($seen[$key])) {
+                return;
+            }
+            $seen[$key] = true;
+            $ordered[] = $key;
+        };
+
+        if ($includeBasicLands) {
+            foreach ($this->basicLandOracleIds($commander) as $oracleId) {
+                $add($oracleId);
+            }
+        }
+
+        foreach ($this->orderedReferenceOracleIds($intelligence) as $oracleId) {
+            $add($oracleId);
+        }
+
+        if ($includeOutOfStock || null !== $store) {
+            foreach (array_keys($stockByOracle) as $oracleId) {
+                $add($oracleId);
+            }
+        }
+
+        if (null === $store) {
+            foreach ($this->cards->findCommanderLegalFillerOracleIds(
+                $commander->getColorIdentity(),
+                self::CATALOG_FILLER_LIMIT,
+            ) as $oracleId) {
+                $add($oracleId);
+            }
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function basicLandOracleIds(Card $commander): array
+    {
+        $identity = $commander->getColorIdentity() ?? [];
+        $colors = [] === $identity ? array_keys(self::BASIC_LAND_NAMES) : $identity;
+
+        $out = [];
+        foreach ($colors as $color) {
+            $name = self::BASIC_LAND_NAMES[$color] ?? null;
+            if (null === $name) {
+                continue;
+            }
+            $card = $this->cards->findOneByExactName($name);
+            if (!$card instanceof Card) {
+                continue;
+            }
+            $out[] = strtolower((string) $card->getOracleId());
+        }
+
+        return $out;
     }
 
     /**

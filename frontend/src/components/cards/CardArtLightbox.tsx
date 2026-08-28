@@ -171,13 +171,18 @@ export function CardArtLightbox({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.15 }}
               className={cx(
-                'w-full overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15',
+                'relative aspect-5/7 w-full overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15',
                 isCatalogCard
                   ? 'max-w-[min(100%,12.5rem)] sm:max-w-[min(100%,16rem)]'
                   : 'max-w-[min(100%,14rem)] sm:max-w-[min(100%,18rem)]',
               )}
             >
-              <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-transparent" fit="contain" />
+              <CardImage
+                src={displayImage}
+                alt={card.name}
+                className="absolute inset-0 h-full w-full bg-transparent"
+                fit="contain"
+              />
             </motion.div>
             <div
               className={cx(
@@ -201,7 +206,9 @@ export function CardArtLightbox({
           <div
             className={cx(
               'w-full min-h-0 text-center',
-              isCatalogCard ? 'mt-2 max-w-3xl flex-1 px-1 sm:mt-3' : 'max-w-md',
+              isCatalogCard
+                ? 'mt-2 flex max-w-3xl flex-1 flex-col overflow-hidden px-1 sm:mt-3'
+                : 'max-w-md',
             )}
           >
             {isCatalogCard && (

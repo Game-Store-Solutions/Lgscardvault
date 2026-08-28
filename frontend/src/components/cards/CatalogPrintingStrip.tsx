@@ -46,7 +46,7 @@ export function CatalogPrintingStrip({
     'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
 
   return (
-    <div className={cx('w-full', isLightbox && 'flex min-h-0 flex-col')}>
+    <div className={cx('w-full', isLightbox && 'flex min-h-0 flex-1 flex-col')}>
       <p
         className={cx(
           'shrink-0 text-center text-[0.65rem] font-bold uppercase tracking-[0.14em]',
@@ -58,17 +58,14 @@ export function CatalogPrintingStrip({
       <div
         className={cx(
           isLightbox
-            ? cx(
-                'mt-2 min-h-0 max-h-[min(13rem,34dvh)] sm:mt-3 sm:max-h-[min(18rem,38dvh)]',
-                scrollClassName,
-              )
+            ? cx('mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain py-0.5', scrollClassName)
             : undefined,
         )}
       >
         <ul
           className={cx(
             isLightbox
-              ? 'grid grid-cols-3 justify-items-center gap-x-2 gap-y-3 px-0.5 sm:grid-cols-4 sm:gap-x-3 sm:gap-y-4 md:grid-cols-5 lg:grid-cols-6'
+              ? 'grid grid-cols-3 items-start justify-items-center gap-x-2 gap-y-3 px-0.5 sm:grid-cols-4 sm:gap-x-3 sm:gap-y-4 md:grid-cols-5 lg:grid-cols-6'
               : 'mt-4 flex flex-wrap items-start justify-center gap-x-4 gap-y-5',
           )}
         >
@@ -86,7 +83,7 @@ export function CatalogPrintingStrip({
               >
                 <div
                   className={cx(
-                    'w-full overflow-hidden rounded-xl shadow-2xl transition-[box-shadow,ring-color] duration-200',
+                    'relative aspect-5/7 w-full overflow-hidden rounded-xl shadow-2xl transition-[box-shadow,ring-color] duration-200',
                     isLightbox
                       ? active
                         ? 'shadow-brand-500/20 ring-2 ring-brand-400'
@@ -101,7 +98,7 @@ export function CatalogPrintingStrip({
                     alt={printing.name}
                     fit="contain"
                     showLabel={false}
-                    className="aspect-5/7 w-full bg-transparent"
+                    className="absolute inset-0 h-full w-full bg-transparent"
                   />
                 </div>
                 <span

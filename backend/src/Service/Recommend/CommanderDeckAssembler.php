@@ -7,6 +7,7 @@ use App\Entity\Store;
 use App\Service\CaseCards\ColorIdentityParser;
 use App\Service\CaseCards\SectionSerializer;
 use App\Service\Recommend\Intelligence\CandidateGenerator;
+use App\Service\Recommend\Intelligence\CommanderIntelligence;
 use App\Service\Recommend\Intelligence\CommanderIntelligenceProvider;
 use App\Service\Recommend\Intelligence\CommanderLegalityValidator;
 use App\Service\Recommend\Intelligence\DeckContextAnalyzer;
@@ -124,55 +125,14 @@ final class CommanderDeckAssembler
         $nonLandBudget = max(0, $targetNonCommander - $landTarget);
         $nonLandCount = 0;
 
-        $canPick = function (PreparedCandidate $candidate) use (
-            &$quantities,
-            &$includedGameChangers,
-            &$spentCents,
-            &$landCount,
-            &$nonLandCount,
-            $commander,
-            $budgetCents,
-            $maxCardCents,
-            $maxGameChangers,
-            $landTarget,
-            $nonLandBudget,
-        ): bool {
-            $profile = $candidate->profile;
-
-            // Legality first, always. Singleton is checked against what we have
-            // already taken, which is why it cannot live in candidate generation.
-            // Basic lands are the format's one exception and may repeat.
-            if (!$this->legality->isLegal($commander, $profile->card, $quantities)) {
-                return false;
-            }
-
-            // The land count is a hard structural constraint in both directions,
-            // not a scoring preference. Scoring alone will always prefer another
-            // synergy piece to another land, so a purely score-driven build
-            // finishes at 99 cards with an unplayable mana base. Reserving the
-            // slots lets scoring decide *which* lands without letting it decide
-            // whether to have any.
-            if ($profile->isLand) {
-                if ($landCount >= $landTarget) {
-                    return false;
-                }
-            } elseif ($nonLandCount >= $nonLandBudget) {
-                return false;
-            }
-
-            $price = $candidate->priceCents ?? 0;
-            if (null !== $maxCardCents && !$profile->isBasicLand && $price > $maxCardCents) {
-                return false;
-            }
-            if (null !== $budgetCents && ($spentCents + $price) > $budgetCents) {
-                return false;
-            }
-            if ($profile->isGameChanger && count($includedGameChangers) >= $maxGameChangers) {
-                return false;
-            }
-
-            return true;
-        };
+        $pickContext = [
+            'commander' => $commander,
+            'budgetCents' => $budgetCents,
+            'maxCardCents' => $maxCardCents,
+            'maxGameChangers' => $maxGameChangers,
+            'landTarget' => $landTarget,
+            'nonLandBudget' => $nonLandBudget,
+        ];
 
         // Greedy construction with re-scoring: each round scores every remaining
         // candidate against the deck built so far, so role need, package gaps,
@@ -202,30 +162,32 @@ final class CommanderDeckAssembler
                     continue;
                 }
 
-                if (!$canPick($candidate)) {
-                    // Budget and bracket rejections are not permanent — a
-                    // cheaper deck state later might allow them — but keeping
-                    // them in the pool risks spinning, so drop them and let the
-                    // gap report surface the shortfall.
+                if (!$this->canPickCandidate(
+                    $candidate,
+                    $pickContext,
+                    $quantities,
+                    $includedGameChangers,
+                    $spentCents,
+                    $landCount,
+                    $nonLandCount,
+                )) {
+                    // Slot and budget rejections are temporary — a later pick may
+                    // open room — so keep the candidate for another round.
+                    $stillRemaining[] = $candidate;
                     continue;
                 }
 
-                $picked[$oracleId] = $scored;
-                $quantities[$oracleId] = ($quantities[$oracleId] ?? 0) + 1;
-                ++$totalCards;
-                $spentCents += $scored->priceCents ?? 0;
-                if ($scored->profile->isLand) {
-                    ++$landCount;
-                } else {
-                    ++$nonLandCount;
-                }
-                if ($scored->profile->isGameChanger) {
-                    $includedGameChangers[] = [
-                        'name' => $scored->profile->name,
-                        'oracleId' => $oracleId,
-                        'priceCents' => $scored->priceCents,
-                    ];
-                }
+                $this->recordPick(
+                    $candidate,
+                    $scored,
+                    $picked,
+                    $quantities,
+                    $totalCards,
+                    $landCount,
+                    $nonLandCount,
+                    $spentCents,
+                    $includedGameChangers,
+                );
                 ++$takenThisRound;
 
                 // A basic land can legally repeat, so keep it available for the
@@ -241,6 +203,22 @@ final class CommanderDeckAssembler
                 break;
             }
         }
+
+        $this->fillRemainingSlots(
+            $commander,
+            $strategyId,
+            $intelligence,
+            $prepared,
+            $pickContext,
+            $picked,
+            $quantities,
+            $totalCards,
+            $landCount,
+            $nonLandCount,
+            $spentCents,
+            $includedGameChangers,
+            $targetNonCommander,
+        );
 
         $finalContext = $this->deckAnalyzer->analyze($this->flatten($quantities), $strategyId);
         $cards = $this->serializeDeck($picked, $quantities);
@@ -522,5 +500,288 @@ final class CommanderDeckAssembler
         $cents = (int) $value;
 
         return $cents > 0 ? $cents : null;
+    }
+
+    /**
+     * @param array{
+     *   commander: Card,
+     *   budgetCents: ?int,
+     *   maxCardCents: ?int,
+     *   maxGameChangers: int,
+     *   landTarget: int,
+     *   nonLandBudget: int
+     * } $pickContext
+     * @param array<string, true> $quantities
+     * @param list<array{name: string, oracleId: string, priceCents: ?int}> $includedGameChangers
+     */
+    private function canPickCandidate(
+        PreparedCandidate $candidate,
+        array $pickContext,
+        array $quantities,
+        array $includedGameChangers,
+        int $spentCents,
+        int $landCount,
+        int $nonLandCount,
+        bool $ignoreBudget = false,
+    ): bool {
+        $commander = $pickContext['commander'];
+        $profile = $candidate->profile;
+
+        if (!$this->legality->isLegal($commander, $profile->card, $quantities)) {
+            return false;
+        }
+
+        if ($profile->isLand) {
+            if ($landCount >= $pickContext['landTarget']) {
+                return false;
+            }
+        } elseif ($nonLandCount >= $pickContext['nonLandBudget']) {
+            return false;
+        }
+
+        $price = $candidate->priceCents ?? 0;
+        if (null !== $pickContext['maxCardCents'] && !$profile->isBasicLand && $price > $pickContext['maxCardCents']) {
+            return false;
+        }
+        if (!$ignoreBudget && null !== $pickContext['budgetCents'] && ($spentCents + $price) > $pickContext['budgetCents']) {
+            return false;
+        }
+        if ($profile->isGameChanger && count($includedGameChangers) >= $pickContext['maxGameChangers']) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, ScoredCard> $picked
+     * @param array<string, int>        $quantities
+     * @param list<array{name: string, oracleId: string, priceCents: ?int}> $includedGameChangers
+     */
+    private function recordPick(
+        PreparedCandidate $candidate,
+        ScoredCard $scored,
+        array &$picked,
+        array &$quantities,
+        int &$totalCards,
+        int &$landCount,
+        int &$nonLandCount,
+        int &$spentCents,
+        array &$includedGameChangers,
+    ): void {
+        $oracleId = $candidate->oracleId();
+        $picked[$oracleId] = $scored;
+        $quantities[$oracleId] = ($quantities[$oracleId] ?? 0) + 1;
+        ++$totalCards;
+        $spentCents += $scored->priceCents ?? 0;
+        if ($scored->profile->isLand) {
+            ++$landCount;
+        } else {
+            ++$nonLandCount;
+        }
+        if ($scored->profile->isGameChanger) {
+            $includedGameChangers[] = [
+                'name' => $scored->profile->name,
+                'oracleId' => $oracleId,
+                'priceCents' => $scored->priceCents,
+            ];
+        }
+    }
+
+    /**
+     * Deterministic top-up once scoring has done its job. Fills reserved land
+     * slots with basics first, then completes the 99 with the cheapest legal
+     * singletons still available.
+     *
+     * @param list<PreparedCandidate> $prepared
+     * @param array{
+     *   commander: Card,
+     *   budgetCents: ?int,
+     *   maxCardCents: ?int,
+     *   maxGameChangers: int,
+     *   landTarget: int,
+     *   nonLandBudget: int
+     * } $pickContext
+     * @param array<string, ScoredCard> $picked
+     * @param array<string, int>        $quantities
+     * @param list<array{name: string, oracleId: string, priceCents: ?int}> $includedGameChangers
+     */
+    private function fillRemainingSlots(
+        Card $commander,
+        string $strategyId,
+        CommanderIntelligence $intelligence,
+        array $prepared,
+        array $pickContext,
+        array &$picked,
+        array &$quantities,
+        int &$totalCards,
+        int &$landCount,
+        int &$nonLandCount,
+        int &$spentCents,
+        array &$includedGameChangers,
+        int $targetNonCommander,
+    ): void {
+        $basics = array_values(array_filter(
+            $prepared,
+            static fn (PreparedCandidate $candidate): bool => $candidate->profile->isBasicLand,
+        ));
+        usort(
+            $basics,
+            static fn (PreparedCandidate $a, PreparedCandidate $b): int => ($a->priceCents ?? 0) <=> ($b->priceCents ?? 0),
+        );
+
+        $guard = 0;
+        while ($totalCards < $targetNonCommander && $landCount < $pickContext['landTarget'] && $guard < $targetNonCommander) {
+            ++$guard;
+            $next = null;
+            foreach ($basics as $candidate) {
+                if ($this->canPickCandidate(
+                    $candidate,
+                    $pickContext,
+                    $quantities,
+                    $includedGameChangers,
+                    $spentCents,
+                    $landCount,
+                    $nonLandCount,
+                    ignoreBudget: true,
+                )) {
+                    $next = $candidate;
+                    break;
+                }
+            }
+            if (!$next instanceof PreparedCandidate) {
+                break;
+            }
+            $this->applyPreparedPick(
+                $commander,
+                $strategyId,
+                $intelligence,
+                $next,
+                $pickContext,
+                $picked,
+                $quantities,
+                $totalCards,
+                $landCount,
+                $nonLandCount,
+                $spentCents,
+                $includedGameChangers,
+                ignoreBudget: true,
+            );
+        }
+
+        $guard = 0;
+        while ($totalCards < $targetNonCommander && $nonLandCount < $pickContext['nonLandBudget'] && $guard < $targetNonCommander) {
+            ++$guard;
+            $affordable = [];
+            foreach ($prepared as $candidate) {
+                if ($candidate->profile->isLand) {
+                    continue;
+                }
+                if ($this->canPickCandidate(
+                    $candidate,
+                    $pickContext,
+                    $quantities,
+                    $includedGameChangers,
+                    $spentCents,
+                    $landCount,
+                    $nonLandCount,
+                    ignoreBudget: true,
+                )) {
+                    $affordable[] = $candidate;
+                }
+            }
+
+            if ([] === $affordable) {
+                break;
+            }
+
+            usort($affordable, static function (PreparedCandidate $a, PreparedCandidate $b): int {
+                $priceCmp = ($a->priceCents ?? \PHP_INT_MAX) <=> ($b->priceCents ?? \PHP_INT_MAX);
+                if (0 !== $priceCmp) {
+                    return $priceCmp;
+                }
+
+                $aScore = (float) ($a->stat['baseScore'] ?? 0);
+                $bScore = (float) ($b->stat['baseScore'] ?? 0);
+
+                return $bScore <=> $aScore;
+            });
+
+            $this->applyPreparedPick(
+                $commander,
+                $strategyId,
+                $intelligence,
+                $affordable[0],
+                $pickContext,
+                $picked,
+                $quantities,
+                $totalCards,
+                $landCount,
+                $nonLandCount,
+                $spentCents,
+                $includedGameChangers,
+                ignoreBudget: true,
+            );
+        }
+    }
+
+    /**
+     * @param array{
+     *   commander: Card,
+     *   budgetCents: ?int,
+     *   maxCardCents: ?int,
+     *   maxGameChangers: int,
+     *   landTarget: int,
+     *   nonLandBudget: int
+     * } $pickContext
+     * @param array<string, ScoredCard> $picked
+     * @param array<string, int>        $quantities
+     * @param list<array{name: string, oracleId: string, priceCents: ?int}> $includedGameChangers
+     */
+    private function applyPreparedPick(
+        Card $commander,
+        string $strategyId,
+        CommanderIntelligence $intelligence,
+        PreparedCandidate $candidate,
+        array $pickContext,
+        array &$picked,
+        array &$quantities,
+        int &$totalCards,
+        int &$landCount,
+        int &$nonLandCount,
+        int &$spentCents,
+        array &$includedGameChangers,
+        bool $ignoreBudget = false,
+    ): void {
+        $deckContext = $this->deckAnalyzer->analyze($this->flatten($quantities), $strategyId);
+        $scored = $this->engine->rescore($commander, $strategyId, $intelligence, $deckContext, [$candidate])[0] ?? null;
+        if (!$scored instanceof ScoredCard) {
+            return;
+        }
+
+        if (!$this->canPickCandidate(
+            $candidate,
+            $pickContext,
+            $quantities,
+            $includedGameChangers,
+            $spentCents,
+            $landCount,
+            $nonLandCount,
+            $ignoreBudget,
+        )) {
+            return;
+        }
+
+        $this->recordPick(
+            $candidate,
+            $scored,
+            $picked,
+            $quantities,
+            $totalCards,
+            $landCount,
+            $nonLandCount,
+            $spentCents,
+            $includedGameChangers,
+        );
     }
 }
