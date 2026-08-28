@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Search, ShoppingCart } from 'lucide-react'
-import { cardImage, formatPrice } from '../../api/client'
+import { formatPrice } from '../../api/client'
 import type { AssembledDeckResponse } from '../../hooks'
 import { Button, buttonVariants, EmptyState, LoadingPanel } from '../../components/ui'
-import { CardImage } from '../../components/cards'
+import {
+  PublicFloatingCard,
+  PUBLIC_FLOATING_CARD_GRID_CLASS,
+  previewFromDeckRow,
+  type CardArtPreview,
+} from '../../components/cards'
 import { cx } from '../../lib/cx'
-import type { DeckBuilderNavState } from '../../lib/deckBuilder'
 import { intelligenceSummary } from './utils'
 
 export function StoreDeckPanel({
@@ -16,7 +20,7 @@ export function StoreDeckPanel({
   signedIn,
   busy,
   onAddAll,
-  linkState,
+  onOpenCardPreview,
 }: {
   slug: string
   loading: boolean
@@ -24,7 +28,7 @@ export function StoreDeckPanel({
   signedIn: boolean
   busy: boolean
   onAddAll: () => void
-  linkState?: DeckBuilderNavState
+  onOpenCardPreview: (cards: CardArtPreview[], oracleId: string) => void
 }) {
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
 
@@ -44,6 +48,9 @@ export function StoreDeckPanel({
     if (stockFilter === 'out_of_stock') return !row.inventoryItem
     return true
   })
+  const previewCards: CardArtPreview[] = visibleCards.map((row) =>
+    previewFromDeckRow(row, { storeSlug: slug }),
+  )
   const intel = deck.intelligence
   const intelLine = intelligenceSummary(intel)
   const structureBits = (['lands', 'ramp', 'draw', 'removal'] as const)
@@ -169,60 +176,24 @@ export function StoreDeckPanel({
           }
         />
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className={PUBLIC_FLOATING_CARD_GRID_CLASS}>
           {visibleCards.map((row) => {
-            const item = row.inventoryItem
-            const name = item?.card.name ?? row.card.name
-            const image = cardImage(item?.card ?? row.card)
-            const detailPath = item ? `/s/${slug}/cards/${item.id}` : null
-            const meta = [
-              row.quantity > 1 ? `${row.quantity}×` : null,
-              row.slot.replaceAll('_', ' '),
-              row.gameChanger ? 'game changer' : null,
-              item ? formatPrice(item.priceCents) : 'not stocked',
-            ]
-              .filter(Boolean)
-              .join(' · ')
-
+            const preview = previewFromDeckRow(row, { storeSlug: slug })
+            const badge =
+              row.quantity > 1
+                ? `${row.quantity}×`
+                : row.gameChanger
+                  ? 'GC'
+                  : !row.inventoryItem
+                    ? '—'
+                    : undefined
             return (
-              <li
+              <PublicFloatingCard
                 key={row.card.oracleId}
-                className={cx(
-                  'flex gap-2 rounded-card border border-border bg-surface p-2',
-                  !item && 'opacity-70',
-                )}
-                title={row.reasons?.slice(0, 3).join(' · ')}
-              >
-                {detailPath ? (
-                  <Link
-                    to={detailPath}
-                    state={linkState}
-                    className="relative aspect-5/7 w-12 shrink-0 overflow-hidden rounded-md bg-bg"
-                  >
-                    <CardImage src={image} alt={name} className="absolute inset-0 size-full" showLabel={false} />
-                  </Link>
-                ) : (
-                  <div className="relative aspect-5/7 w-12 shrink-0 overflow-hidden rounded-md bg-bg">
-                    <CardImage src={image} alt={name} className="absolute inset-0 size-full" showLabel={false} />
-                  </div>
-                )}
-                <div className="min-w-0 self-center">
-                  {detailPath ? (
-                    <Link
-                      to={detailPath}
-                      state={linkState}
-                      className="block truncate text-sm font-semibold text-fg hover:text-brand-600"
-                    >
-                      {name}
-                    </Link>
-                  ) : (
-                    <span className="block truncate text-sm font-semibold text-fg">{name}</span>
-                  )}
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-muted">
-                    {meta}
-                  </p>
-                </div>
-              </li>
+                preview={preview}
+                onPreview={() => onOpenCardPreview(previewCards, row.card.oracleId)}
+                badge={badge}
+              />
             )
           })}
         </ul>

@@ -1,7 +1,7 @@
 import type { CommanderSummary } from '../hooks/useCommanderRecommend'
 
 export type DeckBuilderPanel = 'synergy' | 'combos' | 'deck'
-export type DeckBuilderView = 'roles' | 'types'
+export type DeckBuilderView = 'stacks' | 'roles' | 'types'
 
 export interface DeckBuilderNavState {
   from: 'deck-builder'
@@ -26,7 +26,8 @@ export function parseDeckBuilderPanel(value: string | null): DeckBuilderPanel {
 }
 
 export function parseDeckBuilderView(value: string | null): DeckBuilderView {
-  return value === 'types' ? 'types' : 'roles'
+  if (value === 'roles' || value === 'types') return value
+  return 'stacks'
 }
 
 export function parseDeckBuilderBracket(value: string | null): string {
@@ -59,7 +60,7 @@ export function deckBuilderPath(
   if (opts?.commanderId) params.set('commander', opts.commanderId)
   if (opts?.commanderId && opts.strategy) params.set('strategy', opts.strategy)
   if (opts?.commanderId && opts.panel && opts.panel !== 'synergy') params.set('panel', opts.panel)
-  if (opts?.commanderId && opts.view && opts.view !== 'roles') params.set('view', opts.view)
+  if (opts?.commanderId && opts.view && opts.view !== 'stacks') params.set('view', opts.view)
   if (opts?.commanderId && opts.budgetDollars) params.set('budget', opts.budgetDollars)
   if (opts?.commanderId && opts.maxCardDollars) params.set('maxCard', opts.maxCardDollars)
   if (opts?.commanderId && opts.bracket && opts.bracket !== 'auto') params.set('bracket', opts.bracket)
@@ -83,7 +84,7 @@ export function publicDeckBuilderPath(
   if (opts?.commanderId) params.set('commander', opts.commanderId)
   if (opts?.commanderId && opts.strategy) params.set('strategy', opts.strategy)
   if (opts?.commanderId && opts.panel && opts.panel !== 'synergy') params.set('panel', opts.panel)
-  if (opts?.commanderId && opts.view && opts.view !== 'roles') params.set('view', opts.view)
+  if (opts?.commanderId && opts.view && opts.view !== 'stacks') params.set('view', opts.view)
   if (opts?.commanderId && opts.budgetDollars) params.set('budget', opts.budgetDollars)
   if (opts?.commanderId && opts.maxCardDollars) params.set('maxCard', opts.maxCardDollars)
   if (opts?.commanderId && opts.bracket && opts.bracket !== 'auto') params.set('bracket', opts.bracket)

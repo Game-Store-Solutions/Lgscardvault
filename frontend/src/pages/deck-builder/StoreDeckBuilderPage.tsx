@@ -1,5 +1,6 @@
 import { Crown, Layers, Sparkles, Wand2 } from 'lucide-react'
 import { BackButton, Tabs, TabPanel } from '../../components/ui'
+import { CardArtLightbox } from '../../components/cards'
 import { StorePageLoader } from '../../components/store/StorePageLoader'
 import { useStoreTheme } from '../../hooks'
 import { useAppShellFlush } from '../../components/layout/AppShellLayout'
@@ -16,7 +17,7 @@ import { useDeckBuilderState } from './useDeckBuilderState'
 
 export default function StoreDeckBuilderPage() {
   const state = useDeckBuilderState('store')
-  const { routeSlug, store, storeLoading, selected, query, handleQueryChange, search, showSearchGrid, searchResults, pickCommander, panel, setPanel, recommend, combos, deck, signedIn, cartQtyByInventoryId, addOne, cart, deckBusy, addDeckToCart, cardLinkState } = state
+  const { routeSlug, store, storeLoading, selected, query, handleQueryChange, search, showSearchGrid, searchResults, pickCommander, panel, setPanel, recommend, combos, deck, signedIn, cartQtyByInventoryId, addOne, cart, deckBusy, addDeckToCart, cardLinkState, cardPreview, setCardPreview, openCardPreview } = state
 
   useStoreTheme(store)
   useAppShellFlush(true)
@@ -155,13 +156,22 @@ export default function StoreDeckBuilderPage() {
                   signedIn={signedIn}
                   busy={deckBusy}
                   onAddAll={addDeckToCart}
-                  linkState={cardLinkState}
+                  onOpenCardPreview={openCardPreview}
                 />
               </TabPanel>
             </div>
           </>
         )}
       </section>
+
+      {cardPreview && (
+        <CardArtLightbox
+          cards={cardPreview.cards}
+          index={cardPreview.index}
+          onClose={() => setCardPreview(null)}
+          onIndexChange={(index) => setCardPreview((prev) => (prev ? { ...prev, index } : null))}
+        />
+      )}
     </div>
   )
 }

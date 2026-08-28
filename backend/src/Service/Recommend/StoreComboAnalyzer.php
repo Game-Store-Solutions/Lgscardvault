@@ -27,6 +27,7 @@ final class StoreComboAnalyzer
         private readonly CardRepository $cards,
         private readonly ColorIdentityParser $colorIdentity,
         private readonly SectionSerializer $sectionSerializer,
+        private readonly RecommendListingCatalog $listingCatalog,
     ) {
     }
 
@@ -66,6 +67,7 @@ final class StoreComboAnalyzer
         $identityIndex = $this->buildIdentityIndex($variants, $stockIndex);
         $catalogOracleByName = $this->buildCatalogOracleIndex($variants, $stockIndex);
         $catalogImageByName = $this->buildCatalogImageIndex($variants);
+        $catalogImageByOracle = $this->buildCatalogImageByOracleIndex($variants, $catalogOracleByName);
 
         $combos = [];
         $filteredOut = 0;
@@ -79,6 +81,7 @@ final class StoreComboAnalyzer
                 $stockIndex,
                 $catalogOracleByName,
                 $catalogImageByName,
+                $catalogImageByOracle,
                 $commanderKey,
                 $commanderOracle,
                 $identityIndex,
@@ -108,6 +111,17 @@ final class StoreComboAnalyzer
 
             return $a['missingCount'] <=> $b['missingCount'];
         });
+
+        $this->listingCatalog->attachComboInventoryOptions($store, $combos);
+
+        if (!$store instanceof Store) {
+            foreach ($combos as &$combo) {
+                $combo['missing'] = [];
+                $combo['missingCount'] = 0;
+                $combo['completeInStore'] = false;
+            }
+            unset($combo);
+        }
 
         return [
             'commander' => $commanderName,
@@ -310,6 +324,42 @@ final class StoreComboAnalyzer
 
     /**
      * @param list<array<string, mixed>> $variants
+     * @param array<string, string> $catalogOracleByName
+     * @return array<string, string> lowercase oracle id → image URL
+     */
+    private function buildCatalogImageByOracleIndex(array $variants, array $catalogOracleByName): array
+    {
+        $oracleIds = [];
+        foreach ($variants as $variant) {
+            $uses = is_array($variant['uses'] ?? null) ? $variant['uses'] : [];
+            foreach ($uses as $use) {
+                $card = is_array($use['card'] ?? null) ? $use['card'] : [];
+                foreach (['oracleId', 'oracle_id', 'scryfallOracleId'] as $field) {
+                    $raw = $card[$field] ?? null;
+                    if (is_string($raw) && '' !== trim($raw)) {
+                        $oracleIds[strtolower(trim($raw))] = true;
+                    }
+                }
+                $name = (string) ($card['name'] ?? '');
+                if ('' !== $name) {
+                    $key = strtolower($this->frontFace($name));
+                    $oracle = $catalogOracleByName[$key] ?? null;
+                    if (is_string($oracle) && '' !== $oracle) {
+                        $oracleIds[strtolower($oracle)] = true;
+                    }
+                }
+            }
+        }
+
+        if ([] === $oracleIds) {
+            return [];
+        }
+
+        return $this->cards->mapImageUrlByOracleIds(array_keys($oracleIds));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $variants
      * @param array{
      *   byOracle: array<string, array{listing: InventoryItem, quantity: int}>,
      *   byName: array<string, string>,
@@ -408,6 +458,7 @@ final class StoreComboAnalyzer
         array $stockIndex,
         array $catalogOracleByName,
         array $catalogImageByName,
+        array $catalogImageByOracle,
         string $commanderKey,
         string $commanderOracle,
         array $identityIndex,
@@ -436,7 +487,13 @@ final class StoreComboAnalyzer
             $row = [
                 'name' => $name,
                 'oracleId' => $stock['oracleKey'] ?? $catalogOracleByName[$key] ?? null,
-                'imageUrl' => $this->resolvePieceImageUrl($key, $stock, $catalogImageByName),
+                'imageUrl' => $this->resolvePieceImageUrl(
+                    $key,
+                    $stock,
+                    $catalogImageByName,
+                    $catalogImageByOracle,
+                    $stock['oracleKey'] ?? $catalogOracleByName[$key] ?? null,
+                ),
                 'quantity' => $requiredQty,
                 'inStock' => $available,
                 'isCommander' => $isCommander,
@@ -491,13 +548,25 @@ final class StoreComboAnalyzer
      * } $stock
      * @param array<string, string> $catalogImageByName
      */
-    private function resolvePieceImageUrl(string $nameKey, array $stock, array $catalogImageByName): ?string
-    {
+    private function resolvePieceImageUrl(
+        string $nameKey,
+        array $stock,
+        array $catalogImageByName,
+        array $catalogImageByOracle,
+        ?string $oracleKey,
+    ): ?string {
         $listing = $stock['listing'] ?? null;
         if ($listing instanceof InventoryItem) {
             $url = $listing->getCard()?->getImageUrl();
             if (null !== $url && '' !== $url) {
                 return $url;
+            }
+        }
+
+        if (null !== $oracleKey && '' !== $oracleKey) {
+            $fromOracle = $catalogImageByOracle[strtolower($oracleKey)] ?? null;
+            if (null !== $fromOracle && '' !== $fromOracle) {
+                return $fromOracle;
             }
         }
 

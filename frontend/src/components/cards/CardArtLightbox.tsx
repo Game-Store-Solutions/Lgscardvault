@@ -1,7 +1,10 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
+import { Link } from 'react-router'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { AnimatePresence, motion } from '../motion'
-import { cardImageUrl } from '../../api/client'
+import { cardImageUrl, formatPrice } from '../../api/client'
+import type { InventoryItem } from '../../api/types'
+import { listingLabel, buildCardArtPreview } from '../../lib/cardPreview'
 import { CardImage } from './CardImage'
 import { cx } from '../../lib/cx'
 
@@ -10,6 +13,10 @@ export interface CardArtPreview {
   name: string
   imageUrl: string
   typeLine?: string | null
+  priceCents?: number | null
+  priceLabel?: string
+  inventoryOptions?: InventoryItem[]
+  storeSlug?: string
 }
 
 export function CardArtLightbox({
@@ -26,6 +33,11 @@ export function CardArtLightbox({
   const card = cards[index]
   const hasPrev = index > 0
   const hasNext = index < cards.length - 1
+  const [selectedListingId, setSelectedListingId] = useState<number | null>(null)
+
+  useEffect(() => {
+    setSelectedListingId(null)
+  }, [index, card?.oracleId])
 
   const goPrev = useCallback(() => {
     if (hasPrev) onIndexChange(index - 1)
@@ -51,6 +63,14 @@ export function CardArtLightbox({
   }, [goNext, goPrev, onClose])
 
   if (!card) return null
+
+  const listings = card.inventoryOptions ?? []
+  const selectedListing =
+    listings.find((item) => item.id === selectedListingId) ?? listings[0] ?? card.inventoryOptions?.[0] ?? null
+  const displayImage =
+    selectedListing?.card != null ? cardImageUrl(selectedListing.card) : card.imageUrl
+  const displayPrice =
+    selectedListing?.priceCents ?? card.priceCents ?? (listings[0]?.priceCents ?? null)
 
   return (
     <AnimatePresence>
@@ -84,22 +104,89 @@ export function CardArtLightbox({
         )}
 
         <motion.div
-          key={card.oracleId}
+          key={`${card.oracleId}-${selectedListingId ?? 'default'}`}
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.2 }}
-          className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col items-center"
+          className={cx(
+            'flex max-h-[calc(100dvh-2rem)] w-full flex-col items-center',
+            listings.length > 0 ? 'max-w-lg' : 'max-w-md',
+          )}
         >
           <div className="w-full max-w-[min(100%,18rem)] overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15">
-            <CardImage src={card.imageUrl} alt={card.name} className="aspect-5/7 w-full bg-bg" fit="contain" />
+            <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-bg" fit="contain" />
           </div>
-          <div className="mt-4 max-w-md text-center">
+          <div className="mt-4 w-full max-w-md text-center">
             <p className="font-display text-lg font-bold text-white">{card.name}</p>
             {card.typeLine && <p className="mt-1 text-sm text-white/75">{card.typeLine}</p>}
+            {displayPrice != null && (
+              <p className="mt-2 text-base font-bold text-brand-300">{formatPrice(displayPrice)}</p>
+            )}
             <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-white/50">
               {index + 1} of {cards.length}
             </p>
+
+            {listings.length > 0 && (
+              <div className="mt-4 text-left">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/45">
+                  {listings.length === 1 ? 'In stock here' : 'Variants in stock'}
+                </p>
+                <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                  {listings.map((item) => {
+                    const active = selectedListing?.id === item.id
+                    const row = (
+                      <span className="flex w-full items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-left text-sm font-medium">
+                          {listingLabel(item)}
+                          {item.quantity > 1 ? ` · ${item.quantity} avail.` : ''}
+                        </span>
+                        <span className="shrink-0 font-bold">{formatPrice(item.priceCents)}</span>
+                      </span>
+                    )
+                    const className = cx(
+                      'block w-full rounded-lg border px-3 py-2 transition-colors',
+                      active
+                        ? 'border-brand-400/80 bg-white/15 text-white'
+                        : 'border-white/10 bg-white/5 text-white/85 hover:bg-white/10',
+                    )
+
+                    if (card.storeSlug) {
+                      return (
+                        <li key={item.id}>
+                          <Link
+                            to={`/s/${card.storeSlug}/cards/${item.id}`}
+                            className={className}
+                            onClick={(event) => {
+                              event.preventDefault()
+                              setSelectedListingId(item.id)
+                            }}
+                          >
+                            {row}
+                          </Link>
+                        </li>
+                      )
+                    }
+
+                    return (
+                      <li key={item.id}>
+                        <button type="button" className={className} onClick={() => setSelectedListingId(item.id)}>
+                          {row}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                {card.storeSlug && selectedListing && (
+                  <Link
+                    to={`/s/${card.storeSlug}/cards/${selectedListing.id}`}
+                    className="mt-3 inline-flex text-sm font-semibold text-brand-300 hover:text-brand-200"
+                  >
+                    View listing →
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -118,30 +205,28 @@ export function CardArtLightbox({
   )
 }
 
-export function previewFromRecommendation(row: {
-  card: { oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
-  inventoryItem?: { card: { imageUrl?: string | null; name?: string; typeLine?: string | null } } | null
-}): CardArtPreview {
-  const catalogCard = row.inventoryItem?.card ?? row.card
-  return {
-    oracleId: row.card.oracleId,
-    name: row.card.name,
-    typeLine: row.card.typeLine,
-    imageUrl: cardImageUrl(catalogCard),
-  }
+export function previewFromRecommendation(
+  row: {
+    card: { oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
+    inventoryItem?: InventoryItem | null
+    priceCents?: number | null
+    inventoryOptions?: InventoryItem[] | null
+  },
+  opts?: { storeSlug?: string },
+): CardArtPreview {
+  return buildCardArtPreview(row, opts)
 }
 
-export function previewFromDeckRow(row: {
-  card: { oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
-  inventoryItem?: { card: { name?: string; typeLine?: string | null; imageUrl?: string | null } } | null
-}): CardArtPreview {
-  const catalogCard = row.inventoryItem?.card ?? row.card
-  return {
-    oracleId: row.card.oracleId,
-    name: row.inventoryItem?.card.name ?? row.card.name,
-    typeLine: row.inventoryItem?.card.typeLine ?? row.card.typeLine,
-    imageUrl: cardImageUrl(catalogCard),
-  }
+export function previewFromDeckRow(
+  row: {
+    card: { oracleId: string; name: string; typeLine?: string | null; imageUrl?: string | null }
+    inventoryItem?: InventoryItem | null
+    priceCents?: number | null
+    inventoryOptions?: InventoryItem[] | null
+  },
+  opts?: { storeSlug?: string },
+): CardArtPreview {
+  return buildCardArtPreview(row, opts)
 }
 
 export function cardArtButtonClassName(compact = false) {
@@ -163,6 +248,7 @@ export function PublicFloatingCard({
   onToggle,
   onPreview,
   badge,
+  tag: Tag = 'li',
 }: {
   preview: CardArtPreview
   selected?: boolean
@@ -171,9 +257,10 @@ export function PublicFloatingCard({
   onToggle?: () => void
   onPreview: () => void
   badge?: string
+  tag?: 'li' | 'div'
 }) {
   return (
-    <li className="group min-w-0">
+    <Tag className="group min-w-0">
       <div
         className={cx(
           'relative',
@@ -224,6 +311,11 @@ export function PublicFloatingCard({
       <p className="mt-1 truncate px-0.5 text-center text-[0.58rem] font-semibold leading-tight text-fg-muted sm:text-[0.62rem]">
         {preview.name}
       </p>
-    </li>
+      {preview.priceLabel && (
+        <p className="truncate px-0.5 text-center text-[0.58rem] font-bold leading-tight text-brand-600 sm:text-[0.62rem]">
+          {preview.priceLabel}
+        </p>
+      )}
+    </Tag>
   )
 }

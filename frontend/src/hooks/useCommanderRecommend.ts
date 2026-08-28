@@ -27,6 +27,7 @@ export interface SpellbookComboCard {
   colorIdentity?: string[]
   recommendedColors?: string[]
   inventoryItem: InventoryItem | null
+  inventoryOptions?: InventoryItem[]
 }
 
 export interface SpellbookCombo {
@@ -102,6 +103,7 @@ export interface AssembledDeckCard {
   card: RecommendedCard
   /** Null when the card is recommended but not stocked here. */
   inventoryItem: InventoryItem | null
+  inventoryOptions?: InventoryItem[]
 }
 
 export interface AssembledDeckBudget {
@@ -209,6 +211,7 @@ export interface CommanderRecommendation {
   card: RecommendedCard
   /** Null when the card is recommended but not stocked here. */
   inventoryItem: InventoryItem | null
+  inventoryOptions?: InventoryItem[]
 }
 
 export interface DeckContextSummary {
