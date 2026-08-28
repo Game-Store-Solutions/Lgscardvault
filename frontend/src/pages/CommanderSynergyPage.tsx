@@ -58,6 +58,8 @@ import {
   cardArtButtonClassName,
   previewFromRecommendation,
   previewFromDeckRow,
+  PublicFloatingCard,
+  PUBLIC_FLOATING_CARD_GRID_CLASS,
   type CardArtPreview,
 } from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
@@ -780,7 +782,34 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
     setCardPreview({ cards, index })
   }
 
+  function renderPublicCardGrid(rows: CommanderRecommendation[]) {
+    const previewCards = rows.map((row) => previewFromRecommendation(row))
+    return (
+      <ul className={PUBLIC_FLOATING_CARD_GRID_CLASS}>
+        {rows.map((row) => {
+          const preview = previewFromRecommendation(row)
+          const match = Math.round(row.score * 100)
+          const checked = picked.has(row.card.oracleId)
+          return (
+            <PublicFloatingCard
+              key={row.card.oracleId}
+              preview={preview}
+              selectable
+              selected={checked}
+              checked={checked}
+              onToggle={() => togglePick(row.card.oracleId, row.inventoryItem)}
+              onPreview={() => openCardPreview(previewCards, row.card.oracleId)}
+              badge={`${match}%`}
+            />
+          )
+        })}
+      </ul>
+    )
+  }
+
   function renderRows(rows: CommanderRecommendation[]) {
+    if (isPublic) return renderPublicCardGrid(rows)
+
     const previewCards = rows.map((row) => previewFromRecommendation(row))
     return (
       <ul className="space-y-2">
@@ -1213,7 +1242,7 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                 {!strategyId || strategiesQuery.isLoading ? (
                   <LoadingPanel label="Reading this commander's strategies…" />
                 ) : recommend.isLoading ? (
-                  <LoadingPanel label="Building your in-stock package…" />
+                  <LoadingPanel label={isPublic ? 'Building synergy picks…' : 'Building your in-stock package…'} />
                 ) : recommendations.length === 0 ? (
                   <EmptyState
                     icon={Search}
@@ -1231,10 +1260,16 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                         <div className="min-w-0">
                           <p className="font-display text-base font-extrabold text-fg">
                             {packageData?.strategy.label}
-                            <span className="ml-2 text-sm font-semibold text-fg-muted">
-                              {recommendations.filter((r) => r.inventoryItem).length} in stock
-                              {!includeOutOfStock ? '' : ` · ${recommendations.length} total`}
-                            </span>
+                            {isPublic ? (
+                              <span className="ml-2 text-sm font-semibold text-fg-muted">
+                                {recommendations.length} picks
+                              </span>
+                            ) : (
+                              <span className="ml-2 text-sm font-semibold text-fg-muted">
+                                {recommendations.filter((r) => r.inventoryItem).length} in stock
+                                {!includeOutOfStock ? '' : ` · ${recommendations.length} total`}
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-fg-muted">
                             {packageData?.totalCandidates ?? recommendations.length} color-legal
@@ -1831,6 +1866,26 @@ function DeckPanel({
               : 'Every card in this build is available at this store.'
           }
         />
+      ) : publicMode && onOpenCardPreview ? (
+        <ul className={PUBLIC_FLOATING_CARD_GRID_CLASS}>
+          {visibleCards.map((row) => {
+            const preview = previewFromDeckRow(row)
+            const badge =
+              row.quantity > 1
+                ? `${row.quantity}×`
+                : row.gameChanger
+                  ? 'GC'
+                  : undefined
+            return (
+              <PublicFloatingCard
+                key={row.card.oracleId}
+                preview={preview}
+                onPreview={() => onOpenCardPreview(previewCards, row.card.oracleId)}
+                badge={badge}
+              />
+            )
+          })}
+        </ul>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
           {visibleCards.map((row) => {

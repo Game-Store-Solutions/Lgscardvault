@@ -150,3 +150,80 @@ export function cardArtButtonClassName(compact = false) {
     compact ? 'w-12 sm:w-14' : 'w-full',
   )
 }
+
+/** Responsive grid that reaches 10 columns on large screens. */
+export const PUBLIC_FLOATING_CARD_GRID_CLASS =
+  'grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 xl:grid-cols-10'
+
+export function PublicFloatingCard({
+  preview,
+  selected = false,
+  selectable = false,
+  checked = false,
+  onToggle,
+  onPreview,
+  badge,
+}: {
+  preview: CardArtPreview
+  selected?: boolean
+  selectable?: boolean
+  checked?: boolean
+  onToggle?: () => void
+  onPreview: () => void
+  badge?: string
+}) {
+  return (
+    <li className="group min-w-0">
+      <div
+        className={cx(
+          'relative',
+          selected && 'rounded-[4.5%/3.5%] ring-2 ring-brand-500 ring-offset-1 ring-offset-bg',
+        )}
+      >
+        {selectable && onToggle && (
+          <label
+            className="absolute left-1 top-1 z-20 grid size-6 cursor-pointer place-items-center rounded-md bg-black/60 shadow-sm backdrop-blur-sm transition-colors hover:bg-black/75"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              className="size-3.5 rounded border-white/40 text-brand-500 focus:ring-brand-500/40"
+              checked={checked}
+              onChange={onToggle}
+              aria-label={`Select ${preview.name}`}
+            />
+          </label>
+        )}
+        <button
+          type="button"
+          onClick={onPreview}
+          title={preview.name}
+          aria-label={`View ${preview.name}`}
+          className={cx(
+            'relative block w-full overflow-hidden rounded-[4.5%/3.5%] bg-bg shadow-md ring-1 ring-black/10',
+            'transition duration-200 hover:-translate-y-1 hover:shadow-xl hover:ring-brand-400/70',
+            'active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
+            'cursor-zoom-in',
+          )}
+        >
+          <CardImage
+            src={preview.imageUrl}
+            alt={preview.name}
+            className="aspect-5/7 w-full"
+            fit="contain"
+            showLabel={false}
+          />
+          {badge && (
+            <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/75 px-1 py-0.5 text-[0.55rem] font-bold uppercase tracking-wide text-white">
+              {badge}
+            </span>
+          )}
+        </button>
+      </div>
+      <p className="mt-1 truncate px-0.5 text-center text-[0.58rem] font-semibold leading-tight text-fg-muted sm:text-[0.62rem]">
+        {preview.name}
+      </p>
+    </li>
+  )
+}
