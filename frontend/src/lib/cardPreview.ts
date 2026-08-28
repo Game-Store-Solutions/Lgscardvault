@@ -138,6 +138,7 @@ type CommanderPreviewSource = {
   name: string
   typeLine?: string | null
   imageUrl?: string | null
+  priceCents?: number | null
   inventoryItem?: InventoryItem | null
   inventoryOptions?: InventoryItem[] | null
 }
@@ -159,7 +160,7 @@ export function buildCommanderArtPreview(
       },
       inventoryItem: commander.inventoryItem ?? null,
       inventoryOptions: commander.inventoryOptions,
-      priceCents: commander.inventoryItem?.priceCents,
+      priceCents: commander.inventoryItem?.priceCents ?? commander.priceCents,
     },
     opts,
   )
@@ -196,4 +197,51 @@ export function buildComboArtPreview(
   }
 
   return applyPrintingSelection(base, opts?.printingSelection)
+}
+
+export function resolveCatalogPriceCents(
+  _oracleId: string,
+  fallbackCents: number | null | undefined,
+  printingSelection?: CardPrintingSelection | null,
+): number | null {
+  if (printingSelection?.priceCents != null) {
+    return printingSelection.priceCents
+  }
+  return fallbackCents ?? null
+}
+
+export function computeCatalogDeckTotalCents(
+  cards: { card: { oracleId: string }; quantity: number; priceCents?: number | null }[],
+  commander: { oracleId: string; priceCents?: number | null } | null | undefined,
+  getPrintingSelection: (oracleId: string) => CardPrintingSelection | undefined,
+): number | null {
+  let total = 0
+  let priced = 0
+
+  if (commander) {
+    const cents = resolveCatalogPriceCents(
+      commander.oracleId,
+      commander.priceCents,
+      getPrintingSelection(commander.oracleId),
+    )
+    if (cents != null) {
+      total += cents
+      priced += 1
+    }
+  }
+
+  for (const row of cards) {
+    const cents = resolveCatalogPriceCents(
+      row.card.oracleId,
+      row.priceCents,
+      getPrintingSelection(row.card.oracleId),
+    )
+    if (cents == null) {
+      continue
+    }
+    total += cents * Math.max(1, row.quantity)
+    priced += 1
+  }
+
+  return priced > 0 ? total : null
 }

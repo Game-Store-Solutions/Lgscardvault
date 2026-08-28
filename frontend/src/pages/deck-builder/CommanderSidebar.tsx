@@ -1,14 +1,11 @@
 import { useMemo } from 'react'
 import { CheckCircle2, ChevronDown } from 'lucide-react'
-import {
-  PublicFloatingCard,
-} from '../../components/cards'
+import { PublicFloatingCard } from '../../components/cards'
 import { Skeleton } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
 import { buildCommanderArtPreview } from '../../lib/cardPreview'
 import { cx } from '../../lib/cx'
 import { DeckBuildConstraintsFields } from './DeckBuildConstraintsFields'
-import { COMMANDER_SIDEBAR_CARD_GRID } from './layoutClasses'
 import { colorPips } from './utils'
 import type { DeckBuilderState } from './useDeckBuilderState'
 
@@ -78,6 +75,7 @@ export function CommanderSidebar({
           oracleId: selected.oracleId || enrichedCommander?.oracleId || selected.id,
           inventoryItem: enrichedCommander?.inventoryItem,
           inventoryOptions: enrichedCommander?.inventoryOptions,
+          priceCents: enrichedCommander?.priceCents,
         },
         {
           storeSlug: showStoreConstraints ? routeSlug : undefined,
@@ -94,15 +92,15 @@ export function CommanderSidebar({
     <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-[calc(5.5rem+env(safe-area-inset-top,0px))] xl:w-[22rem] xl:max-h-[calc(100dvh-7rem-env(safe-area-inset-top,0px))] xl:self-start xl:overflow-y-auto xl:overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm dark:glass-card">
         <div className="p-4">
-          <ul className={COMMANDER_SIDEBAR_CARD_GRID}>
+          <div className="mx-auto w-full max-w-[11rem]">
             <PublicFloatingCard
-              tag="li"
-              className="col-start-2"
+              tag="div"
               showCaption={false}
+              showPriceOnCard={!showStoreConstraints}
               preview={commanderPreview}
               onPreview={() => openCardPreview([commanderPreview], commanderPreview.oracleId)}
             />
-          </ul>
+          </div>
           <div className="mt-3 text-center">
             <p className="font-display text-base font-extrabold leading-snug text-fg sm:text-lg">
               {selected.name}
@@ -119,7 +117,7 @@ export function CommanderSidebar({
                   .join(' · ')}
               </p>
             )}
-            {commanderPreview.priceLabel && (
+            {showStoreConstraints && commanderPreview.priceLabel && (
               <p className="mt-2 text-sm font-bold text-brand-600">{commanderPreview.priceLabel}</p>
             )}
             <button

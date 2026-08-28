@@ -6,6 +6,7 @@ use App\Entity\Card;
 use App\Entity\Store;
 use App\Service\CaseCards\ColorIdentityParser;
 use App\Service\CaseCards\SectionSerializer;
+use App\Service\Catalog\MarketPrice;
 use App\Service\Recommend\Intelligence\CandidateGenerator;
 use App\Service\Recommend\Intelligence\CommanderIntelligence;
 use App\Service\Recommend\Intelligence\CommanderIntelligenceProvider;
@@ -177,6 +178,7 @@ final class CommanderRecommender
                 'themes' => $this->tokenizer->tokenize($commander),
                 'inventoryItem' => $commanderOptions[0] ?? null,
                 'inventoryOptions' => $commanderOptions,
+                'priceCents' => MarketPrice::centsFromCard($commander),
             ],
             'colorIdentity' => $commander->getColorIdentity() ?? [],
             'identityCode' => $this->colorIdentity->identityCode($commander->getColorIdentity()),

@@ -58,6 +58,7 @@ export function SynergyCardGrid({
             selectable={selectable}
             selected={checked}
             checked={checked}
+            showPriceOnCard={!storeSlug}
             onToggle={() => togglePick(row.card.oracleId, row.inventoryItem)}
             onPreview={() => openCardPreview(previewCards, row.card.oracleId)}
             badge={`${match}%`}

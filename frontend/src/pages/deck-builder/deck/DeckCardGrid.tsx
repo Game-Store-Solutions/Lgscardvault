@@ -53,6 +53,7 @@ export function DeckCardGrid({
           <PublicFloatingCard
             key={row.card.oracleId}
             preview={preview}
+            showPriceOnCard={!storeSlug}
             onPreview={() => onOpenCardPreview(previewCards, row.card.oracleId)}
             badge={badge}
           />

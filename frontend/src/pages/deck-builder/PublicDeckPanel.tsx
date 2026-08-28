@@ -29,6 +29,7 @@ export function PublicDeckPanel({
   setGroupBy,
   onOpenCardPreview,
   getPrintingSelection,
+  catalogDeckTotalCents,
 }: {
   loading: boolean
   deck: AssembledDeckResponse | undefined
@@ -44,6 +45,7 @@ export function PublicDeckPanel({
   setGroupBy: Dispatch<SetStateAction<DeckBuilderGroupBy>>
   onOpenCardPreview: (cards: CardArtPreview[], oracleId: string) => void
   getPrintingSelection?: (oracleId: string) => CardPrintingSelection | undefined
+  catalogDeckTotalCents?: number | null
 }) {
   if (loading || !deck) {
     return <LoadingPanel label="Assembling your Commander deck…" />
@@ -129,6 +131,14 @@ export function PublicDeckPanel({
             </p>
             <p className="mt-1 text-xs text-fg-muted">
               {structureBits} · avg MV {deck.averageManaValue}
+              {catalogDeckTotalCents != null && (
+                <>
+                  {' · '}
+                  <span className="font-semibold text-brand-600">
+                    Est. {formatPrice(catalogDeckTotalCents)}
+                  </span>
+                </>
+              )}
             </p>
             {deck.gaps.length > 0 && (
               <p className="mt-1.5 text-xs font-medium text-warning-700">{deck.gaps[0]}</p>

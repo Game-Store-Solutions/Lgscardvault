@@ -231,6 +231,7 @@ export interface CommanderRecommendResponse {
     themes?: string[]
     inventoryItem?: InventoryItem | null
     inventoryOptions?: InventoryItem[]
+    priceCents?: number | null
   }
   colorIdentity: string[]
   identityCode: string

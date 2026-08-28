@@ -4,6 +4,7 @@ namespace App\Service\Recommend\Intelligence;
 
 use App\Entity\Card;
 use App\Entity\InventoryItem;
+use App\Service\Catalog\MarketPrice;
 use App\Service\Recommend\StrategyCatalog;
 use App\Service\Recommend\ThemeTokenizer;
 
@@ -168,7 +169,9 @@ final class RecommendationEngine
                 strategyRoles: array_values(array_map('strval', $classification['roles'])),
                 inventoryItem: $item instanceof InventoryItem ? $item : null,
                 stockQuantity: $stockQuantity,
-                priceCents: $item instanceof InventoryItem ? $item->getPriceCents() : null,
+                priceCents: $item instanceof InventoryItem
+                    ? $item->getPriceCents()
+                    : MarketPrice::centsFromCard($profile->card),
                 confidence: null !== $stat ? (float) $stat['confidence'] : $intelligence->confidence,
             );
         }

@@ -85,6 +85,7 @@ export default function PublicDeckBuilderPage() {
     openCardPreview,
     getPrintingSelection,
     selectCatalogPrinting,
+    catalogDeckTotalCents,
   } = state
 
   return (
@@ -220,6 +221,7 @@ export default function PublicDeckBuilderPage() {
                   setGroupBy={setGroupBy}
                   onOpenCardPreview={openCardPreview}
                   getPrintingSelection={getPrintingSelection}
+                  catalogDeckTotalCents={catalogDeckTotalCents}
                 />
               </TabPanel>
             </div>

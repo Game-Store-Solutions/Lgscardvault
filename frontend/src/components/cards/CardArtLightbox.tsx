@@ -150,20 +150,40 @@ export function CardArtLightbox({
         )}
 
         <motion.div
-          key={`${card.oracleId}-${activePrintingId ?? selectedListingId ?? 'default'}`}
+          key={card.oracleId}
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.2 }}
           className={cx(
             'flex max-h-[calc(100dvh-2rem)] w-full flex-col items-center',
-            listings.length > 0 || (isCatalogCard && catalogPrintings.length > 0) ? 'max-w-lg' : 'max-w-md',
+            isCatalogCard && catalogPrintings.length > 0
+              ? 'max-w-3xl'
+              : listings.length > 0
+                ? 'max-w-lg'
+                : 'max-w-md',
           )}
         >
-          <div className="w-full max-w-[min(100%,14rem)] overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15 sm:max-w-[min(100%,18rem)]">
+          <motion.div
+            key={activePrintingId ?? selectedListingId ?? 'default'}
+            initial={{ opacity: 0.85, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.15 }}
+            className={cx(
+              'w-full overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15',
+              isCatalogCard && catalogPrintings.length > 0
+                ? 'max-w-[min(100%,16rem)] sm:max-w-[min(100%,20rem)]'
+                : 'max-w-[min(100%,14rem)] sm:max-w-[min(100%,18rem)]',
+            )}
+          >
             <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-bg" fit="contain" />
-          </div>
-          <div className="mt-4 w-full max-w-md text-center">
+          </motion.div>
+          <div
+            className={cx(
+              'mt-4 w-full text-center',
+              isCatalogCard && catalogPrintings.length > 0 ? 'max-w-3xl px-1' : 'max-w-md',
+            )}
+          >
             <p className="font-display text-lg font-bold text-white">{card.name}</p>
             {card.typeLine && <p className="mt-1 text-sm text-white/75">{card.typeLine}</p>}
             {displayPriceLabel && (
@@ -174,7 +194,7 @@ export function CardArtLightbox({
             </p>
 
             {isCatalogCard && (
-              <div className="mt-5 w-full">
+              <div className="mt-5 w-full text-left">
                 <CatalogPrintingStrip
                   items={catalogPrintings}
                   selectedId={activePrintingId}
@@ -311,6 +331,7 @@ export function PublicFloatingCard({
   badge,
   tag: Tag = 'li',
   showCaption = true,
+  showPriceOnCard = false,
   className,
 }: {
   preview: CardArtPreview
@@ -322,6 +343,8 @@ export function PublicFloatingCard({
   badge?: string
   tag?: 'li' | 'div'
   showCaption?: boolean
+  /** Overlay market price on the card art (no background). */
+  showPriceOnCard?: boolean
   className?: string
 }) {
   return (
@@ -371,6 +394,11 @@ export function PublicFloatingCard({
               {badge}
             </span>
           )}
+          {showPriceOnCard && preview.priceLabel && (
+            <span className="pointer-events-none absolute bottom-1 left-1 max-w-[calc(100%-0.5rem)] truncate text-[0.58rem] font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] sm:text-[0.62rem]">
+              {preview.priceLabel}
+            </span>
+          )}
         </button>
       </div>
       {showCaption && (
@@ -378,7 +406,7 @@ export function PublicFloatingCard({
           <p className="mt-1 truncate px-0.5 text-center text-[0.58rem] font-semibold leading-tight text-fg-muted sm:text-[0.62rem]">
             {preview.name}
           </p>
-          {preview.priceLabel && (
+          {preview.priceLabel && !showPriceOnCard && (
             <p className="truncate px-0.5 text-center text-[0.58rem] font-bold leading-tight text-brand-600 sm:text-[0.62rem]">
               {preview.priceLabel}
             </p>

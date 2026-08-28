@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router'
 import type { InventoryItem } from '../../api/types'
 import { useAuth } from '../../context/AuthContext'
@@ -27,7 +27,7 @@ import {
   type DeckBuilderGroupBy,
 } from '../../lib/deckBuilder'
 import type { CardArtPreview } from '../../components/cards'
-import type { CardPrintingSelection } from '../../lib/cardPreview'
+import { computeCatalogDeckTotalCents, type CardPrintingSelection } from '../../lib/cardPreview'
 import { intelligenceSummary } from './utils'
 
 export type DeckBuilderMode = 'public' | 'store'
@@ -315,6 +315,23 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
     return printingByOracle.get(oracleId)
   }
 
+  const catalogDeckTotalCents = useMemo(() => {
+    if (!isPublic || !deck.data) {
+      return null
+    }
+    const commander = recommend.data?.commander ?? selected
+    return computeCatalogDeckTotalCents(
+      deck.data.cards,
+      commander
+        ? {
+            oracleId: commander.oracleId || selected?.oracleId || selected?.id || '',
+            priceCents: recommend.data?.commander.priceCents,
+          }
+        : null,
+      getPrintingSelection,
+    )
+  }, [isPublic, deck.data, recommend.data?.commander, selected, printingByOracle])
+
   const searchResults = search.data ?? []
   const showSearchGrid = !selected && query.trim().length >= 2
 
@@ -382,6 +399,7 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
     printingByOracle,
     selectCatalogPrinting,
     getPrintingSelection,
+    catalogDeckTotalCents,
     searchResults,
     showSearchGrid,
   }

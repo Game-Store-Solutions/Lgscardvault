@@ -60,7 +60,8 @@ export function ComboPieceGrid({
             <PublicFloatingCard
               tag="div"
               preview={preview}
-              badge={pieceBadge(piece, storeSlug)}
+              showPriceOnCard={!storeSlug}
+            badge={pieceBadge(piece, storeSlug)}
               onPreview={() => setLightbox({ index })}
             />
           </StaggerItem>

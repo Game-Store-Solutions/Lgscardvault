@@ -48,15 +48,14 @@ export function CatalogPrintingStrip({
       <p
         className={cx(
           'text-[0.65rem] font-bold uppercase tracking-[0.14em]',
-          isLightbox ? 'text-center text-white/45' : 'text-fg-muted',
+          isLightbox ? 'text-white/45' : 'text-fg-muted',
         )}
       >
         {items.length === 1 ? 'Printing' : 'Available printings'}
       </p>
       <ul
         className={cx(
-          'mt-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          isLightbox ? 'justify-center px-1' : 'justify-start',
+          'mt-3 flex w-full snap-none justify-start gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/25 [&::-webkit-scrollbar-track]:bg-transparent',
         )}
       >
         {items.map((printing) => {
@@ -65,16 +64,16 @@ export function CatalogPrintingStrip({
           const lang = printing.lang?.toLowerCase()
 
           return (
-            <li key={printing.id} className="w-[5.5rem] shrink-0 sm:w-[6.25rem]">
+            <li key={printing.id} className="w-[7.25rem] shrink-0 sm:w-[8.5rem]">
               <button
                 type="button"
                 onClick={() => onSelect(printing)}
                 className={cx(
-                  'w-full touch-manipulation overflow-hidden rounded-lg text-left transition-[border-color,box-shadow,transform] duration-200',
+                  'w-full touch-manipulation overflow-hidden rounded-lg text-left transition-[box-shadow,ring-color] duration-200',
                   isLightbox
                     ? active
-                      ? 'ring-2 ring-brand-400 ring-offset-2 ring-offset-black/80'
-                      : 'ring-1 ring-white/15 hover:ring-white/35'
+                      ? 'ring-2 ring-brand-400'
+                      : 'ring-1 ring-white/20 hover:ring-white/40'
                     : active
                       ? 'ring-2 ring-brand-500 ring-offset-1 ring-offset-bg'
                       : 'ring-1 ring-border hover:ring-brand-300',
@@ -89,27 +88,32 @@ export function CatalogPrintingStrip({
                 />
                 <span
                   className={cx(
-                    'block px-1.5 py-1.5',
-                    isLightbox ? 'bg-black/50 text-white' : 'bg-surface text-fg',
+                    'block px-2 py-2',
+                    isLightbox ? 'text-white' : 'text-fg',
                   )}
                 >
-                  <span className="block truncate text-[0.58rem] font-semibold leading-tight sm:text-[0.62rem]">
+                  <span
+                    className={cx(
+                      'line-clamp-2 text-[0.65rem] font-semibold leading-snug sm:text-xs',
+                      isLightbox && 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]',
+                    )}
+                  >
                     {printing.setName ?? printing.setCode?.toUpperCase() ?? 'Unknown set'}
                   </span>
                   {priceLabel ? (
                     <span
                       className={cx(
-                        'mt-0.5 block text-[0.62rem] font-bold leading-tight sm:text-xs',
+                        'mt-1 block text-xs font-bold leading-tight sm:text-sm',
                         isLightbox ? 'text-brand-300' : 'text-brand-600',
                       )}
                     >
                       {priceLabel}
                     </span>
                   ) : (
-                    <span className="mt-0.5 block text-[0.58rem] text-fg-muted">—</span>
+                    <span className="mt-1 block text-xs text-fg-muted">—</span>
                   )}
                   {lang && lang !== 'en' && (
-                    <span className="mt-0.5 block text-[0.55rem] font-bold uppercase text-fg-muted">{lang}</span>
+                    <span className="mt-0.5 block text-[0.6rem] font-bold uppercase text-fg-muted">{lang}</span>
                   )}
                 </span>
               </button>
