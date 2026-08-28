@@ -1,71 +1,58 @@
 import { useMemo, useState } from 'react'
-import { cardImageUrl } from '../../api/client'
 import {
   CardArtLightbox,
-  PUBLIC_FLOATING_CARD_GRID_CLASS,
   PublicFloatingCard,
   type CardArtPreview,
 } from '../../components/cards'
+import { Stagger, StaggerItem } from '../../components/motion'
 import type { SpellbookComboCard } from '../../hooks'
+import { buildComboArtPreview } from '../../lib/cardPreview'
+import { cx } from '../../lib/cx'
 
-function previewFromComboPiece(piece: SpellbookComboCard): CardArtPreview | null {
-  const catalog = piece.inventoryItem?.card
-  const rawUrl = piece.imageUrl ?? catalog?.imageUrl
-  if (!rawUrl) {
-    return null
-  }
-
-  return {
-    oracleId: piece.oracleId ?? piece.name,
-    name: piece.name,
-    imageUrl: catalog ? cardImageUrl(catalog) : cardImageUrl({ imageUrl: rawUrl }),
-  }
-}
-
-function pieceBadge(piece: SpellbookComboCard): string | undefined {
+function pieceBadge(piece: SpellbookComboCard, storeSlug?: string): string | undefined {
   if (piece.isCommander) return 'CMD'
-  if (!piece.inStock) return '—'
+  if (storeSlug && !piece.inStock) return '—'
   if (piece.quantity > 1) return `×${piece.quantity}`
   return undefined
 }
 
-export function ComboPieceGrid({ pieces }: { pieces: SpellbookComboCard[] }) {
-  const previews = useMemo(
+/** Sized for combo pieces (2–4 cards), not full deck grids. */
+export const COMBO_PIECE_GRID_CLASS =
+  'mt-3 grid grid-cols-[repeat(auto-fill,minmax(4.75rem,1fr))] gap-2 sm:grid-cols-[repeat(auto-fill,minmax(5.25rem,1fr))] max-w-xl'
+
+export function ComboPieceGrid({
+  pieces,
+  storeSlug,
+}: {
+  pieces: SpellbookComboCard[]
+  storeSlug?: string
+}) {
+  const entries = useMemo(
     () =>
-      pieces
-        .map((piece) => ({ piece, preview: previewFromComboPiece(piece) }))
-        .filter((entry): entry is { piece: SpellbookComboCard; preview: CardArtPreview } => entry.preview !== null),
-    [pieces],
+      pieces.map((piece) => ({
+        piece,
+        preview: buildComboArtPreview(piece, { storeSlug }),
+      })),
+    [pieces, storeSlug],
   )
 
   const [lightbox, setLightbox] = useState<{ index: number } | null>(null)
-
-  if (previews.length === 0) {
-    return (
-      <ul className="mt-3 space-y-1.5">
-        {pieces.map((piece) => (
-          <li key={piece.name} className="rounded-lg bg-bg px-3 py-2 text-sm text-fg-muted">
-            {piece.name}
-          </li>
-        ))}
-      </ul>
-    )
-  }
-
-  const cards = previews.map((entry) => entry.preview)
+  const cards: CardArtPreview[] = entries.map((entry) => entry.preview)
 
   return (
     <>
-      <ul className={`mt-3 ${PUBLIC_FLOATING_CARD_GRID_CLASS}`}>
-        {previews.map(({ piece, preview }, index) => (
-          <PublicFloatingCard
-            key={`${preview.oracleId}-${piece.name}`}
-            preview={preview}
-            badge={pieceBadge(piece)}
-            onPreview={() => setLightbox({ index })}
-          />
+      <Stagger immediate gap={0.05} className={cx('list-none', COMBO_PIECE_GRID_CLASS)} role="list">
+        {entries.map(({ piece, preview }, index) => (
+          <StaggerItem key={`${preview.oracleId}-${piece.name}`} className="min-w-0">
+            <PublicFloatingCard
+              tag="div"
+              preview={preview}
+              badge={pieceBadge(piece, storeSlug)}
+              onPreview={() => setLightbox({ index })}
+            />
+          </StaggerItem>
         ))}
-      </ul>
+      </Stagger>
       {lightbox && (
         <CardArtLightbox
           cards={cards}

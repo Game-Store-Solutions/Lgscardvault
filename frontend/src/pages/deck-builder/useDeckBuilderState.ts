@@ -49,7 +49,7 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
     return { id: commanderId, oracleId: '', name: '' }
   })
   const [strategyId, setStrategyId] = useState<string | null>(() => searchParams.get('strategy'))
-  const [view, setView] = useState<'roles' | 'types'>(() => parseDeckBuilderView(searchParams.get('view')))
+  const [view, setView] = useState<'stacks' | 'roles' | 'types'>(() => parseDeckBuilderView(searchParams.get('view')))
   const [picked, setPicked] = useState<Map<string, { oracleId: string; item: InventoryItem | null }>>(
     () => new Map(),
   )
@@ -141,7 +141,7 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
       next.set('commander', selected.id)
       if (strategyId) next.set('strategy', strategyId)
       if (panel !== 'synergy') next.set('panel', panel)
-      if (view !== 'roles') next.set('view', view)
+      if (view !== 'stacks') next.set('view', view)
       if (budgetDollars.trim()) next.set('budget', budgetDollars.trim())
       if (maxCardDollars.trim()) next.set('maxCard', maxCardDollars.trim())
       if (bracket !== 'auto') next.set('bracket', bracket)

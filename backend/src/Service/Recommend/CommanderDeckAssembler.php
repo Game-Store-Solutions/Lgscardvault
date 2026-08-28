@@ -60,6 +60,7 @@ final class CommanderDeckAssembler
         private readonly CommanderLegalityValidator $legality,
         private readonly ThemeTokenizer $tokenizer,
         private readonly StoreComboAnalyzer $comboAnalyzer,
+        private readonly RecommendListingCatalog $listingCatalog,
     ) {
     }
 
@@ -243,6 +244,7 @@ final class CommanderDeckAssembler
 
         $finalContext = $this->deckAnalyzer->analyze($this->flatten($quantities), $strategyId);
         $cards = $this->serializeDeck($picked, $quantities);
+        $this->listingCatalog->attachInventoryOptions($store, $cards);
 
         $combos = $this->comboAnalyzer->analyzeForCommander(
             $store,

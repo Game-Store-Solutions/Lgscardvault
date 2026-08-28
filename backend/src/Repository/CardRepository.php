@@ -862,6 +862,50 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Catalog art URLs keyed by lowercase oracle id.
+     *
+     * @param list<string> $oracleIds
+     * @return array<string, string> lowercase oracle id → image URL
+     */
+    public function mapImageUrlByOracleIds(array $oracleIds): array
+    {
+        $ids = [];
+        foreach ($oracleIds as $oracleId) {
+            $trimmed = mb_strtolower(trim((string) $oracleId));
+            if ('' !== $trimmed) {
+                $ids[$trimmed] = $trimmed;
+            }
+        }
+        if ([] === $ids) {
+            return [];
+        }
+
+        $cards = $this->magicScoped()
+            ->andWhere('LOWER(c.oracleId) IN (:oracleIds)')
+            ->setParameter('oracleIds', array_values($ids))
+            ->setMaxResults(200)
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($cards as $card) {
+            if (!$card instanceof Card) {
+                continue;
+            }
+            $imageUrl = $card->getImageUrl();
+            if (null === $imageUrl || '' === $imageUrl) {
+                continue;
+            }
+            $oracle = mb_strtolower((string) $card->getOracleId());
+            if (!isset($map[$oracle])) {
+                $map[$oracle] = $imageUrl;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * Color identity keyed by lowercase exact name (front face of a DFC
      * matches the name before " // "). First printing wins.
      *

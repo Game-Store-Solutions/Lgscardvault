@@ -4,6 +4,7 @@ import { formatPrice } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import type { SpellbookCombo } from '../../hooks'
 import { Badge, Button, EmptyState, LoadingPanel } from '../../components/ui'
+import { Reveal, Stagger, StaggerItem } from '../../components/motion'
 import type { DeckBuilderNavState } from '../../lib/deckBuilder'
 import { ComboPieceGrid } from './ComboPieceGrid'
 import { colorPips } from './utils'
@@ -49,19 +50,22 @@ export function StoreCombosPanel({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-card border border-border bg-surface px-4 py-3 text-sm">
-        <p className="font-semibold text-fg">
-          Legal in {identityCode || 'this identity'}
-          <span className="ml-2 inline-flex align-middle">{colorPips(colorIdentity)}</span>
-        </p>
-        <p className="mt-1 text-xs text-fg-muted">
-          Only pieces this store actually has on the shelf count as in stock (any printing of the same card). Colorless cards are always allowed. Combos are ranked complete-in-store first, then by coverage.
-          {filteredOutCount ? ` Hidden ${filteredOutCount} off-identity combo${filteredOutCount === 1 ? '' : 's'}.` : ''}
-        </p>
-      </div>
-      <ul className="space-y-3">
+      <Reveal immediate>
+        <div className="rounded-card border border-border bg-surface px-4 py-3 text-sm">
+          <p className="font-semibold text-fg">
+            Legal in {identityCode || 'this identity'}
+            <span className="ml-2 inline-flex align-middle">{colorPips(colorIdentity)}</span>
+          </p>
+          <p className="mt-1 text-xs text-fg-muted">
+            Only pieces this store actually has on the shelf count as in stock (any printing of the same card). Colorless cards are always allowed. Combos are ranked complete-in-store first, then by coverage.
+            {filteredOutCount ? ` Hidden ${filteredOutCount} off-identity combo${filteredOutCount === 1 ? '' : 's'}.` : ''}
+          </p>
+        </div>
+      </Reveal>
+      <Stagger immediate gap={0.08} className="space-y-3">
         {combos.map((combo) => (
-          <li key={combo.id || combo.description} className="rounded-card border border-border bg-surface p-4 shadow-sm">
+          <StaggerItem key={combo.id || combo.description}>
+            <article className="rounded-card border border-border bg-surface p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-bold text-fg">
@@ -77,7 +81,7 @@ export function StoreCombosPanel({
             {combo.description && (
               <p className="mt-2 text-sm leading-relaxed text-fg-muted">{combo.description}</p>
             )}
-            <ComboPieceGrid pieces={combo.cards} />
+            <ComboPieceGrid pieces={combo.cards} storeSlug={slug} />
             {combo.cards.some((piece) => piece.inventoryItem) && (
               <ul className="mt-3 space-y-1.5">
                 {combo.cards
@@ -129,9 +133,10 @@ export function StoreCombosPanel({
                 {combo.missing.length > 6 ? '…' : ''}
               </p>
             )}
-          </li>
+            </article>
+          </StaggerItem>
         ))}
-      </ul>
+      </Stagger>
     </div>
   )
 }

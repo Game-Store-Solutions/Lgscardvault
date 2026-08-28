@@ -47,6 +47,7 @@ final class CommanderRecommender
         private readonly RecommendationEngine $engine,
         private readonly DeckContextAnalyzer $deckAnalyzer,
         private readonly ThemeTokenizer $tokenizer,
+        private readonly RecommendListingCatalog $listingCatalog,
     ) {
     }
 
@@ -157,6 +158,8 @@ final class CommanderRecommender
         foreach (array_slice($scored, 0, $limit) as $card) {
             $rows[] = $this->serialize($card);
         }
+
+        $this->listingCatalog->attachInventoryOptions($store, $rows);
 
         return [
             'commander' => [
