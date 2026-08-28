@@ -60,6 +60,7 @@ export type {
   RecommendedCard,
   ScoreBreakdown,
   SpellbookCombo,
+  SpellbookComboCard,
   CommanderCombosResponse,
   AssembledDeckResponse,
   AssembledDeckCard,

@@ -1,0 +1,18 @@
+{% extends 'emails/layout.html.twig' %}
+
+{% block content %}
+  <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;font-weight:700;color:#111827;">
+    New newsletter signup
+  </h1>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 20px;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0;">
+    <tr>
+      <td style="padding:8px 0;font-size:15px;font-weight:700;color:#111827;">Email</td>
+      <td style="padding:8px 0;font-size:15px;color:#374151;">{{ email }}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 0;font-size:15px;font-weight:700;color:#111827;">Source</td>
+      <td style="padding:8px 0;font-size:15px;color:#374151;">{{ source }}</td>
+    </tr>
+  </table>
+{% endblock %}

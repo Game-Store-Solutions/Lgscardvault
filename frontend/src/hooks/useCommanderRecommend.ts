@@ -18,6 +18,8 @@ export interface CommanderSummary {
 
 export interface SpellbookComboCard {
   name: string
+  oracleId?: string | null
+  imageUrl?: string | null
   quantity: number
   inStock: boolean
   isCommander?: boolean

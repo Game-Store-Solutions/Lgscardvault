@@ -12,6 +12,12 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+
+ARG VITE_PLAUSIBLE_DOMAIN=
+ARG VITE_GA_MEASUREMENT_ID=
+ENV VITE_PLAUSIBLE_DOMAIN=$VITE_PLAUSIBLE_DOMAIN
+ENV VITE_GA_MEASUREMENT_ID=$VITE_GA_MEASUREMENT_ID
+
 RUN npm run build
 
 # ---- Stage 2: serve with nginx -----------------------------------------------

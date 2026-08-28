@@ -59,6 +59,12 @@ framework:
             limit: 5
             interval: '30 minutes'
 
+        # Public newsletter signup on the landing page.
+        newsletter_signup:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '30 minutes'
+
         # Public CCPA / privacy-rights form. Same envelope as contact: a person
         # can correct a typo; a script cannot flood the intake queue.
         privacy_request:
@@ -75,6 +81,10 @@ when@test:
                 limit: 1000
                 interval: '1 minute'
             contact_form:
+                policy: 'sliding_window'
+                limit: 1000
+                interval: '1 minute'
+            newsletter_signup:
                 policy: 'sliding_window'
                 limit: 1000
                 interval: '1 minute'
