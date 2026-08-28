@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import {
   Check,
@@ -52,7 +52,13 @@ import {
   TabPanel,
 } from '../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../components/motion'
-import { CardImage } from '../components/cards'
+import {
+  CardArtLightbox,
+  CardImage,
+  cardArtButtonClassName,
+  previewFromRecommendation,
+  type CardArtPreview,
+} from '../components/cards'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
 import { finishName } from '../lib/finishes'
@@ -138,6 +144,102 @@ function intelligenceSummary(intel: IntelligenceProvenance | undefined): string 
   return `${conf}% confidence · ${sample} reference deck${sample === 1 ? '' : 's'} · ${scope}`
 }
 
+function publicRecommendationReasons(reasons: string[]): string[] {
+  return reasons.filter(
+    (reason) => !reason.startsWith('Appears in') && !reason.includes('reference deck'),
+  )
+}
+
+type DeckBracket = ReturnType<typeof parseDeckBuilderBracket>
+
+function DeckBuildConstraintsFields({
+  budgetDollars,
+  setBudgetDollars,
+  maxCardDollars,
+  setMaxCardDollars,
+  bracket,
+  setBracket,
+  includeOutOfStock,
+  setIncludeOutOfStock,
+  showOutOfStockToggle,
+  onOutOfStockChange,
+  publicMode = false,
+}: {
+  budgetDollars: string
+  setBudgetDollars: Dispatch<SetStateAction<string>>
+  maxCardDollars: string
+  setMaxCardDollars: Dispatch<SetStateAction<string>>
+  bracket: DeckBracket
+  setBracket: Dispatch<SetStateAction<DeckBracket>>
+  includeOutOfStock: boolean
+  setIncludeOutOfStock: Dispatch<SetStateAction<boolean>>
+  showOutOfStockToggle: boolean
+  onOutOfStockChange?: () => void
+  publicMode?: boolean
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs leading-relaxed text-fg-muted">
+        Caps apply to the 100-card list. Combos stay legal in this commander&apos;s colors.
+      </p>
+      {showOutOfStockToggle && (
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-bg px-3 py-2.5">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 rounded border-border text-brand-600 focus:ring-brand-500"
+            checked={includeOutOfStock}
+            onChange={(e) => {
+              setIncludeOutOfStock(e.target.checked)
+              onOutOfStockChange?.()
+            }}
+          />
+          <span>
+            <span className="block text-sm font-semibold text-fg">Include out of stock</span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-fg-muted">
+              Still recommend cards this store does not carry — flagged, not buyable.
+            </span>
+          </span>
+        </label>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="Deck budget"
+          inputMode="decimal"
+          placeholder="500"
+          value={budgetDollars}
+          onChange={(e) => setBudgetDollars(e.target.value)}
+          hint="USD total"
+        />
+        <Input
+          label="Card max"
+          inputMode="decimal"
+          placeholder="25"
+          value={maxCardDollars}
+          onChange={(e) => setMaxCardDollars(e.target.value)}
+          hint="USD each"
+        />
+      </div>
+      <Select
+        label="Commander bracket"
+        value={bracket}
+        onChange={(e) => setBracket(parseDeckBuilderBracket(e.target.value))}
+        hint={
+          publicMode
+            ? 'Auto picks a bracket from the full catalog.'
+            : 'Auto uses Scryfall Game Changers this store stocks in-identity.'
+        }
+      >
+        <option value="auto">{publicMode ? 'Auto' : 'Auto from store stock'}</option>
+        <option value="1">1 · Exhibition (no Game Changers)</option>
+        <option value="2">2 · Core (no Game Changers)</option>
+        <option value="3">3 · Upgraded (up to 3 Game Changers)</option>
+        <option value="4">4 · Optimized</option>
+        <option value="5">5 · cEDH</option>
+      </Select>
+    </div>
+  )
+}
+
 function RecRow({
   row,
   slug,
@@ -148,6 +250,7 @@ function RecRow({
   adding,
   linkState,
   publicMode = false,
+  onPreview,
   onToggle,
   onAdd,
 }: {
@@ -160,6 +263,7 @@ function RecRow({
   adding: boolean
   linkState?: DeckBuilderNavState
   publicMode?: boolean
+  onPreview?: () => void
   onToggle: () => void
   onAdd: () => void
 }) {
@@ -170,6 +274,7 @@ function RecRow({
   const typeLine = item?.card.typeLine ?? row.card.typeLine
   const image = cardImage(item?.card ?? row.card)
   const detailPath = item && !publicMode ? `/s/${slug}/cards/${item.id}` : null
+  const visibleReasons = publicMode ? publicRecommendationReasons(row.reasons) : row.reasons
 
   const title = detailPath ? (
     <Link
@@ -181,6 +286,31 @@ function RecRow({
     </Link>
   ) : (
     <span className="font-display text-sm font-bold text-fg sm:text-[0.95rem]">{name}</span>
+  )
+
+  const cardThumb = (
+    <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
+  )
+
+  const imageCell = onPreview ? (
+    <button
+      type="button"
+      onClick={onPreview}
+      className={cardArtButtonClassName(true)}
+      aria-label={`View ${name}`}
+    >
+      {cardThumb}
+    </button>
+  ) : detailPath ? (
+    <Link
+      to={detailPath}
+      state={linkState}
+      className="w-12 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-14"
+    >
+      {cardThumb}
+    </Link>
+  ) : (
+    <div className="w-12 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-14">{cardThumb}</div>
   )
 
   return (
@@ -203,19 +333,7 @@ function RecRow({
           aria-label={`Select ${name}`}
         />
       </label>
-      {detailPath ? (
-        <Link
-          to={detailPath}
-          state={linkState}
-          className="w-12 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-14"
-        >
-          <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
-        </Link>
-      ) : (
-        <div className="w-12 shrink-0 overflow-hidden rounded-md shadow-sm sm:w-14">
-          <CardImage src={image} alt={name} className="aspect-5/7 w-full" />
-        </div>
-      )}
+      {imageCell}
       <div className="min-w-0 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4">
         <div className="min-w-0">
           {title}
@@ -234,9 +352,9 @@ function RecRow({
               ' · not in stock here'
             )}
           </p>
-          {row.reasons.length > 0 && (
+          {visibleReasons.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
-              {row.reasons.slice(0, 3).map((reason) => (
+              {visibleReasons.slice(0, 3).map((reason) => (
                 <span
                   key={reason}
                   className="rounded-full bg-bg px-2 py-0.5 text-[0.65rem] font-semibold text-fg-muted"
@@ -247,11 +365,18 @@ function RecRow({
             </div>
           )}
         </div>
-        <div className="mt-3 flex items-center justify-between gap-3 sm:mt-0 sm:flex-col sm:items-end sm:justify-center">
-          <div className="text-right">
-            <p className="font-display text-base font-extrabold tracking-tight text-fg">
-              {item ? formatPrice(item.priceCents) : '—'}
-            </p>
+        <div
+          className={cx(
+            'mt-3 flex items-center gap-3 sm:mt-0',
+            publicMode ? 'sm:justify-end' : 'justify-between sm:flex-col sm:items-end sm:justify-center',
+          )}
+        >
+          <div className={publicMode ? 'text-right' : 'text-right'}>
+            {!publicMode && (
+              <p className="font-display text-base font-extrabold tracking-tight text-fg">
+                {item ? formatPrice(item.priceCents) : '—'}
+              </p>
+            )}
             <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-fg-muted">
               {roleLabel} · {match}% match
             </p>
@@ -346,9 +471,9 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
   const signedIn = Boolean(user)
 
   usePageMeta({
-    title: isPublic ? 'Free Commander Deck Builder' : 'Deck Builder',
+    title: isPublic ? 'Commander Deck Builder' : 'Deck Builder',
     description: isPublic
-      ? 'Build a 100-card Commander deck with strategy-aware recommendations, Spellbook combos, and mana-curve analysis. No store login required.'
+      ? 'Build a 100-card Commander deck with strategy-aware recommendations, Spellbook combos, and mana-curve analysis.'
       : 'Search commanders, pick a strategy, and fill your deck from this store\'s in-stock singles.',
     path: isPublic ? '/tools/deck-builder' : `/s/${routeSlug}/deck-builder`,
   })
@@ -410,7 +535,9 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
   const [bracket, setBracket] = useState(() => parseDeckBuilderBracket(searchParams.get('bracket')))
   const [includeOutOfStock, setIncludeOutOfStock] = useState(true)
   const [constraintsOpen, setConstraintsOpen] = useState(false)
+  const [deckConstraintsOpen, setDeckConstraintsOpen] = useState(false)
   const [strategiesOpen, setStrategiesOpen] = useState(true)
+  const [cardPreview, setCardPreview] = useState<{ cards: CardArtPreview[]; index: number } | null>(null)
   const debouncedBudgetDollars = useDebouncedValue(budgetDollars, 400)
   const debouncedMaxCardDollars = useDebouncedValue(maxCardDollars, 400)
 
@@ -646,7 +773,14 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
       }
     : undefined
 
+  function openCardPreview(cards: CardArtPreview[], oracleId: string) {
+    const index = cards.findIndex((card) => card.oracleId === oracleId)
+    if (index < 0) return
+    setCardPreview({ cards, index })
+  }
+
   function renderRows(rows: CommanderRecommendation[]) {
+    const previewCards = rows.map((row) => previewFromRecommendation(row))
     return (
       <ul className="space-y-2">
         {rows.map((row) => {
@@ -665,6 +799,11 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
               disabledPick={!isPublic && inCart > 0}
               adding={cart.setItem.isPending}
               publicMode={isPublic}
+              onPreview={
+                isPublic
+                  ? () => openCardPreview(previewCards, row.card.oracleId)
+                  : undefined
+              }
               onToggle={() => togglePick(row.card.oracleId, item)}
               onAdd={() => item && void addOne(item)}
               linkState={cardLinkState}
@@ -716,13 +855,14 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
               Commander
             </p>
             <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight text-fg sm:text-5xl">
-              {isPublic ? 'Free Commander Deck Builder' : 'Deck Builder'}
+              {isPublic ? 'Commander Deck Builder' : 'Deck Builder'}
             </h1>
-            <p className="mt-3 max-w-lg text-base leading-7 text-fg-muted">
-              {isPublic
-                ? 'Search any legal commander, pick a strategy, and build a full 100-card list with synergy picks and Spellbook combos. No store login required.'
-                : 'Search a legal commander, pick a strategy, then add this store\'s in-stock cards grouped by role or type.'}
-            </p>
+            {!isPublic && (
+              <p className="mt-3 max-w-lg text-base leading-7 text-fg-muted">
+                Search a legal commander, pick a strategy, then add this store&apos;s in-stock cards
+                grouped by role or type.
+              </p>
+            )}
             {isPublic && (
               <p className="mt-2 text-sm text-fg-muted">
                 Want to buy cards too?{' '}
@@ -736,7 +876,7 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
               {isPublic && (
                 <ShareButton
                   url="/tools/deck-builder"
-                  title="Free Commander Deck Builder"
+                  title="Commander Deck Builder"
                   text="Build a strategy-aware Commander deck with combos on LGS Card Vault."
                   label="Share deck builder"
                 />
@@ -882,6 +1022,7 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                   </div>
                 </div>
 
+                {!isPublic && (
                 <div className="border-t border-border">
                   <button
                     type="button"
@@ -924,69 +1065,25 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                         transition={{ duration: 0.28, ease: EASE_PREMIUM }}
                         className="overflow-hidden"
                       >
-                        <div className="space-y-3 px-4 pb-4">
-                          <p className="text-xs leading-relaxed text-fg-muted">
-                            Caps apply to the 100-card list. Combos stay legal in this
-                            commander&apos;s colors.
-                          </p>
-                          {!isPublic && (
-                          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-bg px-3 py-2.5">
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 size-4 rounded border-border text-brand-600 focus:ring-brand-500"
-                              checked={includeOutOfStock}
-                              onChange={(e) => {
-                                setIncludeOutOfStock(e.target.checked)
-                                resetPicks()
-                              }}
-                            />
-                            <span>
-                              <span className="block text-sm font-semibold text-fg">
-                                Include out of stock
-                              </span>
-                              <span className="mt-0.5 block text-xs leading-relaxed text-fg-muted">
-                                Still recommend cards this store does not carry — flagged, not
-                                buyable.
-                              </span>
-                            </span>
-                          </label>
-                          )}
-                          <div className="grid grid-cols-2 gap-3">
-                            <Input
-                              label="Deck budget"
-                              inputMode="decimal"
-                              placeholder="500"
-                              value={budgetDollars}
-                              onChange={(e) => setBudgetDollars(e.target.value)}
-                              hint="USD total"
-                            />
-                            <Input
-                              label="Card max"
-                              inputMode="decimal"
-                              placeholder="25"
-                              value={maxCardDollars}
-                              onChange={(e) => setMaxCardDollars(e.target.value)}
-                              hint="USD each"
-                            />
-                          </div>
-                          <Select
-                            label="Commander bracket"
-                            value={bracket}
-                            onChange={(e) => setBracket(parseDeckBuilderBracket(e.target.value))}
-                            hint="Auto uses Scryfall Game Changers this store stocks in-identity."
-                          >
-                            <option value="auto">Auto from store stock</option>
-                            <option value="1">1 · Exhibition (no Game Changers)</option>
-                            <option value="2">2 · Core (no Game Changers)</option>
-                            <option value="3">3 · Upgraded (up to 3 Game Changers)</option>
-                            <option value="4">4 · Optimized</option>
-                            <option value="5">5 · cEDH</option>
-                          </Select>
+                        <div className="px-4 pb-4">
+                          <DeckBuildConstraintsFields
+                            budgetDollars={budgetDollars}
+                            setBudgetDollars={setBudgetDollars}
+                            maxCardDollars={maxCardDollars}
+                            setMaxCardDollars={setMaxCardDollars}
+                            bracket={bracket}
+                            setBracket={setBracket}
+                            includeOutOfStock={includeOutOfStock}
+                            setIncludeOutOfStock={setIncludeOutOfStock}
+                            showOutOfStockToggle
+                            onOutOfStockChange={resetPicks}
+                          />
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
+                )}
               </div>
 
               <div className="min-h-0 overflow-hidden rounded-card border border-border bg-surface shadow-sm">
@@ -1146,7 +1243,7 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                               : ''}
                             {nextCards.isFetching ? ' · updating…' : ''}
                           </p>
-                          {intelLine && (
+                          {intelLine && !isPublic && (
                             <p className="mt-1 text-[0.7rem] font-medium text-fg-muted">{intelLine}</p>
                           )}
                         </div>
@@ -1297,12 +1394,30 @@ export default function CommanderSynergyPage({ variant = 'store' }: { variant?: 
                   busy={deckBusy}
                   onAddAll={() => void addDeckToCart()}
                   linkState={cardLinkState}
+                  budgetDollars={budgetDollars}
+                  setBudgetDollars={setBudgetDollars}
+                  maxCardDollars={maxCardDollars}
+                  setMaxCardDollars={setMaxCardDollars}
+                  bracket={bracket}
+                  setBracket={setBracket}
+                  constraintsOpen={deckConstraintsOpen}
+                  setConstraintsOpen={setDeckConstraintsOpen}
+                  onOpenCardPreview={isPublic ? openCardPreview : undefined}
                 />
               </TabPanel>
             </div>
           </>
         )}
       </section>
+
+      {cardPreview && (
+        <CardArtLightbox
+          cards={cardPreview.cards}
+          index={cardPreview.index}
+          onClose={() => setCardPreview(null)}
+          onIndexChange={(index) => setCardPreview((prev) => (prev ? { ...prev, index } : null))}
+        />
+      )}
     </div>
   )
 }
@@ -1453,6 +1568,15 @@ function DeckPanel({
   busy,
   onAddAll,
   linkState,
+  budgetDollars,
+  setBudgetDollars,
+  maxCardDollars,
+  setMaxCardDollars,
+  bracket,
+  setBracket,
+  constraintsOpen = false,
+  setConstraintsOpen,
+  onOpenCardPreview,
 }: {
   slug: string
   publicMode?: boolean
@@ -1462,6 +1586,15 @@ function DeckPanel({
   busy: boolean
   onAddAll: () => void
   linkState?: DeckBuilderNavState
+  budgetDollars?: string
+  setBudgetDollars?: Dispatch<SetStateAction<string>>
+  maxCardDollars?: string
+  setMaxCardDollars?: Dispatch<SetStateAction<string>>
+  bracket?: DeckBracket
+  setBracket?: Dispatch<SetStateAction<DeckBracket>>
+  constraintsOpen?: boolean
+  setConstraintsOpen?: Dispatch<SetStateAction<boolean>>
+  onOpenCardPreview?: (cards: CardArtPreview[], oracleId: string) => void
 }) {
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
 
@@ -1485,6 +1618,12 @@ function DeckPanel({
     if (stockFilter === 'out_of_stock') return !row.inventoryItem
     return true
   })
+  const previewCards: CardArtPreview[] = visibleCards.map((row) => ({
+    oracleId: row.card.oracleId,
+    name: row.inventoryItem?.card.name ?? row.card.name,
+    typeLine: row.inventoryItem?.card.typeLine ?? row.card.typeLine,
+    imageUrl: cardImage(row.inventoryItem?.card ?? row.card),
+  }))
   const intel = deck.intelligence
   const intelLine = intelligenceSummary(intel)
   const structureBits = (['lands', 'ramp', 'draw', 'removal'] as const)
@@ -1493,6 +1632,75 @@ function DeckPanel({
 
   return (
     <div className="space-y-4">
+      {publicMode &&
+        budgetDollars != null &&
+        setBudgetDollars &&
+        maxCardDollars != null &&
+        setMaxCardDollars &&
+        bracket != null &&
+        setBracket &&
+        setConstraintsOpen && (
+          <div className="overflow-hidden rounded-card border border-border bg-surface shadow-sm">
+            <button
+              type="button"
+              aria-expanded={constraintsOpen}
+              aria-controls="deck-builder-deck-constraints"
+              onClick={() => setConstraintsOpen((open) => !open)}
+              className="flex w-full items-start gap-2 px-4 py-3 text-left transition-colors hover:bg-bg/50"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.7rem] font-bold uppercase tracking-[0.16em] text-fg-muted">
+                  Build constraints
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-fg-muted">
+                  {[
+                    budgetDollars.trim() ? `Budget $${budgetDollars.trim()}` : null,
+                    maxCardDollars.trim() ? `Max $${maxCardDollars.trim()}` : null,
+                    bracket !== 'auto' ? `Bracket ${bracket}` : 'Auto bracket',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'Budget, card cap, and bracket for the 100-card list'}
+                </span>
+              </span>
+              <ChevronDown
+                aria-hidden
+                className={cx(
+                  'mt-0.5 size-4 shrink-0 text-fg-muted transition-transform duration-200',
+                  constraintsOpen && 'rotate-180',
+                )}
+              />
+            </button>
+            <AnimatePresence initial={false}>
+              {constraintsOpen && (
+                <motion.div
+                  id="deck-builder-deck-constraints"
+                  key="deck-constraints"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: EASE_PREMIUM }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 pb-4">
+                    <DeckBuildConstraintsFields
+                      budgetDollars={budgetDollars}
+                      setBudgetDollars={setBudgetDollars}
+                      maxCardDollars={maxCardDollars}
+                      setMaxCardDollars={setMaxCardDollars}
+                      bracket={bracket}
+                      setBracket={setBracket}
+                      includeOutOfStock
+                      setIncludeOutOfStock={() => {}}
+                      showOutOfStockToggle={false}
+                      publicMode
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
       <div className="rounded-card border border-border bg-surface p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -1547,19 +1755,24 @@ function DeckPanel({
         <details className="mt-3 border-t border-border pt-3">
           <summary className="cursor-pointer text-xs font-semibold text-fg-muted transition-colors hover:text-fg">
             Build details
-            {intel ? ` · ${Math.round(intel.confidence * 100)}% confidence` : ''}
+            {!publicMode && intel ? ` · ${Math.round(intel.confidence * 100)}% confidence` : ''}
             {deck.combos.length > 0
               ? ` · ${deck.combos.filter((c) => c.completeInStore).length}/${deck.combos.length} combos`
               : ''}
           </summary>
           <div className="mt-2 space-y-1.5 text-xs text-fg-muted">
-            {intelLine && <p>{intelLine}</p>}
-            <p>
-              Built from {intel?.source ?? 'catalog'}
-              {deck.budget.maxCardCents != null
-                ? ` · max ${formatPrice(deck.budget.maxCardCents)} / card`
-                : ''}
-            </p>
+            {!publicMode && intelLine && <p>{intelLine}</p>}
+            {!publicMode && (
+              <p>
+                Built from {intel?.source ?? 'catalog'}
+                {deck.budget.maxCardCents != null
+                  ? ` · max ${formatPrice(deck.budget.maxCardCents)} / card`
+                  : ''}
+              </p>
+            )}
+            {publicMode && deck.budget.maxCardCents != null && (
+              <p>Max {formatPrice(deck.budget.maxCardCents)} per card</p>
+            )}
             {deck.bracket.gameChangersIncluded.length > 0 && (
               <p>
                 Game Changers: {deck.bracket.gameChangersIncluded.map((c) => c.name).join(', ')}
@@ -1647,7 +1860,16 @@ function DeckPanel({
                 )}
                 title={row.reasons?.slice(0, 3).join(' · ')}
               >
-                {detailPath ? (
+                {onOpenCardPreview ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenCardPreview(previewCards, row.card.oracleId)}
+                    className={cardArtButtonClassName(true)}
+                    aria-label={`View ${name}`}
+                  >
+                    <CardImage src={image} alt={name} className="aspect-5/7 w-full" showLabel={false} />
+                  </button>
+                ) : detailPath ? (
                   <Link
                     to={detailPath}
                     state={linkState}
