@@ -869,20 +869,25 @@ class CardRepository extends ServiceEntityRepository
      */
     public function mapImageUrlByOracleIds(array $oracleIds): array
     {
-        $ids = [];
+        $uuids = [];
         foreach ($oracleIds as $oracleId) {
             $trimmed = mb_strtolower(trim((string) $oracleId));
-            if ('' !== $trimmed) {
-                $ids[$trimmed] = $trimmed;
+            if ('' === $trimmed || isset($uuids[$trimmed])) {
+                continue;
+            }
+            try {
+                $uuids[$trimmed] = Uuid::fromString($trimmed);
+            } catch (\InvalidArgumentException) {
+                continue;
             }
         }
-        if ([] === $ids) {
+        if ([] === $uuids) {
             return [];
         }
 
         $cards = $this->magicScoped()
-            ->andWhere('LOWER(c.oracleId) IN (:oracleIds)')
-            ->setParameter('oracleIds', array_values($ids))
+            ->andWhere('c.oracleId IN (:oracleIds)')
+            ->setParameter('oracleIds', array_values($uuids))
             ->setMaxResults(200)
             ->getQuery()
             ->getResult();
