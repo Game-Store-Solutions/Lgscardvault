@@ -1,8 +1,8 @@
 import { Link } from 'react-router'
 import { Check, Search, ShoppingCart } from 'lucide-react'
 import { Button, buttonVariants, EmptyState, LoadingPanel } from '../../components/ui'
+import { ListLayoutSwitcher } from './ListLayoutSwitcher'
 import { SynergyPanelBody } from './synergy/SynergyPanelBody'
-import { SynergyViewSwitcher } from './synergy/SynergyViewSwitcher'
 import type { DeckBuilderState } from './useDeckBuilderState'
 
 type StoreSynergyPanelProps = Pick<
@@ -14,8 +14,10 @@ type StoreSynergyPanelProps = Pick<
   | 'packageData'
   | 'pickedOracleIds'
   | 'nextCards'
-  | 'view'
-  | 'setView'
+  | 'layout'
+  | 'setLayout'
+  | 'groupBy'
+  | 'setGroupBy'
   | 'allSelected'
   | 'toggleSelectAll'
   | 'picked'
@@ -43,8 +45,10 @@ export function StoreSynergyPanel({
   packageData,
   pickedOracleIds,
   nextCards,
-  view,
-  setView,
+  layout,
+  setLayout,
+  groupBy,
+  setGroupBy,
   allSelected,
   toggleSelectAll,
   picked,
@@ -109,7 +113,12 @@ export function StoreSynergyPanel({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <SynergyViewSwitcher view={view} onChange={setView} />
+            <ListLayoutSwitcher
+              layout={layout}
+              groupBy={groupBy}
+              onLayoutChange={setLayout}
+              onGroupByChange={setGroupBy}
+            />
             <Button type="button" variant="ghost" size="sm" onClick={toggleSelectAll}>
               {allSelected ? 'Clear' : 'Select all'}
             </Button>
@@ -149,7 +158,8 @@ export function StoreSynergyPanel({
       )}
 
       <SynergyPanelBody
-        view={view}
+        layout={layout}
+        groupBy={groupBy}
         byRole={byRole}
         byType={byType}
         storeSlug={routeSlug}

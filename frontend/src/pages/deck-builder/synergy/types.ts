@@ -2,11 +2,11 @@ import type { InventoryItem } from '../../../api/types'
 import type { CardArtPreview } from '../../../components/cards'
 import type { CommanderRecommendation } from '../../../hooks'
 
-export interface SynergySection {
+export interface SynergySection<TRow = CommanderRecommendation> {
   id: string
   label: string
   count: number
-  rows: CommanderRecommendation[]
+  rows: TRow[]
 }
 
 export interface SynergyViewProps {
@@ -20,12 +20,12 @@ export interface SynergyViewProps {
   cartPending?: boolean
 }
 
-export function buildSections(
+export function buildSections<TRow>(
   order: readonly string[],
   labels: Record<string, string>,
-  grouped: Record<string, CommanderRecommendation[] | undefined>,
-): SynergySection[] {
-  const sections: SynergySection[] = []
+  grouped: Record<string, TRow[] | undefined>,
+): SynergySection<TRow>[] {
+  const sections: SynergySection<TRow>[] = []
   for (const id of order) {
     const rows = grouped[id] ?? []
     if (rows.length === 0) continue

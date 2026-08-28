@@ -7,6 +7,15 @@ import {
   type CardArtPreview,
 } from '../../../components/cards'
 
+export interface SynergyCardGridProps {
+  rows: CommanderRecommendation[]
+  storeSlug?: string
+  picked: Map<string, { oracleId: string; item: InventoryItem | null }>
+  togglePick: (oracleId: string, item: InventoryItem | null) => void
+  openCardPreview: (cards: CardArtPreview[], oracleId: string) => void
+  selectable?: boolean
+}
+
 export function SynergyCardGrid({
   rows,
   storeSlug,
@@ -14,14 +23,7 @@ export function SynergyCardGrid({
   togglePick,
   openCardPreview,
   selectable = true,
-}: {
-  rows: CommanderRecommendation[]
-  storeSlug?: string
-  picked: Map<string, { oracleId: string; item: InventoryItem | null }>
-  togglePick: (oracleId: string, item: InventoryItem | null) => void
-  openCardPreview: (cards: CardArtPreview[], oracleId: string) => void
-  selectable?: boolean
-}) {
+}: SynergyCardGridProps) {
   const previewCards = rows.map((row) => previewFromRecommendation(row, { storeSlug }))
 
   return (

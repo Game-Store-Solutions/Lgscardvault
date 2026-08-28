@@ -1,16 +1,14 @@
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { Link } from 'react-router'
 import { Search, ShoppingCart } from 'lucide-react'
 import { formatPrice } from '../../api/client'
 import type { AssembledDeckResponse } from '../../hooks'
+import type { DeckBuilderGroupBy, DeckBuilderLayout } from '../../lib/deckBuilder'
 import { Button, buttonVariants, EmptyState, LoadingPanel } from '../../components/ui'
-import {
-  PublicFloatingCard,
-  PUBLIC_FLOATING_CARD_GRID_CLASS,
-  previewFromDeckRow,
-  type CardArtPreview,
-} from '../../components/cards'
+import { type CardArtPreview } from '../../components/cards'
 import { cx } from '../../lib/cx'
+import { DeckListBody } from './deck/DeckListBody'
+import { ListLayoutSwitcher } from './ListLayoutSwitcher'
 import { intelligenceSummary } from './utils'
 
 export function StoreDeckPanel({
@@ -20,6 +18,10 @@ export function StoreDeckPanel({
   signedIn,
   busy,
   onAddAll,
+  layout,
+  setLayout,
+  groupBy,
+  setGroupBy,
   onOpenCardPreview,
 }: {
   slug: string
@@ -28,6 +30,10 @@ export function StoreDeckPanel({
   signedIn: boolean
   busy: boolean
   onAddAll: () => void
+  layout: DeckBuilderLayout
+  setLayout: Dispatch<SetStateAction<DeckBuilderLayout>>
+  groupBy: DeckBuilderGroupBy
+  setGroupBy: Dispatch<SetStateAction<DeckBuilderGroupBy>>
   onOpenCardPreview: (cards: CardArtPreview[], oracleId: string) => void
 }) {
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
@@ -48,9 +54,6 @@ export function StoreDeckPanel({
     if (stockFilter === 'out_of_stock') return !row.inventoryItem
     return true
   })
-  const previewCards: CardArtPreview[] = visibleCards.map((row) =>
-    previewFromDeckRow(row, { storeSlug: slug }),
-  )
   const intel = deck.intelligence
   const intelLine = intelligenceSummary(intel)
   const structureBits = (['lands', 'ramp', 'draw', 'removal'] as const)
@@ -163,6 +166,12 @@ export function StoreDeckPanel({
         <p className="text-xs text-fg-muted">
           Showing {visibleCards.length} of {deck.cards.length}
         </p>
+        <ListLayoutSwitcher
+          layout={layout}
+          groupBy={groupBy}
+          onLayoutChange={setLayout}
+          onGroupByChange={setGroupBy}
+        />
       </div>
 
       {visibleCards.length === 0 ? (
@@ -176,27 +185,13 @@ export function StoreDeckPanel({
           }
         />
       ) : (
-        <ul className={PUBLIC_FLOATING_CARD_GRID_CLASS}>
-          {visibleCards.map((row) => {
-            const preview = previewFromDeckRow(row, { storeSlug: slug })
-            const badge =
-              row.quantity > 1
-                ? `${row.quantity}×`
-                : row.gameChanger
-                  ? 'GC'
-                  : !row.inventoryItem
-                    ? '—'
-                    : undefined
-            return (
-              <PublicFloatingCard
-                key={row.card.oracleId}
-                preview={preview}
-                onPreview={() => onOpenCardPreview(previewCards, row.card.oracleId)}
-                badge={badge}
-              />
-            )
-          })}
-        </ul>
+        <DeckListBody
+          cards={visibleCards}
+          layout={layout}
+          groupBy={groupBy}
+          storeSlug={slug}
+          onOpenCardPreview={onOpenCardPreview}
+        />
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-import type { DeckBuilderView } from '../../../lib/deckBuilder'
+import type { DeckBuilderGroupBy } from '../../../lib/deckBuilder'
 import type { DeckRole, DeckCardType, CommanderRecommendation } from '../../../hooks'
 import { ROLE_META, TYPE_LABELS, TYPE_ORDER } from '../constants'
 import { SynergyGroupedGrid } from './SynergyGroupedGrid'
@@ -6,11 +6,11 @@ import { SynergyVisualStacks } from './SynergyVisualStacks'
 import { buildSections, type SynergyViewProps } from './types'
 
 export function buildSynergySections(
-  view: DeckBuilderView,
+  groupBy: DeckBuilderGroupBy,
   byRole: Partial<Record<DeckRole, CommanderRecommendation[]>> | undefined,
   byType: Partial<Record<DeckCardType, CommanderRecommendation[]>> | undefined,
 ) {
-  if (view === 'roles' && byRole) {
+  if (groupBy === 'role' && byRole) {
     const labels = Object.fromEntries(
       (Object.keys(ROLE_META) as DeckRole[]).map((role) => [role, ROLE_META[role].label]),
     )
@@ -23,24 +23,22 @@ export function buildSynergySections(
 }
 
 export function SynergyPanelBody({
-  view,
+  layout,
+  groupBy,
   byRole,
   byType,
   ...viewProps
 }: SynergyViewProps & {
-  view: DeckBuilderView
+  layout: 'stacks' | 'grid'
+  groupBy: DeckBuilderGroupBy
   byRole?: Partial<Record<DeckRole, CommanderRecommendation[]>>
   byType?: Partial<Record<DeckCardType, CommanderRecommendation[]>>
 }) {
-  const sections = buildSynergySections(view, byRole, byType)
+  const sections = buildSynergySections(groupBy, byRole, byType)
 
-  if (view === 'stacks') {
+  if (layout === 'stacks') {
     return <SynergyVisualStacks sections={sections} {...viewProps} />
   }
 
-  if (view === 'roles') {
-    return <SynergyGroupedGrid sections={sections} groupBy="role" {...viewProps} />
-  }
-
-  return <SynergyGroupedGrid sections={sections} groupBy="type" {...viewProps} />
+  return <SynergyGroupedGrid sections={sections} groupBy={groupBy} {...viewProps} />
 }
