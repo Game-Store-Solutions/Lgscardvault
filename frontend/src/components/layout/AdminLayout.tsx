@@ -16,9 +16,11 @@ import {
 
   LayoutDashboard,
 
-  Megaphone,
-
   LogOut,
+
+  Mail,
+
+  Megaphone,
 
   Menu,
 
@@ -133,6 +135,7 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
 
           items: [
             { to: '/platform/admin/users', label: 'Users', icon: Users },
+            { to: '/platform/admin/newsletter', label: 'Newsletter', icon: Mail },
             { to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone },
           ],
 

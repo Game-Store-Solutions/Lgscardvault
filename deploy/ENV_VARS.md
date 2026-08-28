@@ -3,8 +3,18 @@
 Everything the backend expects for a successful deploy. Copy
 [`prod.env.example`](prod.env.example) on the server and fill in **Required**.
 
-The frontend production image uses same-origin `/api` (no `VITE_*` required).
+The frontend production image uses same-origin `/api` (no other `VITE_*` required).
 Do **not** set `VITE_ENABLE_TEST_CHECKOUT=true` in production.
+
+Optional **frontend build-time** vars (baked into the static bundle when the image
+is built — set them in `prod.env` and pass through `docker-compose.prod.yml`):
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_PLAUSIBLE_DOMAIN` | Plausible analytics domain (e.g. `lgscardvault.com`). Empty = off. |
+| `VITE_GA_MEASUREMENT_ID` | Google Analytics 4 measurement ID (e.g. `G-XXXXXXXX`). Empty = off. |
+
+Both load only after the shopper opts in via cookie consent.
 
 Optional backend var: `APP_CONTACT_RECIPIENTS` — comma-separated inboxes that
 receive landing-page contact-form submissions (`POST /api/contact`). Unset, it
@@ -12,6 +22,15 @@ defaults to the platform owners (`tedy@` / `robert@gamestoresolutions.com`). Set
 it to route enquiries elsewhere, e.g.
 `APP_CONTACT_RECIPIENTS=support@gamestoresolutions.com`. Delivery uses
 `MAILER_DSN`, so the form needs a working mailer in production.
+
+Optional backend var: `APP_NEWSLETTER_RECIPIENTS` — comma-separated inboxes that
+receive new newsletter signups (`POST /api/newsletter`). Unset, it falls back to
+`APP_CONTACT_RECIPIENTS`, then the platform owners.
+
+Newsletter **broadcasts** are composed at `/platform/admin/newsletter` and queued
+on the `async` messenger transport (`SendNewsletterCampaignMessage`). The worker
+must be running (`messenger:consume async`) or sends will stay stuck in `sending`.
+Run migration `Version20260828020000` before using campaigns.
 
 JWT **key files** (`config/jwt/*.pem`) are not env vars — generate once on the
 server (`lexik:jwt:generate-keypair`); see [`LAUNCH.md`](LAUNCH.md).

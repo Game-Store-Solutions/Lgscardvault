@@ -9,6 +9,7 @@ import { useGameShowcase, useShowcaseCards } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { ContactForm } from './ContactForm'
+import { NewsletterSignup } from './NewsletterSignup'
 import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
 import { GameShowcaseReel, warmupShowcaseCards } from './GameShowcaseReel'
 import { GameTile } from './GameTile'
@@ -218,6 +219,14 @@ export default function MarketplaceLanding() {
             ))}
           </Stagger>
         </section>
+
+        <Reveal
+          className="scroll-mt-24 overflow-hidden rounded-card border border-border bg-surface shadow-card dark:border-white/10 dark:bg-white/[0.03]"
+        >
+          <div className="p-6 sm:p-8">
+            <NewsletterSignup />
+          </div>
+        </Reveal>
 
         {/* Contact us. */}
         <Reveal

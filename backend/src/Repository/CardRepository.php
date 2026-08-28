@@ -803,6 +803,65 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Catalog art URLs keyed by lowercase exact / front-face name.
+     *
+     * @param list<string> $lowerNames
+     * @return array<string, string> lowercase name → image URL
+     */
+    public function mapImageUrlByLowerNames(array $lowerNames): array
+    {
+        $names = [];
+        foreach ($lowerNames as $name) {
+            $trimmed = mb_strtolower(trim((string) $name));
+            if ('' !== $trimmed) {
+                $names[$trimmed] = $trimmed;
+            }
+        }
+        if ([] === $names) {
+            return [];
+        }
+
+        $qb = $this->magicScoped();
+        $or = $qb->expr()->orX('LOWER(c.name) IN (:names)');
+        $i = 0;
+        foreach (array_values($names) as $name) {
+            $or->add('LOWER(c.name) LIKE :front'.$i);
+            $qb->setParameter('front'.$i, $name.' //%');
+            ++$i;
+            if ($i >= 40) {
+                break;
+            }
+        }
+        $cards = $qb
+            ->andWhere($or)
+            ->setParameter('names', array_values($names))
+            ->setMaxResults(200)
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($cards as $card) {
+            if (!$card instanceof Card) {
+                continue;
+            }
+            $imageUrl = $card->getImageUrl();
+            if (null === $imageUrl || '' === $imageUrl) {
+                continue;
+            }
+            $full = mb_strtolower($card->getName());
+            $front = str_contains($full, ' // ') ? trim(explode(' // ', $full, 2)[0]) : $full;
+            if (!isset($map[$full])) {
+                $map[$full] = $imageUrl;
+            }
+            if (!isset($map[$front])) {
+                $map[$front] = $imageUrl;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * Color identity keyed by lowercase exact name (front face of a DFC
      * matches the name before " // "). First printing wins.
      *
