@@ -1,10 +1,9 @@
 import type { CommanderSummary } from '../hooks/useCommanderRecommend'
 
 export type DeckBuilderPanel = 'synergy' | 'combos' | 'deck'
-export type DeckBuilderLayout = 'stacks' | 'grid'
 export type DeckBuilderGroupBy = 'role' | 'type'
 
-/** @deprecated Prefer layout + groupBy. Kept for older deep links. */
+/** @deprecated Legacy deep-link values; maps to groupBy only. */
 export type DeckBuilderView = 'stacks' | 'roles' | 'types'
 
 export interface DeckBuilderNavState {
@@ -12,7 +11,6 @@ export interface DeckBuilderNavState {
   commanderId: string
   strategy?: string | null
   panel?: DeckBuilderPanel
-  layout?: DeckBuilderLayout
   groupBy?: DeckBuilderGroupBy
   /** @deprecated */
   view?: DeckBuilderView
@@ -22,7 +20,6 @@ export interface DeckBuilderSession {
   commander: CommanderSummary
   strategyId: string | null
   panel: DeckBuilderPanel
-  layout: DeckBuilderLayout
   groupBy: DeckBuilderGroupBy
   budgetDollars?: string
   maxCardDollars?: string
@@ -31,12 +28,6 @@ export interface DeckBuilderSession {
 
 export function parseDeckBuilderPanel(value: string | null): DeckBuilderPanel {
   return value === 'combos' || value === 'deck' ? value : 'synergy'
-}
-
-export function parseDeckBuilderLayout(value: string | null): DeckBuilderLayout {
-  if (value === 'grid' || value === 'roles' || value === 'types') return 'grid'
-  if (value === 'stacks') return 'stacks'
-  return 'grid'
 }
 
 export function parseDeckBuilderGroupBy(
@@ -52,9 +43,7 @@ export function parseDeckBuilderGroupBy(
 
 /** @deprecated */
 export function parseDeckBuilderView(value: string | null): DeckBuilderView {
-  const layout = parseDeckBuilderLayout(value)
   const groupBy = parseDeckBuilderGroupBy(null, value)
-  if (layout === 'stacks') return 'stacks'
   return groupBy === 'role' ? 'roles' : 'types'
 }
 
@@ -71,17 +60,12 @@ export function dollarsToCents(raw: string | null | undefined): number | null {
   return Math.round(n * 100)
 }
 
-function appendLayoutParams(
-  params: URLSearchParams,
-  layout: DeckBuilderLayout,
-  groupBy: DeckBuilderGroupBy,
-) {
-  if (layout === 'stacks') {
-    params.set('view', 'stacks')
-    return
+function appendGroupParam(params: URLSearchParams, groupBy: DeckBuilderGroupBy) {
+  if (groupBy === 'role') {
+    params.set('group', 'role')
+  } else {
+    params.set('group', 'type')
   }
-  params.set('view', 'grid')
-  if (groupBy === 'role') params.set('group', 'role')
 }
 
 /** Storefront URL that reopens a commander package. */
@@ -91,7 +75,6 @@ export function deckBuilderPath(
     commanderId?: string | null
     strategy?: string | null
     panel?: DeckBuilderPanel
-    layout?: DeckBuilderLayout
     groupBy?: DeckBuilderGroupBy
     budgetDollars?: string | null
     maxCardDollars?: string | null
@@ -103,9 +86,7 @@ export function deckBuilderPath(
     params.set('commander', opts.commanderId)
     if (opts.strategy) params.set('strategy', opts.strategy)
     if (opts.panel && opts.panel !== 'synergy') params.set('panel', opts.panel)
-    if (opts.layout) {
-      appendLayoutParams(params, opts.layout, opts.groupBy ?? 'role')
-    }
+    if (opts.groupBy) appendGroupParam(params, opts.groupBy)
     if (opts.budgetDollars) params.set('budget', opts.budgetDollars)
     if (opts.maxCardDollars) params.set('maxCard', opts.maxCardDollars)
     if (opts.bracket && opts.bracket !== 'auto') params.set('bracket', opts.bracket)
@@ -120,7 +101,6 @@ export function publicDeckBuilderPath(
     commanderId?: string | null
     strategy?: string | null
     panel?: DeckBuilderPanel
-    layout?: DeckBuilderLayout
     groupBy?: DeckBuilderGroupBy
     budgetDollars?: string | null
     maxCardDollars?: string | null
@@ -132,9 +112,7 @@ export function publicDeckBuilderPath(
     params.set('commander', opts.commanderId)
     if (opts.strategy) params.set('strategy', opts.strategy)
     if (opts.panel && opts.panel !== 'synergy') params.set('panel', opts.panel)
-    if (opts.layout) {
-      appendLayoutParams(params, opts.layout, opts.groupBy ?? 'role')
-    }
+    if (opts.groupBy) appendGroupParam(params, opts.groupBy)
     if (opts.budgetDollars) params.set('budget', opts.budgetDollars)
     if (opts.maxCardDollars) params.set('maxCard', opts.maxCardDollars)
     if (opts.bracket && opts.bracket !== 'auto') params.set('bracket', opts.bracket)
@@ -165,11 +143,10 @@ export function loadDeckBuilderSession(slug: string): DeckBuilderSession | null 
   try {
     const raw = sessionStorage.getItem(storageKey(slug))
     if (!raw) return null
-    const parsed = JSON.parse(raw) as DeckBuilderSession & { view?: DeckBuilderView }
+    const parsed = JSON.parse(raw) as DeckBuilderSession & { view?: DeckBuilderView; layout?: string }
     if (!parsed?.commander?.id) return null
-    const layout = parsed.layout ?? parseDeckBuilderLayout(parsed.view ?? null)
     const groupBy = parsed.groupBy ?? parseDeckBuilderGroupBy(null, parsed.view ?? null)
-    return { ...parsed, layout, groupBy }
+    return { ...parsed, groupBy }
   } catch {
     return null
   }

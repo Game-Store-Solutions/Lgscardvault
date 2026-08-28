@@ -46,7 +46,7 @@ import { EditInventoryModal, type InventoryEditPayload } from './store-admin/sea
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 import { setBrowsePath } from '../lib/setBrowse'
 import { artistBrowsePath, resolveCardArtist } from '../lib/artistBrowse'
-import { deckBuilderPath, isDeckBuilderNav, parseDeckBuilderGroupBy, parseDeckBuilderLayout } from '../lib/deckBuilder'
+import { deckBuilderPath, isDeckBuilderNav, parseDeckBuilderGroupBy } from '../lib/deckBuilder'
 import { storeSearchFromNavState, storeSearchPath, withStoreSearchNav } from '../lib/storeSearch'
 import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
 import { ShareButton } from '../components/ShareButton'
@@ -96,7 +96,6 @@ export default function CardDetailsPage() {
         commanderId: deckNav.commanderId,
         strategy: deckNav.strategy,
         panel: deckNav.panel,
-        layout: deckNav.layout ?? parseDeckBuilderLayout(deckNav.view ?? null),
         groupBy: deckNav.groupBy ?? parseDeckBuilderGroupBy(null, deckNav.view ?? null),
       })
     : cameFromCaseCards

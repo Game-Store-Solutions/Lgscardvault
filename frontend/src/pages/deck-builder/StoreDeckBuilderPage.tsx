@@ -17,7 +17,7 @@ import { useDeckBuilderState } from './useDeckBuilderState'
 
 export default function StoreDeckBuilderPage() {
   const state = useDeckBuilderState('store')
-  const { routeSlug, store, storeLoading, selected, query, handleQueryChange, search, showSearchGrid, searchResults, pickCommander, panel, setPanel, recommend, combos, deck, signedIn, cartQtyByInventoryId, addOne, cart, deckBusy, addDeckToCart, cardLinkState, cardPreview, setCardPreview, openCardPreview, layout, setLayout, groupBy, setGroupBy } = state
+  const { routeSlug, store, storeLoading, selected, query, handleQueryChange, search, showSearchGrid, searchResults, pickCommander, panel, setPanel, recommend, combos, deck, signedIn, cartQtyByInventoryId, addOne, cart, deckBusy, addDeckToCart, cardLinkState, cardPreview, setCardPreview, openCardPreview, groupBy, setGroupBy } = state
 
   useStoreTheme(store)
   useAppShellFlush(true)
@@ -156,8 +156,6 @@ export default function StoreDeckBuilderPage() {
                   signedIn={signedIn}
                   busy={deckBusy}
                   onAddAll={addDeckToCart}
-                  layout={layout}
-                  setLayout={setLayout}
                   groupBy={groupBy}
                   setGroupBy={setGroupBy}
                   onOpenCardPreview={openCardPreview}

@@ -2,7 +2,6 @@ import type { DeckBuilderGroupBy } from '../../../lib/deckBuilder'
 import type { DeckRole, DeckCardType, CommanderRecommendation } from '../../../hooks'
 import { ROLE_META, TYPE_LABELS, TYPE_ORDER } from '../constants'
 import { SynergyGroupedGrid } from './SynergyGroupedGrid'
-import { SynergyVisualStacks } from './SynergyVisualStacks'
 import { buildSections, type SynergyViewProps } from './types'
 
 export function buildSynergySections(
@@ -23,22 +22,15 @@ export function buildSynergySections(
 }
 
 export function SynergyPanelBody({
-  layout,
   groupBy,
   byRole,
   byType,
   ...viewProps
 }: SynergyViewProps & {
-  layout: 'stacks' | 'grid'
   groupBy: DeckBuilderGroupBy
   byRole?: Partial<Record<DeckRole, CommanderRecommendation[]>>
   byType?: Partial<Record<DeckCardType, CommanderRecommendation[]>>
 }) {
   const sections = buildSynergySections(groupBy, byRole, byType)
-
-  if (layout === 'stacks') {
-    return <SynergyVisualStacks sections={sections} {...viewProps} />
-  }
-
   return <SynergyGroupedGrid sections={sections} groupBy={groupBy} {...viewProps} />
 }

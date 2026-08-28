@@ -20,12 +20,10 @@ import {
   loadDeckBuilderSession,
   parseDeckBuilderBracket,
   parseDeckBuilderPanel,
-  parseDeckBuilderLayout,
   parseDeckBuilderGroupBy,
   saveDeckBuilderSession,
   PUBLIC_DECK_BUILDER_SCOPE,
   type DeckBuilderNavState,
-  type DeckBuilderLayout,
   type DeckBuilderGroupBy,
 } from '../../lib/deckBuilder'
 import type { CardArtPreview } from '../../components/cards'
@@ -52,9 +50,6 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
     return { id: commanderId, oracleId: '', name: '' }
   })
   const [strategyId, setStrategyId] = useState<string | null>(() => searchParams.get('strategy'))
-  const [layout, setLayout] = useState<DeckBuilderLayout>(() =>
-    parseDeckBuilderLayout(searchParams.get('view')),
-  )
   const [groupBy, setGroupBy] = useState<DeckBuilderGroupBy>(() =>
     parseDeckBuilderGroupBy(searchParams.get('group'), searchParams.get('view')),
   )
@@ -149,16 +144,15 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
       next.set('commander', selected.id)
       if (strategyId) next.set('strategy', strategyId)
       if (panel !== 'synergy') next.set('panel', panel)
-      if (layout === 'grid') next.set('view', 'grid')
-      else next.set('view', 'stacks')
       if (groupBy === 'role') next.set('group', 'role')
+      else if (groupBy === 'type') next.set('group', 'type')
       if (budgetDollars.trim()) next.set('budget', budgetDollars.trim())
       if (maxCardDollars.trim()) next.set('maxCard', maxCardDollars.trim())
       if (bracket !== 'auto') next.set('bracket', bracket)
     }
     if (next.toString() === searchParams.toString()) return
     setSearchParams(next, { replace: true })
-  }, [bracket, budgetDollars, groupBy, layout, maxCardDollars, panel, searchParams, selected?.id, setSearchParams, strategyId])
+  }, [bracket, budgetDollars, groupBy, maxCardDollars, panel, searchParams, selected?.id, setSearchParams, strategyId])
 
   useEffect(() => {
     if (!sessionScope) return
@@ -170,13 +164,12 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
       commander: selected,
       strategyId,
       panel,
-      layout,
       groupBy,
       budgetDollars,
       maxCardDollars,
       bracket,
     })
-  }, [bracket, budgetDollars, groupBy, layout, maxCardDollars, panel, selected, sessionScope, strategyId])
+  }, [bracket, budgetDollars, groupBy, maxCardDollars, panel, selected, sessionScope, strategyId])
 
   const cartQtyByInventoryId = new Map<number, number>()
   for (const line of cartLines) {
@@ -296,7 +289,6 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
         commanderId: selected.id,
         strategy: strategyId,
         panel,
-        layout,
         groupBy,
       }
     : undefined
@@ -320,8 +312,6 @@ export function useDeckBuilderState(mode: DeckBuilderMode) {
     selected,
     strategyId,
     setStrategyId,
-    layout,
-    setLayout,
     groupBy,
     setGroupBy,
     picked,

@@ -3,12 +3,12 @@ import { Link } from 'react-router'
 import { Search, ShoppingCart } from 'lucide-react'
 import { formatPrice } from '../../api/client'
 import type { AssembledDeckResponse } from '../../hooks'
-import type { DeckBuilderGroupBy, DeckBuilderLayout } from '../../lib/deckBuilder'
+import type { DeckBuilderGroupBy } from '../../lib/deckBuilder'
 import { Button, buttonVariants, EmptyState, LoadingPanel } from '../../components/ui'
 import { type CardArtPreview } from '../../components/cards'
 import { cx } from '../../lib/cx'
 import { DeckListBody } from './deck/DeckListBody'
-import { ListLayoutSwitcher } from './ListLayoutSwitcher'
+import { GroupBySwitcher } from './GroupBySwitcher'
 import { intelligenceSummary } from './utils'
 
 export function StoreDeckPanel({
@@ -18,8 +18,6 @@ export function StoreDeckPanel({
   signedIn,
   busy,
   onAddAll,
-  layout,
-  setLayout,
   groupBy,
   setGroupBy,
   onOpenCardPreview,
@@ -30,8 +28,6 @@ export function StoreDeckPanel({
   signedIn: boolean
   busy: boolean
   onAddAll: () => void
-  layout: DeckBuilderLayout
-  setLayout: Dispatch<SetStateAction<DeckBuilderLayout>>
   groupBy: DeckBuilderGroupBy
   setGroupBy: Dispatch<SetStateAction<DeckBuilderGroupBy>>
   onOpenCardPreview: (cards: CardArtPreview[], oracleId: string) => void
@@ -166,12 +162,7 @@ export function StoreDeckPanel({
         <p className="text-xs text-fg-muted">
           Showing {visibleCards.length} of {deck.cards.length}
         </p>
-        <ListLayoutSwitcher
-          layout={layout}
-          groupBy={groupBy}
-          onLayoutChange={setLayout}
-          onGroupByChange={setGroupBy}
-        />
+        <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
       </div>
 
       {visibleCards.length === 0 ? (
@@ -187,7 +178,6 @@ export function StoreDeckPanel({
       ) : (
         <DeckListBody
           cards={visibleCards}
-          layout={layout}
           groupBy={groupBy}
           storeSlug={slug}
           onOpenCardPreview={onOpenCardPreview}

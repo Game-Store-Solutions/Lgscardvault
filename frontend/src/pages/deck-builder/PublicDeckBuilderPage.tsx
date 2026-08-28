@@ -71,8 +71,6 @@ export default function PublicDeckBuilderPage() {
     setBracket,
     constraintsOpen,
     setConstraintsOpen,
-    layout,
-    setLayout,
     groupBy,
     setGroupBy,
     deck,
@@ -212,8 +210,6 @@ export default function PublicDeckBuilderPage() {
                   setBracket={setBracket}
                   constraintsOpen={constraintsOpen}
                   setConstraintsOpen={setConstraintsOpen}
-                  layout={layout}
-                  setLayout={setLayout}
                   groupBy={groupBy}
                   setGroupBy={setGroupBy}
                   onOpenCardPreview={openCardPreview}

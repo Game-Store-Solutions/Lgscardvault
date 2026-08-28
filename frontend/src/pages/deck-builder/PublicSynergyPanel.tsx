@@ -1,6 +1,6 @@
 import { Search } from 'lucide-react'
 import { EmptyState, LoadingPanel } from '../../components/ui'
-import { ListLayoutSwitcher } from './ListLayoutSwitcher'
+import { GroupBySwitcher } from './GroupBySwitcher'
 import { SynergyPanelBody } from './synergy/SynergyPanelBody'
 import type { DeckBuilderState } from './useDeckBuilderState'
 
@@ -13,8 +13,6 @@ type PublicSynergyPanelProps = Pick<
   | 'packageData'
   | 'pickedOracleIds'
   | 'nextCards'
-  | 'layout'
-  | 'setLayout'
   | 'groupBy'
   | 'setGroupBy'
   | 'picked'
@@ -32,8 +30,6 @@ export function PublicSynergyPanel({
   packageData,
   pickedOracleIds,
   nextCards,
-  layout,
-  setLayout,
   groupBy,
   setGroupBy,
   picked,
@@ -79,17 +75,11 @@ export function PublicSynergyPanel({
               {nextCards.isFetching ? ' · updating…' : ''}
             </p>
           </div>
-          <ListLayoutSwitcher
-            layout={layout}
-            groupBy={groupBy}
-            onLayoutChange={setLayout}
-            onGroupByChange={setGroupBy}
-          />
+          <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
         </div>
       </div>
 
       <SynergyPanelBody
-        layout={layout}
         groupBy={groupBy}
         byRole={byRole}
         byType={byType}

@@ -3,14 +3,14 @@ import { Link } from 'react-router'
 import { ChevronDown } from 'lucide-react'
 import { formatPrice } from '../../api/client'
 import type { AssembledDeckResponse } from '../../hooks'
-import type { DeckBuilderGroupBy, DeckBuilderLayout } from '../../lib/deckBuilder'
+import type { DeckBuilderGroupBy } from '../../lib/deckBuilder'
 import { buttonVariants, LoadingPanel } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
 import { type CardArtPreview } from '../../components/cards'
 import { cx } from '../../lib/cx'
 import { DeckListBody } from './deck/DeckListBody'
 import { DeckBuildConstraintsFields } from './DeckBuildConstraintsFields'
-import { ListLayoutSwitcher } from './ListLayoutSwitcher'
+import { GroupBySwitcher } from './GroupBySwitcher'
 import type { DeckBracket } from './utils'
 
 export function PublicDeckPanel({
@@ -24,8 +24,6 @@ export function PublicDeckPanel({
   setBracket,
   constraintsOpen = false,
   setConstraintsOpen,
-  layout,
-  setLayout,
   groupBy,
   setGroupBy,
   onOpenCardPreview,
@@ -40,8 +38,6 @@ export function PublicDeckPanel({
   setBracket: Dispatch<SetStateAction<DeckBracket>>
   constraintsOpen?: boolean
   setConstraintsOpen: Dispatch<SetStateAction<boolean>>
-  layout: DeckBuilderLayout
-  setLayout: Dispatch<SetStateAction<DeckBuilderLayout>>
   groupBy: DeckBuilderGroupBy
   setGroupBy: Dispatch<SetStateAction<DeckBuilderGroupBy>>
   onOpenCardPreview: (cards: CardArtPreview[], oracleId: string) => void
@@ -186,17 +182,11 @@ export function PublicDeckPanel({
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-fg-muted">{visibleCards.length} cards in list</p>
-        <ListLayoutSwitcher
-          layout={layout}
-          groupBy={groupBy}
-          onLayoutChange={setLayout}
-          onGroupByChange={setGroupBy}
-        />
+        <GroupBySwitcher groupBy={groupBy} onChange={setGroupBy} />
       </div>
 
       <DeckListBody
         cards={visibleCards}
-        layout={layout}
         groupBy={groupBy}
         onOpenCardPreview={onOpenCardPreview}
       />
