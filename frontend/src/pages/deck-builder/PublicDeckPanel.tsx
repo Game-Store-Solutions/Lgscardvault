@@ -124,30 +124,37 @@ export function PublicDeckPanel({
       </div>
 
       <div className="rounded-card border border-border bg-surface p-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
             <p className="font-display text-base font-extrabold text-fg">
               {deck.filledSize} / {deck.targetSize} · {deck.strategy.label}
             </p>
-            <p className="mt-1 text-xs text-fg-muted">
-              {structureBits} · avg MV {deck.averageManaValue}
-              {catalogDeckTotalCents != null && (
-                <>
-                  {' · '}
-                  <span className="font-semibold text-brand-600">
-                    Est. {formatPrice(catalogDeckTotalCents)}
-                  </span>
-                </>
-              )}
-            </p>
-            {deck.gaps.length > 0 && (
-              <p className="mt-1.5 text-xs font-medium text-warning-700">{deck.gaps[0]}</p>
+            {catalogDeckTotalCents != null && (
+              <div className="text-left sm:text-right">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-fg-muted">
+                  Est. deck price
+                </p>
+                <p className="font-display text-2xl font-extrabold leading-none text-brand-600 tabular-nums sm:text-3xl">
+                  {formatPrice(catalogDeckTotalCents)}
+                </p>
+              </div>
             )}
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Link to="/stores" className={buttonVariants({ size: 'sm' })}>
-              Browse stores
-            </Link>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs text-fg-muted">
+                {structureBits} · avg MV {deck.averageManaValue}
+              </p>
+              {deck.gaps.length > 0 && (
+                <p className="mt-1.5 text-xs font-medium text-warning-700">{deck.gaps[0]}</p>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link to="/stores" className={buttonVariants({ size: 'sm' })}>
+                Browse stores
+              </Link>
+            </div>
           </div>
         </div>
 
