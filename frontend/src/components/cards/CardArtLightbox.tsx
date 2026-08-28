@@ -156,64 +156,73 @@ export function CardArtLightbox({
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.2 }}
           className={cx(
-            'flex max-h-[calc(100dvh-2rem)] w-full flex-col items-center',
-            isCatalogCard && catalogPrintings.length > 0
+            'flex max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1rem)] w-full min-h-0 flex-col items-center overflow-hidden',
+            isCatalogCard
               ? 'max-w-3xl'
               : listings.length > 0
                 ? 'max-w-lg'
                 : 'max-w-md',
           )}
         >
-          <motion.div
-            key={activePrintingId ?? selectedListingId ?? 'default'}
-            initial={{ opacity: 0.85, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.15 }}
-            className={cx(
-              'w-full overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15',
-              isCatalogCard && catalogPrintings.length > 0
-                ? 'max-w-[min(100%,16rem)] sm:max-w-[min(100%,20rem)]'
-                : 'max-w-[min(100%,14rem)] sm:max-w-[min(100%,18rem)]',
-            )}
-          >
-            <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-transparent" fit="contain" />
-          </motion.div>
+          <div className="flex w-full shrink-0 flex-col items-center px-1">
+            <motion.div
+              key={activePrintingId ?? selectedListingId ?? 'default'}
+              initial={{ opacity: 0.85, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.15 }}
+              className={cx(
+                'w-full overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/15',
+                isCatalogCard
+                  ? 'max-w-[min(100%,12.5rem)] sm:max-w-[min(100%,16rem)]'
+                  : 'max-w-[min(100%,14rem)] sm:max-w-[min(100%,18rem)]',
+              )}
+            >
+              <CardImage src={displayImage} alt={card.name} className="aspect-5/7 w-full bg-transparent" fit="contain" />
+            </motion.div>
+            <div
+              className={cx(
+                'mt-2 w-full text-center sm:mt-3',
+                isCatalogCard ? 'max-w-3xl' : 'max-w-md',
+              )}
+            >
+              <p className="font-display text-base font-bold text-white sm:text-lg">{card.name}</p>
+              {card.typeLine && (
+                <p className="mt-0.5 line-clamp-2 text-xs text-white/75 sm:mt-1 sm:text-sm">{card.typeLine}</p>
+              )}
+              {displayPriceLabel && (
+                <p className="mt-1 text-sm font-bold text-brand-300 sm:mt-2 sm:text-base">{displayPriceLabel}</p>
+              )}
+              <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white/50 sm:mt-2 sm:text-xs">
+                {index + 1} of {cards.length}
+              </p>
+            </div>
+          </div>
+
           <div
             className={cx(
-              'mt-4 w-full text-center',
-              isCatalogCard && catalogPrintings.length > 0 ? 'max-w-3xl px-1' : 'max-w-md',
+              'w-full min-h-0 text-center',
+              isCatalogCard ? 'mt-2 max-w-3xl flex-1 px-1 sm:mt-3' : 'max-w-md',
             )}
           >
-            <p className="font-display text-lg font-bold text-white">{card.name}</p>
-            {card.typeLine && <p className="mt-1 text-sm text-white/75">{card.typeLine}</p>}
-            {displayPriceLabel && (
-              <p className="mt-2 text-base font-bold text-brand-300">{displayPriceLabel}</p>
-            )}
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-white/50">
-              {index + 1} of {cards.length}
-            </p>
-
             {isCatalogCard && (
-              <div className="mt-5 w-full text-center">
-                <CatalogPrintingStrip
-                  items={catalogPrintings}
-                  selectedId={activePrintingId}
-                  loading={printingsQuery.isLoading}
-                  variant="lightbox"
-                  onSelect={(printing) => {
-                    setActivePrintingId(printing.id)
-                    onSelectPrinting?.(card.oracleId, selectionFromCatalogPrinting(printing))
-                  }}
-                />
-              </div>
+              <CatalogPrintingStrip
+                items={catalogPrintings}
+                selectedId={activePrintingId}
+                loading={printingsQuery.isLoading}
+                variant="lightbox"
+                onSelect={(printing) => {
+                  setActivePrintingId(printing.id)
+                  onSelectPrinting?.(card.oracleId, selectionFromCatalogPrinting(printing))
+                }}
+              />
             )}
 
             {!isCatalogCard && listings.length > 0 && (
-              <div className="mt-4 text-left">
+              <div className="mt-3 shrink-0 text-left sm:mt-4">
                 <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/45">
                   {listings.length === 1 ? 'In stock here' : 'Variants in stock'}
                 </p>
-                <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto overscroll-contain pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {listings.map((item) => {
                     const active = selectedListing?.id === item.id
                     const row = (

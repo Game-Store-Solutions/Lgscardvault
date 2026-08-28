@@ -42,25 +42,43 @@ export function CatalogPrintingStrip({
   }
 
   const isLightbox = variant === 'lightbox'
+  const scrollClassName =
+    'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
 
   return (
-    <div className="w-full">
+    <div className={cx('w-full', isLightbox && 'flex min-h-0 flex-col')}>
       <p
         className={cx(
-          'text-center text-[0.65rem] font-bold uppercase tracking-[0.14em]',
+          'shrink-0 text-center text-[0.65rem] font-bold uppercase tracking-[0.14em]',
           isLightbox ? 'text-white/45' : 'text-fg-muted',
         )}
       >
         {items.length === 1 ? 'Printing' : 'Available printings'}
       </p>
-      <ul className="mt-4 flex flex-wrap items-start justify-center gap-x-4 gap-y-5">
+      <div
+        className={cx(
+          isLightbox
+            ? cx(
+                'mt-2 min-h-0 max-h-[min(13rem,34dvh)] sm:mt-3 sm:max-h-[min(18rem,38dvh)]',
+                scrollClassName,
+              )
+            : undefined,
+        )}
+      >
+        <ul
+          className={cx(
+            isLightbox
+              ? 'grid grid-cols-3 justify-items-center gap-x-2 gap-y-3 px-0.5 sm:grid-cols-4 sm:gap-x-3 sm:gap-y-4 md:grid-cols-5 lg:grid-cols-6'
+              : 'mt-4 flex flex-wrap items-start justify-center gap-x-4 gap-y-5',
+          )}
+        >
         {items.map((printing) => {
           const active = printing.id === selectedId
           const priceLabel = catalogPrintingPriceLabel(printing)
           const lang = printing.lang?.toLowerCase()
 
           return (
-            <li key={printing.id} className="w-[5.75rem] sm:w-24">
+            <li key={printing.id} className={isLightbox ? 'w-full max-w-[5.5rem] sm:max-w-24' : 'w-[5.75rem] sm:w-24'}>
               <button
                 type="button"
                 onClick={() => onSelect(printing)}
@@ -122,7 +140,8 @@ export function CatalogPrintingStrip({
             </li>
           )
         })}
-      </ul>
+        </ul>
+      </div>
     </div>
   )
 }
