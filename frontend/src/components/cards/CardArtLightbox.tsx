@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { AnimatePresence, motion } from '../motion'
@@ -118,10 +119,10 @@ export function CardArtLightbox({
   const displayPriceLabel =
     displayPrice != null ? formatPrice(displayPrice) : card.priceLabel
 
-  return (
+  const lightbox = (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-sm sm:p-4"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-sm sm:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -132,10 +133,10 @@ export function CardArtLightbox({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] grid size-11 touch-manipulation place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:right-4 sm:top-4 sm:size-10"
+          className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 grid size-12 touch-manipulation place-items-center rounded-full bg-black/70 text-white shadow-lg ring-1 ring-white/25 transition-colors hover:bg-black/85 sm:right-4 sm:top-4 sm:size-11"
           aria-label="Close card preview"
         >
-          <X aria-hidden className="size-5" />
+          <X aria-hidden className="size-6 sm:size-5" />
         </button>
 
         {hasPrev && (
@@ -300,6 +301,9 @@ export function CardArtLightbox({
       </motion.div>
     </AnimatePresence>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(lightbox, document.body)
 }
 
 export function previewFromRecommendation(
