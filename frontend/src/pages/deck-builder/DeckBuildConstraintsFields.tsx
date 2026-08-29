@@ -31,7 +31,9 @@ export function DeckBuildConstraintsFields({
   return (
     <div className="space-y-3">
       <p className="text-xs leading-relaxed text-fg-muted">
-        Caps apply to the 100-card list. Combos stay legal in this commander&apos;s colors.
+        Budget and card max apply to every card in the 99. Bracket only caps{' '}
+        <span className="font-medium text-fg">Game Changers</span> (Wizards&apos; official list) — not tutors,
+        fast mana, or overall power level.
       </p>
       {showOutOfStockToggle && (
         <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-bg px-3 py-2.5">
@@ -76,8 +78,8 @@ export function DeckBuildConstraintsFields({
         onChange={(e) => setBracket(parseDeckBuilderBracket(e.target.value))}
         hint={
           catalogMode
-            ? 'Auto picks a bracket from the full catalog.'
-            : 'Auto uses Scryfall Game Changers this store stocks in-identity.'
+            ? 'Auto picks the highest bracket your catalog Game Changers support in these colors.'
+            : 'Auto picks the highest bracket from in-stock, in-identity Game Changers at this store.'
         }
       >
         <option value="auto">{catalogMode ? 'Auto' : 'Auto from store stock'}</option>

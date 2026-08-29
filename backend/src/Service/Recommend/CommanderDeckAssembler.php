@@ -104,9 +104,9 @@ final class CommanderDeckAssembler
             $generated['stockByOracle'],
         );
 
-        $gameChangersInStock = $this->gameChangersInStock($prepared);
+        $gameChangersAvailable = $this->gameChangersAvailable($store, $prepared);
         $requestedBracket = CommanderBracket::clamp(isset($options['bracket']) ? (int) $options['bracket'] : null);
-        $appliedBracket = $requestedBracket ?? CommanderBracket::suggestFromGameChangerCount(count($gameChangersInStock));
+        $appliedBracket = $requestedBracket ?? CommanderBracket::suggestFromGameChangerCount(count($gameChangersAvailable));
         $maxGameChangers = CommanderBracket::maxGameChangers($appliedBracket);
 
         $structure = $this->taxonomy->structure($strategyId);
@@ -290,9 +290,9 @@ final class CommanderDeckAssembler
                 'label' => CommanderBracket::label($appliedBracket),
                 'auto' => null === $requestedBracket,
                 'maxGameChangers' => \PHP_INT_MAX === $maxGameChangers ? null : $maxGameChangers,
-                'gameChangersInStock' => array_values($gameChangersInStock),
+                'gameChangersInStock' => array_values($gameChangersAvailable),
                 'gameChangersIncluded' => $includedGameChangers,
-                'accommodated' => count($gameChangersInStock) >= min(3, \PHP_INT_MAX === $maxGameChangers ? 4 : $maxGameChangers)
+                'accommodated' => count($gameChangersAvailable) >= min(3, \PHP_INT_MAX === $maxGameChangers ? 4 : $maxGameChangers)
                     || 0 === CommanderBracket::maxGameChangers($appliedBracket),
             ],
             'inventoryIds' => array_values(array_filter(array_map(
@@ -337,15 +337,22 @@ final class CommanderDeckAssembler
     }
 
     /**
+     * Game Changers the builder can consider when auto-selecting a bracket.
+     * Store builds count in-stock copies only; public catalog builds count any
+     * commander-legal Game Changer in the candidate pool.
+     *
      * @param list<PreparedCandidate> $prepared
      *
      * @return array<string, array{name: string, oracleId: string, priceCents: ?int}>
      */
-    private function gameChangersInStock(array $prepared): array
+    private function gameChangersAvailable(?Store $store, array $prepared): array
     {
         $out = [];
         foreach ($prepared as $candidate) {
-            if (!$candidate->profile->isGameChanger || !$candidate->isInStock()) {
+            if (!$candidate->profile->isGameChanger) {
+                continue;
+            }
+            if ($store instanceof Store && !$candidate->isInStock()) {
                 continue;
             }
             $out[$candidate->oracleId()] = [

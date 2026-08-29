@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { Search, ShoppingCart } from 'lucide-react'
 import { formatPrice } from '../../api/client'
 import type { AssembledDeckResponse } from '../../hooks'
-import type { DeckBuilderGroupBy } from '../../lib/deckBuilder'
+import { formatDeckBracketSummary, type DeckBuilderGroupBy } from '../../lib/deckBuilder'
 import { Button, buttonVariants, EmptyState, LoadingPanel } from '../../components/ui'
 import { type CardArtPreview } from '../../components/cards'
 import { cx } from '../../lib/cx'
@@ -65,8 +65,7 @@ export function StoreDeckPanel({
               {deck.filledSize} / {deck.targetSize} · {deck.strategy.label}
             </p>
             <p className="mt-1 text-xs text-fg-muted">
-              {deck.bracket.label}
-              {deck.bracket.auto ? ' · auto' : ''}
+              {formatDeckBracketSummary(deck.bracket)}
               {' · '}
               {deck.budget.limitCents != null
                 ? `${formatPrice(deck.budget.spentCents)} of ${formatPrice(deck.budget.limitCents)}`

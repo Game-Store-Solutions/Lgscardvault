@@ -1,4 +1,4 @@
-import type { CommanderSummary } from '../hooks/useCommanderRecommend'
+import type { AssembledDeckBracket, CommanderSummary } from '../hooks/useCommanderRecommend'
 
 export type DeckBuilderPanel = 'synergy' | 'combos' | 'deck'
 export type DeckBuilderGroupBy = 'role' | 'type'
@@ -50,6 +50,19 @@ export function parseDeckBuilderView(value: string | null): DeckBuilderView {
 export function parseDeckBuilderBracket(value: string | null): string {
   if (value === '1' || value === '2' || value === '3' || value === '4' || value === '5') return value
   return 'auto'
+}
+
+/** One-line bracket status for deck summary headers. */
+export function formatDeckBracketSummary(bracket: AssembledDeckBracket): string {
+  const mode = bracket.auto ? ' · auto' : ''
+  const included = bracket.gameChangersIncluded.length
+  const max = bracket.maxGameChangers
+  const gameChangers =
+    max == null
+      ? `${included} Game Changer${included === 1 ? '' : 's'}`
+      : `${included} / ${max} Game Changer${max === 1 ? '' : 's'}`
+
+  return `Bracket ${bracket.applied} · ${bracket.label}${mode} · ${gameChangers}`
 }
 
 /** Dollars typed by the shopper → integer cents, or null when unset/invalid. */

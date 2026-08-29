@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { ChevronDown } from 'lucide-react'
 import { formatPrice } from '../../api/client'
 import type { AssembledDeckResponse } from '../../hooks'
-import type { DeckBuilderGroupBy } from '../../lib/deckBuilder'
+import { formatDeckBracketSummary, type DeckBuilderGroupBy } from '../../lib/deckBuilder'
 import { buttonVariants, LoadingPanel } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
 import { type CardArtPreview } from '../../components/cards'
@@ -201,6 +201,7 @@ export function PublicDeckPanel({
                 })}
                 {' · '}avg MV {deck.averageManaValue}
               </p>
+              <p className="mt-1 text-xs text-fg-muted">{formatDeckBracketSummary(deck.bracket)}</p>
               {isDeckComplete ? (
                 <p className="mt-1.5 text-xs font-medium text-success-700">100-card list ready</p>
               ) : (
