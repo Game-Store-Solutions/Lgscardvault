@@ -21,14 +21,14 @@ const routes = [
     path: '/',
     title: 'Shop Local Game Stores Online',
     description:
-      'Browse real inventory from verified local game stores. Free Commander deck builder, online checkout, and sell/trade your collection.',
+      'Browse real inventory from verified local game stores. Online checkout and sell/trade your collection.',
   },
-  {
-    path: '/tools/deck-builder',
-    title: 'Commander Deck Builder',
-    description:
-      'Build a 100-card Commander deck with strategy-aware recommendations, Spellbook combos, and mana-curve analysis.',
-  },
+  // {
+  //   path: '/tools/deck-builder',
+  //   title: 'Commander Deck Builder',
+  //   description:
+  //     'Build a 100-card Commander deck with strategy-aware recommendations, Spellbook combos, and mana-curve analysis.',
+  // },
   {
     path: '/stores',
     title: 'Find local game stores',

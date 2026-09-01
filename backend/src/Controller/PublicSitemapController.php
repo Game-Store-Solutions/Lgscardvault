@@ -18,7 +18,7 @@ final class PublicSitemapController extends AbstractController
         return [
             ['path' => '/', 'changefreq' => 'daily', 'priority' => '1.0'],
             ['path' => '/stores', 'changefreq' => 'daily', 'priority' => '0.9'],
-            ['path' => '/tools/deck-builder', 'changefreq' => 'weekly', 'priority' => '0.9'],
+            // ['path' => '/tools/deck-builder', 'changefreq' => 'weekly', 'priority' => '0.9'],
             ['path' => '/pricing', 'changefreq' => 'weekly', 'priority' => '0.8'],
             ['path' => '/register/customer', 'changefreq' => 'monthly', 'priority' => '0.5'],
             ['path' => '/register/owner', 'changefreq' => 'monthly', 'priority' => '0.5'],

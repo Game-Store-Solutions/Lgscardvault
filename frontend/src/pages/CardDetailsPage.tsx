@@ -49,7 +49,6 @@ import { artistBrowsePath, resolveCardArtist } from '../lib/artistBrowse'
 import { deckBuilderPath, isDeckBuilderNav, parseDeckBuilderGroupBy } from '../lib/deckBuilder'
 import { storeSearchFromNavState, storeSearchPath, withStoreSearchNav } from '../lib/storeSearch'
 import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
-import { ShareButton } from '../components/ShareButton'
 
 /** Slugify a card name for an EDHREC deck-context link (front face only). */
 function edhrecUrl(name: string): string {
@@ -539,13 +538,6 @@ export default function CardDetailsPage() {
           {/* Title + set. Sits beside the card on tablets; left of the buy box on desktop. */}
           <header className={cx(colPad, 'xl:col-start-2 xl:row-start-1')}>
             <h1 className="text-xl font-bold leading-snug text-fg sm:text-2xl xl:text-[1.65rem]">{productTitle}</h1>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <ShareButton
-                url={`/s/${slug}/cards/${item.id}`}
-                title={`${productTitle} at ${store?.name ?? 'store'}`}
-                label="Share card"
-              />
-            </div>
             {setDisplay && setPageUrl && (
               <Link
                 to={setPageUrl}

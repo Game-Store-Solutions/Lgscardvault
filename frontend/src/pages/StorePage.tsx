@@ -44,7 +44,6 @@ import {
  } from './utils/actionsUtil.tsx'
 import { hasActiveStoreSearch, parseStoreSearch, serializeStoreSearch } from '../lib/storeSearch'
 import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
-import { ShareButton } from '../components/ShareButton'
 
 export default function StorePage() {
   const { slug = '' } = useParams()
@@ -499,11 +498,6 @@ export default function StorePage() {
         showcaseCards={heroShowcaseCards}
         actions={
           <>
-            <ShareButton
-              url={`/s/${slug}`}
-              title={`Shop ${store?.name ?? slug} on LGS Card Vault`}
-              label="Share store"
-            />
             <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               <Calendar aria-hidden className="size-4" />
               Event calendar

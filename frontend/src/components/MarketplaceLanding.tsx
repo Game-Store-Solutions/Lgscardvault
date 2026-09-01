@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet, Wand2 } from 'lucide-react'
+import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
@@ -76,10 +76,10 @@ export default function MarketplaceLanding() {
     buttonVariants({ variant: 'primary', size: 'lg' }),
     heroCtaSize,
   )
-  const deckBuilderCta = cx(
-    buttonVariants({ variant: 'secondary', size: 'lg' }),
-    heroCtaSize,
-  )
+  // const deckBuilderCta = cx(
+  //   buttonVariants({ variant: 'secondary', size: 'lg' }),
+  //   heroCtaSize,
+  // )
   const secondaryCta =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn border border-border bg-surface px-6 text-sm font-bold text-fg shadow-sm transition-colors hover:bg-bg sm:w-auto dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]'
 
@@ -145,10 +145,10 @@ export default function MarketplaceLanding() {
               Explore stores
               <ArrowRight aria-hidden className="size-4" />
             </Link>
-            <Link to="/tools/deck-builder" className={deckBuilderCta}>
+            {/* <Link to="/tools/deck-builder" className={deckBuilderCta}>
               <Wand2 aria-hidden className="size-4" />
               Deck builder
-            </Link>
+            </Link> */}
             {isSuperAdmin ? (
               <Link to="/platform/admin" className={secondaryCta}>
                 <Store aria-hidden className="size-4" />

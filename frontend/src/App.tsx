@@ -43,7 +43,7 @@ import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 import LegalPage from './pages/LegalPage'
 import GuestOrderBalancePage from './pages/GuestOrderBalancePage'
 import PricingPage from './pages/PricingPage'
-import PublicDeckBuilderPage from './pages/PublicDeckBuilderPage'
+// import PublicDeckBuilderPage from './pages/PublicDeckBuilderPage'
 import NewsletterAdminPage from './pages/platform-admin/NewsletterAdminPage'
 import NewsletterUnsubscribePage from './pages/NewsletterUnsubscribePage'
 import { CookieConsentBanner } from './components/CookieConsentBanner'
@@ -93,7 +93,7 @@ export default function App() {
               <Route index element={<HomePage />} />
               <Route path="pricing" element={<PricingPage />} />
               <Route path="newsletter/unsubscribe" element={<NewsletterUnsubscribePage />} />
-              <Route path="tools/deck-builder" element={<PublicDeckBuilderPage />} />
+              {/* <Route path="tools/deck-builder" element={<PublicDeckBuilderPage />} /> */}
               <Route path="stores" element={<StoreDirectoryPage />} />
               {/* Global identity settings + "your stores". One account across the marketplace */}
               <Route

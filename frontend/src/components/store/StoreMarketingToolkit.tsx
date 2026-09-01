@@ -3,7 +3,6 @@ import { Check, Copy, QrCode } from 'lucide-react'
 import QRCode from 'qrcode'
 import { Button } from '../ui'
 import { absoluteUrl, copyText } from '../../lib/share'
-import { ShareButton } from '../ShareButton'
 
 export function StoreMarketingToolkit({ slug, storeName }: { slug: string; storeName: string }) {
   const storefrontUrl = absoluteUrl(`/s/${slug}`)
@@ -65,12 +64,6 @@ export function StoreMarketingToolkit({ slug, storeName }: { slug: string; store
               {copied ? <Check aria-hidden className="size-4" /> : <Copy aria-hidden className="size-4" />}
               {copied ? 'Copied' : 'Copy link'}
             </Button>
-            <ShareButton
-              url={`/s/${slug}`}
-              title={`Shop ${storeName} on LGS Card Vault`}
-              text={`Browse singles and sealed from ${storeName}.`}
-              label="Share storefront"
-            />
           </div>
           <p className="text-xs leading-relaxed text-fg-muted">
             Tip: add this link to your Google Business profile, Linktree, Discord, and event posters.

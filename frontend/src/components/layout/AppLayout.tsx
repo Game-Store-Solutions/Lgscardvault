@@ -24,7 +24,7 @@ const LANDING_SECTIONS = [
 ] as const
 
 const LANDING_ROUTES = [
-  { to: '/tools/deck-builder', label: 'Deck Builder' },
+  // { to: '/tools/deck-builder', label: 'Deck Builder' },
   { to: '/pricing', label: 'Pricing' },
 ] as const
 
