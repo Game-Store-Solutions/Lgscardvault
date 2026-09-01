@@ -5,8 +5,8 @@ import { Badge } from '../../../components/ui'
 
 function planHeadline(plan: Plan): string {
   if (plan.billingModel === 'usage') {
-    const pct = (plan.feePercentBps ?? 500) / 100
-    return `${pct}% per sale`
+    const pct = (plan.feePercentBps ?? 1000) / 100
+    return `${pct}% of daily sales`
   }
   if (plan.priceCents > 0) {
     return formatPrice(plan.priceCents)
@@ -16,7 +16,7 @@ function planHeadline(plan: Plan): string {
 
 function planSubline(plan: Plan): string {
   if (plan.billingModel === 'usage') {
-    return `until ${formatPrice(plan.capCents ?? 45000)}`
+    return `until ${formatPrice(plan.capCents ?? 45000)} · settled nightly`
   }
   if (plan.priceCents > 0) {
     return 'one-time'

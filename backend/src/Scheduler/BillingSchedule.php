@@ -3,6 +3,7 @@
 namespace App\Scheduler;
 
 use App\Message\ChargeDueSubscriptionsMessage;
+use App\Message\SettlePlatformDailyFeesMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
 use Symfony\Component\Scheduler\Schedule;
@@ -10,12 +11,11 @@ use Symfony\Component\Scheduler\ScheduleProviderInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 
 /**
- * Collects subscription renewals from store owners.
+ * Collects subscription renewals and nightly usage-plan platform fees.
  *
- * Runs in the small hours so a decline is waiting for the owner in the morning
- * rather than arriving mid-trading. Only stores whose paid period has already
- * elapsed are charged, and each attempt carries a deterministic idempotency
- * key, so running twice — or catching up after an outage — cannot double-bill.
+ * Subscription renewals run in the small hours so a decline is waiting for the
+ * owner in the morning rather than arriving mid-trading. Usage-plan platform
+ * fees settle just after midnight Pacific on each closed business day.
  *
  * Run it with:
  *   php bin/console messenger:consume scheduler_billing
@@ -23,7 +23,10 @@ use Symfony\Contracts\Cache\CacheInterface;
 #[AsSchedule('billing')]
 final readonly class BillingSchedule implements ScheduleProviderInterface
 {
-    private const DAILY_RUN_TIME = '03:15 UTC';
+    private const SUBSCRIPTION_RUN_TIME = '03:15 UTC';
+
+    /** Usage-plan platform fee: 10% of the prior business day's shopper sales. */
+    private const PLATFORM_FEE_RUN_TIME = '00:05 America/Los_Angeles';
 
     public function __construct(private CacheInterface $cache)
     {
@@ -41,7 +44,12 @@ final readonly class BillingSchedule implements ScheduleProviderInterface
             ->add(RecurringMessage::every(
                 '1 day',
                 new ChargeDueSubscriptionsMessage(),
-                from: new \DateTimeImmutable(self::DAILY_RUN_TIME),
+                from: new \DateTimeImmutable(self::SUBSCRIPTION_RUN_TIME),
+            ))
+            ->add(RecurringMessage::every(
+                '1 day',
+                new SettlePlatformDailyFeesMessage(),
+                from: new \DateTimeImmutable(self::PLATFORM_FEE_RUN_TIME),
             ));
     }
 }

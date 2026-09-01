@@ -10,6 +10,7 @@ use App\Enum\OrderStatus;
 use App\Repository\OrderRepository;
 use App\Repository\SquareWebhookEventRepository;
 use App\Repository\StorePaymentAccountRepository;
+use App\Service\Billing\PlatformDailySalesAccrual;
 use App\Service\Billing\PlatformFeeRecorder;
 use App\Service\Checkout\OrderStockReleaser;
 use App\Service\Payments\SquareWebhookVerifier;
@@ -43,6 +44,7 @@ final class SquareWebhookController extends AbstractController
         private readonly OrderRepository $orders,
         private readonly OrderStockReleaser $stockReleaser,
         private readonly PlatformFeeRecorder $platformFees,
+        private readonly PlatformDailySalesAccrual $dailySales,
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
     ) {
@@ -151,9 +153,13 @@ final class SquareWebhookController extends AbstractController
                 }
 
                 $store = $order->getStore();
-                $appFee = (int) ($payment['app_fee_money']['amount'] ?? $payment['application_fee_money']['amount'] ?? 0);
-                if ($appFee > 0 && $store instanceof Store) {
-                    $this->platformFees->recordCollectedFee($store, $appFee);
+                if ($store instanceof Store) {
+                    $appFee = (int) ($payment['app_fee_money']['amount'] ?? $payment['application_fee_money']['amount'] ?? 0);
+                    if ($appFee > 0) {
+                        $this->platformFees->recordCollectedFee($store, $appFee);
+                    } else {
+                        $this->dailySales->accrueCapture($store, $amount);
+                    }
                 }
             }
         }

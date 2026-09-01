@@ -23,12 +23,6 @@ const routes = [
     description:
       'Browse real inventory from verified local game stores. Online checkout and sell/trade your collection.',
   },
-  // {
-  //   path: '/tools/deck-builder',
-  //   title: 'Commander Deck Builder',
-  //   description:
-  //     'Build a 100-card Commander deck with strategy-aware recommendations, Spellbook combos, and mana-curve analysis.',
-  // },
   {
     path: '/stores',
     title: 'Find local game stores',
@@ -39,7 +33,7 @@ const routes = [
     path: '/pricing',
     title: 'Store Pricing',
     description:
-      'Open your verified storefront on LGS Card Vault for $450 flat or 5% per sale until $450. Full platform access with no monthly fees after the cap.',
+      'Open your verified storefront on LGS Card Vault for $450 flat or 10% of daily online sales until $450. Full platform access with no monthly fees after the cap.',
   },
 ]
 

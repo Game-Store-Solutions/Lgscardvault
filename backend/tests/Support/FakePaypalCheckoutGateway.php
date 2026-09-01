@@ -56,9 +56,7 @@ final class FakePaypalCheckoutGateway implements PaypalCheckoutGatewayInterface
             throw new \RuntimeException('This store has not connected PayPal yet.');
         }
 
-        $platformFeeCents = 'usage' === $store->getPlanKey()
-            ? (int) round($amountCents * 500 / 10000)
-            : 0;
+        $platformFeeCents = 0;
 
         $this->orders[] = [
             'amount' => $amountCents,

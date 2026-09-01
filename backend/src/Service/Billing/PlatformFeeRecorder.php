@@ -6,9 +6,9 @@ use App\Entity\Store;
 use App\Service\Onboarding\PlanCatalog;
 
 /**
- * Usage-plan stores accrue platform fees as a % of each shopper capture until
- * the $450 cap is met. Call {@see recordCollectedFee} only after the processor
- * confirms the split was included on the payment.
+ * Usage-plan stores accrue platform fees as a % of each business day's shopper
+ * sales until the $450 cap is met. Call {@see recordCollectedFee} after the
+ * nightly settlement charge succeeds.
  */
 final readonly class PlatformFeeRecorder
 {

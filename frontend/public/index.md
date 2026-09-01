@@ -12,7 +12,7 @@ Player-first marketplace for trading-card games. Discover, play, and trade cards
 - **Checkout** — Square card pay or pay-in-store; **pickup only** (no shipping). Each store is the merchant of record.
 - **Buylist** — sell or trade cards back to a store for cash or credit
 - **Events** — store calendars and community boards
-- **Commander deck builder** — strategy-aware recommendations from real decklists
+- **Store deck builder** — strategy-aware Commander recommendations on each storefront (`/s/{slug}/deck-builder`)
 
 Games include Magic: The Gathering, Pokémon, One Piece, Flesh & Blood, and others that participating stores stock.
 

@@ -4,7 +4,6 @@ import { BackButton, Tabs, TabPanel } from '../../components/ui'
 import { CardArtLightbox } from '../../components/cards'
 import { useAppShellFlush } from '../../components/layout/AppShellLayout'
 import { usePageMeta, useJsonLd } from '../../hooks/usePageMeta'
-import { ShareButton } from '../../components/ShareButton'
 import { cx } from '../../lib/cx'
 import { CommanderSearchField } from './CommanderSearchField'
 import { CommanderSearchGrid } from './CommanderSearchGrid'
@@ -134,14 +133,6 @@ export default function PublicDeckBuilderPage() {
               </Link>
               .
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ShareButton
-                url="/tools/deck-builder"
-                title="Commander Deck Builder"
-                text="Build a strategy-aware Commander deck with combos on LGS Card Vault."
-                label="Share deck builder"
-              />
-            </div>
             <div className="mt-8">
               <CommanderSearchField
                 value={query}

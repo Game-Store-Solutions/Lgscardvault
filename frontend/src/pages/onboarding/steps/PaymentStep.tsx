@@ -91,8 +91,8 @@ export function PaymentStep({
         <p className="text-right font-display text-2xl font-bold text-fg">
           {isUsage ? (
             <span className="text-lg">
-              {(plan?.feePercentBps ?? 500) / 100}%
-              <span className="block text-sm font-medium text-fg-muted">per sale</span>
+              {(plan?.feePercentBps ?? 1000) / 100}%
+              <span className="block text-sm font-medium text-fg-muted">of daily sales</span>
             </span>
           ) : (
             <>
@@ -104,8 +104,8 @@ export function PaymentStep({
       </div>
       {isUsage ? (
         <p className="rounded-btn bg-brand-50 px-3 py-2 text-sm text-brand-800">
-          Link a payment method so we can collect 5% of each sale until {formatPrice(plan?.capCents ?? 45000)}. PayPal
-          may show a $1 verification charge.
+          Link a payment method so we can collect {(plan?.feePercentBps ?? 1000) / 100}% of each day's online sales at
+          midnight until {formatPrice(plan?.capCents ?? 45000)}. PayPal may show a $1 verification charge.
         </p>
       ) : null}
 

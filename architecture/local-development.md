@@ -141,7 +141,7 @@ php bin/console app:subscriptions:charge --dry-run   # what is due right now
 php bin/console app:subscriptions:charge             # actually bill it
 ```
 
-In production the job runs nightly at 03:15 UTC from `App\Scheduler\BillingSchedule`. **That requires the schedule ticker to be running** — `messenger:consume scheduler_billing` — or nothing is ever billed. The deploy configs under `deploy/` include it as a single-instance `scheduler` service alongside the workers.
+In production subscription renewals run at 03:15 UTC and usage-plan daily platform fees settle at 00:05 America/Los_Angeles from `App\Scheduler\BillingSchedule`. **That requires the schedule ticker to be running** — `messenger:consume scheduler_billing` — or nothing is ever billed. Manual runs: `app:subscriptions:charge` and `app:platform-fees:settle`. The deploy configs under `deploy/` include it as a single-instance `scheduler` service alongside the workers.
 
 ### Webhooks
 

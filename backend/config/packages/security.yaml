@@ -59,8 +59,8 @@ security:
         # Mass search posts a name list; GET would overflow the URL on a 100-card deck.
         - { path: ^/api/stores/.+/inventory/mass-search, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/catalog, roles: PUBLIC_ACCESS, methods: [GET] }
-        # Public commander deck builder (catalog-only, no store inventory).
-        - { path: ^/api/recommend, roles: PUBLIC_ACCESS }
+        # Public catalog deck builder is disabled; store-scoped recommend stays on GET /api/stores.
+        # - { path: ^/api/recommend, roles: PUBLIC_ACCESS }
         - { path: ^/sitemap\.xml$, roles: PUBLIC_ACCESS, methods: [GET] }
         # Landing-page contact form; rate limited per IP in the controller.
         - { path: ^/api/contact, roles: PUBLIC_ACCESS, methods: [POST] }

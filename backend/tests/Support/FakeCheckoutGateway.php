@@ -95,9 +95,7 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
 
         $taxCents = max(0, $this->addedTaxCents);
         $chargedCents = $amountCents + $taxCents;
-        $platformFeeCents = 'usage' === $store->getPlanKey()
-            ? (int) round($chargedCents * 500 / 10000)
-            : 0;
+        $platformFeeCents = 0;
 
         $this->charges[] = [
             'amount' => $chargedCents,

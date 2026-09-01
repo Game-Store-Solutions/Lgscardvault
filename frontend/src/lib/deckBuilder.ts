@@ -108,32 +108,7 @@ export function deckBuilderPath(
   return query ? `/s/${slug}/deck-builder?${query}` : `/s/${slug}/deck-builder`
 }
 
-/** Public catalog deck builder (no store inventory). */
-export function publicDeckBuilderPath(
-  opts?: {
-    commanderId?: string | null
-    strategy?: string | null
-    panel?: DeckBuilderPanel
-    groupBy?: DeckBuilderGroupBy
-    budgetDollars?: string | null
-    maxCardDollars?: string | null
-    bracket?: string | null
-  },
-): string {
-  const params = new URLSearchParams()
-  if (opts?.commanderId) {
-    params.set('commander', opts.commanderId)
-    if (opts.strategy) params.set('strategy', opts.strategy)
-    if (opts.panel && opts.panel !== 'synergy') params.set('panel', opts.panel)
-    if (opts.groupBy) appendGroupParam(params, opts.groupBy)
-    if (opts.budgetDollars) params.set('budget', opts.budgetDollars)
-    if (opts.maxCardDollars) params.set('maxCard', opts.maxCardDollars)
-    if (opts.bracket && opts.bracket !== 'auto') params.set('bracket', opts.bracket)
-  }
-  const query = params.toString()
-  return query ? `/tools/deck-builder?${query}` : '/tools/deck-builder'
-}
-
+/** @deprecated Public `/tools/deck-builder` is disabled; kept for session storage keying. */
 export const PUBLIC_DECK_BUILDER_SCOPE = 'public'
 
 function storageKey(slug: string) {

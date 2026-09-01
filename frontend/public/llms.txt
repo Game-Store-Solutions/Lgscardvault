@@ -2,7 +2,7 @@
 
 > Player-first marketplace for Magic: The Gathering, Pokémon, One Piece, Flesh & Blood, and other TCGs sold by verified local game stores.
 
-LGS Card Vault (https://lgscardvault.com) lets players browse real store inventory, check out online or in store, and sell or trade cards back to shops they already trust. Store owners get a branded storefront, CSV inventory import, Square checkout, events, and a Commander deck builder.
+LGS Card Vault (https://lgscardvault.com) lets players browse real store inventory, check out online or in store, and sell or trade cards back to shops they already trust. Store owners get a branded storefront, CSV inventory import, Square and PayPal checkout, events, and a per-store Commander deck builder.
 
 ## Start here
 
@@ -29,7 +29,7 @@ LGS Card Vault (https://lgscardvault.com) lets players browse real store invento
 - `GET /api/health` and `GET /api/health/ready` are exposed as `/health` and `/health/ready` on the site origin
 - `POST /api/contact` — landing-page contact form (rate limited)
 
-Storefront URLs follow `/s/{slug}` (inventory, sealed, mass search, deck builder, sell/trade, events, cart).
+Storefront URLs follow `/s/{slug}` (inventory, sealed, mass search, store deck builder, sell/trade, events, cart).
 
 ## Do not crawl
 

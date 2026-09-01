@@ -48,6 +48,8 @@ Full setup narrative: [local-development.md](local-development.md). Feature deta
 |---------|----------------|
 | `app:subscriptions:charge --dry-run` | List subscriptions due without charging. |
 | `app:subscriptions:charge` | Charge vaulted Square cards for due renewals. |
+| `app:platform-fees:settle --dry-run` | List usage-plan daily platform fees due without charging. |
+| `app:platform-fees:settle` | Charge vaulted cards for closed business days (10% of daily sales). |
 | `app:privacy:sla-remind --dry-run` | List open privacy / takedown requests past 45 days. |
 | `app:privacy:sla-remind` | Email `LEGAL_CONTACT_EMAIL` a digest of overdue privacy tickets. |
 
@@ -80,7 +82,7 @@ CSV uploads and Archidekt/catalog work use **separate transports** so one long h
 | `messenger:consume async -vv` | Catalog sync + commander intelligence (Archidekt harvest, prune, etc.). |
 | `messenger:consume csv failed …` / `async failed …` | Same plus dead-letter retry surface (prod defaults). |
 | `messenger:consume scheduler_catalog` | Ticks the daily TCGCSV catalog schedule. |
-| `messenger:consume scheduler_billing` | Ticks nightly subscription charges. |
+| `messenger:consume scheduler_billing` | Ticks nightly subscription charges and usage-plan daily platform fee settlement. |
 | `messenger:consume scheduler_commanders` | Ticks commander catalog sync, intelligence sweep, prune. |
 | `debug:scheduler` | Show scheduled tasks and next run times. |
 | `messenger:failed:show` | List failed messages. |

@@ -3,15 +3,15 @@
 namespace App\Service\Onboarding;
 
 /**
- * Platform pricing for new stores. Two choices: pay $450 once, or 5% of each
- * shopper payment until $450 is reached. Legacy monthly tiers remain readable
- * for stores already on them.
+ * Platform pricing for new stores. Two choices: pay $450 once, or 10% of each
+ * business day's shopper sales (settled at midnight) until $450 is reached.
+ * Legacy monthly tiers remain readable for stores already on them.
  */
 final class PlanCatalog
 {
     public const PLATFORM_CAP_CENTS = 45000;
 
-    public const USAGE_FEE_BPS = 500;
+    public const USAGE_FEE_BPS = 1000;
 
     private const FEATURES = [
         'Full storefront & marketplace listing',
@@ -44,7 +44,7 @@ final class PlanCatalog
             'capCents' => self::PLATFORM_CAP_CENTS,
             'feePercentBps' => self::USAGE_FEE_BPS,
             'requiresVault' => true,
-            'tagline' => '5% of each sale until $450 — then no more platform fees.',
+            'tagline' => '10% of each day\'s sales until $450 — settled nightly, then no more platform fees.',
             'features' => self::FEATURES,
         ],
     ];

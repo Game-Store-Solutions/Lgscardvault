@@ -9,8 +9,8 @@ import { usePageMeta } from '../hooks/usePageMeta'
 
 function planPriceLabel(plan: Plan): string {
   if (plan.billingModel === 'usage') {
-    const pct = (plan.feePercentBps ?? 500) / 100
-    return `${pct}% per sale`
+    const pct = (plan.feePercentBps ?? 1000) / 100
+    return `${pct}% of daily sales`
   }
   if (plan.priceCents > 0) {
     return formatPrice(plan.priceCents)
@@ -21,7 +21,7 @@ function planPriceLabel(plan: Plan): string {
 function planPriceDetail(plan: Plan): string {
   const cap = formatPrice(plan.capCents ?? 45000)
   if (plan.billingModel === 'usage') {
-    return `Until ${cap} is paid, then no more platform fees.`
+    return `Settled nightly until ${cap} is paid, then no more platform fees.`
   }
   if (plan.priceCents > 0) {
     return `One-time · full platform access`
@@ -33,7 +33,7 @@ export default function PricingPage() {
   usePageMeta({
     title: 'Store Pricing',
     description:
-      'Open your verified storefront on LGS Card Vault for $450 flat or 5% per sale until $450. Full platform access with no monthly fees after the cap.',
+      'Open your verified storefront on LGS Card Vault for $450 flat or 10% of daily online sales until $450. Full platform access with no monthly fees after the cap.',
     path: '/pricing',
   })
 
@@ -53,8 +53,8 @@ export default function PricingPage() {
           Simple pricing. Everything included.
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-fg-muted">
-          Open your verified storefront on LGS Card Vault for a flat $450, or pay 5% of each online sale until you reach
-          $450. Then keep every feature with no monthly bill and no sales fees.
+          Open your verified storefront on LGS Card Vault for a flat $450, or pay 10% of each day's online sales
+          (settled at midnight) until you reach $450. Then keep every feature with no monthly bill and no sales fees.
         </p>
 
         {isPending ? (
@@ -101,8 +101,8 @@ export default function PricingPage() {
           <p className="font-semibold text-fg">What about shopper checkout fees?</p>
           <p className="mt-2 leading-relaxed">
             Square and PayPal charge their normal card-processing rates on each sale. That is separate from the LGS Card
-            Vault platform fee. On the pay-as-you-sell plan, our 5% is only until you have paid $450 total to the
-            platform.
+            Vault platform fee. On the pay-as-you-sell plan, we collect {(plans[1]?.feePercentBps ?? 1000) / 100}% of each
+            day's online sales total at midnight Pacific until you have paid $450 total to the platform.
           </p>
           <p className="mt-4">
             Questions?{' '}

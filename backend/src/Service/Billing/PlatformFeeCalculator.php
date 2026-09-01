@@ -6,7 +6,8 @@ use App\Entity\Store;
 use App\Service\Onboarding\PlanCatalog;
 
 /**
- * Computes how much platform fee to collect on the next shopper capture.
+ * Computes usage-plan platform fees from daily shopper capture totals.
+ * Per-transaction splits are not used — fees settle nightly at midnight.
  */
 final readonly class PlatformFeeCalculator
 {
@@ -14,9 +15,15 @@ final readonly class PlatformFeeCalculator
     {
     }
 
+    /** Usage-plan fees are settled nightly; nothing is split at capture time. */
     public function feeDueForCapture(Store $store, int $captureAmountCents): int
     {
-        if ($captureAmountCents < 1) {
+        return 0;
+    }
+
+    public function feeDueForDailyGross(Store $store, int $dailyGrossCents): int
+    {
+        if ($dailyGrossCents < 1) {
             return 0;
         }
 
@@ -39,7 +46,7 @@ final readonly class PlatformFeeCalculator
             return 0;
         }
 
-        $fee = (int) round($captureAmountCents * $bps / 10000);
+        $fee = (int) round($dailyGrossCents * $bps / 10000);
 
         return min(max(0, $fee), $remaining);
     }

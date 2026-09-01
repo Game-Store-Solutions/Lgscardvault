@@ -5,7 +5,7 @@ namespace App\Service\Order;
 use App\Entity\Order;
 use App\Entity\Store;
 use App\Entity\StorePaymentAccount;
-use App\Service\Billing\PlatformFeeRecorder;
+use App\Service\Billing\PlatformDailySalesAccrual;
 use App\Service\Payments\CheckoutGatewayInterface;
 use App\Service\Payments\PaypalCheckoutGatewayInterface;
 
@@ -19,7 +19,7 @@ final readonly class OrderPaymentAdjuster
     public function __construct(
         private CheckoutGatewayInterface $square,
         private PaypalCheckoutGatewayInterface $paypal,
-        private PlatformFeeRecorder $platformFees,
+        private PlatformDailySalesAccrual $dailySales,
     ) {
     }
 
@@ -115,7 +115,7 @@ final readonly class OrderPaymentAdjuster
         $order->ensurePaymentCaptureLedger();
         $order->recordPaymentCapture($captureId, $charged);
         $order->setPaidCents($order->getPaidCents() + $charged);
-        $this->platformFees->recordCollectedFee($store, (int) ($payment['platformFeeCents'] ?? 0));
+        $this->dailySales->accrueCapture($store, $charged);
 
         return $order;
     }

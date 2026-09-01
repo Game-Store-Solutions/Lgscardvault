@@ -35,7 +35,7 @@ export function ReviewStep({
       <ReviewRow title="Plan" onEdit={() => onJump(stepIndex('plan'))}>
         {plan ? `${plan.name} · ${
           plan.billingModel === 'usage'
-            ? `${(plan.feePercentBps ?? 500) / 100}% per sale until ${formatPrice(plan.capCents ?? 45000)}`
+            ? `${(plan.feePercentBps ?? 1000) / 100}% of daily sales until ${formatPrice(plan.capCents ?? 45000)}`
             : plan.priceCents === 0
               ? 'Free'
               : `${formatPrice(plan.priceCents)} one-time`
