@@ -2,7 +2,6 @@
 
 namespace App\Tests\Controller;
 
-use App\Entity\InventoryItem;
 use App\Entity\SealedInventoryItem;
 use App\Entity\SealedProduct;
 use App\Entity\User;
@@ -25,6 +24,7 @@ final class StoreInventoryClearTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = static::createClient();
+        $this->client->disableReboot();
         $c = static::getContainer();
         $this->em = $c->get('doctrine')->getManager();
         $this->fixtures = new CatalogFixtures($this->em);
@@ -91,6 +91,9 @@ final class StoreInventoryClearTest extends WebTestCase
         $this->sealedLine($store, $this->sealedProduct('Wipe Box'), 3);
         $this->sealedLine($other, $this->sealedProduct('Keep Box'), 5);
 
+        $wipeId = (int) $store->getId();
+        $keepId = (int) $other->getId();
+
         $this->authenticate($store->getOwner());
         $body = $this->jsonRequest('POST', '/api/stores/wipe-store/settings/clear-inventory', [
             'confirmSlug' => 'wipe-store',
@@ -101,10 +104,10 @@ final class StoreInventoryClearTest extends WebTestCase
         self::assertSame(1, $body['deletedSealed']);
 
         $this->em->clear();
-        self::assertSame(0, $this->em->getRepository(InventoryItem::class)->count(['store' => $store->getId()]));
-        self::assertSame(0, $this->em->getRepository(SealedInventoryItem::class)->count(['store' => $store->getId()]));
-        self::assertSame(1, $this->em->getRepository(InventoryItem::class)->count(['store' => $other->getId()]));
-        self::assertSame(1, $this->em->getRepository(SealedInventoryItem::class)->count(['store' => $other->getId()]));
+        self::assertSame(0, $this->countSingles($wipeId));
+        self::assertSame(0, $this->countSealed($wipeId));
+        self::assertSame(1, $this->countSingles($keepId));
+        self::assertSame(1, $this->countSealed($keepId));
     }
 
     public function testClearRequiresMatchingSlug(): void
@@ -119,7 +122,7 @@ final class StoreInventoryClearTest extends WebTestCase
 
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
         $this->em->clear();
-        self::assertSame(1, $this->em->getRepository(InventoryItem::class)->count(['store' => $store->getId()]));
+        self::assertSame(1, $this->countSingles((int) $store->getId()));
     }
 
     public function testClearIsForbiddenForOtherStoresAndGuests(): void
@@ -140,6 +143,22 @@ final class StoreInventoryClearTest extends WebTestCase
         self::assertSame(403, $this->client->getResponse()->getStatusCode());
 
         $this->em->clear();
-        self::assertSame(1, $this->em->getRepository(InventoryItem::class)->count(['store' => $store->getId()]));
+        self::assertSame(1, $this->countSingles((int) $store->getId()));
+    }
+
+    private function countSingles(int $storeId): int
+    {
+        return (int) $this->em->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM inventory_items WHERE store_id = ?',
+            [$storeId],
+        );
+    }
+
+    private function countSealed(int $storeId): int
+    {
+        return (int) $this->em->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM sealed_inventory_items WHERE store_id = ?',
+            [$storeId],
+        );
     }
 }

@@ -6,10 +6,14 @@ use App\Entity\Store;
 use Doctrine\DBAL\Connection;
 
 /**
- * Permanently wipes a store's singles and sealed listings in one transaction.
+ * Permanently wipes a store's singles and sealed listings.
  *
  * Carts, favorites, and case-card rows follow via ON DELETE CASCADE. Order
  * lines keep the order and SET NULL on the listing pointers.
+ *
+ * Deletes run as two statements (same pattern as {@see \App\Service\Store\StoreAdminRemover})
+ * rather than Connection::transactional(), which opens a nested savepoint that
+ * collides with DAMA's test transaction and can hide remaining rows.
  */
 final readonly class StoreInventoryClearer
 {
@@ -25,20 +29,18 @@ final readonly class StoreInventoryClearer
     {
         $storeId = (int) $store->getId();
 
-        return $this->connection->transactional(function (Connection $conn) use ($storeId): array {
-            $singles = (int) $conn->executeStatement(
-                'DELETE FROM inventory_items WHERE store_id = ?',
-                [$storeId],
-            );
-            $sealed = (int) $conn->executeStatement(
-                'DELETE FROM sealed_inventory_items WHERE store_id = ?',
-                [$storeId],
-            );
+        $singles = (int) $this->connection->executeStatement(
+            'DELETE FROM inventory_items WHERE store_id = ?',
+            [$storeId],
+        );
+        $sealed = (int) $this->connection->executeStatement(
+            'DELETE FROM sealed_inventory_items WHERE store_id = ?',
+            [$storeId],
+        );
 
-            return [
-                'deletedSingles' => $singles,
-                'deletedSealed' => $sealed,
-            ];
-        });
+        return [
+            'deletedSingles' => $singles,
+            'deletedSealed' => $sealed,
+        ];
     }
 }
