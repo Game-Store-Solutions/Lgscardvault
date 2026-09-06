@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Repository\StoreRepository;
+use App\Service\Inventory\StoreInventoryClearer;
 use App\Service\Store\StoreSettingsUpdater;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,6 +18,7 @@ class StoreSettingsController extends AbstractController
     public function __construct(
         private readonly StoreRepository $storeRepository,
         private readonly StoreSettingsUpdater $settingsUpdater,
+        private readonly StoreInventoryClearer $inventoryClearer,
     ) {
     }
 
@@ -41,5 +43,32 @@ class StoreSettingsController extends AbstractController
         }
 
         return $this->json($this->settingsUpdater->serialize($store));
+    }
+
+    /**
+     * Permanently delete every singles and sealed listing. Requires
+     * `{ "confirmSlug": "<slug>" }` so a mis-click cannot empty the store.
+     */
+    #[Route('/clear-inventory', name: 'api_store_settings_clear_inventory', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function clearInventory(string $slug, Request $request): JsonResponse
+    {
+        $store = $this->storeRepository->findOneBySlug($slug);
+        if (null === $store) {
+            throw new NotFoundHttpException(sprintf('Store "%s" not found.', $slug));
+        }
+
+        $this->denyAccessUnlessGranted('STORE_MANAGE', $store);
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $confirmSlug = trim((string) ($payload['confirmSlug'] ?? ''));
+        if ($confirmSlug !== $store->getSlug()) {
+            return $this->json([
+                'detail' => 'Type the store slug to confirm deleting all inventory.',
+            ], 422);
+        }
+
+        return $this->json($this->inventoryClearer->clear($store));
     }
 }

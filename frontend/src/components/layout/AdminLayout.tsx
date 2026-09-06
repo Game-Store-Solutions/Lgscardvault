@@ -38,6 +38,8 @@ import {
 
   Sparkles,
 
+  Settings,
+
   Store,
 
   TrendingUp,
@@ -211,6 +213,18 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
 
           { to: `${base}/patch-notes`, label: 'Patch notes', icon: Megaphone },
           { to: `${base}/users`, label: 'Users', icon: Users },
+
+        ],
+
+      },
+
+      {
+
+        heading: 'Admin',
+
+        items: [
+
+          { to: `${base}/settings`, label: 'Admin settings', icon: Settings },
 
         ],
 

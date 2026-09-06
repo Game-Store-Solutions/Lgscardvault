@@ -24,7 +24,7 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
 import type { InventoryItem, Order, OrderChannel, OrderLine, OrderStatus } from '../../api/types'
 import { inventoryKey, openStoreOrdersCountKey, ordersKey, resolveOrdersListTotal, useDebouncedValue, useInventoryPage, useOrders, useStoreOrderQueueCounts } from '../../hooks'
-import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal, Select } from '../../components/ui'
+import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal, Select, Skeleton, Spinner } from '../../components/ui'
 import { OrderLineList } from '../../components/orders/OrderLineList'
 import { OrderWorkflow } from '../../components/orders/OrderWorkflow'
 import { cx } from '../../lib/cx'
@@ -209,14 +209,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
 
   const status = httpStatus(error)
   const endpointMissing = status === 404 || status === 405
-
-  if (isPending && data.length === 0 && !error) {
-    return (
-      <div className="rounded-2xl bg-bg px-4 py-16">
-        <LoadingPanel label="Loading orders…" />
-      </div>
-    )
-  }
+  const listLoading = isPending
 
   if (endpointMissing) {
     return (
@@ -306,7 +299,9 @@ export default function OrdersTab({ slug }: { slug: string }) {
                 )}
               >
                 <span>{item.label}</span>
-                {item.id !== 'delivered' && count > 0 ? (
+                {active && isFetching ? (
+                  <Spinner size="sm" className="size-3.5 text-current" label="Loading orders" />
+                ) : item.id !== 'delivered' && count > 0 ? (
                   <span
                     className={cx(
                       'grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-bold tabular-nums leading-none',
@@ -351,7 +346,9 @@ export default function OrdersTab({ slug }: { slug: string }) {
           </div>
         </div>
 
-        {orderTotal === 0 ? (
+        {listLoading ? (
+          <OrdersTableSkeleton />
+        ) : orderTotal === 0 ? (
           <div className="px-5 py-16">
             <EmptyState
               icon={ReceiptText}
@@ -370,27 +367,10 @@ export default function OrdersTab({ slug }: { slug: string }) {
         ) : (
           <>
             <div className="relative min-w-0">
-              {isFetching ? (
-                <p
-                  className="pointer-events-none absolute inset-x-0 top-0 z-10 border-b border-border/60 bg-surface/90 px-5 py-2 text-xs font-medium text-fg-muted backdrop-blur-[2px]"
-                  role="status"
-                >
-                  Updating list…
-                </p>
-              ) : null}
               <table className="w-full table-fixed text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
-                    <th className="w-[28%] px-5 py-3 font-semibold">Product Name</th>
-                    <th className="w-[20%] px-5 py-3 font-semibold">Customer Name</th>
-                    <th className="w-[14%] px-5 py-3 font-semibold">Order Id</th>
-                    <th className="w-[12%] px-5 py-3 font-semibold">Amount</th>
-                    <th className="w-[12%] px-5 py-3 font-semibold">Status</th>
-                    <th className="w-16 px-3 py-3 font-semibold text-right">Action</th>
-                  </tr>
-                </thead>
+                <OrdersTableHead />
                 <tbody
-                  className={cx('min-h-0 transition-opacity duration-150', isFetching && 'opacity-70')}
+                  className={cx('min-h-0 transition-opacity duration-150', isFetching && 'opacity-60')}
                 >
                   {pageOrders.map((order) => (
                       <OrderRow
@@ -429,6 +409,73 @@ export default function OrdersTab({ slug }: { slug: string }) {
           onUpdateStatus={(status) => updateStatus.mutate({ order: detailOrder, status })}
         />
       )}
+    </div>
+  )
+}
+
+function OrdersTableHead() {
+  return (
+    <thead>
+      <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
+        <th className="w-[28%] px-5 py-3 font-semibold">Product Name</th>
+        <th className="w-[20%] px-5 py-3 font-semibold">Customer Name</th>
+        <th className="w-[14%] px-5 py-3 font-semibold">Order Id</th>
+        <th className="w-[12%] px-5 py-3 font-semibold">Amount</th>
+        <th className="w-[12%] px-5 py-3 font-semibold">Status</th>
+        <th className="w-16 px-3 py-3 font-semibold text-right">Action</th>
+      </tr>
+    </thead>
+  )
+}
+
+function OrdersTableSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
+  return (
+    <div className="relative min-w-0" aria-busy="true" aria-label="Loading orders">
+      <table className="w-full table-fixed text-left text-sm">
+        <OrdersTableHead />
+        <tbody>
+          {Array.from({ length: rows }, (_, i) => (
+            <tr key={i} className={cx('border-b border-border/60', ORDER_TABLE_ROW_H)}>
+              <td className="px-5 py-4 align-middle">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-11 shrink-0 rounded-xl" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
+                </div>
+              </td>
+              <td className="px-5 py-4 align-middle">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-8 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                </div>
+              </td>
+              <td className="px-5 py-4 align-middle">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </td>
+              <td className="px-5 py-4 align-middle">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-14" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </td>
+              <td className="px-5 py-4 align-middle">
+                <Skeleton className="h-6 w-20 rounded-lg" />
+              </td>
+              <td className="px-3 py-4 align-middle text-right">
+                <Skeleton className="ml-auto size-9 rounded-lg" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
