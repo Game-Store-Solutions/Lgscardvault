@@ -10,6 +10,7 @@ use App\Entity\Order;
 use App\Entity\OrderLine;
 use App\Entity\Store;
 use App\Entity\User;
+use App\Enum\OrderStatus;
 use App\MultiTenancy\TenantContext;
 use App\Repository\CardRepository;
 use App\Repository\InventoryItemRepository;
@@ -65,6 +66,12 @@ final readonly class StoreOrderProcessor implements ProcessorInterface
         $data->setStore($store);
         $data->setReference(Order::generateReference());
         $this->attributeKioskCustomer($data);
+
+        // Staff/admin “New kiosk order” and terminal creates: skip Pending and
+        // land in Ready for pickup (customer is already in the store).
+        if (Order::CHANNEL_KIOSK === $data->getChannel()) {
+            $data->setStatus(OrderStatus::FULFILLED);
+        }
 
         $total = 0;
         foreach ($inputLines as $i => $lineData) {

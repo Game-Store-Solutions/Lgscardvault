@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
+  Check,
+  ChevronDown,
   ChevronRight,
   Heart,
   ListPlus,
@@ -29,6 +31,8 @@ import {
   useStoreTheme,
 } from '../hooks'
 import { Badge, BackButton, Button, buttonVariants, ErrorState, TabPanel, Tabs } from '../components/ui'
+import { dropdownItemClass, dropdownPanelClass } from '../components/ui/dropdown'
+import { AnimatePresence, EASE_PREMIUM, motion } from '../components/motion'
 import { FlipCard, InteractiveCard, SpotlightCard } from '../components/cards'
 import { formatDate } from '../lib/format'
 import { rarityAccent, rarityLabel } from '../lib/mtg'
@@ -138,6 +142,7 @@ export default function CardDetailsPage() {
   // Which face of a multi-faced card is currently shown (0 = front).
   const [faceIndex, setFaceIndex] = useState(0)
   const [infoTab, setInfoTab] = useState<'details' | 'legality'>('details')
+  const [buyQty, setBuyQty] = useState(1)
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -157,6 +162,11 @@ export default function CardDetailsPage() {
       return data
     },
   })
+
+  useEffect(() => {
+    if (!item) return
+    setBuyQty((qty) => Math.min(Math.max(1, qty), Math.max(1, item.quantity)))
+  }, [item?.id, item?.quantity])
 
   usePageMeta({
     title: item?.card.name
@@ -212,6 +222,13 @@ export default function CardDetailsPage() {
   const { data: favorites = [] } = useCustomerFavorites(slug, Boolean(user))
   const { data: wantList = [] } = useCustomerWantList(slug, Boolean(user))
   const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
+
+  const cartQtyForItem =
+    (cartQuery.data ?? []).find((entry) => entry.inventoryItem?.id === item?.id)?.quantity ?? 0
+
+  useEffect(() => {
+    if (cartQtyForItem > 0) setBuyQty(cartQtyForItem)
+  }, [cartQtyForItem])
 
   const favoriteMutation = useMutation({
     mutationFn: async ({ inventoryItem, favorite }: { inventoryItem: InventoryItem; favorite: boolean }) => {
@@ -352,7 +369,21 @@ export default function CardDetailsPage() {
 
   const cartEntry = (cartQuery.data ?? []).find((entry) => entry.inventoryItem?.id === item.id)
   const inCart = Boolean(cartEntry)
+  const cartQty = cartEntry?.quantity ?? 0
   const outOfStock = item.quantity < 1
+  const maxQty = Math.max(1, item.quantity)
+  const qtyOptions = Array.from({ length: maxQty }, (_, i) => i + 1)
+
+  function setCartQuantity(next: number) {
+    const clamped = Math.max(1, Math.min(next, item.quantity))
+    cartSetItem.mutate({ item, quantity: clamped })
+  }
+
+  function onBuyQtyChange(next: number) {
+    const clamped = Math.max(1, Math.min(next, maxQty))
+    setBuyQty(clamped)
+    if (inCart) setCartQuantity(clamped)
+  }
 
   const related = (relatedQuery.data?.items ?? [])
     .filter((row) => row.id !== item.id && row.quantity > 0)
@@ -567,8 +598,8 @@ export default function CardDetailsPage() {
           {/* Buy column. After the title on phones/tablets so Add to Cart stays on screen. */}
           <aside className={cx(colPad, 'xl:col-start-3 xl:row-start-1 xl:row-span-2')}>
             <div className="space-y-3 xl:sticky xl:top-16">
-              <div className="tcg-buy-box overflow-hidden">
-                <div className="flex items-center gap-2 border-b border-brand-200/90 bg-brand-50 px-3 py-2.5 dark:border-brand-500/25 dark:bg-brand-500/10">
+              <div className="tcg-buy-box">
+                <div className="flex items-center gap-2 overflow-hidden rounded-t-[inherit] border-b border-brand-200/90 bg-brand-50 px-3 py-2.5 dark:border-brand-500/25 dark:bg-brand-500/10">
                   <ShieldCheck aria-hidden className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
                   <span className="text-sm font-bold text-brand-700 dark:text-brand-300">{store?.name ?? 'This store'}</span>
                 </div>
@@ -585,32 +616,18 @@ export default function CardDetailsPage() {
                     Sold by {store?.name ?? 'this store'}
                   </p>
 
-                  <div className="mt-4 flex min-w-0">
-                    <div className="flex h-11 shrink-0 items-center gap-1 rounded-l-md border border-r-0 border-border bg-bg px-3 text-sm text-fg-muted">
-                      <span className="font-semibold text-fg">1</span>
-                      <span className="text-xs">of {Math.max(1, item.quantity)}</span>
-                    </div>
-                    {inCart ? (
-                      <Link
-                        to={`/s/${slug}/cart`}
-                        className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md px-4 shadow-none`}
-                      >
-                        <ShoppingCart aria-hidden className="size-4" />
-                        {user ? `Checkout (${cartEntry?.quantity})` : `View cart (${cartEntry?.quantity})`}
-                      </Link>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="lg"
-                        className="h-11 min-w-0 flex-1 rounded-l-none rounded-r-md shadow-none"
-                        loading={cartSetItem.isPending}
-                        disabled={cartSetItem.isPending || outOfStock}
-                        onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
-                      >
-                        {outOfStock ? 'Out of stock' : 'Add to Cart'}
-                      </Button>
-                    )}
-                  </div>
+                  <BuyQtyControl
+                    buyQty={buyQty}
+                    qtyOptions={qtyOptions}
+                    outOfStock={outOfStock}
+                    inCart={inCart}
+                    cartQty={cartQty}
+                    pending={cartSetItem.isPending}
+                    onQtyChange={onBuyQtyChange}
+                    onAdd={() => setCartQuantity(buyQty)}
+                    cartHref={`/s/${slug}/cart`}
+                    cartLinkLabel={user ? `Checkout (${cartQty})` : `View cart (${cartQty})`}
+                  />
 
                   {!user && (
                     <p className="mt-2 text-center text-xs text-fg-muted">
@@ -900,6 +917,187 @@ export default function CardDetailsPage() {
         onClose={closeManageListing}
         onSave={(payload) => updateListingMutation.mutate(payload)}
       />
+    </div>
+  )
+}
+
+function BuyQtyControl({
+  buyQty,
+  qtyOptions,
+  outOfStock,
+  inCart,
+  cartQty,
+  pending,
+  onQtyChange,
+  onAdd,
+  cartHref,
+  cartLinkLabel,
+}: {
+  buyQty: number
+  qtyOptions: number[]
+  outOfStock: boolean
+  inCart: boolean
+  cartQty: number
+  pending: boolean
+  onQtyChange: (next: number) => void
+  onAdd: () => void
+  cartHref: string
+  cartLinkLabel: string
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const listId = useId()
+  const buttonKey = outOfStock ? 'oos' : inCart ? 'cart' : 'add'
+  const buttonLabel = outOfStock ? 'Out of stock' : inCart ? cartLinkLabel : 'Add to Cart'
+
+  useEffect(() => {
+    if (!open) return
+    function onPointer(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="mt-4">
+      <div className="relative flex min-w-0">
+        <motion.button
+          type="button"
+          aria-label="Quantity"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={listId}
+          disabled={outOfStock || pending || qtyOptions.length <= 1}
+          whileTap={outOfStock || pending ? undefined : { scale: 0.97 }}
+          onClick={() => setOpen((current) => !current)}
+          className={cx(
+            'relative flex h-11 shrink-0 items-center gap-1 rounded-l-md border border-r-0 border-border bg-bg px-3 text-sm text-fg',
+            'transition-[border-color,background-color] duration-200 hover:bg-surface',
+            'focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
+            'disabled:cursor-not-allowed disabled:opacity-40',
+            open && 'border-brand-400 bg-surface',
+          )}
+        >
+          <span className="relative inline-grid min-w-[1.25rem] place-items-center overflow-hidden tabular-nums">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={buyQty}
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -10, opacity: 0 }}
+                transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                className="col-start-1 row-start-1 font-semibold"
+              >
+                {buyQty}
+              </motion.span>
+            </AnimatePresence>
+          </span>
+          <motion.span
+            aria-hidden
+            animate={{ rotate: open ? 180 : 0 }}
+            transition={{ duration: 0.18, ease: EASE_PREMIUM }}
+            className="text-fg-muted"
+          >
+            <ChevronDown className="size-3.5" />
+          </motion.span>
+        </motion.button>
+
+        {inCart && !outOfStock ? (
+          <Link
+            to={cartHref}
+            className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 min-w-0 flex-1 overflow-hidden rounded-l-none rounded-r-md px-4 shadow-none`}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={buttonKey}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                className="inline-flex items-center gap-1.5"
+              >
+                <ShoppingCart aria-hidden className="size-4" />
+                {buttonLabel}
+              </motion.span>
+            </AnimatePresence>
+          </Link>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
+            className="h-11 min-w-0 flex-1 overflow-hidden rounded-l-none rounded-r-md shadow-none"
+            loading={pending}
+            disabled={pending || outOfStock}
+            onClick={onAdd}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={buttonKey}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                className="inline-flex items-center gap-1.5"
+              >
+                {buttonKey === 'add' ? <ShoppingCart aria-hidden className="size-4" /> : null}
+                {buttonLabel}
+              </motion.span>
+            </AnimatePresence>
+          </Button>
+        )}
+
+        <AnimatePresence>
+          {open ? (
+            <motion.ul
+              id={listId}
+              role="listbox"
+              aria-label="Quantity"
+              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+              className={cx(
+                dropdownPanelClass,
+                'absolute left-0 top-[calc(100%+0.4rem)] z-30 max-h-56 min-w-[4.25rem] overflow-y-auto p-1',
+              )}
+            >
+              {qtyOptions.map((n, index) => {
+                const selected = n === buyQty
+                return (
+                  <motion.li
+                    key={n}
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.14, ease: EASE_PREMIUM, delay: Math.min(index, 8) * 0.015 }}
+                  >
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => {
+                        onQtyChange(n)
+                        setOpen(false)
+                      }}
+                      className={dropdownItemClass({ selected, active: selected })}
+                    >
+                      <span className="min-w-[1.25rem] tabular-nums">{n}</span>
+                      {selected ? <Check aria-hidden className="ml-auto size-3.5 shrink-0 text-brand-500" /> : null}
+                    </button>
+                  </motion.li>
+                )
+              })}
+            </motion.ul>
+          ) : null}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

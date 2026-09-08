@@ -56,6 +56,9 @@ security:
         - { path: ^/api/stores/.+/guest/orders/.+/balance, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/stores/.+/guest/orders/.+/paypal/order, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/stores/.+/guest/orders/.+/paypal/capture, roles: PUBLIC_ACCESS, methods: [POST] }
+        # Kiosk terminal uses a signed session token (JWT may be cleared).
+        - { path: ^/api/stores/.+/kiosk/order, roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api/stores/.+/kiosk/verify-exit, roles: PUBLIC_ACCESS, methods: [POST] }
         # Mass search posts a name list; GET would overflow the URL on a 100-card deck.
         - { path: ^/api/stores/.+/inventory/mass-search, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/catalog, roles: PUBLIC_ACCESS, methods: [GET] }

@@ -811,7 +811,10 @@ export default function StorePage() {
                       slug={slug}
                       inCartQuantity={cartByItemId.get(item.id)}
                       adding={cartSetItem.isPending && cartSetItem.variables?.item.id === item.id}
-                      onAddToCart={() => cartSetItem.mutate({ item, quantity: 1 })}
+                      onAddToCart={() => {
+                        const current = cartByItemId.get(item.id) ?? 0
+                        cartSetItem.mutate({ item, quantity: Math.min(item.quantity, current + 1) })
+                      }}
                     />
                   ))}
                 </div>
