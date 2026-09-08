@@ -40,7 +40,7 @@ import {
   percentChange,
   type OrderListTab,
 } from '../../lib/orderManagementUi'
-import { ORDER_STATUS_LABELS, formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
+import { formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
 import { printOrderSheet } from '../../lib/printOrderSheet'
 
 const PAGE_SIZE = 8

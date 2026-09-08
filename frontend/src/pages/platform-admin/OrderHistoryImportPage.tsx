@@ -157,12 +157,12 @@ export default function OrderHistoryImportPage() {
 
         {importMutation.isError ? (
           <p role="alert" className="text-sm font-medium text-danger-700">
-            {extractErrorMessage(importMutation.error)}
+            {extractErrorMessage(importMutation.error, 'Could not import that CSV.')}
           </p>
         ) : null}
         {relinkMutation.isError ? (
           <p role="alert" className="text-sm font-medium text-danger-700">
-            {extractErrorMessage(relinkMutation.error)}
+            {extractErrorMessage(relinkMutation.error, 'Could not relink order card images.')}
           </p>
         ) : null}
         {relinkMutation.isSuccess ? (
