@@ -81,6 +81,8 @@ export interface Store {
   isActive?: boolean
   featured?: boolean
   isListed?: boolean
+  /** True when an admin has set a kiosk exit code (code itself is never exposed). */
+  kioskExitCodeSet?: boolean
   features?: Partial<Record<StoreFeatureKey, boolean>>
   spotlightMinPriceCents?: number
   spotlightMinItems?: number

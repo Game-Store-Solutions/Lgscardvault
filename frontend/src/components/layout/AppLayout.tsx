@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router'
+import { Link, NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
-import { useCustomerCart, useGuestCart, useKioskMode, useTheme, APP_CHROME_CLASS, STORE_THEME_CLASS } from '../../hooks'
+import { useCustomerCart, useGuestCart, useKioskMode, useStore, useTheme, APP_CHROME_CLASS, STORE_THEME_CLASS } from '../../hooks'
 import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 import { isOnboardingDraftInProgress } from '../../pages/onboarding/draftStorage'
 import { StorefrontBackground } from '../store/backgrounds'
@@ -10,6 +10,7 @@ import { StoreFooter } from '../store/StoreFooter'
 import { LegalLinks } from '../legal/LegalLinks'
 import { Avatar, Button, buttonVariants, dropdownItemClass, dropdownPanelClass } from '../ui'
 import { BrandLogo } from '../BrandLogo'
+import { KioskExitModal } from '../kiosk/KioskExitModal'
 import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { manageableStores } from '../../lib/manageableStores'
 import { AppShellLayoutProvider, useAppShellLayout } from './AppShellLayout'
@@ -33,7 +34,8 @@ const LANDING_ROUTES = [
 export default function AppLayout() {
   const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { kioskMode, enterKioskMode, exitKioskMode } = useKioskMode()
+  const { kioskMode, kioskStoreSlug, enterKioskMode, exitKioskMode } = useKioskMode()
+  const navigate = useNavigate()
   const ownedStores = manageableStores(user)
   // The customer profile + cart are per-store, so only surface those links when
   // the current route is within a store (e.g. /s/:slug, /s/:slug/cards/:id).
@@ -42,6 +44,10 @@ export default function AppLayout() {
   const accountMatch = useMatch({ path: '/account', end: false })
   const storeAccountMatch = useMatch('/s/:slug/account')
   const storeSlug = storeMatch?.params.slug ?? exactStoreMatch?.params.slug
+  const kioskSlug = storeSlug ?? kioskStoreSlug ?? ownedStores[0]?.slug
+  const { data: kioskStore } = useStore(kioskSlug ?? undefined)
+  const [exitModalOpen, setExitModalOpen] = useState(false)
+  const [enterError, setEnterError] = useState<string | null>(null)
   const fullWidthAccount = Boolean(accountMatch || storeAccountMatch)
   const headerShell = fullWidthAccount
     ? FULL_WIDTH_APP_SHELL
@@ -66,6 +72,21 @@ export default function AppLayout() {
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
   const storeMenuRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
+
+  const tryEnterKiosk = () => {
+    setEnterError(null)
+    if (!kioskSlug) {
+      setEnterError('Open your storefront first, then enter kiosk mode.')
+      return
+    }
+    if (!kioskStore?.kioskExitCodeSet) {
+      setEnterError('Set a kiosk exit code in Admin → Settings before entering kiosk mode.')
+      navigate(`/s/${kioskSlug}/admin/settings`)
+      return
+    }
+    enterKioskMode(kioskSlug)
+    navigate(`/s/${kioskSlug}`)
+  }
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -150,9 +171,10 @@ export default function AppLayout() {
   )
 
   // Kiosk mode: locked-down storefront chrome. No navigation, no account
-  // controls — just the store pages and the cart. Only the store owner (or a
-  // platform admin) can leave it; the terminal stays signed in as the owner.
+  // controls — just the store pages and the cart. Leaving requires the
+  // admin-configured exit code so customers cannot reach admin tools.
   if (kioskMode) {
+    const lockedSlug = kioskStoreSlug ?? storeSlug
     return (
       <AppShellLayoutProvider>
         <div className="flex min-h-screen flex-col bg-bg text-fg">
@@ -160,15 +182,25 @@ export default function AppLayout() {
           <header className={cx(APP_CHROME_CLASS, 'sticky top-0 z-40 border-b border-border/60 bg-surface/85 shadow-sm backdrop-blur-xl')}>
             <div className={cx(headerShell, 'flex items-center justify-between gap-4 py-3')}>
               <span className="flex items-center gap-2">
-                <BrandLogo size="md" />
+                <BrandLogo size="md" to={null} />
                 <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-700">
                   Kiosk
                 </span>
               </span>
               <div className="flex items-center gap-2">
                 {cartLink}
-                {(isStoreOwner || isSuperAdmin) && (
-                  <Button variant="secondary" size="sm" onClick={exitKioskMode}>
+                {(isStoreOwner || isSuperAdmin) && lockedSlug && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (kioskStore?.kioskExitCodeSet === false) {
+                        exitKioskMode()
+                        return
+                      }
+                      setExitModalOpen(true)
+                    }}
+                  >
                     <Monitor aria-hidden className="size-4" />
                     Exit kiosk
                   </Button>
@@ -184,6 +216,18 @@ export default function AppLayout() {
               {storeSlug ? <StoreFooter slug={storeSlug} /> : <MarketplaceLegalFooter />}
             </div>
           </div>
+
+          {lockedSlug && (
+            <KioskExitModal
+              open={exitModalOpen}
+              slug={lockedSlug}
+              onClose={() => setExitModalOpen(false)}
+              onUnlocked={() => {
+                setExitModalOpen(false)
+                exitKioskMode()
+              }}
+            />
+          )}
         </div>
       </AppShellLayoutProvider>
     )
@@ -302,20 +346,24 @@ export default function AppLayout() {
                       className={dropdownItemClass({})}
                       onNavigate={() => setUserMenuOpen(false)}
                     />
-                    {/* Kiosk terminals belong to stores: their owners flip the mode. */}
                     {isStoreOwner && (
                       <button
                         type="button"
                         role="menuitem"
                         onClick={() => {
                           setUserMenuOpen(false)
-                          enterKioskMode()
+                          tryEnterKiosk()
                         }}
                         className={dropdownItemClass({})}
                       >
                         <Monitor aria-hidden className="size-4 text-fg-muted" />
                         Enter kiosk mode
                       </button>
+                    )}
+                    {enterError && (
+                      <p role="alert" className="px-2.5 py-1.5 text-xs font-medium text-danger-700">
+                        {enterError}
+                      </p>
                     )}
                     <button
                       type="button"
@@ -461,12 +509,17 @@ export default function AppLayout() {
                   type="button"
                   onClick={() => {
                     closeMobile()
-                    enterKioskMode()
+                    tryEnterKiosk()
                   }}
                   className={`${mobileLinkClass} w-full text-left`}
                 >
                   Enter kiosk mode
                 </button>
+              )}
+              {enterError && (
+                <p role="alert" className="px-3 py-1 text-sm font-medium text-danger-700">
+                  {enterError}
+                </p>
               )}
 
               <div className="mt-2 border-t border-border pt-2">

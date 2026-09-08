@@ -51,6 +51,7 @@ import { StoreFeatureRoute } from './components/store/StoreFeatureRoute'
 import { CookieConsentBanner } from './components/CookieConsentBanner'
 import { AnalyticsLoader } from './components/AnalyticsLoader'
 import { SessionExpiredModal } from './components/auth/SessionExpiredModal'
+import { KioskRouteGuard } from './components/kiosk/KioskRouteGuard'
 import { httpStatus } from './api/client'
 
 const queryClient = new QueryClient({
@@ -86,6 +87,7 @@ export default function App() {
           <AnalyticsLoader />
           <SessionExpiredModal />
           <Routes>
+            <Route element={<KioskRouteGuard />}>
             {/* Full-screen auth flow (no app navbar) */}
             <Route element={<AuthLayout />}>
               <Route path="login" element={<LoginPage />} />
@@ -217,6 +219,7 @@ export default function App() {
               <Route path="stores/:slug/imports" element={<PlatformStoreImportsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
           </Routes>
           {/* Must stay inside BrowserRouter — the banner uses <Link>. */}
           <CookieConsentBanner />

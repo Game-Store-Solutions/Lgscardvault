@@ -137,6 +137,10 @@ final readonly class StoreSettingsUpdater
             $store->setIsListed($this->boolValue($payload['isListed'], 'isListed'));
         }
 
+        if (array_key_exists('kioskExitCode', $payload)) {
+            $this->applyKioskExitCode($store, $payload['kioskExitCode']);
+        }
+
         if (array_key_exists('features', $payload)) {
             $store->setFeatures([
                 ...$store->getFeatures(),
@@ -346,6 +350,7 @@ final readonly class StoreSettingsUpdater
             'name' => $store->getName(),
             'slug' => $store->getSlug(),
             'isListed' => $store->isListed(),
+            'kioskExitCodeSet' => $store->isKioskExitCodeSet(),
             'features' => $store->getFeatures(),
             'spotlightMinPriceCents' => $store->getSpotlightMinPriceCents(),
             'spotlightMinItems' => $store->getSpotlightMinItems(),
@@ -722,6 +727,41 @@ final readonly class StoreSettingsUpdater
         }
 
         return strtolower($hex);
+    }
+
+    /**
+     * Set or clear the kiosk exit PIN. Empty string clears. Never store plaintext.
+     */
+    private function applyKioskExitCode(Store $store, mixed $raw): void
+    {
+        if (!is_string($raw) && !is_int($raw) && !is_float($raw)) {
+            throw new \InvalidArgumentException('kioskExitCode must be a string.');
+        }
+        $code = trim((string) $raw);
+        if ('' === $code) {
+            $store->setKioskExitCodeHash(null);
+
+            return;
+        }
+        if (1 !== preg_match('/^[A-Za-z0-9]{4,12}$/', $code)) {
+            throw new \InvalidArgumentException('kioskExitCode must be 4–12 letters or digits.');
+        }
+        $store->setKioskExitCodeHash(password_hash($code, \PASSWORD_DEFAULT));
+    }
+
+    /** Verify a candidate exit code against the store's configured hash. */
+    public function verifyKioskExitCode(Store $store, string $code): bool
+    {
+        $hash = $store->getKioskExitCodeHash();
+        if (null === $hash || '' === $hash) {
+            return false;
+        }
+        $code = trim($code);
+        if ('' === $code) {
+            return false;
+        }
+
+        return password_verify($code, $hash);
     }
 
     private function stringValue(mixed $value): string
