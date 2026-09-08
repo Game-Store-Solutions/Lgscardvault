@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
-import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases } from '../../hooks'
+import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases, useStoreGames } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
-import type { PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
+import type { CardSummary, PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
 import {
   Badge,
   Button,
@@ -16,7 +16,11 @@ import {
   LoadingPanel,
   Modal,
   Select,
+  dropdownItemClass,
+  dropdownPanelClass,
 } from '../../components/ui'
+import { foldSearchText, typeaheadNameTier } from '../../lib/searchText'
+import { cx } from '../../lib/cx'
 
 /** Rarities the auto-fill filter accepts — must mirror the backend allow-list. */
 const RARITIES = ['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus'] as const
@@ -835,21 +839,84 @@ function InventoryPicker({
   onClose: () => void
   onChanged: () => void
 }) {
+  const { data: storeGames = [] } = useStoreGames(slug)
+  const [game, setGame] = useState('')
   const [query, setQuery] = useState('')
-  const debounced = useDebouncedValue(query, 200)
+  const [pickedName, setPickedName] = useState<string | null>(null)
+  const [typeaheadOpen, setTypeaheadOpen] = useState(false)
+  const typeaheadRef = useRef<HTMLDivElement>(null)
+  const debounced = useDebouncedValue(query.trim(), 300)
+
+  useEffect(() => {
+    if (!game && storeGames.length > 0) {
+      setGame(storeGames[0].code)
+    }
+  }, [game, storeGames])
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (typeaheadRef.current && !typeaheadRef.current.contains(event.target as Node)) {
+        setTypeaheadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
 
   const alreadyIn = useMemo(
     () => new Set(section.cards.map((c) => c.inventoryItem.id)),
     [section.cards],
   )
 
-  // Search server-side rather than filtering a full inventory download in the
-  // browser; with no term this is just the first page of the store's listings.
-  const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
-    q: debounced.trim(),
-    itemsPerPage: 60,
+  // Same ranked catalog typeahead as Singles → Add (prefix / exact / word tiers).
+  const typeaheadReady = debounced.length >= 2 && Boolean(game) && !pickedName
+  const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
+    queryKey: ['card-search', 'typeahead', 'section-picker', debounced, game],
+    queryFn: async () => {
+      const { data } = await api.get<CardSummary[]>('/catalog/search', {
+        params: {
+          q: debounced,
+          unique: 'cards',
+          game,
+        },
+      })
+      return data.slice(0, 12)
+    },
+    enabled: typeaheadReady,
+    staleTime: 30_000,
   })
-  const results = searchPage?.items ?? []
+
+  const typeaheadNames = useMemo(() => {
+    const seen = new Set<string>()
+    return [...typeaheadResults]
+      .filter((card) => {
+        const key = foldSearchText(card.name)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((left, right) => typeaheadNameTier(left.name, debounced) - typeaheadNameTier(right.name, debounced))
+  }, [typeaheadResults, debounced])
+
+  const inventoryQuery = pickedName ?? (debounced.length >= 2 ? debounced : '')
+  const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
+    q: inventoryQuery,
+    game: game || undefined,
+    inStockOnly: true,
+    itemsPerPage: 60,
+    enabled: inventoryQuery !== '' && Boolean(game),
+  })
+
+  const results = useMemo(() => {
+    const items = searchPage?.items ?? []
+    const q = inventoryQuery
+    return [...items].sort(
+      (a, b) =>
+        typeaheadNameTier(a.card.name, q) - typeaheadNameTier(b.card.name, q) ||
+        a.card.name.localeCompare(b.card.name) ||
+        a.id - b.id,
+    )
+  }, [searchPage?.items, inventoryQuery])
 
   const addMutation = useMutation({
     mutationFn: async (inventoryItemId: number) => {
@@ -858,50 +925,142 @@ function InventoryPicker({
     onSuccess: onChanged,
   })
 
+  function pickCatalogName(name: string) {
+    setQuery(name)
+    setPickedName(name)
+    setTypeaheadOpen(false)
+  }
+
+  function onQueryChange(value: string) {
+    setQuery(value)
+    setPickedName(null)
+    setTypeaheadOpen(true)
+  }
+
+  const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
+
   return (
-    <Modal open onClose={onClose} title={`Add cards to “${section.title}”`}>
-      <div className="space-y-4">
-        <Input
-          label="Search inventory"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Card name…"
-          autoFocus
-        />
-        {isLoading ? (
-          <LoadingPanel />
-        ) : results.length === 0 ? (
-          <EmptyState icon={Search} title="No matching listings" description="Try a different search." />
-        ) : (
-          <ul className="max-h-96 space-y-2 overflow-y-auto">
-            {results.map((item) => {
-              const added = alreadyIn.has(item.id)
-              return (
-                <li key={item.id} className="flex items-center gap-3 rounded-card border border-border bg-surface p-2">
-                  {cardImage(item.card) && (
-                    <img src={cardImage(item.card)} alt={item.card.name} className="h-14 w-10 flex-shrink-0 rounded object-cover" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-fg">{item.card.name}</p>
-                    <p className="text-xs text-fg-muted">
-                      {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
-                      {item.isFoil ? ` · ${item.finish}` : ''}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={added ? 'ghost' : 'primary'}
-                    disabled={added}
-                    loading={addMutation.isPending && addMutation.variables === item.id}
-                    onClick={() => addMutation.mutate(item.id)}
-                  >
-                    {added ? 'Added' : 'Add'}
-                  </Button>
-                </li>
-              )
-            })}
-          </ul>
+    <Modal
+      open
+      onClose={onClose}
+      title={`Add cards to “${section.title}”`}
+      className="max-w-5xl min-h-[min(42rem,90vh)]"
+    >
+      <div className="flex min-h-[min(32rem,70vh)] flex-col gap-4">
+        {storeGames.length > 1 && (
+          <Select label="Game" value={game} onChange={(e) => {
+            setGame(e.target.value)
+            setPickedName(null)
+          }}>
+            {storeGames.map((g) => (
+              <option key={g.code} value={g.code}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
         )}
+        <div ref={typeaheadRef} className="relative shrink-0">
+          <Input
+            label="Search inventory"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onFocus={() => setTypeaheadOpen(true)}
+            placeholder="Card name (same search as Singles)…"
+            autoFocus
+          />
+          {showTypeahead && (
+            <ul
+              role="listbox"
+              className={cx(
+                dropdownPanelClass,
+                'absolute left-0 right-0 z-20 mt-1 max-h-[min(36rem,65vh)] overflow-y-auto p-1.5',
+              )}
+            >
+              {typeaheadNames.map((card) => {
+                const image = cardImage(card)
+                return (
+                  <li key={card.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      className={cx(dropdownItemClass({}), 'w-full gap-3 py-2.5 text-left')}
+                      onClick={() => pickCatalogName(card.name)}
+                    >
+                      {image ? (
+                        <img
+                          src={image}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="h-20 w-14 shrink-0 rounded object-cover"
+                        />
+                      ) : (
+                        <span className="h-20 w-14 shrink-0 rounded bg-bg" aria-hidden />
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-base font-semibold text-fg">{card.name}</span>
+                      <span className="shrink-0 text-sm text-fg-muted">{card.setCode?.toUpperCase()}</span>
+                    </button>
+                  </li>
+                )
+              })}
+              {typeaheadFetching && (
+                <li className="px-2.5 py-1.5 text-xs text-fg-muted">Searching…</li>
+              )}
+            </ul>
+          )}
+        </div>
+        <div className="min-h-0 flex-1">
+          {inventoryQuery === '' ? (
+            <p className="text-sm text-fg-muted">Type at least 2 characters to find cards in stock.</p>
+          ) : isLoading ? (
+            <LoadingPanel />
+          ) : results.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="No matching listings"
+              description="Try another name, or pick a suggestion from the catalog search above."
+            />
+          ) : (
+            <ul className="h-full max-h-[min(36rem,65vh)] space-y-2.5 overflow-y-auto">
+              {results.map((item) => {
+                const added = alreadyIn.has(item.id)
+                const image = cardImage(item.card)
+                return (
+                  <li key={item.id} className="flex items-center gap-4 rounded-card border border-border bg-surface p-3">
+                    {image ? (
+                      <img
+                        src={image}
+                        alt={item.card.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-24 w-[4.25rem] flex-shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <span className="h-24 w-[4.25rem] flex-shrink-0 rounded bg-bg" aria-hidden />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base font-bold text-fg">{item.card.name}</p>
+                      <p className="text-sm text-fg-muted">
+                        {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
+                        {item.isFoil ? ` · ${item.finish}` : ''}
+                        {item.quantity != null ? ` · ${item.quantity} in stock` : ''}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={added ? 'ghost' : 'primary'}
+                      disabled={added}
+                      loading={addMutation.isPending && addMutation.variables === item.id}
+                      onClick={() => addMutation.mutate(item.id)}
+                    >
+                      {added ? 'Added' : 'Add'}
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       </div>
     </Modal>
   )
