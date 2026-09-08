@@ -60,7 +60,7 @@ import {
 
 import { useAuth } from '../../context/AuthContext'
 
-import { APP_CHROME_CLASS, useOpenStoreOrderCount, usePendingSellSubmissionCount, useTheme } from '../../hooks'
+import { APP_CHROME_CLASS, useOpenStoreOrderCount, usePendingSellSubmissionCount, useStore, useTheme } from '../../hooks'
 
 import { Avatar, BackButton, Button, buttonVariants } from '../ui'
 
@@ -99,7 +99,7 @@ interface NavSection {
 
 
 
-function useAdminNav(): { context: string; sections: NavSection[] } {
+function useAdminNav(): { context: string | null; sections: NavSection[] } {
 
   const location = useLocation()
 
@@ -162,7 +162,8 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
 
   return {
 
-    context: 'Store administration',
+    // Brand in the sidebar corner already says "{store} admin" — no second label.
+    context: null,
 
     sections: [
 
@@ -253,6 +254,8 @@ export default function AdminLayout() {
 
   const params = useParams()
 
+  const { data: store } = useStore(params.slug)
+
   const { theme, toggleTheme } = useTheme()
 
   const { data: openOrderCount = 0 } = useOpenStoreOrderCount(params.slug ?? '', Boolean(params.slug))
@@ -266,6 +269,12 @@ export default function AdminLayout() {
   const isStoreAdmin = /\/s\/[^/]+\/admin/.test(location.pathname)
 
   const fullWidthAdmin = isStoreAdmin && !isPlatformAdmin
+
+  const brandLabel = isPlatformAdmin
+    ? 'StoreOps'
+    : store?.name
+      ? `${store.name} admin`
+      : 'Store admin'
 
 
 
@@ -328,15 +337,15 @@ export default function AdminLayout() {
 
         <div className="flex h-16 items-center justify-between gap-2 border-b border-border/60 px-4">
 
-          <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
+          <Link to="/" className="flex min-w-0 items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
 
-            <span className="grid size-9 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">
+            <span className="grid size-9 shrink-0 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">
 
               <Store aria-hidden className="size-5" />
 
             </span>
 
-            <span>StoreOps</span>
+            <span className="truncate">{brandLabel}</span>
 
           </Link>
 
@@ -362,7 +371,9 @@ export default function AdminLayout() {
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
 
-          <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-fg-muted">{context}</p>
+          {context ? (
+            <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-fg-muted">{context}</p>
+          ) : null}
 
           {sections.map((section, index) => (
 
@@ -446,9 +457,9 @@ export default function AdminLayout() {
 
 
 
-      <div className="lg:pl-64">
+      <div className="min-w-0 lg:pl-64">
 
-        <header className={`${APP_CHROME_CLASS} sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border/60 bg-surface/90 px-4 backdrop-blur-md`}>
+        <header className={`${APP_CHROME_CLASS} sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-border/60 bg-surface/90 px-3 backdrop-blur-md sm:gap-4 sm:px-4`}>
 
           <div className="flex items-center gap-3">
 
@@ -468,7 +479,9 @@ export default function AdminLayout() {
 
             </button>
 
-            <span className="text-sm font-semibold text-fg">{context}</span>
+            <span className={`truncate text-sm font-semibold text-fg ${isPlatformAdmin ? '' : 'lg:hidden'}`}>
+              {isPlatformAdmin ? context : brandLabel}
+            </span>
 
           </div>
 
@@ -540,9 +553,9 @@ export default function AdminLayout() {
 
             fullWidthAdmin
 
-              ? `${APP_CHROME_CLASS} w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8`
+              ? `${APP_CHROME_CLASS} w-full min-w-0 px-3 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8`
 
-              : `${APP_CHROME_CLASS} mx-auto max-w-7xl px-4 py-8`
+              : `${APP_CHROME_CLASS} mx-auto max-w-7xl min-w-0 px-4 py-8`
 
           }
 

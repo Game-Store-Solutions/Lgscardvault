@@ -5,8 +5,12 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\StoreRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\EmailVerificationService;
+use App\Service\Auth\PasswordResetService;
+use App\Service\Mail\TransactionalMailer;
 use App\Service\User\UserCsvImporter;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -42,6 +46,10 @@ final class AdminUserController extends AbstractController
         private readonly StoreRepository $stores,
         private readonly UserRepository $users,
         private readonly UserCsvImporter $userImporter,
+        private readonly PasswordResetService $passwordReset,
+        private readonly EmailVerificationService $emailVerification,
+        private readonly TransactionalMailer $mail,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -100,6 +108,57 @@ final class AdminUserController extends AbstractController
         }
 
         return $this->json($result);
+    }
+
+    /**
+     * Resend account setup mail: email verification if still unverified,
+     * otherwise a set-password invite (same until-used link as CSV import).
+     */
+    #[Route('/{id}/resend-invite', name: 'api_admin_user_resend_invite', methods: ['POST'], priority: 10)]
+    public function resendInvite(User $user, Request $request): JsonResponse
+    {
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $brandStore = null;
+        $storeSlug = trim((string) ($payload['storeSlug'] ?? ''));
+        if ('' !== $storeSlug) {
+            $brandStore = $this->stores->findOneBySlug($storeSlug);
+            if (null === $brandStore) {
+                return $this->json(['error' => 'Store not found.'], Response::HTTP_NOT_FOUND);
+            }
+        }
+
+        try {
+            if (!$user->isEmailVerified()) {
+                $issued = $this->emailVerification->issue($user);
+                $this->mail->sendEmailVerification($user, $issued['token'], $issued['otp']);
+
+                return $this->json([
+                    'sent' => true,
+                    'kind' => 'verification',
+                    'email' => $user->getEmail(),
+                ]);
+            }
+
+            $token = $this->passwordReset->issueToken($user, null);
+            $this->mail->sendPasswordReset($user, $token, $brandStore, untilUsed: true);
+
+            return $this->json([
+                'sent' => true,
+                'kind' => 'password_reset',
+                'email' => $user->getEmail(),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Admin resend invite email failed.', [
+                'user' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(
+                ['error' => 'Could not send that email. Check mail delivery and try again.'],
+                Response::HTTP_BAD_GATEWAY,
+            );
+        }
     }
 
     /**

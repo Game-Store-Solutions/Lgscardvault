@@ -293,6 +293,8 @@ export default function PaymentsTab({ slug }: { slug: string }) {
   // does not answer on its own.
   const isUsagePlan = sub?.billingModel === 'usage'
   const isPaidInFull = Boolean(sub?.capReached) || sub?.billingModel === 'flat'
+  /** Nightly % of sales only applies on usage before this month’s obligation is met. */
+  const chargesNightlyFees = Boolean(isUsagePlan && !sub?.capReached)
   const subscriptionBadge = !sub ? null : sub.subscriptionStatus === 'suspended' ? (
     <Badge tone="danger">Billing paused</Badge>
   ) : sub.subscriptionStatus === 'past_due' ? (
@@ -433,8 +435,8 @@ export default function PaymentsTab({ slug }: { slug: string }) {
           brand="card"
           name="Debit card"
           purpose="Nightly fees"
-          highlighted={Boolean(sub?.paymentConfigured)}
-          connected={Boolean(sub?.paymentConfigured)}
+          highlighted={chargesNightlyFees && Boolean(sub?.paymentConfigured)}
+          connected={chargesNightlyFees && Boolean(sub?.paymentConfigured)}
           detail={sub?.paymentLast4 ? `•••• ${sub.paymentLast4}` : undefined}
           footerLabel="we charge this"
           error={billingAlert || billingError}
@@ -447,8 +449,12 @@ export default function PaymentsTab({ slug }: { slug: string }) {
       {sub ? (
         <p className="text-sm leading-6 text-fg-muted">
           <span className="font-semibold text-fg">Store sales checkout</span> runs through Square and PayPal Connect.
-          {' '}
-          <span className="font-semibold text-fg">Nightly fees</span> charge {feeSourceLabel(sub)}.
+          {chargesNightlyFees ? (
+            <>
+              {' '}
+              <span className="font-semibold text-fg">Nightly fees</span> charge {feeSourceLabel(sub)}.
+            </>
+          ) : null}
         </p>
       ) : null}
 
@@ -1042,9 +1048,11 @@ function ProcessorCard({
             </button>
           ) : null}
         </div>
-        <p className={cx('pointer-events-none relative z-20 text-sm font-semibold lowercase tracking-wide', tones.connected)}>
-          {footerLabel}
-        </p>
+        {footerLabel ? (
+          <p className={cx('pointer-events-none relative z-20 text-sm font-semibold lowercase tracking-wide', tones.connected)}>
+            {footerLabel}
+          </p>
+        ) : null}
       </div>
       {error ? (
         <p role="alert" className="text-sm font-medium text-danger-700">
@@ -1156,6 +1164,7 @@ function UsageProgress({
     && ((vaultBrand === 'paypal' && salesPaypal && !salesSquare)
       || (vaultBrand !== 'paypal' && salesSquare && !salesPaypal))
   const syncTargetName = vaultBrand === 'paypal' ? 'PayPal' : 'Square'
+  const chargesNightlyFees = sub.billingModel === 'usage' && !sub.capReached
 
   return (
     <div className="rounded-card border border-border bg-surface px-4 py-4">
@@ -1205,18 +1214,30 @@ function UsageProgress({
         </div>
         <div className="flex min-h-0 flex-col">
           <dt className="min-h-[2.5rem] text-xs font-bold uppercase tracking-wide text-fg-muted">
-            Debit card charged for nightly fees
+            {chargesNightlyFees ? 'Debit card charged for nightly fees' : 'Debit card on file'}
           </dt>
           <dd className="mt-2 space-y-2">
             <SourceEditorRow
               brands={[vaultBrand]}
               title={feeLabel}
-              subtitle={sub.paymentConfigured ? 'Charged for the nightly 10%' : 'Add a debit card for nightly fees'}
+              subtitle={
+                chargesNightlyFees
+                  ? sub.paymentConfigured
+                    ? 'Charged for the nightly 10%'
+                    : 'Add a debit card for nightly fees'
+                  : sub.paymentConfigured
+                    ? 'On file for platform billing'
+                    : 'Add a debit card for platform billing'
+              }
               actionLabel={sub.paymentConfigured ? 'Change' : 'Add'}
               ariaLabel={
-                sub.paymentConfigured
-                  ? 'Change debit card charged for nightly fees'
-                  : 'Add a debit card for nightly fees'
+                chargesNightlyFees
+                  ? sub.paymentConfigured
+                    ? 'Change debit card charged for nightly fees'
+                    : 'Add a debit card for nightly fees'
+                  : sub.paymentConfigured
+                    ? 'Change debit card on file'
+                    : 'Add a debit card for platform billing'
               }
               onEdit={onEditFeeSource}
             />
@@ -1224,7 +1245,11 @@ function UsageProgress({
               <SyncAllPayments
                 aligned={salesMatchesVault}
                 alignedMessage={`Store sales checkout already uses ${syncTargetName}.`}
-                hint={`Connect ${syncTargetName} for store sales. Nightly fees keep charging ${feeLabel}.`}
+                hint={
+                  chargesNightlyFees
+                    ? `Connect ${syncTargetName} for store sales. Nightly fees keep charging ${feeLabel}.`
+                    : `Connect ${syncTargetName} for store sales. Platform billing keeps using ${feeLabel}.`
+                }
                 note={nightlySyncNote}
                 syncing={syncing}
                 onSync={onSyncNightly}

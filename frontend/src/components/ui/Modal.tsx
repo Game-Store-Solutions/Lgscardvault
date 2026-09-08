@@ -55,7 +55,7 @@ export function Modal({ open, onClose, title, children, footer, className, overl
           />
           {/* Scroll container: centers short modals, lets tall ones be reached. */}
           <div
-            className="absolute inset-0 flex items-center justify-center overflow-y-auto p-4"
+            className="absolute inset-0 flex items-center justify-center overflow-y-auto overscroll-contain p-2 landscape:p-2 sm:p-4"
             onMouseDown={(e) => {
               // click-outside closes (only when the backdrop area itself is pressed)
               if (e.target === e.currentTarget) onClose()
@@ -72,7 +72,7 @@ export function Modal({ open, onClose, title, children, footer, className, overl
               exit={{ opacity: 0, y: 10, scale: 0.985 }}
               transition={{ duration: 0.24, ease: EASE_PREMIUM }}
               className={cx(
-                'relative z-10 my-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col',
+                'relative z-10 my-auto flex max-h-[calc(100dvh-1rem)] w-full flex-col sm:max-h-[calc(100dvh-2rem)]',
                 'bg-surface border border-border rounded-card shadow-card',
                 'focus-visible:outline-none',
                 !hasMaxWidth && 'max-w-lg',
@@ -80,24 +80,24 @@ export function Modal({ open, onClose, title, children, footer, className, overl
               )}
             >
               {title != null && (
-                <div className="flex shrink-0 items-center justify-between gap-4 px-5 py-4 sm:px-8 border-b border-border">
-                  <h2 id={titleId} className="text-display-xs">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 sm:gap-4 sm:px-8 sm:py-4">
+                  <h2 id={titleId} className="min-w-0 truncate text-display-xs">
                     {title}
                   </h2>
                   <button
                     type="button"
                     onClick={onClose}
                     aria-label="Close dialog"
-                    className="rounded-btn p-1 text-fg-muted hover:text-fg hover:bg-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    className="shrink-0 rounded-btn p-1 text-fg-muted hover:bg-bg hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                   >
                     <X aria-hidden className="size-5" />
                   </button>
                 </div>
               )}
               {/* Body scrolls; header/footer stay pinned. min-h-0 lets it shrink in the flex column. */}
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">{children}</div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-8 sm:py-6">{children}</div>
               {footer != null && (
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 px-5 py-4 sm:px-8 border-t border-border">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-8 sm:py-4">
                   {footer}
                 </div>
               )}

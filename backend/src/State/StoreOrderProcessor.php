@@ -15,6 +15,7 @@ use App\Repository\CardRepository;
 use App\Repository\InventoryItemRepository;
 use App\Repository\UserRepository;
 use App\Service\CaseCards\SectionSaleAllocator;
+use App\Service\Checkout\PickupOrderTaxSync;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -41,6 +42,7 @@ final readonly class StoreOrderProcessor implements ProcessorInterface
         private InventoryItemRepository $inventoryItemRepository,
         private UserRepository $userRepository,
         private SectionSaleAllocator $sectionSaleAllocator,
+        private PickupOrderTaxSync $pickupOrderTaxSync,
     ) {
     }
 
@@ -79,6 +81,7 @@ final readonly class StoreOrderProcessor implements ProcessorInterface
         }
 
         $data->setTotalCents($total);
+        $this->pickupOrderTaxSync->sync($store, $data);
 
         $this->entityManager->persist($data);
         $this->entityManager->flush();

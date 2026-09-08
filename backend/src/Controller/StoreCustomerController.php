@@ -32,6 +32,7 @@ use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Checkout\PaypalOrderFactory;
 use App\Service\Checkout\PickupCardCharge;
 use App\Service\Checkout\PickupFulfillment;
+use App\Service\Checkout\PickupOrderTaxSync;
 use App\Service\Checkout\PickupTaxNotReadyException;
 use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Order\CustomerOrderPagination;
@@ -74,6 +75,7 @@ final class StoreCustomerController extends AbstractController
         private readonly PickupCardCharge $pickupCardCharge,
         private readonly PickupTaxPolicy $pickupTaxPolicy,
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
+        private readonly PickupOrderTaxSync $pickupOrderTaxSync,
         private readonly CustomerPaymentProfileSync $paymentProfileSync,
         private readonly EntityManagerInterface $entityManager,
         private readonly KernelInterface $kernel,
@@ -634,6 +636,7 @@ final class StoreCustomerController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
+        $this->pickupOrderTaxSync->sync($store, $order);
         $this->entityManager->flush();
 
         return $this->json($this->customerOrderSerializer->serialize($order), 201);

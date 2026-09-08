@@ -16,6 +16,7 @@ final readonly class PayInStoreFinalizer
 {
     public function __construct(
         private CheckoutGatewayInterface $checkoutGateway,
+        private PickupOrderTaxSync $pickupOrderTaxSync,
         private LoggerInterface $logger,
     ) {
     }
@@ -26,8 +27,9 @@ final readonly class PayInStoreFinalizer
     public function finalize(Store $store, Order $order): array
     {
         $order->setNotes(Order::NOTE_PAY_IN_STORE);
+        $this->pickupOrderTaxSync->sync($store, $order);
 
-        $amountDue = $order->getTotalCents() - $order->getCreditAppliedCents();
+        $amountDue = $order->amountDueCents();
         if ($amountDue <= 0 || !$this->checkoutGateway->isReady($store)) {
             return [];
         }
