@@ -244,9 +244,12 @@ final class StoreCustomerController extends AbstractController
 
         $payload = $this->jsonPayload($request);
         $card = $this->findCard((string) ($payload['cardId'] ?? ''));
-        $cardName = trim((string) ($payload['cardName'] ?? $card?->getName() ?? ''));
+        if (!$card instanceof Card) {
+            return $this->json(['detail' => 'Pick a card from the catalog.'], 422);
+        }
+        $cardName = trim($card->getName());
         if ('' === $cardName) {
-            return $this->json(['detail' => 'Card name is required.'], 422);
+            return $this->json(['detail' => 'Pick a card from the catalog.'], 422);
         }
 
         $entry = (new CustomerWantListEntry())
@@ -1202,6 +1205,7 @@ final class StoreCustomerController extends AbstractController
             'quantity' => $entry->getQuantity(),
             'notes' => $entry->getNotes(),
             'inventoryItemId' => $listing?->getId(),
+            'inStock' => $listing instanceof InventoryItem && $listing->getQuantity() > 0,
             'createdAt' => $entry->getCreatedAt()->format(DATE_ATOM),
         ];
     }

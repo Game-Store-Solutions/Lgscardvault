@@ -142,8 +142,8 @@ final class TransactionalMailer
         );
     }
 
-    /** Platform — one-time password reset link. */
-    public function sendPasswordReset(User $user, string $rawToken): void
+    /** Platform or store-branded — one-time password reset / set-password link. */
+    public function sendPasswordReset(User $user, string $rawToken, ?Store $store = null, bool $untilUsed = false): void
     {
         $email = $user->getEmail();
         if (null === $email || '' === $email) {
@@ -152,23 +152,55 @@ final class TransactionalMailer
 
         $name = $user->getDisplayName() ?: 'there';
         $resetUrl = $this->frontendUrl().'/reset-password?token='.rawurlencode($rawToken);
+        $brandName = $store?->getName() ?: 'LGS Card Vault';
+        $expiryCopy = $untilUsed
+            ? 'It stays valid until you use it, and can only be used once.'
+            : 'It expires in one hour and can only be used once.';
+
+        if ($store instanceof Store) {
+            $bodyIntro = sprintf('Your account is ready on LGS Card Vault. %s has sent this link', $brandName);
+            $preheader = sprintf('%s invited you to set your password on LGS Card Vault.', $brandName);
+            $subject = sprintf('Set your %s password', $brandName);
+            $footerNote = sprintf("You're receiving this because %s imported your account onto LGS Card Vault.", $brandName);
+            $textBody = sprintf(
+                "Hi %s,\n\nYour account is ready on LGS Card Vault. %s has sent this link — %s\n\n%s\n\nIf you did not expect this, you can ignore this email.\n",
+                $name,
+                $brandName,
+                lcfirst($expiryCopy),
+                $resetUrl,
+            );
+        } else {
+            $bodyIntro = 'We received a request to reset the password for your LGS Card Vault account';
+            $preheader = $untilUsed
+                ? 'Choose a new password. This link stays valid until you use it.'
+                : 'Choose a new password. This link expires in one hour.';
+            $subject = 'Reset your LGS Card Vault password';
+            $footerNote = "You're receiving this because a password reset was requested for this account.";
+            $textBody = sprintf(
+                "Hi %s,\n\nReset your LGS Card Vault password. %s\n\n%s\n\nIf you did not ask for this, you can ignore this email.\n",
+                $name,
+                $expiryCopy,
+                $resetUrl,
+            );
+        }
 
         $this->sendHtml(
             to: $email,
-            subject: 'Reset your LGS Card Vault password',
+            subject: $subject,
             htmlTemplate: 'emails/platform/password_reset.html.twig',
             context: [
-                'preheader' => 'Choose a new password. This link expires in one hour.',
+                'preheader' => $preheader,
                 'displayName' => $name,
                 'resetUrl' => $resetUrl,
-                'footerNote' => "You're receiving this because a password reset was requested for this account.",
+                'brandName' => $brandName,
+                'bodyIntro' => $bodyIntro,
+                'expiryCopy' => $expiryCopy,
+                'footerNote' => $footerNote,
+                // Static HTML confetti for store import invites (email clients can't run JS).
+                'celebrate' => $store instanceof Store && $untilUsed,
             ],
-            textBody: sprintf(
-                "Hi %s,\n\nReset your LGS Card Vault password (expires in one hour):\n%s\n\nIf you did not ask for this, you can ignore this email.\n",
-                $name,
-                $resetUrl,
-            ),
-            store: null,
+            textBody: $textBody,
+            store: $store,
         );
     }
 

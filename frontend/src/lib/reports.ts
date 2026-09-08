@@ -94,7 +94,17 @@ export interface TopCardRow {
   units: number
 }
 
+export type TopSellerMetric = 'revenue' | 'units'
+
 export function topCardsByRevenue(orders: Order[], limit = 8): TopCardRow[] {
+  return rankTopCards(orders, 'revenue', limit)
+}
+
+export function topCardsByUnits(orders: Order[], limit = 8): TopCardRow[] {
+  return rankTopCards(orders, 'units', limit)
+}
+
+function rankTopCards(orders: Order[], metric: TopSellerMetric, limit: number): TopCardRow[] {
   const totals = new Map<string, { revenueCents: number; units: number }>()
   for (const order of orders) {
     if (!REVENUE_STATUSES.has(order.status)) continue
@@ -106,7 +116,11 @@ export function topCardsByRevenue(orders: Order[], limit = 8): TopCardRow[] {
     }
   }
   return Array.from(totals, ([name, row]) => ({ name, ...row }))
-    .sort((a, b) => b.revenueCents - a.revenueCents)
+    .sort((a, b) =>
+      metric === 'units'
+        ? b.units - a.units || b.revenueCents - a.revenueCents
+        : b.revenueCents - a.revenueCents || b.units - a.units,
+    )
     .slice(0, limit)
 }
 

@@ -33,19 +33,41 @@ class CardRepository extends ServiceEntityRepository
      */
     public function searchByName(string $query, int $limit = 20): array
     {
-        return $this->mergeUniqueCards(
-            $this->searchByNameLike($this->magicScoped(), $query, $limit),
-            $this->searchMagicCatalogFolded($query, $limit),
+        $query = $this->normalizeSearchQuery($query);
+
+        return $this->broadenNameSearch(
+            $this->mergeUniqueCards(
+                $this->searchByNameLike($this->magicScoped(), $query, $limit),
+                $this->searchMagicCatalogFolded($query, $limit),
+                $limit,
+            ),
+            $query,
             $limit,
+            fn (string $token): array => $this->mergeUniqueCards(
+                $this->searchByNameLike($this->magicScoped(), $token, $limit),
+                $this->searchMagicCatalogFolded($token, $limit),
+                $limit,
+            ),
         );
     }
 
     public function searchByNameForGame(Game $game, string $query, int $limit = 40): array
     {
-        return $this->mergeUniqueCards(
-            $this->searchByNameLike($this->scopedToGame($game), $query, $limit),
-            $this->searchGameCatalogFolded($game, $query, $limit),
+        $query = $this->normalizeSearchQuery($query);
+
+        return $this->broadenNameSearch(
+            $this->mergeUniqueCards(
+                $this->searchByNameLike($this->scopedToGame($game), $query, $limit),
+                $this->searchGameCatalogFolded($game, $query, $limit),
+                $limit,
+            ),
+            $query,
             $limit,
+            fn (string $token): array => $this->mergeUniqueCards(
+                $this->searchByNameLike($this->scopedToGame($game), $token, $limit),
+                $this->searchGameCatalogFolded($game, $token, $limit),
+                $limit,
+            ),
         );
     }
 
@@ -110,19 +132,71 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Prefix hits first, then later-word hits, then any substring. A leading-%
+     * LIKE ordered by name used to fill the limit with "Ashaya, Soul…" before
+     * "Sol Ring" ever entered the candidate set the ranker could sort.
+     *
+     * Over-fetch and collapse by oracle/name: the most popular So- card has
+     * a hundred printings, and without that collapse they occupy every slot.
+     *
      * @return list<Card>
      */
     private function searchByNameLike(QueryBuilder $scoped, string $query, int $limit): array
     {
-        $needle = mb_strtolower(trim($query));
+        $needle = $this->normalizeSearchQuery($query);
         if ('' === $needle) {
             return [];
         }
 
-        return $scoped
+        $fetchLimit = min(400, max($limit * 10, $limit));
+        $merged = [];
+        $seenId = [];
+        $seenIdentity = [];
+        foreach ([$needle.'%', '% '.$needle.'%', '%'.$needle.'%'] as $pattern) {
+            foreach ($this->runNameLike($scoped, $pattern, $fetchLimit) as $card) {
+                $id = (string) $card->getId();
+                if (isset($seenId[$id])) {
+                    continue;
+                }
+                $identity = $this->nameSearchIdentity($card);
+                if (isset($seenIdentity[$identity])) {
+                    continue;
+                }
+                $seenId[$id] = true;
+                $seenIdentity[$identity] = true;
+                $merged[] = $card;
+                if (\count($merged) >= $limit) {
+                    return $merged;
+                }
+            }
+        }
+
+        return $merged;
+    }
+
+    private function nameSearchIdentity(Card $card): string
+    {
+        $oracle = $card->getOracleId();
+        if (null !== $oracle) {
+            return 'oracle:'.strtolower((string) $oracle);
+        }
+
+        return 'name:'.mb_strtolower($card->getName());
+    }
+
+    /**
+     * @return list<Card>
+     */
+    private function runNameLike(QueryBuilder $scoped, string $pattern, int $limit): array
+    {
+        $qb = clone $scoped;
+
+        return $qb
+            ->addSelect('COALESCE(c.edhrecRank, 2147483647) AS HIDDEN edhrecSort')
             ->andWhere('LOWER(c.name) LIKE :query')
-            ->setParameter('query', '%'.$needle.'%')
-            ->orderBy('c.name', 'ASC')
+            ->setParameter('query', $pattern)
+            ->orderBy('edhrecSort', 'ASC')
+            ->addOrderBy('c.name', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -250,6 +324,49 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Phrase search misses typos ("sol rng"). Pull the first token's hits so
+     * the ranker can still promote the intended card.
+     *
+     * @param list<Card>               $hits
+     * @param callable(string): list<Card> $searchToken
+     *
+     * @return list<Card>
+     */
+    private function broadenNameSearch(array $hits, string $query, int $limit, callable $searchToken): array
+    {
+        if (\count($hits) >= $limit) {
+            return $hits;
+        }
+        $token = $this->firstSearchToken($query);
+        if (null === $token) {
+            return $hits;
+        }
+
+        return $this->mergeUniqueCards($hits, $searchToken($token), $limit);
+    }
+
+    private function normalizeSearchQuery(string $query): string
+    {
+        $needle = mb_strtolower(trim($query));
+        if ('' === $needle) {
+            return '';
+        }
+
+        return trim(preg_replace('/\s+/u', ' ', $needle) ?? $needle);
+    }
+
+    private function firstSearchToken(string $query): ?string
+    {
+        $tokens = preg_split('/[^\p{L}\p{N}]+/u', $query, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $token = mb_strtolower((string) ($tokens[0] ?? ''));
+        if ('' === $token || $token === $query) {
+            return null;
+        }
+
+        return $token;
+    }
+
+    /**
      * @param list<Card> $primary
      * @param list<Card> $secondary
      *
@@ -289,6 +406,62 @@ class CardRepository extends ServiceEntityRepository
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * Prefer a printing in the given set when legacy order lines carry
+     * "Card Name (set)" — falls back to any printing of that name.
+     */
+    public function findOneByNameAndSetCode(string $name, ?string $setCode): ?\App\Entity\Card
+    {
+        $id = $this->findIdByNameAndSetCode($name, $setCode);
+        if (null === $id) {
+            return null;
+        }
+
+        return $this->find($id);
+    }
+
+    /**
+     * Lean lookup for bulk order-history relinking — avoids hydrating the
+     * full Scryfall JSON blob thousands of times.
+     */
+    public function findIdByNameAndSetCode(string $name, ?string $setCode): ?string
+    {
+        $lower = mb_strtolower(trim($name));
+        if ('' === $lower) {
+            return null;
+        }
+
+        $set = null !== $setCode ? strtolower(trim($setCode)) : '';
+        if ('' !== $set) {
+            $inSet = $this->magicScoped()
+                ->select('c.id')
+                ->andWhere('LOWER(c.name) = :name OR LOWER(c.name) LIKE :front')
+                ->andWhere('LOWER(c.setCode) = :setCode')
+                ->setParameter('name', $lower)
+                ->setParameter('front', $lower.' //%')
+                ->setParameter('setCode', $set)
+                ->orderBy('c.releasedAt', 'DESC')
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getSingleColumnResult();
+            if ([] !== $inSet) {
+                return (string) $inSet[0];
+            }
+        }
+
+        $any = $this->magicScoped()
+            ->select('c.id')
+            ->andWhere('LOWER(c.name) = :name OR LOWER(c.name) LIKE :front')
+            ->setParameter('name', $lower)
+            ->setParameter('front', $lower.' //%')
+            ->orderBy('c.releasedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return [] !== $any ? (string) $any[0] : null;
     }
 
     /**
@@ -389,6 +562,31 @@ class CardRepository extends ServiceEntityRepository
             ->orderBy('c.releasedAt', 'DESC')
             ->addOrderBy('c.collectorNumber', 'ASC')
             ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Every catalog printing with this exact name in a non-Magic game.
+     * Name search is too lossy here: LIKE + a limit can fill up with
+     * "Pikachu V" cousins and drop later Pikachu printings.
+     *
+     * @return list<Card>
+     */
+    public function findPrintingsByExactNameForGame(Game $game, string $name, int $limit = 200): array
+    {
+        $needle = mb_strtolower(trim($name));
+        if ('' === $needle) {
+            return [];
+        }
+
+        return $this->scopedToGame($game)
+            ->andWhere('LOWER(c.name) = :name')
+            ->setParameter('name', $needle)
+            ->orderBy('c.releasedAt', 'DESC')
+            ->addOrderBy('c.setCode', 'ASC')
+            ->addOrderBy('c.collectorNumber', 'ASC')
+            ->setMaxResults(max(1, $limit))
             ->getQuery()
             ->getResult();
     }

@@ -1,69 +1,44 @@
-/** Square CardClassSelectors — only properties the Web Payments SDK accepts (see Square docs). */
+/**
+ * Square CardClassSelectors — only properties the Web Payments SDK accepts.
+ * Always dark text on a white field. Dark-mode `color: #fff` is unreadable
+ * when Square (or the browser) keeps a light iframe background, and we cannot
+ * collect PANs ourselves without entering PCI scope.
+ */
 export function squareCardStyle(dark: boolean): Record<string, Record<string, string>> {
-  if (dark) {
-    return {
-      '.input-container': {
-        borderColor: '#404040',
-        borderRadius: '10px',
-        borderWidth: '1px',
-      },
-      '.input-container.is-focus': {
-        borderColor: '#dc2626',
-      },
-      '.input-container.is-error': {
-        borderColor: '#f04438',
-      },
-      '.message-text': {
-        color: '#a3a3a3',
-      },
-      '.message-icon': {
-        color: '#a3a3a3',
-      },
-      '.message-text.is-error': {
-        color: '#fca5a5',
-      },
-      '.message-icon.is-error': {
-        color: '#fca5a5',
-      },
-      input: {
-        backgroundColor: '#171717',
-        color: '#f5f5f5',
-        fontSize: '16px',
-      },
-      'input::placeholder': {
-        color: '#a3a3a3',
-      },
-      'input.is-error': {
-        color: '#fca5a5',
-      },
-    }
-  }
-
   return {
     '.input-container': {
-      borderColor: '#e5e7eb',
+      borderColor: dark ? '#d4d4d4' : '#e5e7eb',
       borderRadius: '10px',
       borderWidth: '1px',
     },
     '.input-container.is-focus': {
-      borderColor: '#0a1627',
+      borderColor: dark ? '#dc2626' : '#0a1627',
     },
     '.input-container.is-error': {
       borderColor: '#f04438',
     },
     '.message-text': {
-      color: '#6b7280',
+      color: '#525252',
     },
     '.message-icon': {
-      color: '#6b7280',
+      color: '#525252',
+    },
+    '.message-text.is-error': {
+      color: '#b42318',
+    },
+    '.message-icon.is-error': {
+      color: '#b42318',
     },
     input: {
       backgroundColor: '#ffffff',
-      color: '#0a0a0b',
+      color: '#171717',
       fontSize: '16px',
     },
     'input::placeholder': {
-      color: '#6b7280',
+      color: '#737373',
+    },
+    'input.is-error': {
+      color: '#b42318',
     },
   }
 }

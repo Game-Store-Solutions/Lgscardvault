@@ -144,6 +144,35 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         self::assertSame(1, $this->repo->countCatalog($store, null, true, $filters));
     }
 
+    public function testCatalogPageFiltersByNamedColor(): void
+    {
+        $store = $this->fixtures->store();
+        $fire = $this->fixtures->card(501, [
+            'name' => 'Charizard',
+            'set' => 'sv3',
+            'colors' => ['Fire'],
+            'color_identity' => ['Fire'],
+            'type_line' => 'Pokémon',
+        ]);
+        $water = $this->fixtures->card(502, [
+            'name' => 'Blastoise',
+            'set' => 'sv3',
+            'colors' => ['Water'],
+            'color_identity' => ['Water'],
+            'type_line' => 'Pokémon',
+        ]);
+        $this->fixtures->inventoryItem($store, $fire, 2);
+        $this->fixtures->inventoryItem($store, $water, 2);
+
+        $filters = new \App\Service\Inventory\InventoryCatalogFilters(colors: ['Fire']);
+        $page = $this->repo->findCatalogPage($store, 0, 24, null, true, $filters);
+
+        self::assertCount(1, $page);
+        self::assertSame('Charizard', $page[0]->getCard()?->getName());
+        self::assertSame(['Fire'], \App\Service\Inventory\InventoryCatalogFilters::fromQuery(['colors' => 'Fire'])->colors);
+        self::assertSame(['W', 'U'], \App\Service\Inventory\InventoryCatalogFilters::fromQuery(['colors' => 'WU'])->colors);
+    }
+
     public function testCatalogSetsAreDistinctAndInStockOnly(): void
     {
         $store = $this->fixtures->store();

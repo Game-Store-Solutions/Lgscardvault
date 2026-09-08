@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
 import { useCustomerCart, useGuestCart, useKioskMode, useTheme, APP_CHROME_CLASS, STORE_THEME_CLASS } from '../../hooks'
+import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
+import { isOnboardingDraftInProgress } from '../../pages/onboarding/draftStorage'
 import { StorefrontBackground } from '../store/backgrounds'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
@@ -296,6 +298,10 @@ export default function AppLayout() {
                       <UserCircle aria-hidden className="size-4 text-fg-muted" />
                       My account
                     </Link>
+                    <StoreApplicationMenuLink
+                      className={dropdownItemClass({})}
+                      onNavigate={() => setUserMenuOpen(false)}
+                    />
                     {/* Kiosk terminals belong to stores: their owners flip the mode. */}
                     {isStoreOwner && (
                       <button
@@ -448,6 +454,7 @@ export default function AppLayout() {
                   My account
                 </Link>
               )}
+              <StoreApplicationMenuLink className={mobileLinkClass} onNavigate={closeMobile} />
 
               {isStoreOwner && (
                 <button
@@ -527,5 +534,36 @@ function MarketplaceLegalFooter() {
         <LegalLinks compact />
       </div>
     </footer>
+  )
+}
+
+function useStoreApplicationCta(): { to: '/register/owner'; label: string } | null {
+  const { user, isSuperAdmin } = useAuth()
+  const draft = useOnboardingDraft()
+  if (isOnboardingDraftInProgress(draft)) {
+    return { to: '/register/owner', label: 'Continue store application' }
+  }
+  if (!user) return null
+  const ownsAStore = (user.ownedStores?.length ?? 0) > 0
+  if (!ownsAStore && !isSuperAdmin) {
+    return { to: '/register/owner', label: 'Open a store' }
+  }
+  return null
+}
+
+function StoreApplicationMenuLink({
+  onNavigate,
+  className,
+}: {
+  onNavigate: () => void
+  className: string
+}) {
+  const cta = useStoreApplicationCta()
+  if (!cta) return null
+  return (
+    <Link role="menuitem" to={cta.to} onClick={onNavigate} className={className}>
+      <Store aria-hidden className="size-4 text-fg-muted" />
+      {cta.label}
+    </Link>
   )
 }

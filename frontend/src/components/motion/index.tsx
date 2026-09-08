@@ -143,4 +143,56 @@ export function HoverLift({ children, className, ...rest }: DivMotionProps) {
   )
 }
 
+const CONFETTI_COLORS = ['#c6a035', '#0a1627', '#dc2626', '#12b76a', '#f79009', '#5c7494'] as const
+
+/**
+ * Short burst of confetti for celebratory moments (e.g. import finished).
+ * Honours reduced motion via MotionRoot — pieces simply fade if motion is off.
+ */
+export function ConfettiBurst({
+  fire,
+  className,
+  pieces = 28,
+}: {
+  fire: boolean
+  className?: string
+  pieces?: number
+}) {
+  if (!fire) return null
+
+  return (
+    <div
+      aria-hidden
+      className={cx('pointer-events-none absolute inset-0 overflow-hidden', className)}
+    >
+      {Array.from({ length: pieces }, (_, i) => {
+        const angle = (i / pieces) * Math.PI * 2 + (i % 3) * 0.35
+        const distance = 70 + (i % 7) * 18
+        const x = Math.cos(angle) * distance
+        const y = Math.sin(angle) * distance - 20
+        const rotate = (i % 2 === 0 ? 1 : -1) * (140 + (i % 5) * 40)
+        const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length]
+        const delay = (i % 8) * 0.018
+
+        return (
+          <motion.span
+            key={i}
+            className="absolute left-1/2 top-1/2 block size-2 rounded-[1px]"
+            style={{ backgroundColor: color, marginLeft: -4, marginTop: -4 }}
+            initial={{ opacity: 1, x: 0, y: 0, scale: 0.4, rotate: 0 }}
+            animate={{
+              opacity: [1, 1, 0],
+              x,
+              y: y + 36,
+              scale: [0.4, 1, 0.85],
+              rotate,
+            }}
+            transition={{ duration: 0.85, ease: EASE_PREMIUM, delay }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 export { AnimatePresence, motion }

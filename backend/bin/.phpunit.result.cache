@@ -1,0 +1,1 @@
+{"version":2,"defects":{"App\\Tests\\Controller\\AdminOrderHistoryImportTest::testPlatformAdminImportsLegacyOrdersAndLinksExistingUsers":8,"App\\Tests\\Controller\\AdminOrderHistoryImportTest::testRelinkCardsEndpointLinksExistingLines":8,"App\\Tests\\Controller\\AdminOrderHistoryImportTest::testDryRunDoesNotPersist":8},"times":[]}

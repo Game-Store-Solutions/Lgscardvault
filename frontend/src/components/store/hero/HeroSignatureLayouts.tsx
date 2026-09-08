@@ -32,24 +32,20 @@ function HeroShell({
   const { heroImageUrl, heroImageOpacity, heroImagePosition, heroImagePositionX, heroImagePositionMobileX, heroImagePositionMobileY, className: outerClass } = props
   return (
     <div className={cx('rounded-card', storeFrameClass('hero'), outerClass)}>
-      <div
-        className={cx(
-          'relative isolate overflow-hidden rounded-[inherit]',
-          minClass,
-          className,
-        )}
-      >
-        <HeroOptionalPhoto
-          layout={layout}
-          heroImageUrl={heroImageUrl}
-          hasImage={hasImage}
-          primary={primary}
-          imageOpacity={clampHeroImageOpacity(heroImageOpacity)}
-          imagePositionX={clampHeroImagePosition(heroImagePositionX)}
-          imagePositionY={clampHeroImagePosition(heroImagePosition)}
-          imagePositionMobileX={heroImagePositionMobileX}
-          imagePositionMobileY={heroImagePositionMobileY}
-        />
+      <div className={cx('relative isolate rounded-[inherit]', minClass, className)}>
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]" aria-hidden>
+          <HeroOptionalPhoto
+            layout={layout}
+            heroImageUrl={heroImageUrl}
+            hasImage={hasImage}
+            primary={primary}
+            imageOpacity={clampHeroImageOpacity(heroImageOpacity)}
+            imagePositionX={clampHeroImagePosition(heroImagePositionX)}
+            imagePositionY={clampHeroImagePosition(heroImagePosition)}
+            imagePositionMobileX={heroImagePositionMobileX}
+            imagePositionMobileY={heroImagePositionMobileY}
+          />
+        </div>
         <div className="relative z-[1]">{children}</div>
       </div>
     </div>
@@ -208,7 +204,7 @@ export function EventBoardHero({ props, tokens }: { props: StoreHeroProps; token
     >
       <div className="grid gap-5 p-5 lg:grid-cols-2 lg:items-start lg:p-8">
         <IdentityHeader props={props} tokens={tokens} light={lightCopy} />
-        <CommunityBoard events={props.communityEvents} compact slug={props.slug} className="lg:rotate-2" />
+        <CommunityBoard events={props.communityEvents} compact slug={props.slug} />
       </div>
     </HeroShell>
   )

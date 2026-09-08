@@ -314,6 +314,11 @@ final readonly class CatalogSynchronizer
         if (isset($extended['cardtype'])) {
             $card->setTypeLine(mb_substr($extended['cardtype'], 0, 255));
         }
+        $colors = $this->extractColors($extended);
+        if (null !== $colors) {
+            $card->setColors($colors);
+            $card->setColorIdentity($colors);
+        }
         $text = $extended['cardtext'] ?? $extended['description'] ?? null;
         if (null !== $text) {
             $card->setOracleText($this->plainText($text));
@@ -433,6 +438,45 @@ final readonly class CatalogSynchronizer
         return trim($text);
     }
 
+
+    /**
+     * Color / energy / pitch from TCGCSV extended data, split on commas and slashes.
+     *
+     * @param array<string, string> $extended
+     *
+     * @return list<string>|null
+     */
+    private function extractColors(array $extended): ?array
+    {
+        $raw = $extended['energytype']
+            ?? $extended['color']
+            ?? $extended['colour']
+            ?? $extended['ink']
+            ?? $extended['attribute']
+            ?? $extended['pitch']
+            ?? null;
+        if (!is_string($raw) || '' === trim($raw)) {
+            return null;
+        }
+
+        $pitch = ['1' => 'Red', '2' => 'Yellow', '3' => 'Blue'];
+        $trimmed = trim($raw);
+        if (isset($pitch[$trimmed])) {
+            return [$pitch[$trimmed]];
+        }
+
+        $parts = preg_split('/[,\/|;]+/', $trimmed) ?: [];
+        $out = [];
+        foreach ($parts as $part) {
+            $token = trim($part);
+            if ('' === $token) {
+                continue;
+            }
+            $out[] = $pitch[$token] ?? $token;
+        }
+
+        return [] === $out ? null : array_values(array_unique($out));
+    }
 
     /**
      * Flattens extendedData ([{name, value}, …]) into a lowercase-keyed map.

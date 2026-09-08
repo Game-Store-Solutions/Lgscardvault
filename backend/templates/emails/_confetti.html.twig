@@ -1,0 +1,32 @@
+{# Email-safe confetti: static colored chips (no JS). Uses brand colors when available. #}
+{% set c1 = accentColor|default('#c6a035') %}
+{% set c2 = ctaColor|default('#0a1627') %}
+{% set c3 = headerColor|default('#0a1627') %}
+{% set chips = [
+  {'c': c1, 'w': 8, 'h': 8, 'r': '2px'},
+  {'c': c2, 'w': 6, 'h': 10, 'r': '1px'},
+  {'c': c1, 'w': 10, 'h': 5, 'r': '2px'},
+  {'c': '#12b76a', 'w': 7, 'h': 7, 'r': '50%'},
+  {'c': c3, 'w': 5, 'h': 9, 'r': '1px'},
+  {'c': c1, 'w': 9, 'h': 6, 'r': '2px'},
+  {'c': '#f79009', 'w': 6, 'h': 6, 'r': '50%'},
+  {'c': c2, 'w': 8, 'h': 4, 'r': '1px'},
+  {'c': c1, 'w': 7, 'h': 8, 'r': '2px'},
+  {'c': '#dc2626', 'w': 5, 'h': 5, 'r': '50%'},
+  {'c': c3, 'w': 9, 'h': 5, 'r': '1px'},
+  {'c': c1, 'w': 6, 'h': 9, 'r': '2px'},
+] %}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
+  <tr>
+    <td align="center" style="padding:0;font-size:0;line-height:0;">
+      {% for chip in chips %}
+        <span style="display:inline-block;width:{{ chip.w }}px;height:{{ chip.h }}px;margin:0 5px 4px;background:{{ chip.c }};border-radius:{{ chip.r }};vertical-align:middle;"></span>
+      {% endfor %}
+    </td>
+  </tr>
+  <tr>
+    <td align="center" style="padding:4px 0 0;font-size:13px;line-height:1.4;font-weight:700;color:{{ accentColor|default('#c6a035') }};">
+      Welcome aboard!
+    </td>
+  </tr>
+</table>

@@ -60,6 +60,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const descId = error || hint ? `${inputId}-desc` : undefined
   const [revealed, setRevealed] = useState(false)
   const isPassword = type === 'password'
+  const isTemporal = type === 'date' || type === 'datetime-local' || type === 'time' || type === 'month' || type === 'week'
   const resolvedType = isPassword && revealed ? 'text' : type
   return (
     <div className={twMerge(cx(fieldStack, 'w-full'), wrapperClassName)}>
@@ -76,7 +77,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={descId}
-          className={cx(controlBase, controlBorder(!!error), 'h-10 px-3 text-sm', isPassword && 'pr-10', className)}
+          className={cx(
+            controlBase,
+            controlBorder(!!error),
+            'h-10 px-3 text-sm',
+            isPassword && 'pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden',
+            isTemporal && 'dark:[&::-webkit-calendar-picker-indicator]:cursor-pointer dark:[&::-webkit-calendar-picker-indicator]:invert',
+            className,
+          )}
           {...props}
         />
         {isPassword && (

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router'
 import { ArrowLeft, ArrowRight, Send, Sparkles } from 'lucide-react'
-import { Button, Card, CardBody, CardHeader } from '../components/ui'
+import { Button, Card, CardBody, CardHeader, LoadingPanel } from '../components/ui'
 import { STEP_SUBTITLE, STEPS } from './onboarding/config'
 import { Stepper } from './onboarding/Stepper'
 import { SubmittedScreen } from './onboarding/SubmittedScreen'
@@ -23,6 +23,14 @@ export default function OwnerOnboardingWizard() {
 
   if (o.submitted) {
     return <SubmittedScreen name={o.submitted.name} onHome={() => navigate('/')} />
+  }
+
+  if (o.hydrating) {
+    return (
+      <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
+        <LoadingPanel label="Loading your setup…" />
+      </div>
+    )
   }
 
   return (

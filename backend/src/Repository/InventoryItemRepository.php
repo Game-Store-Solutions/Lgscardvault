@@ -372,6 +372,20 @@ class InventoryItemRepository extends ServiceEntityRepository
             return;
         }
 
+        if (!$this->isManaPipFilter($colors)) {
+            foreach ($colors as $i => $name) {
+                $param = 'namedColor'.$i;
+                $qb->andWhere(
+                    'LOWER(COALESCE(CAST_AS_TEXT(c.colors), :emptyColor)) LIKE :'.$param
+                    .' OR LOWER(COALESCE(CAST_AS_TEXT(c.colorIdentity), :emptyColor)) LIKE :'.$param
+                    .' OR LOWER(COALESCE(c.typeLine, :emptyColor)) LIKE :'.$param,
+                )->setParameter($param, '%'.mb_strtolower($name).'%');
+            }
+            $qb->setParameter('emptyColor', '');
+
+            return;
+        }
+
         // PostgreSQL has no `json = json` operator, and DQL has no CAST.
         // Exact identity is "has each requested pip and none of the others".
         $wanted = ['C'] === $colors ? [] : $colors;
@@ -385,6 +399,18 @@ class InventoryItemRepository extends ServiceEntityRepository
                     ->setParameter($param, '%"'.$letter.'"%');
             }
         }
+    }
+
+    /** @param list<string> $colors */
+    private function isManaPipFilter(array $colors): bool
+    {
+        foreach ($colors as $color) {
+            if (!in_array($color, ['W', 'U', 'B', 'R', 'G', 'C'], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function applyCatalogSort(QueryBuilder $qb, string $sort): void

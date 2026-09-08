@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties } from 'react'
 import type { Theme } from '../hooks/useTheme'
 
 export interface ReportChartPalette {
@@ -36,6 +36,25 @@ const DARK: ReportChartPalette = {
 
 export function chartPalette(theme: Theme): ReportChartPalette {
   return theme === 'dark' ? DARK : LIGHT
+}
+
+/** Shared Recharts tooltip colors — item/label styles override Recharts dark defaults. */
+export function chartTooltipStyles(palette: ReportChartPalette): {
+  contentStyle: CSSProperties
+  labelStyle: CSSProperties
+  itemStyle: CSSProperties
+} {
+  return {
+    contentStyle: {
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
+      color: palette.tooltipFg,
+      borderRadius: 8,
+      fontSize: 13,
+    },
+    labelStyle: { color: palette.tooltipFg, fontWeight: 600 },
+    itemStyle: { color: palette.tooltipFg },
+  }
 }
 
 /** Channel + status series colors (stable order). */

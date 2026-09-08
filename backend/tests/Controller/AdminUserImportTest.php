@@ -56,6 +56,8 @@ CSV;
         self::assertNotNull($owner);
         self::assertContains('ROLE_STORE_OWNER', $owner->getRoles());
         self::assertEmailCount(1);
+        self::assertNull($owner->getPasswordResetExpiresAt());
+        self::assertNotNull($owner->getPasswordResetToken());
 
         $this->client->request('POST', '/api/login', server: [
             'CONTENT_TYPE' => 'application/json',
@@ -64,6 +66,29 @@ CSV;
             'password' => 'Secret123!',
         ]));
         self::assertResponseIsSuccessful();
+    }
+
+    public function testImportResetEmailUsesStoreBrandingWhenStoreSlugProvided(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $store = $this->fixtures->store('brand-import');
+        $store->setName('Pull N Play');
+        $this->entityManager->flush();
+
+        $csv = "email,displayName,password\nbranded@test.local,Branded Shopper,\n";
+        $payload = $this->importAs($admin, $csv, [
+            'sendResetEmails' => '1',
+            'storeSlug' => 'brand-import',
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertSame(1, $payload['created']);
+        self::assertSame(1, $payload['resetEmailsSent']);
+        self::assertEmailCount(1);
+        $this->assertEmailSubjectContains($this->getMailerMessage(), 'Set your Pull N Play password');
+        $this->assertEmailHtmlBodyContains($this->getMailerMessage(), 'Welcome aboard!');
+        $this->assertEmailHtmlBodyContains($this->getMailerMessage(), 'Pull N Play has sent this link');
+        $this->assertEmailHtmlBodyContains($this->getMailerMessage(), 'stays valid until you use it');
+        $this->assertEmailHtmlBodyContains($this->getMailerMessage(), 'Your account is ready on LGS Card Vault');
     }
 
     public function testImportRecordsDateOfBirthAndRejectsUnder13(): void
@@ -136,6 +161,63 @@ CSV;
             'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
         self::assertSame(400, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testPasswordHashesAreTreatedAsResetNotStored(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $csv = "email,displayName,password\nhashy@test.local,Hashy,\$2y\$10\$usesomesillystringforexamplehashvaluexx\n";
+
+        $payload = $this->importAs($admin, $csv, ['sendResetEmails' => '1']);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertSame(1, $payload['created']);
+        self::assertSame(1, $payload['resetEmailsSent']);
+        self::assertNotEmpty($payload['warnings']);
+        self::assertEmailCount(1);
+
+        $this->client->request('POST', '/api/login', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: (string) json_encode([
+            'email' => 'hashy@test.local',
+            'password' => '$2y$10$usesomesillystringforexamplehashvaluexx',
+        ]));
+        self::assertSame(401, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testSpreadsheetDateFormatsAndEmailAliasesImport(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $csv = "Customer Email,Name,dateOfBirth\nus-date@test.local,US Date,4/12/1991\n";
+
+        $payload = $this->importAs($admin, $csv, ['sendResetEmails' => '0']);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertSame(1, $payload['created']);
+
+        $this->entityManager->clear();
+        $imported = $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'us-date@test.local']);
+        self::assertNotNull($imported);
+        self::assertTrue($imported->isAgeVerified());
+    }
+
+    public function testExcelWorkbookIsRejectedWithAClearError(): void
+    {
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $path = tempnam(sys_get_temp_dir(), 'usrimp').'.xlsx';
+        file_put_contents($path, 'not-a-real-workbook');
+        $upload = new UploadedFile($path, 'users.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', test: true);
+        $token = static::getContainer()->get(JWTTokenManagerInterface::class)->create($admin);
+
+        $this->client->request(
+            'POST',
+            '/api/admin/users/import',
+            files: ['file' => $upload],
+            server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token],
+        );
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertIsArray($payload);
+        self::assertStringContainsString('CSV', (string) ($payload['error'] ?? ''));
     }
 
     /**

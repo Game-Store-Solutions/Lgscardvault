@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Post;
 use App\Repository\StoreRepository;
 use App\Service\Compliance\StoreComplianceGate;
 use App\Service\Onboarding\UsRegion;
+use App\Service\Store\StoreFeatureCatalog;
 use App\State\ActiveStoreCollectionProvider;
 use App\State\StoreAdminProcessor;
 use App\State\StoreBySlugProvider;
@@ -98,6 +99,25 @@ class Store
     #[ORM\Column(options: ['default' => false])]
     #[Groups(['store:read', 'store:admin', 'store:admin_write'])]
     private bool $featured = false;
+
+    /**
+     * Owner-controlled directory listing. Independent of {@see $isActive}
+     * (platform approval). Unlisted stores stay off GET /stores and the sitemap
+     * but remain reachable at /s/{slug}.
+     */
+    #[ORM\Column(name: 'is_listed', options: ['default' => true])]
+    #[Groups(['store:read', 'store:admin'])]
+    #[SerializedName('isListed')]
+    private bool $listed = true;
+
+    /**
+     * Storefront feature flags. Missing keys default to on.
+     *
+     * @var array<string, bool>
+     */
+    #[ORM\Column(type: 'json', options: ['default' => '{}'])]
+    #[Groups(['store:read', 'store:admin'])]
+    private array $features = [];
 
     #[ORM\Column(options: ['default' => 1000])]
     #[Assert\PositiveOrZero]
@@ -358,7 +378,7 @@ class Store
     /**
      * Community events for the event-board hero and /events calendar page.
      * Keys: boardHeading, boardIntro, calendarUrl (https), items[] with id, title,
-     * startsAt (ISO-8601), description, location, externalUrl, pinned.
+     * startsAt (ISO-8601), description, location, externalUrl, imageUrl, pinned.
      *
      * @var array<string, mixed>|null
      */
@@ -530,6 +550,7 @@ class Store
         $this->inventoryItems = new ArrayCollection();
         $this->staff = new ArrayCollection();
         $this->complianceDocuments = new ArrayCollection();
+        $this->features = StoreFeatureCatalog::defaults();
     }
 
     public function getId(): ?int
@@ -606,6 +627,38 @@ class Store
         $this->featured = $featured;
 
         return $this;
+    }
+
+    public function isListed(): bool
+    {
+        return $this->listed;
+    }
+
+    public function setIsListed(bool $isListed): static
+    {
+        $this->listed = $isListed;
+
+        return $this;
+    }
+
+    /** @return array<string, bool> */
+    #[Groups(['store:read', 'store:admin'])]
+    public function getFeatures(): array
+    {
+        return StoreFeatureCatalog::resolve($this->features);
+    }
+
+    /** @param array<string, bool> $features */
+    public function setFeatures(array $features): static
+    {
+        $this->features = StoreFeatureCatalog::resolve($features);
+
+        return $this;
+    }
+
+    public function isFeatureEnabled(string $key): bool
+    {
+        return $this->getFeatures()[$key] ?? true;
     }
 
     public function getSpotlightMinPriceCents(): int
@@ -1391,6 +1444,13 @@ class Store
     public function getLastChargedAt(): ?\DateTimeImmutable
     {
         return $this->lastChargedAt;
+    }
+
+    public function setLastChargedAt(?\DateTimeImmutable $lastChargedAt): static
+    {
+        $this->lastChargedAt = $lastChargedAt;
+
+        return $this;
     }
 
     public function getBillingAttempts(): int

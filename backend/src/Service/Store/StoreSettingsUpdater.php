@@ -7,7 +7,8 @@ use App\Entity\Store;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Applies and validates owner-managed store settings (spotlight + branding).
+ * Applies and validates owner-managed store settings (spotlight, branding,
+ * marketplace listing, and storefront feature flags).
  *
  * Keeps the controller thin: all input validation and entity mutation lives
  * here. Validation failures are signalled with InvalidArgumentException so the
@@ -130,6 +131,17 @@ final readonly class StoreSettingsUpdater
 
         if (array_key_exists('spotlightPinnedInventoryIds', $payload)) {
             $store->setSpotlightPinnedInventoryIds($this->normalizePinnedInventoryIds($store, $payload['spotlightPinnedInventoryIds']));
+        }
+
+        if (array_key_exists('isListed', $payload)) {
+            $store->setIsListed($this->boolValue($payload['isListed'], 'isListed'));
+        }
+
+        if (array_key_exists('features', $payload)) {
+            $store->setFeatures([
+                ...$store->getFeatures(),
+                ...StoreFeatureCatalog::patchFromPayload($payload['features']),
+            ]);
         }
 
         $this->applyBranding($store, $payload);
@@ -333,6 +345,8 @@ final readonly class StoreSettingsUpdater
             'id' => $store->getId(),
             'name' => $store->getName(),
             'slug' => $store->getSlug(),
+            'isListed' => $store->isListed(),
+            'features' => $store->getFeatures(),
             'spotlightMinPriceCents' => $store->getSpotlightMinPriceCents(),
             'spotlightMinItems' => $store->getSpotlightMinItems(),
             'spotlightMaxItems' => $store->getSpotlightMaxItems(),
@@ -453,6 +467,13 @@ final readonly class StoreSettingsUpdater
                     throw new \InvalidArgumentException(sprintf('communityEvents.items[%d].externalUrl must be http(s) or a / path.', $index));
                 }
                 $row['externalUrl'] = mb_substr($externalUrl, 0, self::URL_MAX);
+            }
+            $imageUrl = $this->stringValue($item['imageUrl'] ?? '');
+            if ('' !== $imageUrl) {
+                if (1 !== preg_match(self::URL, $imageUrl)) {
+                    throw new \InvalidArgumentException(sprintf('communityEvents.items[%d].imageUrl must be http(s) or a / path.', $index));
+                }
+                $row['imageUrl'] = mb_substr($imageUrl, 0, self::URL_MAX);
             }
             if (!empty($item['pinned'])) {
                 $row['pinned'] = true;
@@ -706,6 +727,15 @@ final readonly class StoreSettingsUpdater
     private function stringValue(mixed $value): string
     {
         return is_string($value) ? trim($value) : '';
+    }
+
+    private function boolValue(mixed $value, string $key): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        throw new \InvalidArgumentException(sprintf('%s must be true or false.', $key));
     }
 
     /**

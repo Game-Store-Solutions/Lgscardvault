@@ -24,6 +24,8 @@ import {
 
   Menu,
 
+  Moon,
+
   Package,
 
   Palette,
@@ -42,6 +44,8 @@ import {
 
   Store,
 
+  Sun,
+
   TrendingUp,
 
   Users,
@@ -56,7 +60,7 @@ import {
 
 import { useAuth } from '../../context/AuthContext'
 
-import { APP_CHROME_CLASS, STORE_THEME_CLASS, useOpenStoreOrderCount, usePendingSellSubmissionCount, useStore, useStoreTheme } from '../../hooks'
+import { APP_CHROME_CLASS, useOpenStoreOrderCount, usePendingSellSubmissionCount, useTheme } from '../../hooks'
 
 import { Avatar, BackButton, Button, buttonVariants } from '../ui'
 
@@ -137,6 +141,7 @@ function useAdminNav(): { context: string; sections: NavSection[] } {
 
           items: [
             { to: '/platform/admin/users', label: 'Users', icon: Users },
+            { to: '/platform/admin/order-history', label: 'Order history', icon: FileSpreadsheet },
             { to: '/platform/admin/newsletter', label: 'Newsletter', icon: Mail },
             { to: '/platform/admin/patch-notes', label: 'Patch notes', icon: Megaphone },
           ],
@@ -248,9 +253,7 @@ export default function AdminLayout() {
 
   const params = useParams()
 
-  const { data: store } = useStore(params.slug)
-
-  useStoreTheme(store)
+  const { theme, toggleTheme } = useTheme()
 
   const { data: openOrderCount = 0 } = useOpenStoreOrderCount(params.slug ?? '', Boolean(params.slug))
 
@@ -473,6 +476,24 @@ export default function AdminLayout() {
 
           <div className="flex items-center gap-3">
 
+            <button
+
+              type="button"
+
+              onClick={toggleTheme}
+
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+
+              className="grid size-9 place-items-center rounded-btn border border-border bg-surface text-fg-muted transition-colors hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+
+            >
+
+              {theme === 'dark' ? <Sun aria-hidden className="size-4" /> : <Moon aria-hidden className="size-4" />}
+
+            </button>
+
             <Link to="/" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
 
               <ExternalLink aria-hidden className="size-4" />
@@ -519,9 +540,9 @@ export default function AdminLayout() {
 
             fullWidthAdmin
 
-              ? `${STORE_THEME_CLASS} w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8`
+              ? `${APP_CHROME_CLASS} w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8`
 
-              : `${STORE_THEME_CLASS} mx-auto max-w-7xl px-4 py-8`
+              : `${APP_CHROME_CLASS} mx-auto max-w-7xl px-4 py-8`
 
           }
 

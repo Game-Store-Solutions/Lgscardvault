@@ -26,6 +26,25 @@ const SORTS = new Set<SortKey>(['featured', 'price-desc', 'price-asc', 'name', '
 const VIEWS = new Set<ViewMode>(['grid', 'list'])
 const COLOR_PIPS = new Set(['W', 'U', 'B', 'R', 'G', 'C'])
 
+export function parseStoreSearchColors(raw: string): string[] {
+  const value = raw.trim()
+  if (!value) return []
+  if (value.includes(',')) {
+    return value.split(',').map((token) => token.trim()).filter(Boolean)
+  }
+  const compact = value.toUpperCase()
+  if (/^[WUBRGC]+$/.test(compact)) {
+    return [...compact].filter((pip) => COLOR_PIPS.has(pip))
+  }
+  return [value]
+}
+
+export function serializeStoreSearchColors(colors: string[]): string {
+  if (colors.length === 0) return ''
+  const pips = colors.every((color) => color.length === 1 && COLOR_PIPS.has(color.toUpperCase()))
+  return pips ? colors.map((color) => color.toUpperCase()).join('') : colors.join(',')
+}
+
 export function isStoreSearchNav(state: unknown): state is StoreSearchNavState {
   if (!state || typeof state !== 'object') return false
   const candidate = state as { from?: unknown; search?: unknown }
@@ -72,7 +91,7 @@ export function parseStoreSearch(params: URLSearchParams): StoreSearchSnapshot {
     set: params.get('set') ?? '',
     type: params.get('type') ?? '',
     finish: FINISHES.has(finishRaw as FinishFilter) ? (finishRaw as FinishFilter) : 'all',
-    colors: [...(params.get('colors') ?? '').toUpperCase()].filter((pip) => COLOR_PIPS.has(pip)),
+    colors: parseStoreSearchColors(params.get('colors') ?? ''),
     min: params.get('min') ?? '',
     max: params.get('max') ?? '',
     sort: SORTS.has(sortRaw as SortKey) ? (sortRaw as SortKey) : 'featured',
@@ -88,7 +107,7 @@ export function serializeStoreSearch(snapshot: StoreSearchSnapshot): URLSearchPa
   if (snapshot.set) params.set('set', snapshot.set)
   if (snapshot.type) params.set('type', snapshot.type)
   if (snapshot.finish !== 'all') params.set('finish', snapshot.finish)
-  if (snapshot.colors.length > 0) params.set('colors', snapshot.colors.join(''))
+  if (snapshot.colors.length > 0) params.set('colors', serializeStoreSearchColors(snapshot.colors))
   if (snapshot.min.trim()) params.set('min', snapshot.min.trim())
   if (snapshot.max.trim()) params.set('max', snapshot.max.trim())
   if (snapshot.sort !== 'featured') params.set('sort', snapshot.sort)

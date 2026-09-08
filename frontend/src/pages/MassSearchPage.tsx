@@ -129,10 +129,11 @@ export default function MassSearchPage() {
   const addWant = useMutation({
     mutationFn: async (result: LineResult) => {
       const best = result.listings[0]
+      if (!best?.card.id) throw new Error('Pick a card from the catalog.')
       await api.post(`/stores/${slug}/customer/want-list`, {
-        cardId: best?.card.id,
-        cardName: best?.card.name ?? result.name,
-        setCode: best?.card.setCode ?? '',
+        cardId: best.card.id,
+        cardName: best.card.name,
+        setCode: best.card.setCode ?? '',
         isFoil: false,
         quantity: Math.max(1, result.quantity - result.fillable),
         notes: 'Added from mass search',
@@ -406,6 +407,7 @@ function LineActions({
         ))}
       {signedIn &&
         missing > 0 &&
+        Boolean(result.listings[0]?.card.id) &&
         (wanted ? (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-success-700">
             <Check aria-hidden className="size-3.5" />

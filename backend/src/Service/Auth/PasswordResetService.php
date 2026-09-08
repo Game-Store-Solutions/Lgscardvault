@@ -29,12 +29,22 @@ final class PasswordResetService
     ) {
     }
 
-    /** Create a fresh raw token for $user and persist its hash + expiry. */
-    public function issueToken(User $user): string
+    /**
+     * Create a fresh raw token for $user and persist its hash + expiry.
+     *
+     * @param int|null $ttlSeconds Seconds until expiry. Null = valid until used
+     *                             (import migration emails). Forgot-password keeps
+     *                             the default one-hour TTL.
+     */
+    public function issueToken(User $user, ?int $ttlSeconds = self::TTL_SECONDS): string
     {
         $raw = bin2hex(random_bytes(32));
         $user->setPasswordResetToken($this->hashToken($raw));
-        $user->setPasswordResetExpiresAt(new \DateTimeImmutable('+'.self::TTL_SECONDS.' seconds'));
+        $user->setPasswordResetExpiresAt(
+            null === $ttlSeconds
+                ? null
+                : new \DateTimeImmutable('+'.max(1, $ttlSeconds).' seconds'),
+        );
         $this->entityManager->flush();
 
         return $raw;
@@ -56,7 +66,8 @@ final class PasswordResetService
         }
 
         $expires = $user->getPasswordResetExpiresAt();
-        if (!$expires instanceof \DateTimeImmutable || $expires < new \DateTimeImmutable()) {
+        // Null expiry = import / migration links that stay valid until used.
+        if ($expires instanceof \DateTimeImmutable && $expires < new \DateTimeImmutable()) {
             $user->clearPasswordReset();
             $this->entityManager->flush();
 

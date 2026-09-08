@@ -109,6 +109,31 @@ final class StoreOrderLineTest extends WebTestCase
         self::assertSame(3, $restocked?->getQuantity());
     }
 
+    public function testOrderLinesExposePickSheetFields(): void
+    {
+        [$store, $first, , $owner] = $this->storeWithTwoListings();
+        $card = $first->getCard();
+        self::assertNotNull($card);
+        $card->setSetName('Test Set');
+        $card->setTypeLine('Legendary Instant');
+        $card->setScryfallData(array_merge($card->getScryfallData() ?? [], [
+            'frame_effects' => ['showcase', 'inverted'],
+            'promo_types' => ['boosterfun'],
+        ]));
+        $this->em->flush();
+
+        $this->authenticate($owner);
+        $order = $this->placeKioskOrder($store, $first, 1);
+        $line = $order['lines'][0] ?? [];
+
+        self::assertSame('common', $line['rarity'] ?? null);
+        self::assertSame('Test Set', $line['setName'] ?? null);
+        self::assertSame('Nonfoil', $line['finish'] ?? null);
+        self::assertSame('NM', $line['condition'] ?? null);
+        self::assertSame('tst', $line['setCode'] ?? null);
+        self::assertSame(['Showcase', 'Inverted', 'Booster Fun', 'Legendary'], $line['printingTags'] ?? null);
+    }
+
     public function testAddingTheSameListingIncrementsQuantity(): void
     {
         [$store, $first, , $owner] = $this->storeWithTwoListings();

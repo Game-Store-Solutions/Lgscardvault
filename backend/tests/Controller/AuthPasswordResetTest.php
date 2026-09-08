@@ -136,4 +136,29 @@ final class AuthPasswordResetTest extends WebTestCase
         $this->jsonRequest('POST', '/api/auth/forgot-password', ['email' => 'not-an-email']);
         self::assertSame(400, $this->client->getResponse()->getStatusCode());
     }
+
+    public function testImportStyleTokenWithoutExpiryStaysValidUntilUsed(): void
+    {
+        $email = $this->uniqueEmail('reset-until-used');
+        $user = $this->fixtures->user(['ROLE_USER'], $email);
+        $resets = static::getContainer()->get(PasswordResetService::class);
+        $token = $resets->issueToken($user, null);
+
+        $this->em->clear();
+        $stored = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
+        self::assertInstanceOf(User::class, $stored);
+        self::assertNull($stored->getPasswordResetExpiresAt());
+
+        $this->jsonRequest('POST', '/api/auth/reset-password', [
+            'token' => $token,
+            'password' => 'import-pass-1',
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        $this->jsonRequest('POST', '/api/login', [
+            'email' => $email,
+            'password' => 'import-pass-1',
+        ]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+    }
 }

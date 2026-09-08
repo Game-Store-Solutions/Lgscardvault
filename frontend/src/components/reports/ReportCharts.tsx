@@ -15,7 +15,7 @@ import {
 import { formatPrice } from '../../api/client'
 import { useTheme } from '../../hooks'
 import { cx } from '../../lib/cx'
-import { chartPalette, chartSeriesColors } from '../../lib/reportChartTheme'
+import { chartPalette, chartSeriesColors, chartTooltipStyles } from '../../lib/reportChartTheme'
 
 export interface BarChartPoint {
   label: string
@@ -219,13 +219,7 @@ export function DonutChart({ segments, centerLabel, centerValue, className }: Do
             </Pie>
             <Tooltip
               formatter={(value) => formatPrice(Number(value ?? 0))}
-              contentStyle={{
-                backgroundColor: palette.tooltipBg,
-                borderColor: palette.tooltipBorder,
-                color: palette.tooltipFg,
-                borderRadius: 8,
-                fontSize: 13,
-              }}
+              {...chartTooltipStyles(palette)}
             />
           </PieChart>
         </ResponsiveContainer>
@@ -248,20 +242,24 @@ export interface HorizontalBarRow {
   display?: string
 }
 
-type TopSellerRow = {
+type ChartBarRow = {
   name: string
   fullName: string
-  revenueCents: number
-  revenue: number
+  value: number
   display?: string
 }
 
 export function HorizontalBarList({
   rows,
   valueFormatter = (v) => formatPrice(v),
+  valueKind = 'money',
+  seriesLabel = 'Revenue',
 }: {
   rows: HorizontalBarRow[]
   valueFormatter?: (n: number) => string
+  /** money = cents on a $-axis; count = raw units. */
+  valueKind?: 'money' | 'count'
+  seriesLabel?: string
   maxValue?: number
 }) {
   const { theme } = useTheme()
@@ -271,13 +269,12 @@ export function HorizontalBarList({
     return <p className="text-sm text-fg-muted">Nothing to show yet.</p>
   }
 
-  const data: TopSellerRow[] = [...rows]
+  const data: ChartBarRow[] = [...rows]
     .sort((a, b) => b.value - a.value)
     .map((row) => ({
       name: row.label.length > 28 ? `${row.label.slice(0, 26)}…` : row.label,
       fullName: row.label,
-      revenueCents: row.value,
-      revenue: row.value / 100,
+      value: valueKind === 'money' ? row.value / 100 : row.value,
       display: row.display,
     }))
 
@@ -288,10 +285,15 @@ export function HorizontalBarList({
           <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" horizontal={false} />
           <XAxis
             type="number"
+            allowDecimals={valueKind === 'count' ? false : undefined}
             tick={{ fill: palette.tick, fontSize: 11 }}
             tickLine={false}
             axisLine={{ stroke: palette.grid }}
-            tickFormatter={(v: number) => `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`}
+            tickFormatter={(v: number) =>
+              valueKind === 'count'
+                ? String(v)
+                : `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`
+            }
           />
           <YAxis
             type="category"
@@ -304,22 +306,17 @@ export function HorizontalBarList({
           <Tooltip
             cursor={{ fill: palette.grid, opacity: 0.25 }}
             formatter={(_v, _n, item) => {
-              const row = item.payload as TopSellerRow
-              return [row.display ?? valueFormatter(row.revenueCents), 'Revenue']
+              const row = item.payload as ChartBarRow
+              const raw = valueKind === 'money' ? Math.round(row.value * 100) : row.value
+              return [row.display ?? valueFormatter(raw), seriesLabel]
             }}
             labelFormatter={(_label, payload) => {
-              const row = payload?.[0]?.payload as TopSellerRow | undefined
+              const row = payload?.[0]?.payload as ChartBarRow | undefined
               return row?.fullName ?? ''
             }}
-            contentStyle={{
-              backgroundColor: palette.tooltipBg,
-              borderColor: palette.tooltipBorder,
-              color: palette.tooltipFg,
-              borderRadius: 8,
-              fontSize: 13,
-            }}
+            {...chartTooltipStyles(palette)}
           />
-          <Bar dataKey="revenue" fill={palette.brandMuted} radius={[0, 4, 4, 0]} maxBarSize={22} />
+          <Bar dataKey="value" fill={palette.brandMuted} radius={[0, 4, 4, 0]} maxBarSize={22} />
         </RechartsBarChart>
       </ResponsiveContainer>
     </div>
@@ -369,20 +366,88 @@ export function StatusBarChart({
             tickFormatter={(v: number) => `$${v}`}
           />
           <Tooltip
+            cursor={false}
             formatter={(v, _n, item) => {
               const row = item.payload as (typeof data)[number]
               return [formatPrice(Math.round(Number(v ?? 0) * 100)), `${row.count} order${row.count === 1 ? '' : 's'}`]
             }}
-            contentStyle={{
-              backgroundColor: palette.tooltipBg,
-              borderColor: palette.tooltipBorder,
-              color: palette.tooltipFg,
-              borderRadius: 8,
-            }}
+            {...chartTooltipStyles(palette)}
           />
           <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
             {data.map((entry) => (
               <Cell key={entry.name} fill={entry.fill} />
+            ))}
+          </Bar>
+        </RechartsBarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/** Want-list demand — same vertical bar style as orders-by-status. */
+export function WantListBarChart({
+  rows,
+  className,
+}: {
+  rows: { cardName: string; quantity: number; wanters: number; finish?: string }[]
+  className?: string
+}) {
+  const { theme } = useTheme()
+  const palette = chartPalette(theme)
+  const colors = chartSeriesColors(theme)
+
+  if (rows.length === 0) {
+    return <ChartEmpty message="No want-list demand yet." className={className} />
+  }
+
+  const data = rows.slice(0, 12).map((row, i) => {
+    const label = row.cardName.length > 14 ? `${row.cardName.slice(0, 12)}…` : row.cardName
+    return {
+      name: label,
+      fullName: row.cardName,
+      quantity: row.quantity,
+      wanters: row.wanters,
+      finish: row.finish,
+      fill: colors[i % colors.length],
+    }
+  })
+
+  return (
+    <div className={cx('h-56 w-full min-w-0', className)}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RechartsBarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+          <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="name"
+            tick={{ fill: palette.tick, fontSize: 11 }}
+            tickLine={false}
+            axisLine={{ stroke: palette.grid }}
+            interval={0}
+          />
+          <YAxis
+            allowDecimals={false}
+            tick={{ fill: palette.tick, fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            width={36}
+          />
+          <Tooltip
+            cursor={false}
+            formatter={(v, _n, item) => {
+              const row = item.payload as (typeof data)[number]
+              const shoppers = `${row.wanters} shopper${row.wanters === 1 ? '' : 's'}`
+              const finish = row.finish ? ` · ${row.finish}` : ''
+              return [`${Number(v ?? 0)} wanted`, `${shoppers}${finish}`]
+            }}
+            labelFormatter={(_label, payload) => {
+              const row = payload?.[0]?.payload as (typeof data)[number] | undefined
+              return row?.fullName ?? ''
+            }}
+            {...chartTooltipStyles(palette)}
+          />
+          <Bar dataKey="quantity" radius={[4, 4, 0, 0]} maxBarSize={40}>
+            {data.map((entry) => (
+              <Cell key={`${entry.fullName}-${entry.finish ?? ''}`} fill={entry.fill} />
             ))}
           </Bar>
         </RechartsBarChart>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, Users } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import api, { extractErrorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { ownsStore } from '../../lib/manageableStores'
@@ -112,7 +112,7 @@ export default function TeamTab({ slug }: { slug: string }) {
           />
           <CardBody>
             <form
-              className="grid gap-3 sm:grid-cols-2 sm:items-end"
+              className="grid gap-3 sm:grid-cols-2 sm:items-start"
               onSubmit={(event) => {
                 event.preventDefault()
                 if (email.trim()) add.mutate()
@@ -142,18 +142,18 @@ export default function TeamTab({ slug }: { slug: string }) {
                 minLength={8}
                 placeholder="At least 8 characters"
               />
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex items-end gap-3">
                 <Select
                   label="Access"
                   value={role}
                   onChange={(event) => setRole(event.target.value as 'admin' | 'member')}
-                  wrapperClassName="w-full"
+                  wrapperClassName="min-w-0 flex-1"
                 >
                   <option value="admin">Admin</option>
                   <option value="member">Member</option>
                 </Select>
-                <Button type="submit" loading={add.isPending} disabled={!email.trim()}>
-                  <UserPlus aria-hidden className="size-4" />
+                <Button type="submit" loading={add.isPending} disabled={!email.trim()} className="shrink-0">
+                  <Plus aria-hidden className="size-4" />
                   Add
                 </Button>
               </div>

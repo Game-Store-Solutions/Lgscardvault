@@ -53,7 +53,7 @@ export function ProfileSideNav({
   title?: string
 }) {
   return (
-    <nav aria-label={title || 'Account'} className="rounded-2xl border border-border bg-surface p-2 shadow-sm">
+    <nav aria-label={title || 'Account'} className="p-1">
       {title ? (
         <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wide text-fg-muted">{title}</p>
       ) : null}
@@ -95,36 +95,29 @@ export function ProfileSideNav({
 
 export function ProfileAsideCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-      <p className="border-b border-border px-4 py-3 text-sm font-extrabold text-fg">{title}</p>
-      <div className="p-2">{children}</div>
+    <div className="py-5 first:pt-0">
+      <p className="mb-2 text-sm font-extrabold text-fg">{title}</p>
+      <div className="-mx-2">{children}</div>
     </div>
   )
 }
 
 export function ProfileAsideLink({
   to,
-  icon: Icon,
   label,
   meta,
 }: {
   to: string
-  icon: ComponentType<{ className?: string }>
   label: string
   meta?: string
 }) {
   return (
     <Link
       to={to}
-      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-fg transition-colors hover:bg-bg"
+      className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-fg transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-bg text-fg-muted">
-        <Icon aria-hidden className="size-4" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate">{label}</span>
-        {meta ? <span className="block truncate text-xs font-medium text-fg-muted">{meta}</span> : null}
-      </span>
+      <span className="block truncate">{label}</span>
+      {meta ? <span className="block truncate text-xs font-medium text-fg-muted">{meta}</span> : null}
     </Link>
   )
 }

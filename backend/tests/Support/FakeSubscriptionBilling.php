@@ -48,6 +48,13 @@ final class FakeSubscriptionBilling implements SubscriptionBillingInterface
             throw new \RuntimeException($this->declineWith);
         }
 
+        $this->charges[] = [
+            'customerId' => 'CUST1',
+            'cardId' => 'ccof:CARD1',
+            'amount' => $priceCents,
+            'idempotencyKey' => 'start-'.$sourceId,
+        ];
+
         return [
             'reference' => 'sqpmt_start_'.count($this->charges),
             'customerId' => 'CUST1',

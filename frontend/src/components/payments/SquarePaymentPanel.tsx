@@ -4,6 +4,7 @@ import { CreditCard, Loader2 } from 'lucide-react'
 import type { PaymentMethodType } from '../../api/types'
 import { Button } from '../ui'
 import { isDevBuild } from '../../lib/runtimeEnv'
+import { cx } from '../../lib/cx'
 import { useDarkMode } from '../../hooks/useDarkMode'
 import { useSquarePayments } from './useSquarePayments'
 import { squareCardStyle } from './squareCardStyle'
@@ -338,14 +339,14 @@ export function SquarePaymentPanel({
   const cardBlock = (
     <div className="space-y-3 pt-1">
       <p className="text-sm font-semibold text-fg">{layout === 'checkout' ? 'Card information' : 'Payment method'}</p>
-      <div className="relative min-h-[7.75rem] rounded-xl bg-bg/60 px-2 py-3 dark:bg-bg/40">
+      <div className={cx('relative rounded-xl bg-white px-2 py-1.5 ring-1 ring-black/10', loading && 'min-h-[5rem] py-3')}>
         {loading && (
-          <p className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-fg-muted">
+          <p className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-neutral-600">
             <Loader2 aria-hidden className="size-4 animate-spin" />
             Loading secure payment form…
           </p>
         )}
-        <div ref={cardRef} className={`sq-card-host min-h-[7rem] ${loading ? 'invisible' : ''}`} />
+        <div ref={cardRef} className={cx('sq-card-host min-h-[3.25rem]', loading && 'invisible')} />
       </div>
       {payButtonPlacement === 'inline' ? (
         <Button

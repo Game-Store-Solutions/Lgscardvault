@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Timer } from 'lucide-react'
 import api from '../../api/client'
 import type { TradeRates } from '../../api/types'
+import { useStore } from '../../hooks'
 import { usePromoCountdown } from '../../hooks/usePromoCountdown'
+import { isStoreFeatureEnabled } from '../../lib/storeFeatures'
 
 /**
  * Storefront banner shown while a store's trade-in promo window is live.
@@ -12,10 +14,12 @@ import { usePromoCountdown } from '../../hooks/usePromoCountdown'
  * Renders nothing when no promo is running.
  */
 export function TradePromoBanner({ slug, showSellLink = false }: { slug: string; showSellLink?: boolean }) {
+  const { data: store } = useStore(slug)
+  const sellTradeEnabled = isStoreFeatureEnabled(store, 'sellTrade')
   const { data: rates } = useQuery({
     // Same key as the sell/trade page so the two share one fetch.
     queryKey: ['trade-rates', slug] as const,
-    enabled: Boolean(slug),
+    enabled: Boolean(slug) && sellTradeEnabled,
     queryFn: async () => {
       const { data } = await api.get<TradeRates>(`/stores/${slug}/trade-rates`)
       return data
@@ -23,7 +27,7 @@ export function TradePromoBanner({ slug, showSellLink = false }: { slug: string;
   })
   const countdown = usePromoCountdown(rates?.promoActive ? rates.promoEndsAt : null)
 
-  if (!rates?.promoActive) return null
+  if (!sellTradeEnabled || !rates?.promoActive) return null
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card bg-gradient-to-r from-brand-500 to-brand-700 px-3 py-3 text-white shadow-card sm:px-4">

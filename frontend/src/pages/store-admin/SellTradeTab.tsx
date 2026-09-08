@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, Check, ChevronDown, ChevronLeft, ChevronRight, Percent, Plus, Printer, Trash2, WalletCards, X } from 'lucide-react'
+import { Archive, Check, ChevronDown, ChevronLeft, ChevronRight, Percent, Plus, Printer, Search, Trash2, WalletCards, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput, scryfallPriceCents } from '../../api/client'
 import type {
   BuylistEntry,
@@ -11,10 +11,13 @@ import type {
   TradeRateSettings,
   TradeRates,
 } from '../../api/types'
-import { useDebouncedValue, useSellSubmissionsList, sellSubmissionsKey, useStore } from '../../hooks'
+import { useDebouncedValue, useCardPrintings, useSellSubmissionsList, sellSubmissionsKey, useStore } from '../../hooks'
 import { formatDate } from '../../lib/format'
-import { Avatar, Badge, Button, Card, EmptyState, Input, LoadingPanel, Modal, Select } from '../../components/ui'
+import { PrintingGrid } from '../../components/catalog'
+import { Avatar, Badge, Button, Card, EmptyState, Input, LoadingPanel, Modal, Select, Spinner, dropdownItemClass, dropdownPanelClass } from '../../components/ui'
 import { cx } from '../../lib/cx'
+import { finishChoices, isFoilFinish } from '../../lib/finishes'
+import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
 
 function AccordionPanel({
   id,
@@ -34,7 +37,7 @@ function AccordionPanel({
 
   return (
     <Card>
-      <div className="flex items-start gap-2 border-b border-border px-4 py-4 sm:px-5">
+      <div className="flex items-start gap-2 px-4 py-4 sm:px-5">
         <button
           type="button"
           aria-expanded={open}
@@ -529,6 +532,13 @@ function TradeRatesCard({ slug, rates }: { slug: string; rates: TradeRates | und
   )
 }
 
+function printingHasFinish(card: CardSummary, finish: 'foil' | 'nonfoil'): boolean {
+  const finishes = card.finishes ?? []
+  if (finishes.length === 0) return true
+  if (finish === 'foil') return finishes.some(isFoilFinish)
+  return finishes.some((name) => !isFoilFinish(name))
+}
+
 /** Buy-list curation: add cards (pinned offer optional), toggle visibility, remove. */
 function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefined }) {
   const queryClient = useQueryClient()
@@ -548,20 +558,139 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
     ])
 
   const [query, setQuery] = useState('')
-  const debounced = useDebouncedValue(query, 250)
+  const debounced = useDebouncedValue(query.trim(), 250)
+  const [catalogSetFilter, setCatalogSetFilter] = useState('')
+  const [catalogFinishFilter, setCatalogFinishFilter] = useState<'all' | 'foil' | 'nonfoil'>('all')
+  const [nameHit, setNameHit] = useState<CardSummary | null>(null)
   const [selected, setSelected] = useState<CardSummary | null>(null)
   const [offerText, setOfferText] = useState('')
   const [wantsFoil, setWantsFoil] = useState(false)
   const [maxQty, setMaxQty] = useState('')
+  const [typeaheadIndex, setTypeaheadIndex] = useState(0)
+  const [typeaheadOpen, setTypeaheadOpen] = useState(false)
+  const typeaheadRef = useRef<HTMLDivElement>(null)
 
-  const { data: results = [], isFetching } = useQuery({
-    queryKey: ['buylist-card-search', slug, debounced],
-    enabled: debounced.trim().length > 1,
+  const scopedToSet = Boolean(catalogSetFilter.trim())
+  const scopedToFinish = catalogFinishFilter !== 'all'
+  const typeaheadReady =
+    debounced.length >= 2 &&
+    !nameHit &&
+    !selected &&
+    !scopedToSet
+  const gameFinishes = finishChoices(null)
+
+  const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
+    queryKey: ['buylist-card-search', 'prefix-rank', slug, debounced, catalogFinishFilter],
+    enabled: typeaheadReady,
+    staleTime: 30_000,
     queryFn: async () => {
-      const { data } = await api.get<CardSummary[]>('/catalog/search', { params: { q: debounced } })
-      return data.slice(0, 8)
+      const { data } = await api.get<CardSummary[]>('/catalog/search', {
+        params: {
+          q: debounced,
+          unique: 'cards',
+          ...(scopedToFinish ? { finish: catalogFinishFilter } : {}),
+        },
+      })
+      return data.slice(0, 12)
     },
   })
+
+  const { data: catalogResults = [], refetch: runCatalogSearch, isFetching: catalogSearching } = useQuery({
+    queryKey: ['buylist-card-search', 'unique-cards', query, catalogSetFilter, catalogFinishFilter],
+    enabled: false,
+    queryFn: async () => {
+      if (!query.trim()) return []
+      const { data } = await api.get<CardSummary[]>('/catalog/search', {
+        params: {
+          q: query,
+          ...(scopedToSet ? { set: catalogSetFilter.trim() } : { unique: 'cards' }),
+          ...(scopedToFinish ? { finish: catalogFinishFilter } : {}),
+        },
+      })
+      return data
+    },
+  })
+
+  const printingsQuery = useCardPrintings(nameHit?.id, Boolean(nameHit) && !selected)
+  const printings = useMemo(() => {
+    const items = printingsQuery.data ?? []
+    if (!scopedToFinish) return items
+    return items.filter((card) => printingHasFinish(card, catalogFinishFilter))
+  }, [printingsQuery.data, scopedToFinish, catalogFinishFilter])
+
+  const setScopedPrintings = useMemo(() => {
+    if (!scopedToSet) return []
+    if (!scopedToFinish) return catalogResults
+    return catalogResults.filter((card) => printingHasFinish(card, catalogFinishFilter))
+  }, [catalogResults, scopedToSet, scopedToFinish, catalogFinishFilter])
+
+  useEffect(() => {
+    if (!nameHit || selected) return
+    if (printingsQuery.isPending || printingsQuery.isFetching) return
+    if (printingsQuery.isError) {
+      pickPrinting(nameHit)
+    }
+  }, [nameHit, selected, printingsQuery.isPending, printingsQuery.isFetching, printingsQuery.isError])
+
+  const typeaheadNames = useMemo(() => {
+    const seen = new Set<string>()
+    return [...typeaheadResults]
+      .filter((card) => {
+        const key = foldSearchText(card.name)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((left, right) => typeaheadNameTier(left.name, debounced) - typeaheadNameTier(right.name, debounced))
+  }, [typeaheadResults, debounced])
+
+  const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
+
+  useEffect(() => {
+    setTypeaheadIndex(typeaheadNames.length > 0 ? 0 : -1)
+  }, [debounced, typeaheadNames])
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (typeaheadRef.current && !typeaheadRef.current.contains(event.target as Node)) {
+        setTypeaheadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
+
+  function autofillCatalogName(card: CardSummary) {
+    setQuery(card.name)
+    setTypeaheadOpen(false)
+    setTypeaheadIndex(-1)
+  }
+
+  function pickPrinting(card: CardSummary) {
+    setSelected(card)
+    if (catalogFinishFilter === 'foil') setWantsFoil(true)
+    else if (catalogFinishFilter === 'nonfoil') setWantsFoil(false)
+  }
+
+  async function startCatalogSearch() {
+    setNameHit(null)
+    setSelected(null)
+    const typed = query.trim()
+    const canReuseTypeahead =
+      !scopedToSet &&
+      typeaheadResults.length > 0 &&
+      foldSearchText(debounced) === foldSearchText(typed)
+    const rows = canReuseTypeahead ? typeaheadResults : ((await runCatalogSearch()).data ?? [])
+    if (scopedToSet || rows.length === 0) return
+    const exact = rows.find((card) => catalogNamesMatch(card.name, typed))
+    if (exact) {
+      setNameHit(exact)
+      return
+    }
+    if (rows.length === 1) {
+      setNameHit(rows[0])
+    }
+  }
 
   const addEntry = useMutation({
     mutationFn: async () => {
@@ -575,6 +704,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
     },
     onSuccess: async () => {
       setSelected(null)
+      setNameHit(null)
       setQuery('')
       setOfferText('')
       setMaxQty('')
@@ -612,51 +742,215 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
       subtitle="Cards you actively want. Leave the offer blank to pay your premium rate at market; pin a price to lock the per-copy offer."
     >
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_7rem_auto] sm:items-end">
-          <Input label="Add a card" value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null) }} placeholder="Search the catalog…" />
-          <Input label="Pinned offer ($)" value={offerText} onChange={(e) => setOfferText(e.target.value)} inputMode="decimal" placeholder="Premium rate" />
-          <Input label="Max copies" value={maxQty} onChange={(e) => setMaxQty(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="Any" />
-          <label className="flex h-10 items-center gap-2 text-sm font-medium text-fg">
-            <input type="checkbox" checked={wantsFoil} onChange={(e) => setWantsFoil(e.target.checked)} className="size-4 accent-current" />
-            Foil
-          </label>
+        <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_8rem_10rem_auto] lg:items-end">
+          <div ref={typeaheadRef} className="relative min-w-0">
+            <Input
+              label="Add a card"
+              value={query}
+              autoComplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={showTypeahead}
+              aria-controls="buylist-typeahead"
+              aria-activedescendant={
+                showTypeahead && typeaheadIndex >= 0
+                  ? `buylist-typeahead-${typeaheadNames[typeaheadIndex]?.id}`
+                  : undefined
+              }
+              onFocus={() => {
+                if (typeaheadNames.length > 0) setTypeaheadOpen(true)
+              }}
+              onChange={(e) => {
+                const next = e.target.value
+                setQuery(next)
+                setTypeaheadOpen(true)
+                if (nameHit && foldSearchText(next) !== foldSearchText(nameHit.name)) {
+                  setNameHit(null)
+                  setSelected(null)
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown' && typeaheadNames.length > 0) {
+                  e.preventDefault()
+                  setTypeaheadOpen(true)
+                  setTypeaheadIndex((index) => (index + 1) % typeaheadNames.length)
+                  return
+                }
+                if (e.key === 'ArrowUp' && typeaheadNames.length > 0) {
+                  e.preventDefault()
+                  setTypeaheadOpen(true)
+                  setTypeaheadIndex((index) => (index <= 0 ? typeaheadNames.length - 1 : index - 1))
+                  return
+                }
+                if (e.key === 'Escape') {
+                  setTypeaheadOpen(false)
+                  return
+                }
+                if (e.key === 'Tab' && showTypeahead) {
+                  const card = typeaheadNames[typeaheadIndex] ?? typeaheadNames[0]
+                  if (card) autofillCatalogName(card)
+                  return
+                }
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  if (showTypeahead) {
+                    const card = typeaheadNames[typeaheadIndex] ?? typeaheadNames[0]
+                    if (card && !catalogNamesMatch(card.name, query)) {
+                      autofillCatalogName(card)
+                      return
+                    }
+                  }
+                  void startCatalogSearch()
+                }
+              }}
+              placeholder="Start typing a card name…"
+              className={typeaheadFetching ? 'pr-9' : undefined}
+            />
+            {typeaheadFetching ? (
+              <span className="pointer-events-none absolute bottom-2.5 right-3">
+                <Spinner size="sm" />
+              </span>
+            ) : null}
+            {showTypeahead ? (
+              <ul
+                id="buylist-typeahead"
+                role="listbox"
+                aria-label="Matching cards"
+                className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
+              >
+                {typeaheadNames.map((card, index) => (
+                  <li key={card.id} id={`buylist-typeahead-${card.id}`} role="option" aria-selected={index === typeaheadIndex}>
+                    <button
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => autofillCatalogName(card)}
+                      onMouseEnter={() => setTypeaheadIndex(index)}
+                      className={dropdownItemClass({ active: index === typeaheadIndex })}
+                    >
+                      <span className="truncate">{card.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          <Input
+            label="Set"
+            value={catalogSetFilter}
+            onChange={(e) => setCatalogSetFilter(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void startCatalogSearch()}
+            placeholder="Set code"
+            className="uppercase"
+          />
+          <Select
+            label="Finish"
+            value={catalogFinishFilter}
+            onChange={(e) => setCatalogFinishFilter(e.target.value as 'all' | 'foil' | 'nonfoil')}
+          >
+            <option value="all">All finishes</option>
+            <option value="nonfoil">{gameFinishes.plain} only</option>
+            <option value="foil">{gameFinishes.foil} only</option>
+          </Select>
+          <Button onClick={() => void startCatalogSearch()} loading={catalogSearching}>
+            <Search className="size-4" aria-hidden />
+            Search
+          </Button>
         </div>
 
-        {selected ? (
-          <div className="flex items-center gap-3 rounded-card border border-brand-500 bg-brand-50/40 p-2">
-            {cardImage(selected) && <img src={cardImage(selected)} alt="" className="h-14 w-10 rounded object-cover" />}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-fg">{selected.name}</p>
-              <p className="text-xs text-fg-muted">{selected.setCode?.toUpperCase()} #{selected.collectorNumber ?? '—'}</p>
+        {nameHit && !selected ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-fg">{nameHit.name}</p>
+                <p className="text-xs text-fg-muted">
+                  {printings.length > 0
+                    ? `${printings.length} ${printings.length === 1 ? 'printing' : 'printings'} of ${nameHit.name}`
+                    : 'Pick a printing'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNameHit(null)}
+                className="text-sm font-semibold text-fg-muted hover:text-fg"
+              >
+                Change
+              </button>
             </div>
-            <Button size="sm" loading={addEntry.isPending} onClick={() => addEntry.mutate()}>
-              <Plus className="size-4" aria-hidden />
-              Add to buy list
-            </Button>
-            <button type="button" aria-label="Clear selection" onClick={() => setSelected(null)} className="rounded-full p-1 text-fg-muted hover:bg-bg">
-              <X className="size-4" aria-hidden />
-            </button>
+            {printingsQuery.isPending || printingsQuery.isFetching ? (
+              <div className="flex justify-center py-6">
+                <Spinner size="sm" />
+              </div>
+            ) : printings.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No matching printings"
+                description={
+                  scopedToFinish
+                    ? 'No printing of this card is sold in that finish. Clear the finish filter to see every printing.'
+                    : 'No paper printings were found for this card.'
+                }
+              />
+            ) : (
+              <PrintingGrid
+                items={printings}
+                selectedId={null}
+                finish={catalogFinishFilter === 'foil' ? 'foil' : 'nonfoil'}
+                onSelect={pickPrinting}
+                showIndex={false}
+                size="lg"
+              />
+            )}
           </div>
-        ) : results.length > 0 ? (
-          <ul className="max-h-56 space-y-1 overflow-y-auto">
-            {results.map((card) => (
-              <li key={card.id}>
+        ) : null}
+
+        {scopedToSet && setScopedPrintings.length > 0 && !nameHit && !selected ? (
+          <PrintingGrid
+            items={setScopedPrintings}
+            selectedId={null}
+            finish={catalogFinishFilter === 'foil' ? 'foil' : 'nonfoil'}
+            onSelect={pickPrinting}
+            showIndex={false}
+            size="lg"
+          />
+        ) : null}
+
+        {selected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-card border border-brand-500 bg-brand-50/40 p-2">
+              {cardImage(selected) && <img src={cardImage(selected)} alt="" className="h-14 w-10 rounded object-cover" />}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-fg">{selected.name}</p>
+                <p className="text-xs text-fg-muted">
+                  {selected.setCode?.toUpperCase()} #{selected.collectorNumber ?? '—'}
+                  {selected.setName ? ` · ${selected.setName}` : ''}
+                </p>
+              </div>
+              {nameHit || scopedToSet ? (
                 <button
                   type="button"
-                  onClick={() => setSelected(card)}
-                  className="flex w-full items-center gap-3 rounded-card border border-border bg-surface p-2 text-left transition-colors hover:border-brand-300"
+                  onClick={() => setSelected(null)}
+                  className="text-sm font-semibold text-fg-muted hover:text-fg"
                 >
-                  {cardImage(card) && <img src={cardImage(card)} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-fg">{card.name}</span>
-                    <span className="block text-xs text-fg-muted">{card.setCode?.toUpperCase()} · {card.setName ?? ''}</span>
-                  </span>
+                  Back to printings
                 </button>
-              </li>
-            ))}
-          </ul>
-        ) : isFetching ? (
-          <LoadingPanel />
+              ) : null}
+              <button type="button" aria-label="Clear selection" onClick={() => { setSelected(null); setNameHit(null) }} className="rounded-full p-1 text-fg-muted hover:bg-bg">
+                <X className="size-4" aria-hidden />
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[8rem_7rem_auto_auto] sm:items-end">
+              <Input label="Pinned offer ($)" value={offerText} onChange={(e) => setOfferText(e.target.value)} inputMode="decimal" placeholder="Premium rate" />
+              <Input label="Max copies" value={maxQty} onChange={(e) => setMaxQty(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="Any" />
+              <label className="flex h-10 items-center gap-2 text-sm font-medium text-fg">
+                <input type="checkbox" checked={wantsFoil} onChange={(e) => setWantsFoil(e.target.checked)} className="size-4 accent-current" />
+                Foil
+              </label>
+              <Button size="sm" loading={addEntry.isPending} onClick={() => addEntry.mutate()}>
+                <Plus className="size-4" aria-hidden />
+                Add to buy list
+              </Button>
+            </div>
+          </div>
         ) : null}
 
         {addEntry.isError && (

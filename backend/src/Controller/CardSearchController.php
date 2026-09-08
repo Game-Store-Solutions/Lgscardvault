@@ -8,6 +8,7 @@ use App\Repository\CardRepository;
 use App\Security\ApiRateLimit;
 use App\Service\Catalog\CardPrintingsFinder;
 use App\Service\Catalog\CatalogCardResolver;
+use App\Service\Catalog\CatalogSearchRanker;
 use App\Service\Catalog\PaperPrinting;
 use App\Service\Scryfall\ScryfallClient;
 use Symfony\Component\Uid\Uuid;
@@ -42,6 +43,7 @@ class CardSearchController extends AbstractController
         private readonly ScryfallClient $scryfallClient,
         private readonly CatalogCardResolver $catalogCardResolver,
         private readonly CardPrintingsFinder $cardPrintingsFinder,
+        private readonly CatalogSearchRanker $catalogSearchRanker,
         #[Autowire(service: 'limiter.catalog_search')]
         private readonly RateLimiterFactoryInterface $catalogSearchLimiter,
     ) {
@@ -56,6 +58,7 @@ class CardSearchController extends AbstractController
         }
 
         $query = trim((string) $request->query->get('q', ''));
+        $query = trim(preg_replace('/\s+/u', ' ', $query) ?? $query);
         if ('' === $query) {
             return $this->json([]);
         }
@@ -94,20 +97,20 @@ class CardSearchController extends AbstractController
             // The same filters the Magic path honors. Skipping them here meant
             // a Pokemon workspace's set / rarity / finish pickers changed
             // nothing at all — the results came back untouched.
-            $matches = array_filter(
-                $this->cardRepository->searchByNameForGame($game, $query, 40),
+            $matches = array_values(array_filter(
+                $this->cardRepository->searchByNameForGame($game, $query, 100),
                 fn (Card $card): bool => $this->catalogCardResolver
                     ->matchesFilters($card, $setCode, $collectorNumber, $rarity, $finish),
-            );
+            ));
 
-            return $this->json(array_map($this->catalogCardResolver->serializeCard(...), array_values($matches)));
+            return $this->json($this->serializeSearchHits($matches, $query, $this->wantsUniqueCards($request)));
         }
 
         /** @var array<string, \App\Entity\Card> $merged */
         $merged = [];
 
         // 1. Name-based local matches (honoring all filters).
-        foreach ($this->cardRepository->searchByName($query, 60) as $card) {
+        foreach ($this->cardRepository->searchByName($query, 100) as $card) {
             if ($this->catalogCardResolver->matchesFilters($card, $setCode, $collectorNumber, $rarity, $finish)) {
                 $merged[(string) $card->getId()] = $card;
             }
@@ -172,10 +175,30 @@ class CardSearchController extends AbstractController
                 && PaperPrinting::isPaper($card),
         ));
 
-        return $this->json(array_map(
+        return $this->json($this->serializeSearchHits($results, $query, $this->wantsUniqueCards($request)));
+    }
+
+    /**
+     * @param list<Card> $cards
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function serializeSearchHits(array $cards, string $query, bool $uniqueCards): array
+    {
+        $ranked = $this->catalogSearchRanker->rank($cards, $query);
+        if ($uniqueCards) {
+            $ranked = $this->catalogSearchRanker->uniqueCards($ranked);
+        }
+
+        return array_map(
             $this->catalogCardResolver->serializeCard(...),
-            array_slice($results, 0, 40),
-        ));
+            array_slice($ranked, 0, 40),
+        );
+    }
+
+    private function wantsUniqueCards(Request $request): bool
+    {
+        return 'cards' === strtolower(trim((string) $request->query->get('unique', '')));
     }
 
     #[Route('/by-artist', name: 'api_catalog_by_artist', methods: ['GET'])]

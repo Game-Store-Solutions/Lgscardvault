@@ -50,7 +50,9 @@ class StoreRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->andWhere('s.isActive = :active')
+            ->andWhere('s.listed = :listed')
             ->setParameter('active', true)
+            ->setParameter('listed', true)
             ->orderBy('s.name', 'ASC')
             ->getQuery()
             ->getResult();

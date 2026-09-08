@@ -35,6 +35,63 @@ export function upcomingEvents(events: StoreCommunityEvents, limit?: number): St
   return limit ? sorted.slice(0, limit) : sorted
 }
 
+/** Local calendar day key (`YYYY-MM-DD`) for grouping events without mixing timezones. */
+export function localDayKey(isoOrDate: string | Date): string | null {
+  const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate
+  if (Number.isNaN(d.getTime())) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+export const HERO_DAY_EVENT_CAP = 4
+
+/**
+ * Hero/widget slice: events on today if any remain, otherwise the next day
+ * that has listings. Caps how many rows the board can grow.
+ */
+export function eventsOnNearestDay(
+  events: StoreCommunityEvents,
+  now = new Date(),
+  maxItems = HERO_DAY_EVENT_CAP,
+): {
+  items: StoreCommunityEventItem[]
+  dayLabel: string
+  isToday: boolean
+  hiddenOnDay: number
+  laterCount: number
+} {
+  const todayKey = localDayKey(now)
+  const empty = { items: [] as StoreCommunityEventItem[], dayLabel: '', isToday: false, hiddenOnDay: 0, laterCount: 0 }
+  if (!todayKey) return empty
+
+  const byDay = new Map<string, StoreCommunityEventItem[]>()
+  for (const item of events.items) {
+    const key = localDayKey(item.startsAt)
+    if (!key || key < todayKey) continue
+    const list = byDay.get(key) ?? []
+    list.push(item)
+    byDay.set(key, list)
+  }
+
+  const chosenKey = byDay.has(todayKey) ? todayKey : [...byDay.keys()].sort()[0]
+  if (!chosenKey) return empty
+
+  const dayItems = sortCommunityEvents({ ...EMPTY_COMMUNITY_EVENTS, items: byDay.get(chosenKey) ?? [] }).items
+  const shown = dayItems.slice(0, maxItems)
+  const sample = shown[0] ? new Date(shown[0].startsAt) : now
+  const isToday = chosenKey === todayKey
+
+  return {
+    items: shown,
+    dayLabel: isToday
+      ? 'Today'
+      : sample.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
+    isToday,
+    hiddenOnDay: Math.max(0, dayItems.length - shown.length),
+    laterCount: Math.max(0, [...byDay.values()].reduce((n, list) => n + list.length, 0) - dayItems.length),
+  }
+}
+
 export function formatEventDateTime(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
@@ -45,6 +102,20 @@ export function formatEventDateTime(iso: string): string {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+/** Compact date chip for the events widget: month, day number, and start time. */
+export function eventDateParts(iso: string): { month: string; day: string; weekday: string; time: string } {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    return { month: '', day: '', weekday: '', time: iso }
+  }
+  return {
+    month: d.toLocaleDateString(undefined, { month: 'short' }),
+    day: String(d.getDate()),
+    weekday: d.toLocaleDateString(undefined, { weekday: 'short' }),
+    time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+  }
 }
 
 export function hasEventsContent(events?: StoreCommunityEvents | null): boolean {

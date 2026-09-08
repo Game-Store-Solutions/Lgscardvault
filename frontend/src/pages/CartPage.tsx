@@ -26,6 +26,7 @@ import { finishName } from '../lib/finishes'
 import { FOIL_GRADIENT, rarityAccent } from '../lib/mtg'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { AnimatePresence, motion, Reveal } from '../components/motion'
+import { isStoreFeatureEnabled } from '../lib/storeFeatures'
 
 import { showDevCheckoutTools } from '../lib/runtimeEnv'
 
@@ -81,17 +82,18 @@ export default function CartPage() {
   const { kioskMode } = useKioskMode()
   const [kioskCustomerName, setKioskCustomerName] = useState('')
   const [useCredit, setUseCredit] = useState(false)
+  const storeCreditEnabled = isStoreFeatureEnabled(store, 'storeCredit')
 
   // Store credit can be applied by signed-in customers (not kiosk walk-ups).
   const creditQuery = useQuery({
     queryKey: ['store-credit', slug],
-    enabled: Boolean(user && slug && !kioskMode),
+    enabled: Boolean(user && slug && !kioskMode && storeCreditEnabled),
     queryFn: async () => {
       const { data } = await api.get<StoreCreditSummary>(`/stores/${slug}/customer/credit`)
       return data
     },
   })
-  const creditBalanceCents = creditQuery.data?.balanceCents ?? 0
+  const creditBalanceCents = storeCreditEnabled ? (creditQuery.data?.balanceCents ?? 0) : 0
 
   useEffect(() => {
     if (user) {
@@ -99,6 +101,10 @@ export default function CartPage() {
       setContactEmail(user.email ?? '')
     }
   }, [user])
+
+  useEffect(() => {
+    if (!storeCreditEnabled) setUseCredit(false)
+  }, [storeCreditEnabled])
 
   const checkoutConfigQuery = useQuery({
     queryKey: ['store-checkout-config', slug, isGuest ? 'guest' : 'customer'],
@@ -149,7 +155,7 @@ export default function CartPage() {
       const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, {
         fulfillment: kioskMode ? 'pickup' : fulfillment,
         ...(kioskMode ? { channel: 'kiosk', customerName: kioskCustomerName.trim() } : {}),
-        ...(useCredit && !kioskMode ? { useStoreCredit: true } : {}),
+        ...(useCredit && !kioskMode && storeCreditEnabled ? { useStoreCredit: true } : {}),
       })
       return data
     },
@@ -184,9 +190,9 @@ export default function CartPage() {
       fulfillment: 'pickup' as const,
       customerName: (kioskMode ? kioskCustomerName : contactName).trim(),
       customerEmail: contactEmail.trim() || undefined,
-      ...(isGuest ? { lines: guestCartLines(cart) } : { useStoreCredit: useCredit }),
+      ...(isGuest ? { lines: guestCartLines(cart) } : { useStoreCredit: useCredit && storeCreditEnabled }),
     }),
-    [cart, contactEmail, contactName, isGuest, kioskCustomerName, kioskMode, useCredit],
+    [cart, contactEmail, contactName, isGuest, kioskCustomerName, kioskMode, storeCreditEnabled, useCredit],
   )
   const paymentReady = Boolean((kioskMode ? kioskCustomerName : contactName).trim())
 
@@ -195,7 +201,7 @@ export default function CartPage() {
       'checkout-quote',
       slug,
       isGuest ? 'guest' : 'customer',
-      useCredit,
+      useCredit && storeCreditEnabled,
       cart.map((entry) => `${entry.inventoryItem?.id ?? `s${entry.sealedItem?.id}`}:${entry.quantity}`).join('|'),
     ],
     enabled: Boolean(slug && cart.length > 0 && !kioskMode && !createdOrder),
@@ -203,7 +209,7 @@ export default function CartPage() {
       const path = isGuest ? `/stores/${slug}/guest/checkout/quote` : `/stores/${slug}/customer/checkout/quote`
       const { data } = await api.post<CheckoutQuote>(
         path,
-        isGuest ? { lines: guestCartLines(cart) } : { useStoreCredit: useCredit },
+        isGuest ? { lines: guestCartLines(cart) } : { useStoreCredit: useCredit && storeCreditEnabled },
       )
       return data
     },

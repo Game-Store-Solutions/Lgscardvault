@@ -166,9 +166,9 @@ class OrderRepository extends ServiceEntityRepository
     }
 
     /**
-     * One page of a store's orders, newest first, with lines AND their cards
-     * fetch-joined (serializing lines without the card join caused one lazy
-     * card SELECT per order line — N+1).
+     * One page of a store's orders, newest first, with lines, cards, and
+     * listings fetch-joined (serializing pick-sheet fields without the
+     * listing join caused one lazy SELECT per order line — N+1).
      *
      * Two-step fetch: page the order ids first (LIMIT/OFFSET on a to-many
      * fetch join truncates joined ROWS, not orders — the classic Doctrine
@@ -191,6 +191,8 @@ class OrderRepository extends ServiceEntityRepository
             ->addSelect('line')
             ->leftJoin('line.card', 'card')
             ->addSelect('card')
+            ->leftJoin('line.inventoryItem', 'listing')
+            ->addSelect('listing')
             ->andWhere('o.id IN (:ids)')
             ->setParameter('ids', array_map('intval', $ids), ArrayParameterType::INTEGER)
             ->orderBy('o.createdAt', 'DESC')
@@ -416,6 +418,8 @@ class OrderRepository extends ServiceEntityRepository
             ->addSelect('line')
             ->leftJoin('line.card', 'card')
             ->addSelect('card')
+            ->leftJoin('line.inventoryItem', 'listing')
+            ->addSelect('listing')
             ->leftJoin('o.store', 'store')
             ->addSelect('store')
             ->andWhere('o.id IN (:ids)')

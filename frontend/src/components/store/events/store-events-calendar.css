@@ -48,9 +48,17 @@
   cursor: pointer;
 }
 
-.store-events-calendar .fc .fc-event.fc-event-pinned {
-  --fc-event-bg-color: var(--color-warning-500);
-  --fc-event-border-color: var(--color-warning-700);
+.store-events-calendar .fc .fc-event.fc-event-has-image {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.store-events-calendar .fc-event-thumb {
+  width: 1.15rem;
+  height: 1.15rem;
+  object-fit: cover;
+  border-radius: 0.2rem;
+  flex-shrink: 0;
 }
 
 .store-events-calendar .fc .fc-list-event:hover td {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Search, TrendingUp } from 'lucide-react'
-import { cardImage, formatPrice, parsePriceInput, scryfallPriceCents } from '../../../api/client'
+import { cardImage, formatPrice, parsePriceInput } from '../../../api/client'
 import type { CardSummary, InventoryItem } from '../../../api/types'
 import { Button, Field, Input, Modal, Skeleton } from '../../../components/ui'
 import { InteractiveCard } from '../../../components/cards'
@@ -8,6 +8,7 @@ import { Stagger, StaggerItem } from '../../../components/motion'
 import { CONDITION_LABELS, ConditionSegmented, FinishPicker, QuantityStepper, type Condition } from '../../../components/inventory'
 import { rarityAccent } from '../../../lib/mtg'
 import { defaultFinishFor, finishOptions, isFoilFinish } from '../../../lib/finishes'
+import { listingMarketSummary } from '../../../lib/marketFinishes'
 import { useCardPrintings } from '../../../hooks'
 import { PrintingGrid } from '../recovery/PrintingGrid'
 
@@ -71,7 +72,8 @@ function EditInventoryModalBody({
 
   const finishes = finishOptions(editSelectedCard)
   const editIsFoil = isFoilFinish(editFinish)
-  const marketCents = scryfallPriceCents(editSelectedCard, editIsFoil ? 'foil' : 'nonfoil')
+  const market = listingMarketSummary(editSelectedCard, editIsFoil, editFinish)
+  const marketCents = market.priceCents
   const priceCents = parsePriceInput(editPriceText)
   const priceInvalid = priceCents === null || priceCents <= 0
 
@@ -90,7 +92,14 @@ function EditInventoryModalBody({
       ? editFinish
       : defaultFinishFor(card)
     setEditFinish(nextFinish)
-    setEditPriceText(formatPrice(scryfallPriceCents(card, isFoilFinish(nextFinish) ? 'foil' : 'nonfoil') ?? 0))
+    const { priceCents: nextMarket } = listingMarketSummary(card, isFoilFinish(nextFinish), nextFinish)
+    setEditPriceText(nextMarket != null ? formatPrice(nextMarket) : '')
+  }
+
+  function handleEditFinish(nextFinish: string) {
+    setEditFinish(nextFinish)
+    const { priceCents: nextMarket } = listingMarketSummary(editSelectedCard, isFoilFinish(nextFinish), nextFinish)
+    setEditPriceText(nextMarket != null ? formatPrice(nextMarket) : '')
   }
 
   function useMarketPrice() {
@@ -151,7 +160,7 @@ function EditInventoryModalBody({
             </div>
             <dl className="mt-4 space-y-2.5 border-t border-border/70 pt-4 text-sm">
               <Row label="Stored price" value={formatPrice(item.priceCents)} />
-              <Row label="Market price" value={marketCents !== null ? formatPrice(marketCents) : 'Unavailable'} />
+              <Row label="Market price" value={market.display} />
               <Row label="In stock" value={String(item.quantity)} />
             </dl>
           </div>
@@ -169,7 +178,13 @@ function EditInventoryModalBody({
             </StaggerItem>
             <StaggerItem>
               <Field label="Finish">
-                <FinishPicker value={editFinish} options={finishes} onChange={setEditFinish} />
+                {finishes.length > 1 ? (
+                  <FinishPicker value={editFinish} options={finishes} onChange={handleEditFinish} />
+                ) : (
+                  <p className="flex h-11 items-center rounded-btn border border-border bg-surface px-3 text-sm font-bold text-fg">
+                    {finishes[0]?.value ?? editFinish}
+                  </p>
+                )}
               </Field>
             </StaggerItem>
             <StaggerItem>
