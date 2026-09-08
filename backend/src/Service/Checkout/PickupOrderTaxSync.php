@@ -52,6 +52,12 @@ final readonly class PickupOrderTaxSync
      */
     private function taxIsLocked(Order $order): bool
     {
+        // Legacy history imports already carry their recorded totals — never
+        // invent Square tax that would create a fake unpaid balance.
+        if ($order->isHistoricalImport()) {
+            return true;
+        }
+
         if ($order->getPaidCents() < 1) {
             return false;
         }
