@@ -947,9 +947,8 @@ function BuyQtyControl({
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const listId = useId()
-  const matchedInCart = inCart && cartQty === buyQty
-  const buttonKey = outOfStock ? 'oos' : matchedInCart ? 'in' : 'add'
-  const buttonLabel = outOfStock ? 'Out of stock' : matchedInCart ? 'In cart' : 'Add to Cart'
+  const buttonKey = outOfStock ? 'oos' : inCart ? 'cart' : 'add'
+  const buttonLabel = outOfStock ? 'Out of stock' : inCart ? cartLinkLabel : 'Add to Cart'
 
   useEffect(() => {
     if (!open) return
@@ -1011,29 +1010,49 @@ function BuyQtyControl({
           </motion.span>
         </motion.button>
 
-        <Button
-          variant="primary"
-          size="lg"
-          className="h-11 min-w-0 flex-1 overflow-hidden rounded-l-none rounded-r-md shadow-none"
-          loading={pending}
-          disabled={pending || outOfStock || matchedInCart}
-          onClick={onAdd}
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={buttonKey}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.16, ease: EASE_PREMIUM }}
-              className="inline-flex items-center gap-1.5"
-            >
-              {buttonKey === 'in' ? <Check aria-hidden className="size-4" /> : null}
-              {buttonKey === 'add' ? <ShoppingCart aria-hidden className="size-4" /> : null}
-              {buttonLabel}
-            </motion.span>
-          </AnimatePresence>
-        </Button>
+        {inCart && !outOfStock ? (
+          <Link
+            to={cartHref}
+            className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 min-w-0 flex-1 overflow-hidden rounded-l-none rounded-r-md px-4 shadow-none`}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={buttonKey}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                className="inline-flex items-center gap-1.5"
+              >
+                <ShoppingCart aria-hidden className="size-4" />
+                {buttonLabel}
+              </motion.span>
+            </AnimatePresence>
+          </Link>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
+            className="h-11 min-w-0 flex-1 overflow-hidden rounded-l-none rounded-r-md shadow-none"
+            loading={pending}
+            disabled={pending || outOfStock}
+            onClick={onAdd}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={buttonKey}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                className="inline-flex items-center gap-1.5"
+              >
+                {buttonKey === 'add' ? <ShoppingCart aria-hidden className="size-4" /> : null}
+                {buttonLabel}
+              </motion.span>
+            </AnimatePresence>
+          </Button>
+        )}
 
         <AnimatePresence>
           {open ? (
@@ -1079,27 +1098,6 @@ function BuyQtyControl({
           ) : null}
         </AnimatePresence>
       </div>
-
-      <AnimatePresence initial={false}>
-        {inCart ? (
-          <motion.div
-            key="cart-link"
-            initial={{ opacity: 0, height: 0, y: -4 }}
-            animate={{ opacity: 1, height: 'auto', y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: EASE_PREMIUM }}
-            className="overflow-hidden"
-          >
-            <Link
-              to={cartHref}
-              className="mt-2 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-600 underline-offset-2 hover:underline"
-            >
-              <ShoppingCart aria-hidden className="size-3.5" />
-              {cartLinkLabel}
-            </Link>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   )
 }
