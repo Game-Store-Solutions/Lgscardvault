@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { formatPrice, parsePriceInput } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { useCanManageStore, useDebouncedValue, useInventoryPage, useIsDarkTheme, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreSpotlight, useStoreTheme } from '../hooks'
+import { useCanManageStore, useDebouncedValue, useInventoryPage, useIsDarkTheme, useKioskMode, useStore, useStoreCart, useStoreGameShelf, useStoreGames, useStoreSpotlight, useStoreTheme } from '../hooks'
 import { GameSelector } from '../components/catalog'
 import { Button, buttonVariants, EmptyState, Input, Pagination, Select, InventoryGridSkeleton, SpotlightRailSkeleton } from '../components/ui'
 import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components/cards'
@@ -51,6 +51,7 @@ export default function StorePage() {
   const initialSearch = parseStoreSearch(searchParams)
   const canManage = useCanManageStore(slug)
   const { user } = useAuth()
+  const { kioskMode } = useKioskMode()
   const [search, setSearch] = useState(initialSearch.q)
   const [setFilter, setSetFilter] = useState(initialSearch.set)
   const [typeFilter, setTypeFilter] = useState(initialSearch.type)
@@ -524,26 +525,28 @@ export default function StorePage() {
         }}
         showcaseCards={heroShowcaseCards}
         actions={
-          <>
-            {isStoreFeatureEnabled(store, 'events') && (
-              <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                <Calendar aria-hidden className="size-4" />
-                Event calendar
-              </Link>
-            )}
-            {user && (
-              <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                <UserCircle aria-hidden className="size-4" />
-                My account
-              </Link>
-            )}
-            {canManage && (
-              <Link to={`/s/${slug}/admin`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                <StoreIcon aria-hidden className="size-4" />
-                Admin workspace
-              </Link>
-            )}
-          </>
+          !kioskMode ? (
+            <>
+              {isStoreFeatureEnabled(store, 'events') && (
+                <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  <Calendar aria-hidden className="size-4" />
+                  Event calendar
+                </Link>
+              )}
+              {user && (
+                <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  <UserCircle aria-hidden className="size-4" />
+                  My account
+                </Link>
+              )}
+              {canManage && (
+                <Link to={`/s/${slug}/admin`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  <StoreIcon aria-hidden className="size-4" />
+                  Admin workspace
+                </Link>
+              )}
+            </>
+          ) : undefined
         }
       />
 
