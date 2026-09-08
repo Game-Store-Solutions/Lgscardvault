@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
-import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases } from '../../hooks'
+import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases, useStoreGames } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
-import type { PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
+import type { CardSummary, PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
 import {
   Badge,
   Button,
@@ -16,7 +16,11 @@ import {
   LoadingPanel,
   Modal,
   Select,
+  dropdownItemClass,
+  dropdownPanelClass,
 } from '../../components/ui'
+import { foldSearchText, typeaheadNameTier } from '../../lib/searchText'
+import { cx } from '../../lib/cx'
 
 /** Rarities the auto-fill filter accepts — must mirror the backend allow-list. */
 const RARITIES = ['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus'] as const
@@ -835,21 +839,84 @@ function InventoryPicker({
   onClose: () => void
   onChanged: () => void
 }) {
+  const { data: storeGames = [] } = useStoreGames(slug)
+  const [game, setGame] = useState('')
   const [query, setQuery] = useState('')
-  const debounced = useDebouncedValue(query, 200)
+  const [pickedName, setPickedName] = useState<string | null>(null)
+  const [typeaheadOpen, setTypeaheadOpen] = useState(false)
+  const typeaheadRef = useRef<HTMLDivElement>(null)
+  const debounced = useDebouncedValue(query.trim(), 300)
+
+  useEffect(() => {
+    if (!game && storeGames.length > 0) {
+      setGame(storeGames[0].code)
+    }
+  }, [game, storeGames])
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (typeaheadRef.current && !typeaheadRef.current.contains(event.target as Node)) {
+        setTypeaheadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
 
   const alreadyIn = useMemo(
     () => new Set(section.cards.map((c) => c.inventoryItem.id)),
     [section.cards],
   )
 
-  // Search server-side rather than filtering a full inventory download in the
-  // browser; with no term this is just the first page of the store's listings.
-  const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
-    q: debounced.trim(),
-    itemsPerPage: 60,
+  // Same ranked catalog typeahead as Singles → Add (prefix / exact / word tiers).
+  const typeaheadReady = debounced.length >= 2 && Boolean(game) && !pickedName
+  const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
+    queryKey: ['card-search', 'typeahead', 'section-picker', debounced, game],
+    queryFn: async () => {
+      const { data } = await api.get<CardSummary[]>('/catalog/search', {
+        params: {
+          q: debounced,
+          unique: 'cards',
+          game,
+        },
+      })
+      return data.slice(0, 12)
+    },
+    enabled: typeaheadReady,
+    staleTime: 30_000,
   })
-  const results = searchPage?.items ?? []
+
+  const typeaheadNames = useMemo(() => {
+    const seen = new Set<string>()
+    return [...typeaheadResults]
+      .filter((card) => {
+        const key = foldSearchText(card.name)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((left, right) => typeaheadNameTier(left.name, debounced) - typeaheadNameTier(right.name, debounced))
+  }, [typeaheadResults, debounced])
+
+  const inventoryQuery = pickedName ?? (debounced.length >= 2 ? debounced : '')
+  const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
+    q: inventoryQuery,
+    game: game || undefined,
+    inStockOnly: true,
+    itemsPerPage: 60,
+    enabled: inventoryQuery !== '' && Boolean(game),
+  })
+
+  const results = useMemo(() => {
+    const items = searchPage?.items ?? []
+    const q = inventoryQuery
+    return [...items].sort(
+      (a, b) =>
+        typeaheadNameTier(a.card.name, q) - typeaheadNameTier(b.card.name, q) ||
+        a.card.name.localeCompare(b.card.name) ||
+        a.id - b.id,
+    )
+  }, [searchPage?.items, inventoryQuery])
 
   const addMutation = useMutation({
     mutationFn: async (inventoryItemId: number) => {
@@ -858,20 +925,78 @@ function InventoryPicker({
     onSuccess: onChanged,
   })
 
+  function pickCatalogName(name: string) {
+    setQuery(name)
+    setPickedName(name)
+    setTypeaheadOpen(false)
+  }
+
+  function onQueryChange(value: string) {
+    setQuery(value)
+    setPickedName(null)
+    setTypeaheadOpen(true)
+  }
+
+  const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
+
   return (
-    <Modal open onClose={onClose} title={`Add cards to “${section.title}”`}>
+    <Modal open onClose={onClose} title={`Add cards to “${section.title}”`} className="max-w-xl">
       <div className="space-y-4">
-        <Input
-          label="Search inventory"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Card name…"
-          autoFocus
-        />
-        {isLoading ? (
+        {storeGames.length > 1 && (
+          <Select label="Game" value={game} onChange={(e) => {
+            setGame(e.target.value)
+            setPickedName(null)
+          }}>
+            {storeGames.map((g) => (
+              <option key={g.code} value={g.code}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        <div ref={typeaheadRef} className="relative">
+          <Input
+            label="Search inventory"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onFocus={() => setTypeaheadOpen(true)}
+            placeholder="Card name (same search as Singles)…"
+            autoFocus
+          />
+          {showTypeahead && (
+            <ul
+              role="listbox"
+              className={cx(dropdownPanelClass, 'absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto p-1')}
+            >
+              {typeaheadNames.map((card) => (
+                <li key={card.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    className={cx(dropdownItemClass({}), 'w-full text-left')}
+                    onClick={() => pickCatalogName(card.name)}
+                  >
+                    <span className="min-w-0 flex-1 truncate font-semibold text-fg">{card.name}</span>
+                    <span className="shrink-0 text-xs text-fg-muted">{card.setCode?.toUpperCase()}</span>
+                  </button>
+                </li>
+              ))}
+              {typeaheadFetching && (
+                <li className="px-2.5 py-1.5 text-xs text-fg-muted">Searching…</li>
+              )}
+            </ul>
+          )}
+        </div>
+        {inventoryQuery === '' ? (
+          <p className="text-sm text-fg-muted">Type at least 2 characters to find cards in stock.</p>
+        ) : isLoading ? (
           <LoadingPanel />
         ) : results.length === 0 ? (
-          <EmptyState icon={Search} title="No matching listings" description="Try a different search." />
+          <EmptyState
+            icon={Search}
+            title="No matching listings"
+            description="Try another name, or pick a suggestion from the catalog search above."
+          />
         ) : (
           <ul className="max-h-96 space-y-2 overflow-y-auto">
             {results.map((item) => {
@@ -886,6 +1011,7 @@ function InventoryPicker({
                     <p className="text-xs text-fg-muted">
                       {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
                       {item.isFoil ? ` · ${item.finish}` : ''}
+                      {item.quantity != null ? ` · ${item.quantity} in stock` : ''}
                     </p>
                   </div>
                   <Button
