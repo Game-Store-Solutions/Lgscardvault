@@ -353,13 +353,17 @@ function SectionEditor({
                 <RefreshCw className="size-4" aria-hidden />
                 Pull from inventory
               </Button>
+              <Button variant="secondary" onClick={() => setPickerOpen(true)}>
+                <Plus className="size-4" aria-hidden />
+                Add cards from inventory
+              </Button>
               {section.autoColorIdentityLabel && (
                 <span className="text-xs text-fg-muted">
                   Color filter: <span className="font-bold text-fg">{section.autoColorIdentityLabel}</span>
                 </span>
               )}
               <span className="text-xs text-fg-muted">
-                Pulls 1 copy per card; cards already promised to other sections are skipped. Re-pull any time. Sold cards stay tracked.
+                Pulls 1 copy per card; cards already promised to other sections are skipped. Re-pull any time. Sold cards stay tracked. You can also search and add or remove specific cards below.
               </span>
             </div>
           </div>
