@@ -34,7 +34,8 @@ function printRarity(rarity?: string | null): string {
 function lineDescription(line: OrderLine): string {
   if (line.isSealed) return line.cardName
 
-  const parts = [line.cardName]
+  const setCode = line.setCode?.trim()
+  const parts = [setCode ? `${line.cardName} [${setCode.toUpperCase()}]` : line.cardName]
 
   const finish = printFinishLabel(line.finish)
   if (finish) parts.push(`(${finish})`)
