@@ -19,7 +19,7 @@ import {
   dropdownItemClass,
   dropdownPanelClass,
 } from '../../components/ui'
-import { foldSearchText, typeaheadNameTier } from '../../lib/searchText'
+import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
 import { cx } from '../../lib/cx'
 
 /** Rarities the auto-fill filter accepts — must mirror the backend allow-list. */
@@ -842,9 +842,10 @@ function InventoryPicker({
   const { data: storeGames = [] } = useStoreGames(slug)
   const [game, setGame] = useState('')
   const [query, setQuery] = useState('')
-  const [pickedName, setPickedName] = useState<string | null>(null)
+  const [pickedCard, setPickedCard] = useState<CardSummary | null>(null)
   const [typeaheadOpen, setTypeaheadOpen] = useState(false)
   const typeaheadRef = useRef<HTMLDivElement>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
   const debounced = useDebouncedValue(query.trim(), 300)
 
   useEffect(() => {
@@ -869,7 +870,7 @@ function InventoryPicker({
   )
 
   // Same ranked catalog typeahead as Singles → Add (prefix / exact / word tiers).
-  const typeaheadReady = debounced.length >= 2 && Boolean(game) && !pickedName
+  const typeaheadReady = debounced.length >= 2 && Boolean(game) && !pickedCard
   const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
     queryKey: ['card-search', 'typeahead', 'section-picker', debounced, game],
     queryFn: async () => {
@@ -898,7 +899,7 @@ function InventoryPicker({
       .sort((left, right) => typeaheadNameTier(left.name, debounced) - typeaheadNameTier(right.name, debounced))
   }, [typeaheadResults, debounced])
 
-  const inventoryQuery = pickedName ?? (debounced.length >= 2 ? debounced : '')
+  const inventoryQuery = pickedCard?.name ?? (debounced.length >= 2 ? debounced : '')
   const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
     q: inventoryQuery,
     game: game || undefined,
@@ -910,13 +911,17 @@ function InventoryPicker({
   const results = useMemo(() => {
     const items = searchPage?.items ?? []
     const q = inventoryQuery
-    return [...items].sort(
+    const ranked = [...items].sort(
       (a, b) =>
         typeaheadNameTier(a.card.name, q) - typeaheadNameTier(b.card.name, q) ||
         a.card.name.localeCompare(b.card.name) ||
         a.id - b.id,
     )
-  }, [searchPage?.items, inventoryQuery])
+    if (!pickedCard) return ranked
+    // After a catalog pick, prefer exact-name stock so printings of that card lead.
+    const exact = ranked.filter((item) => catalogNamesMatch(item.card.name, pickedCard.name))
+    return exact.length > 0 ? exact : ranked
+  }, [searchPage?.items, inventoryQuery, pickedCard])
 
   const addMutation = useMutation({
     mutationFn: async (inventoryItemId: number) => {
@@ -925,19 +930,28 @@ function InventoryPicker({
     onSuccess: onChanged,
   })
 
-  function pickCatalogName(name: string) {
-    setQuery(name)
-    setPickedName(name)
+  function pickCatalogCard(card: CardSummary) {
+    setQuery(card.name)
+    setPickedCard(card)
     setTypeaheadOpen(false)
+    window.requestAnimationFrame(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
+
+  function clearPickedCard() {
+    setPickedCard(null)
+    setTypeaheadOpen(true)
   }
 
   function onQueryChange(value: string) {
     setQuery(value)
-    setPickedName(null)
+    setPickedCard(null)
     setTypeaheadOpen(true)
   }
 
   const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
+  const pickedImage = pickedCard ? cardImage(pickedCard) : undefined
 
   return (
     <Modal
@@ -950,7 +964,7 @@ function InventoryPicker({
         {storeGames.length > 1 && (
           <Select label="Game" value={game} onChange={(e) => {
             setGame(e.target.value)
-            setPickedName(null)
+            setPickedCard(null)
           }}>
             {storeGames.map((g) => (
               <option key={g.code} value={g.code}>
@@ -964,7 +978,9 @@ function InventoryPicker({
             label="Search inventory"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            onFocus={() => setTypeaheadOpen(true)}
+            onFocus={() => {
+              if (!pickedCard) setTypeaheadOpen(true)
+            }}
             placeholder="Card name (same search as Singles)…"
             autoFocus
           />
@@ -973,7 +989,7 @@ function InventoryPicker({
               role="listbox"
               className={cx(
                 dropdownPanelClass,
-                'absolute left-0 right-0 z-20 mt-1 max-h-[min(36rem,65vh)] overflow-y-auto p-1.5',
+                'absolute left-0 right-0 z-20 mt-1 max-h-[min(28rem,50vh)] overflow-y-auto p-1.5',
               )}
             >
               {typeaheadNames.map((card) => {
@@ -984,7 +1000,7 @@ function InventoryPicker({
                       type="button"
                       role="option"
                       className={cx(dropdownItemClass({}), 'w-full gap-3 py-2.5 text-left')}
-                      onClick={() => pickCatalogName(card.name)}
+                      onClick={() => pickCatalogCard(card)}
                     >
                       {image ? (
                         <img
@@ -999,6 +1015,7 @@ function InventoryPicker({
                       )}
                       <span className="min-w-0 flex-1 truncate text-base font-semibold text-fg">{card.name}</span>
                       <span className="shrink-0 text-sm text-fg-muted">{card.setCode?.toUpperCase()}</span>
+                      <span className="shrink-0 text-sm font-semibold text-brand-600">Select</span>
                     </button>
                   </li>
                 )
@@ -1009,56 +1026,94 @@ function InventoryPicker({
             </ul>
           )}
         </div>
-        <div className="min-h-0 flex-1">
+
+        <div ref={resultsRef} className="min-h-0 flex-1 space-y-4">
+          {pickedCard && (
+            <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-center">
+              {pickedImage ? (
+                <img
+                  src={pickedImage}
+                  alt={pickedCard.name}
+                  className="mx-auto h-40 w-[7.15rem] shrink-0 rounded-card object-cover sm:mx-0"
+                />
+              ) : (
+                <span className="mx-auto h-40 w-[7.15rem] shrink-0 rounded-card bg-bg sm:mx-0" aria-hidden />
+              )}
+              <div className="min-w-0 flex-1 space-y-1 text-center sm:text-left">
+                <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">Selected card</p>
+                <p className="text-xl font-bold text-fg">{pickedCard.name}</p>
+                <p className="text-sm text-fg-muted">
+                  {[pickedCard.setCode?.toUpperCase(), pickedCard.setName].filter(Boolean).join(' · ') || 'Catalog match'}
+                  {' · '}Choose an in-stock printing below to add it to this case section.
+                </p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={clearPickedCard} className="self-center">
+                Change
+              </Button>
+            </div>
+          )}
+
           {inventoryQuery === '' ? (
-            <p className="text-sm text-fg-muted">Type at least 2 characters to find cards in stock.</p>
+            <p className="text-sm text-fg-muted">Type at least 2 characters, then select a card to add from stock.</p>
           ) : isLoading ? (
             <LoadingPanel />
           ) : results.length === 0 ? (
             <EmptyState
               icon={Search}
-              title="No matching listings"
-              description="Try another name, or pick a suggestion from the catalog search above."
+              title={pickedCard ? 'Not in stock' : 'No matching listings'}
+              description={
+                pickedCard
+                  ? `${pickedCard.name} isn’t in this store’s inventory (or none are in stock).`
+                  : 'Try another name, or pick a suggestion from the catalog search above.'
+              }
             />
           ) : (
-            <ul className="h-full max-h-[min(36rem,65vh)] space-y-2.5 overflow-y-auto">
-              {results.map((item) => {
-                const added = alreadyIn.has(item.id)
-                const image = cardImage(item.card)
-                return (
-                  <li key={item.id} className="flex items-center gap-4 rounded-card border border-border bg-surface p-3">
-                    {image ? (
-                      <img
-                        src={image}
-                        alt={item.card.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-24 w-[4.25rem] flex-shrink-0 rounded object-cover"
-                      />
-                    ) : (
-                      <span className="h-24 w-[4.25rem] flex-shrink-0 rounded bg-bg" aria-hidden />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-bold text-fg">{item.card.name}</p>
-                      <p className="text-sm text-fg-muted">
-                        {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
-                        {item.isFoil ? ` · ${item.finish}` : ''}
-                        {item.quantity != null ? ` · ${item.quantity} in stock` : ''}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={added ? 'ghost' : 'primary'}
-                      disabled={added}
-                      loading={addMutation.isPending && addMutation.variables === item.id}
-                      onClick={() => addMutation.mutate(item.id)}
-                    >
-                      {added ? 'Added' : 'Add'}
-                    </Button>
-                  </li>
-                )
-              })}
-            </ul>
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-sm font-bold text-fg">
+                  {pickedCard ? `In stock · ${pickedCard.name}` : 'Matching stock'}
+                </h3>
+                <p className="text-xs text-fg-muted">{results.length} listing{results.length === 1 ? '' : 's'}</p>
+              </div>
+              <ul className="max-h-[min(36rem,55vh)] space-y-2.5 overflow-y-auto">
+                {results.map((item) => {
+                  const added = alreadyIn.has(item.id)
+                  const image = cardImage(item.card)
+                  return (
+                    <li key={item.id} className="flex items-center gap-4 rounded-card border border-border bg-surface p-3">
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={item.card.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-24 w-[4.25rem] flex-shrink-0 rounded object-cover"
+                        />
+                      ) : (
+                        <span className="h-24 w-[4.25rem] flex-shrink-0 rounded bg-bg" aria-hidden />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-bold text-fg">{item.card.name}</p>
+                        <p className="text-sm text-fg-muted">
+                          {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
+                          {item.isFoil ? ` · ${item.finish}` : ''}
+                          {item.quantity != null ? ` · ${item.quantity} in stock` : ''}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={added ? 'ghost' : 'primary'}
+                        disabled={added}
+                        loading={addMutation.isPending && addMutation.variables === item.id}
+                        onClick={() => addMutation.mutate(item.id)}
+                      >
+                        {added ? 'In case' : 'Add to case'}
+                      </Button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
           )}
         </div>
       </div>
