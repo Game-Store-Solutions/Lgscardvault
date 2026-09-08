@@ -9,6 +9,7 @@ use App\Entity\OrderLine;
 use App\Entity\SealedInventoryItem;
 use App\Entity\Store;
 use App\Entity\User;
+use App\Enum\OrderStatus;
 use App\Service\CaseCards\SectionSaleAllocator;
 use App\Service\Credit\StoreCreditLedger;
 use Doctrine\ORM\EntityManagerInterface;
@@ -55,6 +56,12 @@ final readonly class CartOrderBuilder
             ->setCustomerEmail($customerEmail)
             ->setChannel($channel)
             ->setFulfillment($fulfillment);
+
+        // In-store kiosk: customer is already at the counter — land in Ready for
+        // pickup so staff pull from that queue instead of Pending → Accept.
+        if (Order::CHANNEL_KIOSK === $channel) {
+            $order->setStatus(OrderStatus::FULFILLED);
+        }
 
         $total = 0;
         foreach ($cartItems as $cartItem) {

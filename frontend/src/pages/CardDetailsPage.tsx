@@ -1,10 +1,12 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   ChevronRight,
   Heart,
   ListPlus,
+  Minus,
+  Plus,
   RefreshCw,
   RotateCw,
   Settings,
@@ -138,6 +140,7 @@ export default function CardDetailsPage() {
   // Which face of a multi-faced card is currently shown (0 = front).
   const [faceIndex, setFaceIndex] = useState(0)
   const [infoTab, setInfoTab] = useState<'details' | 'legality'>('details')
+  const [buyQty, setBuyQty] = useState(1)
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -157,6 +160,11 @@ export default function CardDetailsPage() {
       return data
     },
   })
+
+  useEffect(() => {
+    if (!item) return
+    setBuyQty((qty) => Math.min(Math.max(1, qty), Math.max(1, item.quantity)))
+  }, [item?.id, item?.quantity])
 
   usePageMeta({
     title: item?.card.name
@@ -586,9 +594,29 @@ export default function CardDetailsPage() {
                   </p>
 
                   <div className="mt-4 flex min-w-0">
-                    <div className="flex h-11 shrink-0 items-center gap-1 rounded-l-md border border-r-0 border-border bg-bg px-3 text-sm text-fg-muted">
-                      <span className="font-semibold text-fg">1</span>
-                      <span className="text-xs">of {Math.max(1, item.quantity)}</span>
+                    <div className="flex h-11 shrink-0 items-center gap-0.5 rounded-l-md border border-r-0 border-border bg-bg px-1.5 text-sm text-fg-muted">
+                      <button
+                        type="button"
+                        aria-label="Decrease quantity"
+                        disabled={outOfStock || buyQty <= 1}
+                        onClick={() => setBuyQty((qty) => Math.max(1, qty - 1))}
+                        className="grid size-8 place-items-center rounded-btn text-fg disabled:opacity-40"
+                      >
+                        <Minus aria-hidden className="size-3.5" />
+                      </button>
+                      <span className="min-w-[3.25rem] text-center tabular-nums">
+                        <span className="font-semibold text-fg">{buyQty}</span>
+                        <span className="text-xs"> of {Math.max(1, item.quantity)}</span>
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Increase quantity"
+                        disabled={outOfStock || buyQty >= item.quantity}
+                        onClick={() => setBuyQty((qty) => Math.min(item.quantity, qty + 1))}
+                        className="grid size-8 place-items-center rounded-btn text-fg disabled:opacity-40"
+                      >
+                        <Plus aria-hidden className="size-3.5" />
+                      </button>
                     </div>
                     {inCart ? (
                       <Link
@@ -605,12 +633,25 @@ export default function CardDetailsPage() {
                         className="h-11 min-w-0 flex-1 rounded-l-none rounded-r-md shadow-none"
                         loading={cartSetItem.isPending}
                         disabled={cartSetItem.isPending || outOfStock}
-                        onClick={() => cartSetItem.mutate({ item, quantity: 1 })}
+                        onClick={() => cartSetItem.mutate({ item, quantity: buyQty })}
                       >
                         {outOfStock ? 'Out of stock' : 'Add to Cart'}
                       </Button>
                     )}
                   </div>
+
+                  {inCart && !outOfStock && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-2 w-full"
+                      loading={cartSetItem.isPending}
+                      disabled={cartSetItem.isPending || buyQty === cartEntry?.quantity}
+                      onClick={() => cartSetItem.mutate({ item, quantity: buyQty })}
+                    >
+                      Update cart quantity
+                    </Button>
+                  )}
 
                   {!user && (
                     <p className="mt-2 text-center text-xs text-fg-muted">
