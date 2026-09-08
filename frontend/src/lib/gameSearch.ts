@@ -73,9 +73,11 @@ const FAB: GameSearchVocab = {
   placeholder: 'Name, class, or set',
   colorLabel: 'Pitch',
   colors: [
-    { key: 'Red', label: 'Red', swatch: '#ef4444' },
-    { key: 'Yellow', label: 'Yellow', swatch: '#eab308', dark: true },
-    { key: 'Blue', label: 'Blue', swatch: '#3b82f6' },
+    // Disc mark is the pitch number FAB players use; filter key stays Red/Yellow/Blue
+    // to match catalog colors written by the TCGCSV synchronizer.
+    { key: 'Red', label: '1 · Red', swatch: '#ef4444' },
+    { key: 'Yellow', label: '2 · Yellow', swatch: '#eab308', dark: true },
+    { key: 'Blue', label: '3 · Blue', swatch: '#3b82f6' },
   ],
   types: ['Attack', 'Defense', 'Action', 'Instant', 'Equipment', 'Weapon', 'Hero'],
 }

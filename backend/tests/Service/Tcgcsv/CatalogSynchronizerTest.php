@@ -161,6 +161,44 @@ final class CatalogSynchronizerTest extends KernelTestCase
         );
     }
 
+    public function testFleshAndBloodPitchValueMapsToColors(): void
+    {
+        $game = $this->games->findOneByCode('fab');
+        self::assertNotNull($game, 'games are seeded by the migration');
+
+        // TCGCSV uses "Pitch Value" (1/2/3), not a Color field like One Piece.
+        $this->synchronizer([
+            '/62/groups' => [[
+                'groupId' => 23354,
+                'name' => 'Heavy Hitters',
+                'abbreviation' => 'HVY',
+                'publishedOn' => '2024-02-02T00:00:00',
+            ]],
+            '/62/23354/products' => [[
+                'productId' => 760001,
+                'name' => 'Aether Arc',
+                'imageUrl' => 'https://img.example/760001.jpg',
+                'url' => 'https://www.tcgplayer.com/product/760001',
+                'extendedData' => [
+                    ['name' => 'Number', 'value' => 'HVY252'],
+                    ['name' => 'Rarity', 'value' => 'Majestic'],
+                    ['name' => 'CardType', 'value' => 'Action'],
+                    ['name' => 'Class', 'value' => 'Wizard'],
+                    ['name' => 'Pitch Value', 'value' => '3'],
+                ],
+            ]],
+            '/62/23354/prices' => [
+                ['productId' => 760001, 'subTypeName' => 'Normal', 'marketPrice' => 4.01],
+            ],
+        ])->sync($game);
+
+        $card = static::getContainer()->get(CardRepository::class)
+            ->find(CatalogSynchronizer::cardIdForProduct(760001));
+        self::assertNotNull($card);
+        self::assertSame(['Blue'], $card->getColors(), 'pitch 3 must map to Blue for storefront Pitch filters');
+        self::assertSame(['Blue'], $card->getColorIdentity());
+    }
+
     public function testRerunIsIdempotentAndAppliesUpdates(): void
     {
         $game = $this->games->findOneByCode('onepiece');
