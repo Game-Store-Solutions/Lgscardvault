@@ -974,8 +974,8 @@ function CartLine({
             <span className="mx-1" aria-hidden>
               ·
             </span>
-            <span className={cx(atMax && 'font-bold text-warning-700')}>
-              {atMax ? `${item.quantity} left` : `${item.quantity} in stock`}
+            <span>
+              {item.quantity} in stock
             </span>
           </p>
           <button
