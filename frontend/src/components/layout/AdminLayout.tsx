@@ -276,6 +276,8 @@ export default function AdminLayout() {
       ? `${store.name} admin`
       : 'Store admin'
 
+  const storeLogoUrl = !isPlatformAdmin ? store?.logoUrl?.trim() || null : null
+
 
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -339,10 +341,17 @@ export default function AdminLayout() {
 
           <Link to="/" className="flex min-w-0 items-center gap-2 font-display text-lg font-bold tracking-tight text-fg">
 
-            <span className="grid size-9 shrink-0 place-items-center rounded-btn bg-brand-500 text-sm font-bold text-white">
-
-              <Store aria-hidden className="size-5" />
-
+            <span
+              className={[
+                'grid size-9 shrink-0 place-items-center overflow-hidden rounded-btn',
+                storeLogoUrl ? 'bg-bg ring-1 ring-border' : 'bg-brand-500 text-white',
+              ].join(' ')}
+            >
+              {storeLogoUrl ? (
+                <img src={storeLogoUrl} alt="" className="size-full object-cover" />
+              ) : (
+                <Store aria-hidden className="size-5" />
+              )}
             </span>
 
             <span className="truncate">{brandLabel}</span>
