@@ -451,11 +451,11 @@ function OrdersTableHead() {
   return (
     <thead>
       <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
-        <th className="w-[28%] px-5 py-3 font-semibold">Product Name</th>
-        <th className="w-[20%] px-5 py-3 font-semibold">Customer Name</th>
-        <th className="w-[14%] px-5 py-3 font-semibold">Order Id</th>
-        <th className="w-[12%] px-5 py-3 font-semibold">Amount</th>
-        <th className="w-[12%] px-5 py-3 font-semibold">Status</th>
+        <th className="w-[28%] min-w-0 px-5 py-3 font-semibold">Product Name</th>
+        <th className="w-[20%] min-w-0 px-5 py-3 font-semibold">Customer Name</th>
+        <th className="w-[14%] min-w-0 px-5 py-3 font-semibold">Order Id</th>
+        <th className="w-[12%] min-w-0 px-5 py-3 font-semibold">Amount</th>
+        <th className="w-[12%] min-w-0 px-5 py-3 font-semibold">Status</th>
         <th className="w-16 px-3 py-3 font-semibold text-right">Action</th>
       </tr>
     </thead>
@@ -689,8 +689,12 @@ function OrderRow({
 
   return (
     <tr className={cx('border-b border-border/60 transition-colors hover:bg-bg/80', ORDER_TABLE_ROW_H)}>
-      <td className="px-5 py-4 align-middle">
-        <button type="button" onClick={onOpenDetail} className="flex items-center gap-3 text-left">
+      <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          className="flex w-full min-w-0 max-w-full items-center gap-3 text-left"
+        >
           <span className="grid size-11 shrink-0 overflow-hidden rounded-xl bg-bg">
             {thumb ? (
               <img src={thumb} alt="" className="size-full object-cover" />
@@ -700,36 +704,36 @@ function OrderRow({
               </span>
             )}
           </span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1 overflow-hidden">
             <span className="block truncate font-semibold text-fg">{orderPrimaryProductName(order)}</span>
-            <span className="block text-xs text-fg-muted">Items {itemCount}</span>
+            <span className="block truncate text-xs text-fg-muted">Items {itemCount}</span>
           </span>
         </button>
       </td>
-      <td className="px-5 py-4 align-middle">
-        <div className="flex items-center gap-3">
-          <Avatar name={order.customerName ?? 'Guest'} size="sm" />
-          <div className="min-w-0">
+      <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
+        <div className="flex min-w-0 max-w-full items-center gap-3">
+          <Avatar name={order.customerName ?? 'Guest'} size="sm" className="shrink-0" />
+          <div className="min-w-0 flex-1 overflow-hidden">
             <p className="truncate font-semibold text-fg">{order.customerName ?? 'Guest'}</p>
-            <p className="text-xs text-fg-muted">{customerTierLabel(order)}</p>
+            <p className="truncate text-xs text-fg-muted">{customerTierLabel(order)}</p>
           </div>
         </div>
       </td>
-      <td className="px-5 py-4 align-middle">
-        <p className="font-semibold text-fg">{order.reference}</p>
-        <p className="text-xs text-fg-muted">{formatOrderShortDate(order.createdAt)}</p>
+      <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
+        <p className="truncate font-semibold text-fg">{order.reference}</p>
+        <p className="truncate text-xs text-fg-muted">{formatOrderShortDate(order.createdAt)}</p>
       </td>
-      <td className="px-5 py-4 align-middle">
-        <p className="font-bold text-fg">{formatPrice(order.totalCents)}</p>
-        <p className="text-xs text-fg-muted">{paymentSubtitle(order)}</p>
+      <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
+        <p className="truncate font-bold text-fg">{formatPrice(order.totalCents)}</p>
+        <p className="truncate text-xs text-fg-muted">{paymentSubtitle(order)}</p>
       </td>
-      <td className="px-5 py-4 align-middle">
-        <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>{statusUi.label}</span>
+      <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
+        <span className={cx('inline-flex max-w-full truncate rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>{statusUi.label}</span>
         {order.disputeStatus && (
-          <p className="mt-1 text-xs font-bold text-danger-700">Dispute · {order.disputeReason || order.disputeStatus}</p>
+          <p className="mt-1 truncate text-xs font-bold text-danger-700">Dispute · {order.disputeReason || order.disputeStatus}</p>
         )}
       </td>
-      <td className="px-3 py-4 align-middle text-right">
+      <td className="w-16 shrink-0 px-3 py-4 align-middle text-right">
         <button
           ref={triggerRef}
           type="button"
