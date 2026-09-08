@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Pencil, Shield, Trash2, Upload, UserRound, XCircle } from 'lucide-react'
+import { CheckCircle2, Mail, Pencil, Shield, Trash2, Upload, UserRound, XCircle } from 'lucide-react'
 import api, { extractErrorMessage, unwrapCollection } from '../../api/client'
 import type { AdminUser } from '../../api/types'
 import {
@@ -48,6 +48,7 @@ export default function PlatformUsersPage() {
   const [importing, setImporting] = useState(false)
   const [form, setForm] = useState<EditableUser>(emptyForm)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
 
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
@@ -110,6 +111,23 @@ export default function PlatformUsersPage() {
     },
   })
 
+  const resendInvite = useMutation({
+    mutationFn: async (target: AdminUser) => {
+      const { data } = await api.post<{ sent: boolean; kind: string; email: string }>(
+        `/admin/users/${target.id}/resend-invite`,
+        {},
+      )
+      return data
+    },
+    onSuccess: (data) => {
+      setInviteFeedback(
+        data.kind === 'verification'
+          ? `Verification email sent to ${data.email}.`
+          : `Set-password invite sent to ${data.email}.`,
+      )
+    },
+  })
+
   const setRole = (role: 'ROLE_STORE_OWNER' | 'ROLE_SUPER_ADMIN', enabled: boolean) => {
     setForm((current) => ({
       ...current,
@@ -133,6 +151,17 @@ export default function PlatformUsersPage() {
           </Button>
         }
       />
+
+      {inviteFeedback ? (
+        <p role="status" className="rounded-card border border-border bg-surface px-4 py-3 text-sm text-fg">
+          {inviteFeedback}
+        </p>
+      ) : null}
+      {resendInvite.isError ? (
+        <p role="alert" className="rounded-card border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+          {extractErrorMessage(resendInvite.error, 'Could not send that invite email.')}
+        </p>
+      ) : null}
 
       <Card>
         <CardHeader
@@ -211,6 +240,24 @@ export default function PlatformUsersPage() {
                   </TD>
                   <TD className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={resendInvite.isPending && resendInvite.variables?.id === platformUser.id}
+                        title={
+                          platformUser.emailVerified
+                            ? 'Send a set-password invite (valid until used)'
+                            : 'Resend email verification'
+                        }
+                        onClick={() => {
+                          setInviteFeedback(null)
+                          resendInvite.reset()
+                          resendInvite.mutate(platformUser)
+                        }}
+                      >
+                        <Mail aria-hidden className="size-4" />
+                        {platformUser.emailVerified ? 'Resend invite' : 'Resend verify'}
+                      </Button>
                       <Button variant="secondary" size="sm" onClick={() => setEditing(platformUser)}>
                         <Pencil aria-hidden className="size-4" />
                         Edit
