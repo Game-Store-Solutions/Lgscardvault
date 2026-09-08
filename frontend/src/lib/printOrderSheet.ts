@@ -49,15 +49,6 @@ function lineDescription(line: OrderLine): string {
   return parts.join(', ')
 }
 
-function lineSet(line: OrderLine): string {
-  const code = line.setCode?.trim()
-  const name = line.setName?.trim()
-  if (code && name) return `${code.toUpperCase()} / ${name}`
-  if (name) return name
-  if (code) return code.toUpperCase()
-  return ''
-}
-
 function lineLocation(line: OrderLine): string {
   const caseQuantity = line.caseQuantity ?? 0
   if (caseQuantity <= 0) return ''
@@ -119,7 +110,6 @@ function orderSheetHtml(order: Order): string {
         <tr>
           <td class="qty">${line.quantity}</td>
           <td class="description">${escapeHtml(lineDescription(line))}</td>
-          <td class="set">${escapeHtml(lineSet(line))}</td>
           <td class="rarity">${escapeHtml(rarity)}</td>
           <td class="num">${escapeHtml(collector)}</td>
           <td class="price">${formatPrice(line.priceCents)}</td>
@@ -148,20 +138,19 @@ function orderSheetHtml(order: Order): string {
           th { border-bottom: 1px solid #111; font-size: 12px; font-weight: 700; padding-bottom: 10px; }
           td { border-bottom: 1px solid #d4d4d4; padding: 18px 6px; height: 3.4rem; }
           col.qty { width: 5%; }
-          col.description { width: 46%; }
-          col.set { width: 20%; }
-          col.rarity { width: 8%; }
-          col.num { width: 6%; }
-          col.price { width: 15%; }
-          table.has-location col.description { width: 38%; }
-          table.has-location col.set { width: 16%; }
+          col.description { width: 58%; }
+          col.rarity { width: 12%; }
+          col.num { width: 8%; }
+          col.price { width: 17%; }
+          table.has-location col.description { width: 46%; }
+          table.has-location col.rarity { width: 10%; }
           table.has-location col.price { width: 12%; }
-          table.has-location col.location { width: 15%; }
+          table.has-location col.location { width: 19%; }
           .qty, .rarity, .num, .price { white-space: nowrap; }
           .price { text-align: right; }
           th.price { text-align: right; }
           .description { padding-right: 10px; overflow-wrap: normal; word-break: normal; }
-          .set, .location { overflow-wrap: break-word; word-break: normal; }
+          .location { overflow-wrap: break-word; word-break: normal; }
           .totals { margin-left: auto; margin-top: 18px; width: 240px; page-break-inside: avoid; }
           .total-row { display: flex; justify-content: space-between; padding: 4px 0; }
           .total-row.final { font-weight: 700; margin-top: 4px; }
@@ -190,7 +179,6 @@ function orderSheetHtml(order: Order): string {
           <colgroup>
             <col class="qty" />
             <col class="description" />
-            <col class="set" />
             <col class="rarity" />
             <col class="num" />
             <col class="price" />
@@ -200,7 +188,6 @@ function orderSheetHtml(order: Order): string {
             <tr>
               <th class="qty">QTY</th>
               <th class="description">Description</th>
-              <th class="set">Set</th>
               <th class="rarity">Rarity</th>
               <th class="num">#</th>
               <th class="price">Price</th>
