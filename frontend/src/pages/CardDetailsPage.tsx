@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
@@ -11,7 +11,6 @@ import {
   RotateCw,
   Settings,
   ShieldCheck,
-  ShoppingCart,
   UserCircle,
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../api/client'
@@ -140,7 +139,6 @@ export default function CardDetailsPage() {
   // Which face of a multi-faced card is currently shown (0 = front).
   const [faceIndex, setFaceIndex] = useState(0)
   const [infoTab, setInfoTab] = useState<'details' | 'legality'>('details')
-  const [buyQty, setBuyQty] = useState(1)
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -160,11 +158,6 @@ export default function CardDetailsPage() {
       return data
     },
   })
-
-  useEffect(() => {
-    if (!item) return
-    setBuyQty((qty) => Math.min(Math.max(1, qty), Math.max(1, item.quantity)))
-  }, [item?.id, item?.quantity])
 
   usePageMeta({
     title: item?.card.name
@@ -360,7 +353,14 @@ export default function CardDetailsPage() {
 
   const cartEntry = (cartQuery.data ?? []).find((entry) => entry.inventoryItem?.id === item.id)
   const inCart = Boolean(cartEntry)
+  const cartQty = cartEntry?.quantity ?? 0
   const outOfStock = item.quantity < 1
+  const atStockCap = cartQty >= item.quantity
+
+  function setCartQuantity(next: number) {
+    const clamped = Math.max(1, Math.min(next, item.quantity))
+    cartSetItem.mutate({ item, quantity: clamped })
+  }
 
   const related = (relatedQuery.data?.items ?? [])
     .filter((row) => row.id !== item.id && row.quantity > 0)
@@ -598,59 +598,45 @@ export default function CardDetailsPage() {
                       <button
                         type="button"
                         aria-label="Decrease quantity"
-                        disabled={outOfStock || buyQty <= 1}
-                        onClick={() => setBuyQty((qty) => Math.max(1, qty - 1))}
+                        disabled={outOfStock || !inCart || cartQty <= 1 || cartSetItem.isPending}
+                        onClick={() => setCartQuantity(cartQty - 1)}
                         className="grid size-8 place-items-center rounded-btn text-fg disabled:opacity-40"
                       >
                         <Minus aria-hidden className="size-3.5" />
                       </button>
                       <span className="min-w-[3.25rem] text-center tabular-nums">
-                        <span className="font-semibold text-fg">{buyQty}</span>
+                        <span className="font-semibold text-fg">{Math.max(inCart ? cartQty : 1, 1)}</span>
                         <span className="text-xs"> of {Math.max(1, item.quantity)}</span>
                       </span>
                       <button
                         type="button"
                         aria-label="Increase quantity"
-                        disabled={outOfStock || buyQty >= item.quantity}
-                        onClick={() => setBuyQty((qty) => Math.min(item.quantity, qty + 1))}
+                        disabled={outOfStock || !inCart || atStockCap || cartSetItem.isPending}
+                        onClick={() => setCartQuantity(cartQty + 1)}
                         className="grid size-8 place-items-center rounded-btn text-fg disabled:opacity-40"
                       >
                         <Plus aria-hidden className="size-3.5" />
                       </button>
                     </div>
-                    {inCart ? (
-                      <Link
-                        to={`/s/${slug}/cart`}
-                        className={`${buttonVariants({ variant: 'primary', size: 'lg' })} h-11 flex-1 rounded-l-none rounded-r-md px-4 shadow-none`}
-                      >
-                        <ShoppingCart aria-hidden className="size-4" />
-                        {user ? `Checkout (${cartEntry?.quantity})` : `View cart (${cartEntry?.quantity})`}
-                      </Link>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="lg"
-                        className="h-11 min-w-0 flex-1 rounded-l-none rounded-r-md shadow-none"
-                        loading={cartSetItem.isPending}
-                        disabled={cartSetItem.isPending || outOfStock}
-                        onClick={() => cartSetItem.mutate({ item, quantity: buyQty })}
-                      >
-                        {outOfStock ? 'Out of stock' : 'Add to Cart'}
-                      </Button>
-                    )}
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      className="h-11 min-w-0 flex-1 rounded-l-none rounded-r-md shadow-none"
+                      loading={cartSetItem.isPending}
+                      disabled={cartSetItem.isPending || outOfStock || atStockCap}
+                      onClick={() => setCartQuantity(cartQty + 1)}
+                    >
+                      {outOfStock ? 'Out of stock' : atStockCap ? 'In cart' : 'Add to Cart'}
+                    </Button>
                   </div>
 
-                  {inCart && !outOfStock && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="mt-2 w-full"
-                      loading={cartSetItem.isPending}
-                      disabled={cartSetItem.isPending || buyQty === cartEntry?.quantity}
-                      onClick={() => cartSetItem.mutate({ item, quantity: buyQty })}
+                  {inCart && (
+                    <Link
+                      to={`/s/${slug}/cart`}
+                      className="mt-2 block text-center text-sm font-semibold text-brand-600 underline-offset-2 hover:underline"
                     >
-                      Update cart quantity
-                    </Button>
+                      {user ? `Checkout (${cartQty})` : `View cart (${cartQty})`}
+                    </Link>
                   )}
 
                   {!user && (
