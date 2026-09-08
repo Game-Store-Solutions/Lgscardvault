@@ -45,6 +45,27 @@ class StoreRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Flat / usage stores with a period end (for warnings and month-close).
+     *
+     * @return list<Store>
+     */
+    public function findPlatformMonthlyBillingStores(): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.planKey IN (:plans)')
+            ->andWhere('s.currentPeriodEnd IS NOT NULL')
+            ->andWhere('s.subscriptionStatus IN (:statuses)')
+            ->setParameter('plans', ['flat', 'usage'])
+            ->setParameter('statuses', [
+                Store::SUBSCRIPTION_ACTIVE,
+                Store::SUBSCRIPTION_PAST_DUE,
+            ])
+            ->orderBy('s.currentPeriodEnd', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return list<Store> */
     public function findActiveStores(): array
     {

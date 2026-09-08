@@ -3,8 +3,9 @@
 namespace App\Service\Onboarding;
 
 /**
- * Platform pricing for new stores. Two choices: pay $450 once, or 10% of each
- * business day's shopper sales (settled at midnight) until $450 is reached.
+ * Platform pricing for new stores. $450 / calendar month (Pacific):
+ * pay the month in full up front, or accrue 10% of each business day's
+ * shopper sales until $450 — remaining balance auto-charges at month end.
  * Legacy monthly tiers remain readable for stores already on them.
  */
 final class PlanCatalog
@@ -32,7 +33,7 @@ final class PlanCatalog
             'capCents' => self::PLATFORM_CAP_CENTS,
             'feePercentBps' => 0,
             'requiresVault' => false,
-            'tagline' => 'One $450 payment — every feature, no sales fees.',
+            'tagline' => 'One $450 payment each month — every feature, no sales fees that month.',
             'popular' => true,
             'features' => self::FEATURES,
         ],
@@ -44,7 +45,7 @@ final class PlanCatalog
             'capCents' => self::PLATFORM_CAP_CENTS,
             'feePercentBps' => self::USAGE_FEE_BPS,
             'requiresVault' => true,
-            'tagline' => '10% of each day\'s sales until $450 — settled nightly, then no more platform fees.',
+            'tagline' => '10% of each day\'s sales toward this month\'s $450 — remaining auto-charged at month end.',
             'features' => self::FEATURES,
         ],
     ];
@@ -124,15 +125,24 @@ final class PlanCatalog
         return is_array($plan) && 'flat' === ($plan['billingModel'] ?? '');
     }
 
-    /** Monthly SaaS renewals — only legacy tiers. */
+    /**
+     * Monthly SaaS renewals billed by SubscriptionRenewer / month closer.
+     * Flat = full $450; legacy tiers keep their price; usage remainder is
+     * handled separately by {@see \App\Service\Billing\PlatformMonthlyBillingCloser}.
+     */
     public function monthlyRenewalCents(?string $key): int
     {
         $plan = null === $key ? null : $this->find($key);
-        if (!is_array($plan) || 'legacy_monthly' !== ($plan['billingModel'] ?? '')) {
+        if (!is_array($plan)) {
             return 0;
         }
 
-        return max(0, (int) ($plan['priceCents'] ?? 0));
+        $model = (string) ($plan['billingModel'] ?? '');
+        if ('flat' === $model || 'legacy_monthly' === $model) {
+            return max(0, (int) ($plan['priceCents'] ?? 0));
+        }
+
+        return 0;
     }
 
     public function requiresPaymentMethod(?string $key): bool

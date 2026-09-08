@@ -67,6 +67,12 @@ final readonly class SubscriptionRenewer
     private function renew(Store $store, \DateTimeImmutable $now, bool $dryRun): array
     {
         $slug = (string) $store->getSlug();
+
+        // Flat / usage months are closed by PlatformMonthlyBillingCloser.
+        if ($this->planCatalog->isFlatPlan($store->getPlanKey()) || $this->planCatalog->isUsagePlan($store->getPlanKey())) {
+            return ['slug' => $slug, 'outcome' => 'skipped', 'detail' => 'Handled by monthly billing closer.'];
+        }
+
         $priceCents = $this->monthlyRenewalCents($store);
 
         // A store moved onto the free tier still has a period end; carry it

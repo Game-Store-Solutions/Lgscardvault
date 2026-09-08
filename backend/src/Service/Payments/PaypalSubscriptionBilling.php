@@ -8,7 +8,7 @@ namespace App\Service\Payments;
  * First period captures a shopper-approved PayPal order id. Renewals charge a
  * vaulted PayPal payment token when PayPal returned one on capture.
  */
-final class PaypalSubscriptionBilling
+class PaypalSubscriptionBilling
 {
     public function __construct(
         private readonly PaypalClient $client,

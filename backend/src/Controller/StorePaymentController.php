@@ -212,7 +212,11 @@ final class StorePaymentController extends AbstractController
         );
         $returnUrl = $redirectUri.(str_contains($redirectUri, '?') ? '&' : '?').'state='.rawurlencode($state);
 
-        $referral = $this->paypalPartnerClient->createReferral($store->getSlug() ?? $slug, $returnUrl);
+        try {
+            $referral = $this->paypalPartnerClient->createReferral($store->getSlug() ?? $slug, $returnUrl);
+        } catch (\RuntimeException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
 
         return $this->json([
             'authorizationUrl' => $referral['authorizationUrl'],

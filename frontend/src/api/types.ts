@@ -326,12 +326,17 @@ export interface StoreSubscriptionStatus extends PaymentClientConfig {
   billingModel?: 'flat' | 'usage' | 'legacy_monthly' | string | null
   priceCents: number
   capCents: number
+  /** This calendar month's $450 obligation. */
+  monthObligationCents?: number
   feePercentBps: number
   requiresVault: boolean
   platformFeesPaidCents: number
   remainingCapCents: number
   progressPercent: number
+  /** True when this month's $450 is already paid (not lifetime). */
   capReached: boolean
+  /** Usage: remaining will auto-charge at period end. */
+  willAutoChargeRemainder?: boolean
   todayGrossCents: number
   todayFeeCents: number
   todayFeePercent: number
@@ -342,7 +347,7 @@ export interface StoreSubscriptionStatus extends PaymentClientConfig {
   paymentMethodType?: PaymentMethodType | null
   paymentLast4?: string | null
   paymentConfigured: boolean
-  /** End of the paid period, and therefore the date of the next charge. */
+  /** End of the current billing month (Pacific). */
   currentPeriodEnd?: string | null
   lastChargedAt?: string | null
   /** Consecutive declined renewals; non-zero means the card needs attention. */

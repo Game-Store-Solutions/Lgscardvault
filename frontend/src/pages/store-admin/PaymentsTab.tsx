@@ -300,7 +300,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
   ) : isPaidInFull ? (
     <Badge tone="success">
       <CheckCircle2 aria-hidden className="size-3.5" />
-      Paid in full
+      Month paid
     </Badge>
   ) : isUsagePlan ? (
     <Badge tone="neutral">Pay as you sell</Badge>
@@ -699,10 +699,14 @@ export default function PaymentsTab({ slug }: { slug: string }) {
             <div className="space-y-4 rounded-card border border-border bg-surface px-4 py-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-fg">Pay toward the cap</p>
+                  <p className="text-sm font-semibold text-fg">Pay toward this month</p>
                   <p className="mt-0.5 text-sm text-fg-muted">
-                    {formatPrice(sub.remainingCapCents)} left of {formatPrice(sub.capCents)}. Paying the rest in full turns off the{' '}
-                    {formatFeePercent(sub.todayFeePercent)} nightly take.
+                    {formatPrice(sub.remainingCapCents)} left of {formatPrice(sub.capCents)} for this billing month.
+                    Paying the rest early turns off the {formatFeePercent(sub.todayFeePercent)} nightly take until next
+                    month.
+                    {sub.currentPeriodEnd && sub.willAutoChargeRemainder
+                      ? ` Otherwise the card on file is charged on ${formatPeriodEnd(sub.currentPeriodEnd)}.`
+                      : ''}
                   </p>
                 </div>
                 <Button onClick={() => openPay('full')}>Pay remaining {formatPrice(sub.buyoutCents)}</Button>
@@ -733,10 +737,10 @@ export default function PaymentsTab({ slug }: { slug: string }) {
             <p className="flex items-center gap-2 text-sm font-medium text-success-700">
               <CheckCircle2 aria-hidden className="size-4" />
               {sub.capReached
-                ? 'Paid in full. Nightly sales fees are off.'
+                ? 'This month is paid. Nightly sales fees resume next month.'
                 : lastAppliedCents != null
-                  ? `Applied ${formatPrice(lastAppliedCents)} toward the cap.`
-                  : 'Payment applied toward the cap.'}
+                  ? `Applied ${formatPrice(lastAppliedCents)} toward this month.`
+                  : 'Payment applied toward this month.'}
             </p>
           ) : null}
         </div>
@@ -1234,10 +1238,17 @@ function UsageProgress({
           {formatFeePercent(sub.todayFeePercent)} of today&apos;s store sales
           {sub.todayGrossCents > 0 ? ` (${formatPrice(sub.todayGrossCents)})` : ''}
           {' '}will be charged tonight to {feeLabel}
-          {sub.todayFeeCents > 0 ? ` — ${formatPrice(sub.todayFeeCents)}` : sub.todayGrossCents < 1 ? ' once you make a sale' : ''}.
+          {sub.todayFeeCents > 0 ? ` — ${formatPrice(sub.todayFeeCents)}` : sub.todayGrossCents < 1 ? ' once you make a sale' : ''}
+          {sub.currentPeriodEnd && sub.willAutoChargeRemainder
+            ? `. Remaining balance auto-charges on ${formatPeriodEnd(sub.currentPeriodEnd)}.`
+            : '.'}
         </p>
       ) : (
-        <p className="mt-3 text-sm text-fg-muted">Platform sales fees are complete. No further take from daily sales.</p>
+        <p className="mt-3 text-sm text-fg-muted">
+          {sub.billingModel === 'flat'
+            ? `This month is prepaid. Next ${formatPrice(sub.capCents || 45000)} renews${sub.currentPeriodEnd ? ` on ${formatPeriodEnd(sub.currentPeriodEnd)}` : ''}.`
+            : 'This month’s platform fee is paid. Nightly sales fees resume next month.'}
+        </p>
       )}
     </div>
   )
@@ -1588,15 +1599,28 @@ function writePendingSalesConnect(slug: string, value: 'square' | 'paypal' | nul
 
 function planSummary(sub: StoreSubscriptionStatus): string {
   if (sub.billingModel === 'usage') {
-    return `${sub.planName ?? 'Pay as you sell'} · ${formatFeePercent(sub.todayFeePercent || 10)} of daily sales until ${formatPrice(sub.capCents)}`
+    return `${sub.planName ?? 'Pay as you sell'} · ${formatFeePercent(sub.todayFeePercent || 10)} of daily sales toward ${formatPrice(sub.capCents)}/mo`
   }
-  if (sub.billingModel === 'flat' || sub.capReached) {
-    return `${sub.planName ?? 'Pay in full'} · ${formatPrice(sub.capCents || sub.priceCents)} lifetime`
+  if (sub.billingModel === 'flat') {
+    return `${sub.planName ?? 'Pay in full'} · ${formatPrice(sub.capCents || sub.priceCents)}/mo`
   }
   if (sub.priceCents <= 0) {
     return `${sub.planName ?? sub.planKey ?? 'Plan'} · Free`
   }
   return `${sub.planName ?? sub.planKey ?? 'Plan'} · ${formatPrice(sub.priceCents)}/mo`
+}
+
+function formatPeriodEnd(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'America/Los_Angeles',
+    }).format(new Date(iso))
+  } catch {
+    return iso.slice(0, 10)
+  }
 }
 
 function formatFeePercent(value: number): string {

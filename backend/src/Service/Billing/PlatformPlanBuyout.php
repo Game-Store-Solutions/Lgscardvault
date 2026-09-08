@@ -12,8 +12,8 @@ use App\Service\Payments\SubscriptionBillingInterface;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Lets a usage-plan store put money toward the $450 cap using the card on file
- * or a connected Square / PayPal account.
+ * Lets a usage-plan store put money toward this month's $450 using the card on
+ * file or a connected Square / PayPal account.
  */
 final readonly class PlatformPlanBuyout
 {
@@ -73,7 +73,7 @@ final readonly class PlatformPlanBuyout
         }
         if ($chargeCents > $remaining) {
             throw new \InvalidArgumentException(sprintf(
-                'That is more than the remaining $%s toward the platform cap.',
+                'That is more than the remaining $%s toward this month\'s platform fee.',
                 number_format($remaining / 100, 2),
             ));
         }
@@ -87,7 +87,7 @@ final readonly class PlatformPlanBuyout
         }
 
         $idempotencyKey = sprintf(
-            'platform-cap-%d-%d-%d-%s',
+            'platform-month-%d-%d-%d-%s',
             (int) $store->getId(),
             $store->getPlatformFeesPaidCents(),
             $chargeCents,
@@ -106,8 +106,7 @@ final readonly class PlatformPlanBuyout
         $this->feeRecorder->recordCollectedFee($store, $chargeCents);
         $store->setLastChargedAt(new \DateTimeImmutable());
         if ($store->hasMetPlatformCap() || $this->remainingCents($store) < 1) {
-            $store->setPlanKey('flat');
-            $store->markPlatformCapReached();
+            $store->markMonthObligationMet();
         }
 
         $this->entityManager->persist(SubscriptionCharge::paid($store, $chargeCents, $reference));
@@ -162,7 +161,7 @@ final readonly class PlatformPlanBuyout
         }
 
         return $this->chargeVaulted($store, $amountCents, sprintf(
-            'platform-cap-%d-%d-%d-square-vault',
+            'platform-month-%d-%d-%d-square-vault',
             (int) $store->getId(),
             $store->getPlatformFeesPaidCents(),
             $amountCents,
@@ -203,7 +202,7 @@ final readonly class PlatformPlanBuyout
         $usingPaypal = Store::BILLING_PAYPAL === $store->getBillingProvider();
         $processorLive = $usingPaypal ? $this->paypalBilling->isLive() : $this->billing->isLive();
         if ($processorLive && (null === $customerId || '' === $customerId || null === $cardId || '' === $cardId)) {
-            throw new \InvalidArgumentException('Save a platform payment method before paying toward the cap.');
+            throw new \InvalidArgumentException('Save a platform payment method before paying toward this month\'s fee.');
         }
 
         if ($usingPaypal) {

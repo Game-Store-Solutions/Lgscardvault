@@ -9,9 +9,8 @@ use App\Service\Payments\PaypalSubscriptionBilling;
 use App\Service\Payments\SubscriptionBillingInterface;
 
 /**
- * Owner-facing snapshot of platform billing: plan, cap progress, and today's
- * usage-plan take. Square/PayPal client config is appended so the admin can
- * update the vaulted method from the same payload.
+ * Owner-facing snapshot of platform billing: plan, monthly obligation progress,
+ * and today's usage take.
  *
  * @phpstan-type Status array{
  *   planKey: string|null,
@@ -19,12 +18,14 @@ use App\Service\Payments\SubscriptionBillingInterface;
  *   billingModel: string|null,
  *   priceCents: int,
  *   capCents: int,
+ *   monthObligationCents: int,
  *   feePercentBps: int,
  *   requiresVault: bool,
  *   platformFeesPaidCents: int,
  *   remainingCapCents: int,
  *   progressPercent: float,
  *   capReached: bool,
+ *   willAutoChargeRemainder: bool,
  *   todayGrossCents: int,
  *   todayFeeCents: int,
  *   todayFeePercent: float,
@@ -66,7 +67,9 @@ final readonly class PlatformSubscriptionStatus
         $paid = $store->getPlatformFeesPaidCents();
         $remaining = $capCents > 0 ? max(0, $capCents - $paid) : 0;
         $isUsage = $this->planCatalog->isUsagePlan($store->getPlanKey());
-        $capReached = $store->hasMetPlatformCap() || ($isUsage && $remaining < 1 && $capCents > 0);
+        $isFlat = $this->planCatalog->isFlatPlan($store->getPlanKey());
+        $capReached = $store->hasMetPlatformCap() || ($isUsage && $remaining < 1 && $capCents > 0)
+            || ($isFlat && $paid >= $capCents && $capCents > 0);
 
         $now ??= new \DateTimeImmutable();
         $todayGross = 0;
@@ -78,6 +81,7 @@ final readonly class PlatformSubscriptionStatus
         }
 
         $canBuyout = $isUsage && $remaining > 0 && !$store->hasMetPlatformCap();
+        $willAutoCharge = ($isUsage && $remaining > 0) || $isFlat;
 
         return [
             'planKey' => $store->getPlanKey(),
@@ -85,12 +89,14 @@ final readonly class PlatformSubscriptionStatus
             'billingModel' => $plan['billingModel'] ?? null,
             'priceCents' => $priceCents,
             'capCents' => $capCents,
+            'monthObligationCents' => $capCents > 0 ? $capCents : PlanCatalog::PLATFORM_CAP_CENTS,
             'feePercentBps' => $feePercentBps,
             'requiresVault' => $requiresVault,
             'platformFeesPaidCents' => $paid,
             'remainingCapCents' => $remaining,
             'progressPercent' => $capCents > 0 ? round(min(100, ($paid / $capCents) * 100), 1) : 0.0,
-            'capReached' => $capReached || $this->planCatalog->isFlatPlan($store->getPlanKey()),
+            'capReached' => $capReached,
+            'willAutoChargeRemainder' => $willAutoCharge && !$capReached,
             'todayGrossCents' => $todayGross,
             'todayFeeCents' => $todayFee,
             'todayFeePercent' => $feePercentBps > 0 ? round($feePercentBps / 100, 2) : 0.0,

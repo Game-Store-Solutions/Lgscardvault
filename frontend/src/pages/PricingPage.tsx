@@ -21,10 +21,10 @@ function planPriceLabel(plan: Plan): string {
 function planPriceDetail(plan: Plan): string {
   const cap = formatPrice(plan.capCents ?? 45000)
   if (plan.billingModel === 'usage') {
-    return `Settled nightly until ${cap} is paid, then no more platform fees.`
+    return `${cap} / month · 10% of daily sales, remainder charged at month end`
   }
   if (plan.priceCents > 0) {
-    return `One-time · full platform access`
+    return `${cap} / month · prepaid, no sales fees`
   }
   return ''
 }
@@ -33,7 +33,7 @@ export default function PricingPage() {
   usePageMeta({
     title: 'Store Pricing',
     description:
-      'Open your verified storefront on LGS Card Vault for $450 flat or 10% of daily online sales until $450. Full platform access with no monthly fees after the cap.',
+      'Open your verified storefront on LGS Card Vault for $450 per month — pay in full up front, or 10% of daily online sales with the remainder charged at month end.',
     path: '/pricing',
   })
 
@@ -53,8 +53,10 @@ export default function PricingPage() {
           Simple pricing. Everything included.
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-fg-muted">
-          Open your verified storefront on LGS Card Vault for a flat $450, or pay 10% of each day's online sales
-          (settled at midnight) until you reach $450. Then keep every feature with no monthly bill and no sales fees.
+          Open your verified storefront for <span className="font-semibold text-fg">$450 per month</span> — pay the month
+          in full up front, or pay 10% of each day&apos;s online sales (settled at midnight Pacific) toward that month&apos;s
+          fee. Any remaining balance is charged to the card on file at month end; failed charges suspend the storefront
+          after warnings and retries.
         </p>
 
         {isPending ? (
@@ -102,7 +104,7 @@ export default function PricingPage() {
           <p className="mt-2 leading-relaxed">
             Square and PayPal charge their normal card-processing rates on each sale. That is separate from the LGS Card
             Vault platform fee. On the pay-as-you-sell plan, we collect {(plans[1]?.feePercentBps ?? 1000) / 100}% of each
-            day's online sales total at midnight Pacific until you have paid $450 total to the platform.
+            day's online sales at midnight Pacific toward that month's $450. The remainder is charged at month end.
           </p>
           <p className="mt-4">
             Questions?{' '}

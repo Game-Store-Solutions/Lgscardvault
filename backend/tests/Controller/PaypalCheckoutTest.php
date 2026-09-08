@@ -150,6 +150,17 @@ final class PaypalCheckoutTest extends WebTestCase
 
     public function testPaypalConnectRequiresConfiguration(): void
     {
+        foreach ([
+            'PAYPAL_SANDBOX_CLIENT_ID',
+            'PAYPAL_SANDBOX_CLIENT_SECRET',
+            'PAYPAL_LIVE_CLIENT_ID',
+            'PAYPAL_LIVE_CLIENT_SECRET',
+        ] as $key) {
+            $_ENV[$key] = '';
+            $_SERVER[$key] = '';
+            putenv($key.'=');
+        }
+
         $store = $this->fixtures->store();
         $owner = $store->getOwner();
         self::assertInstanceOf(User::class, $owner);

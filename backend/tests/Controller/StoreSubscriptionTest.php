@@ -62,7 +62,7 @@ final class StoreSubscriptionTest extends WebTestCase
         self::assertFalse($payload['capReached']);
     }
 
-    public function testBuyoutChargesRemainingCapAndSwitchesToFlat(): void
+    public function testBuyoutChargesRemainingCapAndKeepsUsagePlan(): void
     {
         $store = $this->usageStore(10_000);
         $beforeId = (int) $store->getId();
@@ -70,8 +70,8 @@ final class StoreSubscriptionTest extends WebTestCase
         $payload = $this->postBuyout($store);
 
         self::assertResponseIsSuccessful();
-        self::assertSame('flat', $payload['planKey']);
-        self::assertSame('Pay in full', $payload['planName']);
+        self::assertSame('usage', $payload['planKey']);
+        self::assertSame('Pay as you sell', $payload['planName']);
         self::assertFalse($payload['canBuyout']);
         self::assertTrue($payload['capReached']);
         self::assertSame(PlanCatalog::PLATFORM_CAP_CENTS, $payload['platformFeesPaidCents']);
@@ -81,7 +81,7 @@ final class StoreSubscriptionTest extends WebTestCase
 
         $reloaded = $this->em->find(Store::class, $beforeId);
         self::assertInstanceOf(Store::class, $reloaded);
-        self::assertSame('flat', $reloaded->getPlanKey());
+        self::assertSame('usage', $reloaded->getPlanKey());
         self::assertTrue($reloaded->hasMetPlatformCap());
     }
 
@@ -92,7 +92,7 @@ final class StoreSubscriptionTest extends WebTestCase
         $payload = $this->postBuyout($store);
 
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
-        self::assertSame('Save a platform payment method before paying toward the cap.', $payload['error']);
+        self::assertSame('Save a platform payment method before paying toward this month\'s fee.', $payload['error']);
         self::assertSame([], $this->billing->charges);
     }
 
@@ -135,17 +135,19 @@ final class StoreSubscriptionTest extends WebTestCase
         self::assertSame(15_000, $reloaded->getPlatformFeesPaidCents());
     }
 
-    public function testCustomAmountEqualToRemainingSwitchesToFlat(): void
+    public function testCustomAmountEqualToRemainingPaysMonthWithoutSwitchingPlan(): void
     {
         $store = $this->usageStore(40_000);
 
         $payload = $this->postBuyout($store, 5_000);
 
         self::assertResponseIsSuccessful();
-        self::assertSame('flat', $payload['planKey']);
+        self::assertSame('usage', $payload['planKey']);
         self::assertTrue($payload['capReached']);
         self::assertSame(PlanCatalog::PLATFORM_CAP_CENTS, $payload['platformFeesPaidCents']);
         self::assertSame(5_000, $this->billing->charges[0]['amount']);
+        self::assertSame('usage', $store->getPlanKey());
+        self::assertTrue($store->hasMetPlatformCap());
     }
 
     public function testCustomAmountOverRemainingIsRejected(): void
@@ -155,7 +157,7 @@ final class StoreSubscriptionTest extends WebTestCase
         $payload = $this->postBuyout($store, 40_000);
 
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
-        self::assertSame('That is more than the remaining $350.00 toward the platform cap.', $payload['error']);
+        self::assertSame('That is more than the remaining $350.00 toward this month\'s platform fee.', $payload['error']);
         self::assertSame([], $this->billing->charges);
     }
 
@@ -197,6 +199,70 @@ final class StoreSubscriptionTest extends WebTestCase
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
         self::assertSame('Connect Square or save a card on file before charging Square.', $payload['error']);
         self::assertSame([], $this->billing->charges);
+    }
+
+    public function testFlatPlanStatusShowsPaidInFull(): void
+    {
+        $store = $this->fixtures->store('flat-status-'.bin2hex(random_bytes(2)));
+        $store->setPlanKey('flat')
+            ->setSubscriptionStatus(Store::SUBSCRIPTION_ACTIVE)
+            ->setPaymentCustomerId('CUST1')
+            ->setPaymentCardId('ccof:CARD1')
+            ->setPaymentLast4('1111')
+            ->markPlatformCapReached();
+        $this->em->flush();
+
+        $payload = $this->getSubscription($store);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('flat', $payload['billingModel']);
+        self::assertSame('Pay in full', $payload['planName']);
+        self::assertTrue($payload['capReached']);
+        self::assertFalse($payload['canBuyout']);
+        self::assertFalse($payload['requiresVault']);
+        self::assertSame(0, $payload['remainingCapCents']);
+        self::assertSame(PlanCatalog::PLATFORM_CAP_CENTS, $payload['platformFeesPaidCents']);
+    }
+
+    public function testUpdatePaymentMethodReplacesCardAndClearsDunning(): void
+    {
+        $store = $this->usageStore(5_000);
+        $store->setSubscriptionStatus(Store::SUBSCRIPTION_PAST_DUE)
+            ->setNextAttemptAt(new \DateTimeImmutable('+3 days'));
+        $this->em->flush();
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/subscription/payment-method', $store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer($store),
+            ],
+            content: json_encode([
+                'methodType' => 'card',
+                'token' => 'tok_new_card',
+            ]),
+        );
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('4242', $payload['paymentLast4']);
+        self::assertSame(Store::SUBSCRIPTION_PAST_DUE, $payload['subscriptionStatus']);
+        self::assertSame('ccof:CARD2', $store->getPaymentCardId());
+        self::assertNull($store->getNextAttemptAt());
+    }
+
+    public function testBuyoutDeclineDoesNotChangeCapProgress(): void
+    {
+        $store = $this->usageStore(10_000);
+        $this->billing->declineWith = 'Card declined.';
+
+        $payload = $this->postBuyout($store, 5_000);
+
+        self::assertSame(502, $this->client->getResponse()->getStatusCode());
+        self::assertSame('Card declined.', $payload['error'] ?? null);
+        self::assertSame(10_000, $store->getPlatformFeesPaidCents());
+        self::assertSame('usage', $store->getPlanKey());
     }
 
     /**

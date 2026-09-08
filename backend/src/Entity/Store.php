@@ -502,10 +502,22 @@ class Store
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $nextAttemptAt = null;
 
-    /** Usage-plan progress toward the $450 platform cap (flat plans set this to the cap upfront). */
+    /** Usage-plan progress toward this month's $450 obligation (flat sets to cap when prepaid). */
     #[ORM\Column(options: ['default' => 0])]
     #[Groups(['store:admin'])]
     private int $platformFeesPaidCents = 0;
+
+    /** Period-end date (Y-m-d PT) for which the 7-day billing warning was already sent. */
+    #[ORM\Column(name: 'billing_warning_7_sent_for', type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $billingWarning7SentFor = null;
+
+    /** Period-end date for which the 3-day billing warning was already sent. */
+    #[ORM\Column(name: 'billing_warning_3_sent_for', type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $billingWarning3SentFor = null;
+
+    /** Period-end date for which the 1-day billing warning was already sent. */
+    #[ORM\Column(name: 'billing_warning_1_sent_for', type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $billingWarning1SentFor = null;
 
     /** card | apple_pay | google_pay | paypal */
     #[ORM\Column(length: 32, nullable: true)]
@@ -1537,22 +1549,117 @@ class Store
         return $this->platformFeesPaidCents >= 45000;
     }
 
-    /** Flat upfront payment or usage plan hit the $450 cap — no further platform fees. */
-    public function markPlatformCapReached(): static
+    /**
+     * This month's $450 is paid (flat prepaid or usage bought out / fully accrued).
+     * Daily usage fees stop until {@see openNextBillingMonth}.
+     */
+    public function markMonthObligationMet(?\DateTimeImmutable $now = null): static
     {
+        $now ??= new \DateTimeImmutable();
         $this->platformFeesPaidCents = 45000;
-        $this->markLifetimeAccess();
+        if (null === $this->currentPeriodEnd) {
+            $this->currentPeriodEnd = \App\Service\Billing\BillingPeriod::endOfMonthContaining($now);
+        }
+        $this->billingAttempts = 0;
+        $this->nextAttemptAt = null;
+        $this->subscriptionStatus = self::SUBSCRIPTION_ACTIVE;
 
         return $this;
     }
 
-    /** Paid-in-full or cap reached — skip monthly renewal forever. */
-    public function markLifetimeAccess(): static
+    /**
+     * Start the next calendar-month obligation after a successful close or prepaid renewal.
+     */
+    public function openNextBillingMonth(\DateTimeImmutable $now, bool $monthPrepaid = false): static
     {
-        $this->currentPeriodEnd = (new \DateTimeImmutable())->modify('+50 years');
-        $this->subscriptionStatus = self::SUBSCRIPTION_ACTIVE;
+        $anchor = $this->currentPeriodEnd ?? $now;
+        $end = \App\Service\Billing\BillingPeriod::endOfNextMonth($anchor);
+        while ($end <= $now) {
+            $end = \App\Service\Billing\BillingPeriod::endOfNextMonth($end);
+        }
+
+        $this->platformFeesPaidCents = $monthPrepaid ? 45000 : 0;
+        $this->currentPeriodEnd = $end;
+        $this->lastChargedAt = $now;
         $this->billingAttempts = 0;
         $this->nextAttemptAt = null;
+        $this->subscriptionStatus = self::SUBSCRIPTION_ACTIVE;
+        $this->billingWarning7SentFor = null;
+        $this->billingWarning3SentFor = null;
+        $this->billingWarning1SentFor = null;
+        $this->setIsActive(true);
+
+        return $this;
+    }
+
+    /** Assign the current PT calendar month as the billing period (onboarding). */
+    public function beginCurrentBillingMonth(\DateTimeImmutable $now, bool $monthPrepaid = false): static
+    {
+        $this->platformFeesPaidCents = $monthPrepaid ? 45000 : 0;
+        $this->currentPeriodEnd = \App\Service\Billing\BillingPeriod::endOfMonthContaining($now);
+        $this->billingAttempts = 0;
+        $this->nextAttemptAt = null;
+        $this->subscriptionStatus = self::SUBSCRIPTION_ACTIVE;
+        $this->billingWarning7SentFor = null;
+        $this->billingWarning3SentFor = null;
+        $this->billingWarning1SentFor = null;
+
+        return $this;
+    }
+
+    /** @deprecated Use markMonthObligationMet — $450 is a monthly obligation, not lifetime. */
+    public function markPlatformCapReached(): static
+    {
+        return $this->markMonthObligationMet();
+    }
+
+    /** @deprecated Lifetime access removed; prefer markMonthObligationMet / openNextBillingMonth. */
+    public function markLifetimeAccess(): static
+    {
+        return $this->markMonthObligationMet();
+    }
+
+    public function suspendForBillingFailure(): static
+    {
+        $this->subscriptionStatus = self::SUBSCRIPTION_SUSPENDED;
+        $this->nextAttemptAt = null;
+        $this->setIsActive(false);
+
+        return $this;
+    }
+
+    public function getBillingWarning7SentFor(): ?\DateTimeImmutable
+    {
+        return $this->billingWarning7SentFor;
+    }
+
+    public function setBillingWarning7SentFor(?\DateTimeImmutable $date): static
+    {
+        $this->billingWarning7SentFor = $date;
+
+        return $this;
+    }
+
+    public function getBillingWarning3SentFor(): ?\DateTimeImmutable
+    {
+        return $this->billingWarning3SentFor;
+    }
+
+    public function setBillingWarning3SentFor(?\DateTimeImmutable $date): static
+    {
+        $this->billingWarning3SentFor = $date;
+
+        return $this;
+    }
+
+    public function getBillingWarning1SentFor(): ?\DateTimeImmutable
+    {
+        return $this->billingWarning1SentFor;
+    }
+
+    public function setBillingWarning1SentFor(?\DateTimeImmutable $date): static
+    {
+        $this->billingWarning1SentFor = $date;
 
         return $this;
     }

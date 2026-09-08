@@ -234,3 +234,10 @@ when@test:
         App\Service\Payments\SubscriptionBillingInterface:
             alias: App\Tests\Support\FakeSubscriptionBilling
             public: true
+
+        # Same for PayPal SaaS billing (onboarding / buyout / nightly fees).
+        App\Tests\Support\FakePaypalSubscriptionBilling:
+            public: true
+        App\Service\Payments\PaypalSubscriptionBilling:
+            alias: App\Tests\Support\FakePaypalSubscriptionBilling
+            public: true

@@ -16,10 +16,10 @@ function planHeadline(plan: Plan): string {
 
 function planSubline(plan: Plan): string {
   if (plan.billingModel === 'usage') {
-    return `until ${formatPrice(plan.capCents ?? 45000)} · settled nightly`
+    return `${formatPrice(plan.capCents ?? 45000)} / mo · remainder at month end`
   }
   if (plan.priceCents > 0) {
-    return 'one-time'
+    return `${formatPrice(plan.priceCents)} / month`
   }
   return ''
 }

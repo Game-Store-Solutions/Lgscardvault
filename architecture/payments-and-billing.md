@@ -61,30 +61,33 @@ sequenceDiagram
 flowchart TD
     sched["BillingSchedule"] --> sub["03:15 UTC — ChargeDueSubscriptionsMessage"]
     sched --> fees["00:05 America/Los_Angeles — SettlePlatformDailyFeesMessage"]
-    sub --> ren["SubscriptionRenewer::run()"]
+    sched --> month["00:15 America/Los_Angeles — ClosePlatformBillingPeriodsMessage"]
+    sub --> ren["SubscriptionRenewer — legacy monthly only"]
     fees --> settle["PlatformDailyFeeSettler::run()"]
-    ren --> due["StoreRepository::findDueForRenewal(now)"]
-    due --> charge{"chargeVaultedCard<br/>idempotency: sub-id-period-attempt"}
-    charge -->|ok| paid["markSubscriptionCharged<br/>+ SubscriptionCharge paid"]
-    charge -->|decline| fail["past_due + backoff<br/>1d / 3d / 5d<br/>then suspended"]
-    settle --> ledgers["PlatformDailySalesLedger<br/>unsettled before today"]
-    ledgers --> daily{"10% of daily gross<br/>charge vaulted card"}
-    daily -->|ok| cap["recordCollectedFee<br/>toward $450 cap"]
+    month --> closer["PlatformMonthlyBillingCloser"]
+    closer --> warn["Warn emails at -7 / -3 / -1 days"]
+    closer --> close["Charge usage remainder or flat $450"]
+    close -->|ok| next["openNextBillingMonth"]
+    close -->|decline| fail["past_due + backoff then suspend + isActive false"]
+    settle --> ledgers["PlatformDailySalesLedger unsettled before today"]
+    ledgers --> daily["10% of daily gross toward this month's $450"]
 ```
 
-- A store is only charged once `currentPeriodEnd` has passed. Re-running the job the same day bills nothing.
-- Each attempt uses a deterministic idempotency key so overlapping cron runs collapse into one Square payment.
-- After three declines the store becomes `suspended` and is left alone until a human / new card intervenes.
-- Manual collection: `POST /api/admin/billing/{slug}/retry` (super-admin) or `app:subscriptions:charge`.
+- **$450 is a monthly Pacific calendar-month obligation**, not a lifetime cap.
+- **Flat:** prepaid $450 for the current month; renews $450 at month close.
+- **Usage:** nightly 10% of sales toward the month; remaining auto-charges at month end; mid-month buyout pays off *this* month only.
+- Warnings at 7 / 3 / 1 days before period end; failed close → dunning (1d / 3d / 5d) then **suspended** + storefront offline.
+- Legacy monthly tiers still use `SubscriptionRenewer`. Usage/flat use `PlatformMonthlyBillingCloser`.
+- Manual collection: `POST /api/admin/billing/{slug}/retry` (super-admin) or CLI settle/charge commands.
 - Usage-plan daily fees: `app:platform-fees:settle` (or the midnight schedule tick above).
 
 | Layer | Where |
 |-------|-------|
 | Frontend | `pages/onboarding/steps/PaymentStep.tsx`, `pages/store-admin/PaymentsTab.tsx`, `components/payments/SquarePaymentPanel.tsx`, `components/payments/PaypalButtons.tsx` |
 | Controllers | `OnboardingController`, `StoreSubscriptionController`, `AdminBillingController` |
-| Services | `SubscriptionBillingClient`, `PaypalSubscriptionBilling`, `SubscriptionRenewer`, `PlatformDailySalesAccrual`, `PlatformDailyFeeSettler`, `SquareCredentials`, `PaypalCredentials` |
+| Services | `SubscriptionBillingClient`, `PaypalSubscriptionBilling`, `SubscriptionRenewer`, `PlatformDailySalesAccrual`, `PlatformDailyFeeSettler`, `PlatformMonthlyBillingCloser`, `SquareCredentials`, `PaypalCredentials` |
 | Schedule | `Scheduler/BillingSchedule.php` → `messenger:consume scheduler_billing` |
-| Repo/DB | `stores` (period + dunning columns), `subscription_charges`, `platform_daily_sales_ledgers` |
+| Repo/DB | `stores` (period + dunning + billing warning columns), `subscription_charges`, `platform_daily_sales_ledgers` |
 
 ---
 
@@ -119,7 +122,7 @@ sequenceDiagram
 
 PayPal checkout creates a Orders v2 order with `payee.merchant_id` set to the connected store, then captures that order id on `POST .../checkout`. Tax is quoted via Square when Square is connected; **$0 tax in a sales-tax state blocks PayPal the same as cards**. PayPal-only stores in a tax state cannot capture online (pay-in-store remains). No-tax states (AK / DE / MT / NH / OR) can complete at $0 tax.
 
-**Usage-plan platform fees (10% until $450):** usage-plan stores accrue each shopper capture into `platform_daily_sales_ledgers` by Pacific business day. At **00:05 America/Los_Angeles** the scheduler charges **10% of the prior day's gross** against the vaulted card on file (`SettlePlatformDailyFeesMessage` → `PlatformDailyFeeSettler`). Progress is tracked on `stores.platform_fees_paid_cents`. No per-capture Square `app_fee_money` or PayPal `platform_fees` split — shoppers pay the store in full; the platform bills the owner nightly. Pay-in-store Square payment links accrue when the webhook reports a completed payment.
+**Usage-plan platform fees ($450 / month):** usage-plan stores accrue each shopper capture into `platform_daily_sales_ledgers` by Pacific business day. At **00:05 America/Los_Angeles** the scheduler charges **10% of the prior day's gross** against the vaulted card (`SettlePlatformDailyFeesMessage` → `PlatformDailyFeeSettler`). Progress is tracked on `stores.platform_fees_paid_cents` toward **this calendar month's** $450. At **00:15** `ClosePlatformBillingPeriodsMessage` warns (-7/-3/-1), then charges any remaining balance (or flat $450 renewal) and opens the next month — or suspends the storefront after dunning.
 
 Staff line edits do not touch PayPal until **Settle** (`POST .../payment-adjustment`). Removing cards issues one partial refund for the net credit. Adding cards cannot increase the original capture — the shopper approves one supplemental PayPal order from **Account → Orders** (registered) or the signed **email link** (`GET/POST .../guest/orders/{id}/…?token=…`). `orders.payment_captures` keeps every capture so a later full refund unwinds them all. Orders cannot move to ready/delivered while `balanceDueCents > 0`. Shrinking an order returns excess store credit to the customer's ledger automatically.
 
