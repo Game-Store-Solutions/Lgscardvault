@@ -393,6 +393,13 @@ class Store
     #[ORM\Column(name: 'kiosk_exit_code_hash', length: 255, nullable: true)]
     private ?string $kioskExitCodeHash = null;
 
+    /**
+     * Incremented when staff exit kiosk mode so previously issued session
+     * tokens stop authorizing unpaid kiosk checkout.
+     */
+    #[ORM\Column(name: 'kiosk_session_epoch', options: ['default' => 0])]
+    private int $kioskSessionEpoch = 0;
+
     // --- Enterprise onboarding: application status ---
 
     public const STATUS_PENDING = 'pending';
@@ -678,6 +685,18 @@ class Store
     public function isKioskExitCodeSet(): bool
     {
         return null !== $this->kioskExitCodeHash && '' !== $this->kioskExitCodeHash;
+    }
+
+    public function getKioskSessionEpoch(): int
+    {
+        return $this->kioskSessionEpoch;
+    }
+
+    public function bumpKioskSessionEpoch(): static
+    {
+        ++$this->kioskSessionEpoch;
+
+        return $this;
     }
 
     /** @return array<string, bool> */

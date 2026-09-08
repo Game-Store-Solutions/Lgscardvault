@@ -43,15 +43,16 @@ final class StoreKioskExitCodeTest extends WebTestCase
     }
 
     /** @param array<string, mixed> $body */
-    private function verifyExit(array $body): void
+    private function verifyExit(array $body, bool $authed = false): void
     {
+        $server = ['CONTENT_TYPE' => 'application/json'];
+        if ($authed) {
+            $server['HTTP_AUTHORIZATION'] = 'Bearer '.$this->bearer;
+        }
         $this->client->request(
             'POST',
             sprintf('/api/stores/%s/kiosk/verify-exit', $this->store->getSlug()),
-            server: [
-                'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer,
-            ],
+            server: $server,
             content: json_encode($body),
         );
     }
@@ -63,7 +64,7 @@ final class StoreKioskExitCodeTest extends WebTestCase
         self::assertArrayHasKey('kioskExitCodeSet', $read);
         self::assertFalse($read['kioskExitCodeSet']);
 
-        $this->verifyExit(['code' => '1234']);
+        $this->verifyExit(['code' => '1234'], authed: true);
         self::assertResponseIsSuccessful();
 
         $saved = $this->patchSettings(['kioskExitCode' => 'vault99']);
@@ -100,5 +101,58 @@ final class StoreKioskExitCodeTest extends WebTestCase
 
         $this->patchSettings(['kioskExitCode' => 'code with spaces']);
         self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testStartSessionRequiresExitCodeAndAuth(): void
+    {
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/kiosk/start', $this->store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer,
+            ],
+        );
+        self::assertResponseStatusCodeSame(422);
+
+        $this->patchSettings(['kioskExitCode' => 'vault99']);
+        self::assertResponseIsSuccessful();
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/kiosk/start', $this->store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearer,
+            ],
+        );
+        self::assertResponseIsSuccessful();
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertNotEmpty($body['token'] ?? null);
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/kiosk/order', $this->store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_KIOSK_SESSION' => $body['token'],
+            ],
+            content: json_encode(['customerName' => 'Walk-up', 'lines' => []]),
+        );
+        self::assertResponseStatusCodeSame(422);
+
+        $this->verifyExit(['code' => 'vault99']);
+        self::assertResponseIsSuccessful();
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/kiosk/order', $this->store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_KIOSK_SESSION' => $body['token'],
+            ],
+            content: json_encode(['customerName' => 'Walk-up', 'lines' => []]),
+        );
+        self::assertResponseStatusCodeSame(403);
     }
 }

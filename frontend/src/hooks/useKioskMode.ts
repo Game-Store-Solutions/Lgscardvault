@@ -1,24 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
+import {
+  clearKioskSession,
+  isKioskModeActive,
+  readKioskSessionToken,
+  readKioskStoreSlug,
+  writeKioskSession,
+} from '../lib/kioskMode'
 
-const STORAGE_KEY = 'kiosk-mode'
-const SLUG_KEY = 'kiosk-store-slug'
 const CHANGE_EVENT = 'kiosk-mode-change'
 
 function readEnabled(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
+  return isKioskModeActive()
 }
 
 function readSlug(): string | null {
-  try {
-    const value = localStorage.getItem(SLUG_KEY)
-    return value && value.trim() !== '' ? value.trim() : null
-  } catch {
-    return null
-  }
+  return readKioskStoreSlug()
+}
+
+function readSession(): string | null {
+  return readKioskSessionToken()
 }
 
 /**
@@ -28,18 +28,19 @@ function readSlug(): string | null {
  * the kiosk doesn't fall back into the owner's chrome; a custom event keeps
  * every subscribed component in sync within the tab.
  *
- * Leaving kiosk requires the store's admin-configured exit code (verified
- * server-side). The store slug is stored so route guards can bounce admin
- * URLs back to the storefront even when the path has no slug.
+ * A signed kiosk session token (minted at enter) authorizes checkout after
+ * the staff JWT expires — no session-expired popup on a customer terminal.
  */
 export function useKioskMode() {
   const [enabled, setEnabled] = useState(readEnabled)
   const [storeSlug, setStoreSlug] = useState<string | null>(readSlug)
+  const [sessionToken, setSessionToken] = useState<string | null>(readSession)
 
   useEffect(() => {
     const sync = () => {
       setEnabled(readEnabled())
       setStoreSlug(readSlug())
+      setSessionToken(readSession())
     }
     window.addEventListener(CHANGE_EVENT, sync)
     window.addEventListener('storage', sync)
@@ -49,30 +50,24 @@ export function useKioskMode() {
     }
   }, [])
 
-  const enterKioskMode = useCallback((slug: string) => {
-    const trimmed = slug.trim()
+  const enterKioskMode = useCallback((slug: string, nextSessionToken: string) => {
     try {
-      localStorage.setItem(STORAGE_KEY, '1')
-      localStorage.setItem(SLUG_KEY, trimmed)
+      writeKioskSession(slug, nextSessionToken)
     } catch {
-      // Storage unavailable (private mode) — state still updates in-tab.
+      // Storage unavailable (private mode) — state still updates in-tab via event.
     }
     window.dispatchEvent(new Event(CHANGE_EVENT))
   }, [])
 
   const exitKioskMode = useCallback(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, '0')
-      localStorage.removeItem(SLUG_KEY)
-    } catch {
-      // ignore
-    }
+    clearKioskSession()
     window.dispatchEvent(new Event(CHANGE_EVENT))
   }, [])
 
   return {
     kioskMode: enabled,
     kioskStoreSlug: storeSlug,
+    kioskSessionToken: sessionToken,
     enterKioskMode,
     exitKioskMode,
   }

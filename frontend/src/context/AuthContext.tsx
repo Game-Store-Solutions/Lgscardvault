@@ -14,6 +14,7 @@ import api, { httpStatus } from '../api/client'
 import type { UserProfile } from '../api/types'
 import { manageableStores } from '../lib/manageableStores'
 import { readJwtExpiryMs } from '../lib/jwtExpiry'
+import { isKioskModeActive } from '../lib/kioskMode'
 import { announceSessionExpired, onSessionExpired, resetSessionExpiry } from '../lib/sessionExpiry'
 
 interface AuthContextValue {
@@ -63,6 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       localStorage.removeItem('token')
       if (httpStatus(error) === 401 && userRef.current) {
+        if (isKioskModeActive()) {
+          // Customer-facing terminal: drop staff auth quietly and keep browsing.
+          resetSessionExpiry()
+          setToken(null)
+          setUser(null)
+          setSessionExpired(false)
+          return null
+        }
         announceSessionExpired()
         setToken(null)
         setSessionExpired(true)
@@ -82,6 +91,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     return onSessionExpired(() => {
+      if (isKioskModeActive()) {
+        // Never force logout / modal on a kiosk — clear staff JWT and continue.
+        resetSessionExpiry()
+        localStorage.removeItem('token')
+        setToken(null)
+        setUser(null)
+        setSessionExpired(false)
+        return
+      }
       if (!userRef.current) {
         resetSessionExpiry()
         return
@@ -98,7 +116,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const expiresAt = readJwtExpiryMs(token)
     if (expiresAt == null) return
     const wait = Math.max(0, expiresAt - Date.now())
-    const timer = window.setTimeout(() => announceSessionExpired(), wait)
+    const timer = window.setTimeout(() => {
+      if (isKioskModeActive()) {
+        resetSessionExpiry()
+        localStorage.removeItem('token')
+        setToken(null)
+        setUser(null)
+        setSessionExpired(false)
+        return
+      }
+      announceSessionExpired()
+    }, wait)
     return () => window.clearTimeout(timer)
   }, [token])
 

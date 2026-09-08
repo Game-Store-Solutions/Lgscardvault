@@ -71,15 +71,19 @@ export default function CartPage() {
   const { data: store } = useStore(slug)
   useStoreTheme(store)
 
-  const isGuest = !user
-  const { query, setItem, removeItem, setSealedItem, removeSealedItem, clear } = useStoreCart(slug, Boolean(user))
+  const { kioskMode, kioskSessionToken } = useKioskMode()
+  const isGuest = !user || kioskMode
+  // Kiosk terminals always use the local guest cart so checkout survives JWT expiry.
+  const { query, setItem, removeItem, setSealedItem, removeSealedItem, clear } = useStoreCart(
+    slug,
+    Boolean(user && !kioskMode),
+  )
   const { data: cart = [], isLoading } = query
   const [removed, setRemoved] = useState<RemovedLine | null>(null)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const fulfillment = 'pickup' as const
   const [contactName, setContactName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
-  const { kioskMode } = useKioskMode()
   const [kioskCustomerName, setKioskCustomerName] = useState('')
   const [useCredit, setUseCredit] = useState(false)
   const storeCreditEnabled = isStoreFeatureEnabled(store, 'storeCredit')
@@ -122,7 +126,7 @@ export default function CartPage() {
     async (order: Order) => {
       setCreatedOrder(order)
       setKioskCustomerName('')
-      if (isGuest) {
+      if (isGuest || kioskMode) {
         resetGuestCart(slug)
         queryClient.setQueryData(guestCartKey(slug), [])
         await queryClient.invalidateQueries({ queryKey: guestCartKey(slug) })
@@ -138,7 +142,7 @@ export default function CartPage() {
         queryClient.invalidateQueries({ queryKey: ['store-credit', slug] }),
       ])
     },
-    [queryClient, slug, isGuest],
+    [queryClient, slug, isGuest, kioskMode],
   )
 
   useEffect(() => {
@@ -152,10 +156,25 @@ export default function CartPage() {
 
   const testOrder = useMutation({
     mutationFn: async () => {
+      if (kioskMode) {
+        if (!kioskSessionToken) {
+          throw new Error('Kiosk session expired. Exit and re-enter kiosk mode.')
+        }
+        const { data } = await api.post<Order>(
+          `/stores/${slug}/kiosk/order`,
+          {
+            customerName: kioskCustomerName.trim(),
+            fulfillment: 'pickup',
+            lines: guestCartLines(cart),
+            sessionToken: kioskSessionToken,
+          },
+          { headers: { 'X-Kiosk-Session': kioskSessionToken } },
+        )
+        return data
+      }
       const { data } = await api.post<Order>(`/stores/${slug}/customer/test-order`, {
-        fulfillment: kioskMode ? 'pickup' : fulfillment,
-        ...(kioskMode ? { channel: 'kiosk', customerName: kioskCustomerName.trim() } : {}),
-        ...(useCredit && !kioskMode && storeCreditEnabled ? { useStoreCredit: true } : {}),
+        fulfillment,
+        ...(useCredit && storeCreditEnabled ? { useStoreCredit: true } : {}),
       })
       return data
     },
@@ -247,18 +266,13 @@ export default function CartPage() {
     setRemoved(null)
   }
 
-  if (!user && kioskMode) {
+  if (!kioskSessionToken && kioskMode) {
     return (
       <div className="mx-auto max-w-xl rounded-card border border-border bg-surface shadow-card">
         <EmptyState
           icon={ShoppingCart}
-          title="Sign in for kiosk mode"
-          description="Kiosk checkout is only available on a signed-in store terminal."
-          action={
-            <Link to="/login" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-              Sign in
-            </Link>
-          }
+          title="Kiosk session expired"
+          description="Ask staff to exit and re-enter kiosk mode with the exit code."
         />
       </div>
     )

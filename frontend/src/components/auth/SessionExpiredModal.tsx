@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
+import { useKioskMode } from '../../hooks'
 import { Button, Modal } from '../ui'
 
 const COUNTDOWN_SECONDS = 30
@@ -8,13 +9,15 @@ const COUNTDOWN_SECONDS = 30
 /** Overlay when the JWT expires: confirm they're here, then send them to sign in. */
 export function SessionExpiredModal() {
   const { sessionExpired, logout } = useAuth()
+  const { kioskMode } = useKioskMode()
   const navigate = useNavigate()
   const location = useLocation()
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS)
   const leaving = useRef(false)
 
   const onLogin = location.pathname === '/login' || location.pathname.startsWith('/login/')
-  const open = sessionExpired && !onLogin
+  // Kiosk terminals are customer-facing — never interrupt with auth prompts.
+  const open = sessionExpired && !onLogin && !kioskMode
 
   const goToLogin = useCallback(() => {
     if (leaving.current) return

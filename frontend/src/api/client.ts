@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { announceSessionExpired } from '../lib/sessionExpiry'
 import { jwtIsExpired } from '../lib/jwtExpiry'
+import { isKioskModeActive } from '../lib/kioskMode'
 
 const api = axios.create({
   baseURL: '/api',
@@ -15,7 +16,10 @@ api.interceptors.request.use((config) => {
   if (token) {
     if (jwtIsExpired(token)) {
       localStorage.removeItem('token')
-      announceSessionExpired()
+      // Kiosk terminals stay on guest shopping — never interrupt with auth UI.
+      if (!isKioskModeActive()) {
+        announceSessionExpired()
+      }
     } else {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -34,7 +38,8 @@ api.interceptors.request.use((config) => {
 })
 
 // Expired JWTs used to keep hitting the API and surface as generic failures.
-// Drop the token and tell Auth to prompt before signing out.
+// Drop the token and tell Auth to prompt before signing out — except on a
+// kiosk terminal, where the session quietly becomes a guest shopper.
 api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
@@ -43,7 +48,9 @@ api.interceptors.response.use(
     const isCredentialRequest = /\/login(?:\?|$)|\/register(?:\?|$)|\/auth\//.test(url)
     if (!isCredentialRequest && shouldPromptSessionExpiry(status, error)) {
       localStorage.removeItem('token')
-      announceSessionExpired()
+      if (!isKioskModeActive()) {
+        announceSessionExpired()
+      }
     }
     return Promise.reject(error)
   },

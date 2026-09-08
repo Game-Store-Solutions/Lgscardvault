@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router'
+import api, { extractErrorMessage } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { useCustomerCart, useGuestCart, useKioskMode, useStore, useTheme, APP_CHROME_CLASS, STORE_THEME_CLASS } from '../../hooks'
 import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
@@ -48,6 +49,7 @@ export default function AppLayout() {
   const { data: kioskStore } = useStore(kioskSlug ?? undefined)
   const [exitModalOpen, setExitModalOpen] = useState(false)
   const [enterError, setEnterError] = useState<string | null>(null)
+  const [enteringKiosk, setEnteringKiosk] = useState(false)
   const fullWidthAccount = Boolean(accountMatch || storeAccountMatch)
   const headerShell = fullWidthAccount
     ? FULL_WIDTH_APP_SHELL
@@ -55,10 +57,11 @@ export default function AppLayout() {
       ? STOREFRONT_SHELL
       : DEFAULT_APP_SHELL
   // Live cart count for the active store, so the navbar badge stays in sync.
-  const { data: authedCart = [] } = useCustomerCart(storeSlug ?? '', Boolean(user && storeSlug))
-  const { query: guestCartQuery } = useGuestCart(storeSlug ?? '', Boolean(!user && storeSlug))
+  // Kiosk always uses the guest cart (customer-facing), even if staff JWT is still present.
+  const { data: authedCart = [] } = useCustomerCart(storeSlug ?? '', Boolean(user && storeSlug && !kioskMode))
+  const { query: guestCartQuery } = useGuestCart(storeSlug ?? '', Boolean(storeSlug && (!user || kioskMode)))
   const guestCart = guestCartQuery.data ?? []
-  const cart = user ? authedCart : guestCart
+  const cart = user && !kioskMode ? authedCart : guestCart
   const cartCount = cart.reduce((total: number, entry) => total + entry.quantity, 0)
   const cartBadge = cartCount > 99 ? '99+' : String(cartCount)
   const location = useLocation()
@@ -73,7 +76,7 @@ export default function AppLayout() {
   const storeMenuRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
 
-  const tryEnterKiosk = () => {
+  const tryEnterKiosk = async () => {
     setEnterError(null)
     if (!kioskSlug) {
       setEnterError('Open your storefront first, then enter kiosk mode.')
@@ -84,8 +87,16 @@ export default function AppLayout() {
       navigate(`/s/${kioskSlug}/admin/settings`)
       return
     }
-    enterKioskMode(kioskSlug)
-    navigate(`/s/${kioskSlug}`)
+    setEnteringKiosk(true)
+    try {
+      const { data } = await api.post<{ token: string }>(`/stores/${kioskSlug}/kiosk/start`)
+      enterKioskMode(kioskSlug, data.token)
+      navigate(`/s/${kioskSlug}`)
+    } catch (error) {
+      setEnterError(extractErrorMessage(error, 'Could not start kiosk mode.'))
+    } finally {
+      setEnteringKiosk(false)
+    }
   }
 
   useEffect(() => {
@@ -189,17 +200,11 @@ export default function AppLayout() {
               </span>
               <div className="flex items-center gap-2">
                 {cartLink}
-                {(isStoreOwner || isSuperAdmin) && lockedSlug && (
+                {lockedSlug && (
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => {
-                      if (kioskStore?.kioskExitCodeSet === false) {
-                        exitKioskMode()
-                        return
-                      }
-                      setExitModalOpen(true)
-                    }}
+                    onClick={() => setExitModalOpen(true)}
                   >
                     <Monitor aria-hidden className="size-4" />
                     Exit kiosk
@@ -350,14 +355,15 @@ export default function AppLayout() {
                       <button
                         type="button"
                         role="menuitem"
+                        disabled={enteringKiosk}
                         onClick={() => {
                           setUserMenuOpen(false)
-                          tryEnterKiosk()
+                          void tryEnterKiosk()
                         }}
                         className={dropdownItemClass({})}
                       >
                         <Monitor aria-hidden className="size-4 text-fg-muted" />
-                        Enter kiosk mode
+                        {enteringKiosk ? 'Starting kiosk…' : 'Enter kiosk mode'}
                       </button>
                     )}
                     {enterError && (
@@ -507,13 +513,14 @@ export default function AppLayout() {
               {isStoreOwner && (
                 <button
                   type="button"
+                  disabled={enteringKiosk}
                   onClick={() => {
                     closeMobile()
-                    tryEnterKiosk()
+                    void tryEnterKiosk()
                   }}
                   className={`${mobileLinkClass} w-full text-left`}
                 >
-                  Enter kiosk mode
+                  {enteringKiosk ? 'Starting kiosk…' : 'Enter kiosk mode'}
                 </button>
               )}
               {enterError && (
