@@ -184,10 +184,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refreshUser,
-      isSuperAdmin: user?.roles.includes('ROLE_SUPER_ADMIN') ?? false,
-      isStoreOwner:
-        (user?.roles.includes('ROLE_STORE_OWNER') ?? false) ||
-        manageableStores(user).length > 0,
+      // Kiosk terminals are always customer-facing — never report staff roles.
+      isSuperAdmin: isKioskModeActive() ? false : (user?.roles.includes('ROLE_SUPER_ADMIN') ?? false),
+      isStoreOwner: isKioskModeActive()
+        ? false
+        : (user?.roles.includes('ROLE_STORE_OWNER') ?? false) || manageableStores(user).length > 0,
     }),
     [user, token, loading, sessionExpired, login, loginWithToken, register, logout, refreshUser],
   )

@@ -2,9 +2,10 @@ import { Navigate, Outlet, useLocation, useMatch } from 'react-router'
 import { useKioskMode } from '../../hooks'
 
 /**
- * While kiosk mode is on, only storefront shopping routes for the locked
- * store are allowed. Admin, account, auth, platform, and marketplace pages
- * redirect back to that store's home.
+ * While kiosk mode is on, only customer shopping routes for the locked store
+ * are allowed: browse, card details, cart, and related storefront pages.
+ * Admin, account, auth, platform, and marketplace pages redirect home.
+ * Inventory "manage" query params are stripped so edit modals cannot open.
  */
 export function KioskRouteGuard() {
   const { kioskMode, kioskStoreSlug } = useKioskMode()
@@ -24,11 +25,20 @@ export function KioskRouteGuard() {
     (path === `/s/${slug}` ||
       (path.startsWith(`/s/${slug}/`) &&
         !path.startsWith(`/s/${slug}/admin`) &&
-        !path.startsWith(`/s/${slug}/account`)))
+        !path.startsWith(`/s/${slug}/account`) &&
+        !path.startsWith(`/s/${slug}/sell`)))
 
-  if (shoppingAllowed) {
-    return <Outlet />
+  if (!shoppingAllowed) {
+    return <Navigate to={slug ? `/s/${slug}` : '/'} replace />
   }
 
-  return <Navigate to={slug ? `/s/${slug}` : '/'} replace />
+  // Drop manage=1 (and similar) so card-edit UI cannot be forced via URL.
+  const params = new URLSearchParams(location.search)
+  if (params.has('manage')) {
+    params.delete('manage')
+    const search = params.toString()
+    return <Navigate to={{ pathname: path, search: search ? `?${search}` : '', hash: location.hash }} replace />
+  }
+
+  return <Outlet />
 }
