@@ -434,11 +434,11 @@ export default function PaymentsTab({ slug }: { slug: string }) {
         <ProcessorCard
           brand="card"
           name="Debit card"
-          purpose={chargesNightlyFees ? 'Nightly fees' : undefined}
-          highlighted={Boolean(sub?.paymentConfigured)}
-          connected={Boolean(sub?.paymentConfigured)}
+          purpose="Nightly fees"
+          highlighted={chargesNightlyFees && Boolean(sub?.paymentConfigured)}
+          connected={chargesNightlyFees && Boolean(sub?.paymentConfigured)}
           detail={sub?.paymentLast4 ? `•••• ${sub.paymentLast4}` : undefined}
-          footerLabel={chargesNightlyFees ? 'we charge this' : ''}
+          footerLabel="we charge this"
           error={billingAlert || billingError}
           connecting={updatePaymentMutation.isPending}
           showRefresh={false}
