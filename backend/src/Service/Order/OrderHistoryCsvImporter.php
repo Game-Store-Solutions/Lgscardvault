@@ -115,6 +115,7 @@ final class OrderHistoryCsvImporter
          *   netCents: int,
          *   channel: string,
          *   fulfillment: string,
+         *   paymentStatus: string,
          *   notes: string|null,
          *   lines: list<array{cardName: string, quantity: int, priceCents: int}>,
          *   warnings: list<string>
@@ -207,6 +208,7 @@ final class OrderHistoryCsvImporter
                 'netCents' => $netCents,
                 'channel' => $this->mapChannel($cell('type')),
                 'fulfillment' => $this->mapFulfillment($cell('fulfillmentMethod')),
+                'paymentStatus' => $cell('paymentStatus'),
                 'notes' => $this->buildNotes($cell('paymentStatus'), $cell('trackingNumber'), $cell('shippingAddress'), $cell('refunded'), $rawOrderId),
                 'lines' => $lines,
                 'warnings' => $rowWarnings,
@@ -253,7 +255,12 @@ final class OrderHistoryCsvImporter
                 ->setChannel($candidate['channel'])
                 ->setTotalCents($candidate['totalCents'])
                 ->setTaxCents($candidate['taxCents'])
-                ->setPaidCents($this->paidCentsFor($candidate['status'], $candidate['netCents']))
+                ->setPaidCents($this->paidCentsFor(
+                    $candidate['status'],
+                    $candidate['totalCents'],
+                    $candidate['taxCents'],
+                    $candidate['paymentStatus'],
+                ))
                 ->setNotes($candidate['notes'])
                 ->setCreatedAt($candidate['createdAt']);
 
@@ -539,13 +546,36 @@ final class OrderHistoryCsvImporter
         return trim($cleaned);
     }
 
-    private function paidCentsFor(OrderStatus $status, int $netCents): int
+    private function paidCentsFor(OrderStatus $status, int $totalCents, int $taxCents, string $paymentStatus): int
     {
         if (OrderStatus::CANCELLED === $status || OrderStatus::PENDING === $status) {
             return 0;
         }
+        if ($this->isUnpaidPaymentStatus($paymentStatus)) {
+            return 0;
+        }
 
-        return max(0, $netCents);
+        // Match amountDueCents() (merchandise + tax) so imported rows don't
+        // start life with a phantom balance when tax is present.
+        return max(0, $totalCents + $taxCents);
+    }
+
+    private function isUnpaidPaymentStatus(string $raw): bool
+    {
+        $key = strtolower(trim($raw));
+        if ('' === $key) {
+            return false;
+        }
+
+        return in_array($key, [
+            'due at pickup',
+            'unpaid',
+            'owing',
+            'pay in store',
+            'paying in store',
+            'awaiting payment',
+            'pending payment',
+        ], true);
     }
 
     private function mapStatus(string $raw): ?OrderStatus
@@ -649,7 +679,7 @@ final class OrderHistoryCsvImporter
         string $refunded,
         string $legacyId,
     ): ?string {
-        $parts = [sprintf('Imported from legacy order %s', $legacyId)];
+        $parts = [sprintf('%s order %s', Order::NOTE_IMPORTED_PREFIX, $legacyId)];
         if ('' !== $paymentStatus) {
             $parts[] = 'Payment: '.$paymentStatus;
         }

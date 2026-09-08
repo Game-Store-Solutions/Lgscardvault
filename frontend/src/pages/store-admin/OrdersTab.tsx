@@ -34,6 +34,7 @@ import {
   freshStatusPresentation,
   orderAllowsLineEdits,
   orderBalanceDueCents,
+  orderIsHistoricalImport,
   orderCreditOwedCents,
   orderPrimaryProductName,
   paymentSubtitle,
@@ -241,6 +242,12 @@ export default function OrdersTab({ slug }: { slug: string }) {
         <h1 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Order Management</h1>
         <p className="mt-1 text-sm text-fg-muted">Track and manage all store orders in real time.</p>
       </header>
+
+      {updateStatus.isError && (
+        <p role="alert" className="rounded-btn border border-danger-500/30 bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
+          {extractErrorMessage(updateStatus.error, 'Could not update order status.')}
+        </p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <StatCard
@@ -919,8 +926,14 @@ function OrderDetailModal({
 }) {
   const queryClient = useQueryClient()
   const balanceDue = orderBalanceDueCents(order)
+  const historicalImport = orderIsHistoricalImport(order)
   const actions = statusActions(order.status).filter(
-    (action) => !(balanceDue > 0 && (action.status === 'fulfilled' || action.status === 'completed')),
+    (action) =>
+      !(
+        balanceDue > 0 &&
+        !historicalImport &&
+        (action.status === 'fulfilled' || action.status === 'completed')
+      ),
   )
   const statusUi = freshStatusPresentation(order.status)
   const canEdit = orderAllowsLineEdits(order.status, order.disputeStatus)

@@ -81,6 +81,9 @@ class Order
 
     public const NOTE_PAY_IN_STORE = 'Paying in store';
 
+    /** Prefix written by {@see \App\Service\Order\OrderHistoryCsvImporter}. */
+    public const NOTE_IMPORTED_PREFIX = 'Imported from legacy';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -579,6 +582,14 @@ class Order
     public function getNotes(): ?string
     {
         return $this->notes;
+    }
+
+    /** True for rows brought in by the legacy order-history CSV importer. */
+    public function isHistoricalImport(): bool
+    {
+        $notes = $this->notes ?? '';
+
+        return str_starts_with($notes, self::NOTE_IMPORTED_PREFIX);
     }
 
     public function setNotes(?string $notes): static

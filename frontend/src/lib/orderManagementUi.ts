@@ -222,6 +222,11 @@ export function orderBalanceDueCents(order: Order): number {
 
 }
 
+/** Legacy CSV history imports — notes start with this prefix from the importer. */
+export function orderIsHistoricalImport(order: Order): boolean {
+  return (order.notes ?? '').startsWith('Imported from legacy')
+}
+
 export function orderCreditOwedCents(order: Order): number {
   if (!orderAllowsPaymentAdjustment(order)) return 0
   return Math.max(0, (order.paidCents ?? 0) - orderAmountDueCents(order))
