@@ -386,6 +386,13 @@ class Store
     #[Groups(['store:read', 'store:admin'])]
     private ?array $communityEvents = null;
 
+    /**
+     * Password hash of the PIN required to leave kiosk mode on a storefront
+     * terminal. Never serialized; use {@see isKioskExitCodeSet()} instead.
+     */
+    #[ORM\Column(name: 'kiosk_exit_code_hash', length: 255, nullable: true)]
+    private ?string $kioskExitCodeHash = null;
+
     // --- Enterprise onboarding: application status ---
 
     public const STATUS_PENDING = 'pending';
@@ -651,6 +658,26 @@ class Store
         $this->listed = $isListed;
 
         return $this;
+    }
+
+    public function getKioskExitCodeHash(): ?string
+    {
+        return $this->kioskExitCodeHash;
+    }
+
+    public function setKioskExitCodeHash(?string $kioskExitCodeHash): static
+    {
+        $this->kioskExitCodeHash = $kioskExitCodeHash;
+
+        return $this;
+    }
+
+    /** Whether an exit code is configured (never exposes the code itself). */
+    #[Groups(['store:read', 'store:admin'])]
+    #[SerializedName('kioskExitCodeSet')]
+    public function isKioskExitCodeSet(): bool
+    {
+        return null !== $this->kioskExitCodeHash && '' !== $this->kioskExitCodeHash;
     }
 
     /** @return array<string, bool> */
