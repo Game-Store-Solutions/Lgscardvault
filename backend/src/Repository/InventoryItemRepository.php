@@ -375,11 +375,26 @@ class InventoryItemRepository extends ServiceEntityRepository
         if (!$this->isManaPipFilter($colors)) {
             foreach ($colors as $i => $name) {
                 $param = 'namedColor'.$i;
-                $qb->andWhere(
-                    'LOWER(COALESCE(CAST_AS_TEXT(c.colors), :emptyColor)) LIKE :'.$param
-                    .' OR LOWER(COALESCE(CAST_AS_TEXT(c.colorIdentity), :emptyColor)) LIKE :'.$param
-                    .' OR LOWER(COALESCE(c.typeLine, :emptyColor)) LIKE :'.$param,
-                )->setParameter($param, '%'.mb_strtolower($name).'%');
+                // FAB pitch filters send Red/Yellow/Blue; older/partial syncs may
+                // still store the numeric pitch (1/2/3). Match either form on the
+                // color columns only — never as a type-line substring (e.g. "Stage 1").
+                $aliases = match (mb_strtolower($name)) {
+                    'red' => ['red', '1'],
+                    'yellow' => ['yellow', '2'],
+                    'blue' => ['blue', '3'],
+                    default => [mb_strtolower($name)],
+                };
+                $parts = [];
+                foreach ($aliases as $j => $alias) {
+                    $aliasParam = $param.'a'.$j;
+                    $parts[] = 'LOWER(COALESCE(CAST_AS_TEXT(c.colors), :emptyColor)) LIKE :'.$aliasParam
+                        .' OR LOWER(COALESCE(CAST_AS_TEXT(c.colorIdentity), :emptyColor)) LIKE :'.$aliasParam;
+                    $qb->setParameter($aliasParam, '%'.$alias.'%');
+                }
+                $typeParam = $param.'type';
+                $parts[] = 'LOWER(COALESCE(c.typeLine, :emptyColor)) LIKE :'.$typeParam;
+                $qb->setParameter($typeParam, '%'.mb_strtolower($name).'%');
+                $qb->andWhere('('.implode(' OR ', $parts).')');
             }
             $qb->setParameter('emptyColor', '');
 

@@ -173,6 +173,33 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         self::assertSame(['W', 'U'], \App\Service\Inventory\InventoryCatalogFilters::fromQuery(['colors' => 'WU'])->colors);
     }
 
+    public function testCatalogPageFiltersFleshAndBloodPitchByName(): void
+    {
+        $store = $this->fixtures->store();
+        $red = $this->fixtures->card(601, [
+            'name' => 'Command and Conquer',
+            'set' => 'mon',
+            'colors' => ['Red'],
+            'color_identity' => ['Red'],
+            'type_line' => 'Action — Attack',
+        ]);
+        $blue = $this->fixtures->card(602, [
+            'name' => 'Aether Arc',
+            'set' => 'hvy',
+            'colors' => ['Blue'],
+            'color_identity' => ['Blue'],
+            'type_line' => 'Action',
+        ]);
+        $this->fixtures->inventoryItem($store, $red, 2);
+        $this->fixtures->inventoryItem($store, $blue, 2);
+
+        $filters = new \App\Service\Inventory\InventoryCatalogFilters(colors: ['Red']);
+        $page = $this->repo->findCatalogPage($store, 0, 24, null, true, $filters);
+
+        self::assertCount(1, $page);
+        self::assertSame('Command and Conquer', $page[0]->getCard()?->getName());
+    }
+
     public function testCatalogSetsAreDistinctAndInStockOnly(): void
     {
         $store = $this->fixtures->store();

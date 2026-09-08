@@ -448,12 +448,16 @@ final readonly class CatalogSynchronizer
      */
     private function extractColors(array $extended): ?array
     {
+        // TCGCSV names vary by game. FAB stores pitch as "Pitch Value"
+        // (indexed here as pitchvalue), not a Color field like One Piece.
         $raw = $extended['energytype']
             ?? $extended['color']
             ?? $extended['colour']
             ?? $extended['ink']
             ?? $extended['attribute']
             ?? $extended['pitch']
+            ?? $extended['pitchvalue']
+            ?? $extended['cardpitch']
             ?? null;
         if (!is_string($raw) || '' === trim($raw)) {
             return null;
