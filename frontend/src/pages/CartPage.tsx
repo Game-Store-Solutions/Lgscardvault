@@ -66,12 +66,12 @@ export default function CartPage() {
   const navigate = useNavigate()
   const { user, isSuperAdmin } = useAuth()
   const canManage = useCanManageStore(slug)
-  const showOwnerCheckoutDiagnostics = canManage || isSuperAdmin
   const queryClient = useQueryClient()
   const { data: store } = useStore(slug)
   useStoreTheme(store)
 
   const { kioskMode, kioskSessionToken } = useKioskMode()
+  const showOwnerCheckoutDiagnostics = !kioskMode && (canManage || isSuperAdmin)
   const isGuest = !user || kioskMode
   // Kiosk terminals always use the local guest cart so checkout survives JWT expiry.
   const { query, setItem, removeItem, setSealedItem, removeSealedItem, clear } = useStoreCart(

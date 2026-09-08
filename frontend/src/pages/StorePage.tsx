@@ -550,7 +550,7 @@ export default function StorePage() {
         }
       />
 
-      {isStoreFeatureEnabled(store, 'sellTrade') && <TradePromoBanner slug={slug} showSellLink />}
+      {isStoreFeatureEnabled(store, 'sellTrade') && !kioskMode && <TradePromoBanner slug={slug} showSellLink />}
 
       {/* Slim stat line */}
       <p className="text-sm text-fg-muted">
@@ -573,10 +573,15 @@ export default function StorePage() {
       {/* Quick actions. Themed shortcut tiles over the spotlight */}
       <section className="space-y-5">
         <p className="mx-auto max-w-2xl text-center text-sm text-fg/75 sm:text-base">
-          Browse thousands of in-stock singles, build decks, sell or trade your collection.
+          {kioskMode
+            ? 'Browse in-stock singles, pick a card, add it to your cart, and place your order.'
+            : 'Browse thousands of in-stock singles, build decks, sell or trade your collection.'}
         </p>
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
-          {QUICK_ACTIONS.filter(({ feature }) => !feature || isStoreFeatureEnabled(store, feature)).map(({ label, icon: Icon, path, action }) => {
+          {QUICK_ACTIONS.filter(({ feature, path }) => {
+            if (kioskMode && path === 'sell') return false
+            return !feature || isStoreFeatureEnabled(store, feature)
+          }).map(({ label, icon: Icon, path, action }) => {
             const tileClass =
               'group flex flex-col items-center justify-center gap-2 rounded-card px-2 py-3 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
             const content = (

@@ -24,6 +24,7 @@ import {
   useCustomerWantList,
   useInventory,
   useInventoryPage,
+  useKioskMode,
   useStore,
   useStoreTheme,
 } from '../hooks'
@@ -72,7 +73,6 @@ export default function CardDetailsPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const manageListing = searchParams.get('manage') === '1'
   // Pages that link here can pass `state.from` so "back" returns to where the
   // shopper actually came from (e.g. the case cards page) instead of always
   // landing on the storefront.
@@ -131,7 +131,8 @@ export default function CardDetailsPage() {
             ? 'Search'
             : null
   const { user } = useAuth()
-  const canManage = useCanManageStore(slug)
+  const { kioskMode } = useKioskMode()
+  const canManage = useCanManageStore(slug) && !kioskMode
   const queryClient = useQueryClient()
 
   // Which face of a multi-faced card is currently shown (0 = front).
@@ -140,6 +141,9 @@ export default function CardDetailsPage() {
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
+
+  // Never open inventory edit from a kiosk URL (?manage=1).
+  const manageListing = !kioskMode && canManage && searchParams.get('manage') === '1'
 
   const {
     data: item,
@@ -465,13 +469,13 @@ export default function CardDetailsPage() {
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {user && (
+          {user && !kioskMode && (
             <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
               <UserCircle aria-hidden className="size-4" />
               <span className="hidden sm:inline">Account</span>
             </Link>
           )}
-          {canManage && (
+          {canManage && !kioskMode && (
             <Link
               to={`/s/${slug}/cards/${item.id}?manage=1`}
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}

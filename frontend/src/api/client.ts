@@ -34,8 +34,34 @@ api.interceptors.request.use((config) => {
       delete (headers as { 'Content-Type'?: string })['Content-Type']
     }
   }
+
+  // Defense in depth: while a terminal is in kiosk mode, never send store-admin
+  // or platform-admin mutations even if a staff JWT somehow remains.
+  if (isKioskModeActive() && isKioskBlockedAdminRequest(config.method, config.url)) {
+    return Promise.reject(
+      Object.assign(new Error('Admin actions are disabled in kiosk mode.'), {
+        code: 'KIOSK_ADMIN_BLOCKED',
+        config,
+        isAxiosError: true,
+      }),
+    )
+  }
+
   return config
 })
+
+/** Store / platform management paths that must never run from a kiosk terminal. */
+function isKioskBlockedAdminRequest(method?: string, url?: string): boolean {
+  const verb = (method ?? 'get').toLowerCase()
+  if (verb === 'get' || verb === 'head' || verb === 'options') return false
+  const path = (url ?? '').split('?')[0]
+  if (!path) return false
+  if (/^\/?admin(?:\/|$)/.test(path)) return true
+  if (/\/stores\/[^/]+\/(?:sections|cases|imports|settings|team|reports|credit)(?:\/|$)/.test(path)) return true
+  if (/\/stores\/[^/]+\/inventory(?:\/|$)/.test(path) && verb !== 'get') return true
+  if (/\/stores\/[^/]+\/admin(?:\/|$)/.test(path)) return true
+  return false
+}
 
 // Expired JWTs used to keep hitting the API and surface as generic failures.
 // Drop the token and tell Auth to prompt before signing out — except on a

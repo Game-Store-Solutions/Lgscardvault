@@ -90,7 +90,10 @@ export default function AppLayout() {
     setEnteringKiosk(true)
     try {
       const { data } = await api.post<{ token: string }>(`/stores/${kioskSlug}/kiosk/start`)
+      // Drop the staff JWT immediately so Manage / admin APIs cannot be used
+      // from the customer terminal. Checkout uses the kiosk session token.
       enterKioskMode(kioskSlug, data.token)
+      logout()
       navigate(`/s/${kioskSlug}`)
     } catch (error) {
       setEnterError(extractErrorMessage(error, 'Could not start kiosk mode.'))
