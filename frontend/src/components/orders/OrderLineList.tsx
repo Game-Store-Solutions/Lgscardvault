@@ -24,7 +24,7 @@ export function OrderLineList({
   }
 
   return (
-    <div className="grid gap-2">
+    <div className={cx('grid', compact ? 'divide-y divide-border' : 'gap-2')}>
       {lines.map((line) => {
         const image = orderLineImage(line)
         const busy = busyLineId === line.id
@@ -32,8 +32,8 @@ export function OrderLineList({
           <div
             key={line.id}
             className={cx(
-              'flex items-center justify-between gap-3 rounded-btn border border-border bg-surface px-3 py-2',
-              compact && 'px-2 py-1.5',
+              'flex items-center justify-between gap-3',
+              compact ? 'px-0 py-2.5' : 'rounded-btn border border-border bg-surface px-3 py-2',
             )}
           >
             <div className="flex min-w-0 items-center gap-3">

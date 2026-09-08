@@ -57,6 +57,7 @@ final class WantListNotifierTest extends WebTestCase
         // The customer wants the card at store A.
         $this->authenticate($customer);
         $this->jsonRequest('POST', "/api/stores/{$storeA->getSlug()}/customer/want-list", [
+            'cardId' => (string) $card->getId(),
             'cardName' => $card->getName(),
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode());

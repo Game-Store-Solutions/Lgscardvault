@@ -6,6 +6,7 @@ use App\Entity\CustomerWantListEntry;
 use App\Entity\Store;
 use App\Entity\StoreCustomer;
 use App\Entity\User;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -91,5 +92,53 @@ class CustomerWantListEntryRepository extends ServiceEntityRepository
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Most-wanted cards for a store, ranked by total quantity then distinct shoppers.
+     *
+     * @return list<array{
+     *     cardName: string,
+     *     setCode: string|null,
+     *     finish: string,
+     *     quantity: int,
+     *     wanters: int,
+     *     entries: int
+     * }>
+     */
+    public function aggregateMostWantedForStore(Store $store, int $limit = 25): array
+    {
+        $limit = max(1, min(100, $limit));
+
+        $rows = $this->createQueryBuilder('w')
+            ->select(
+                'w.cardName AS cardName',
+                'MAX(w.setCode) AS setCode',
+                'w.finish AS finish',
+                'SUM(w.quantity) AS quantity',
+                'COUNT(DISTINCT c.id) AS wanters',
+                'COUNT(w.id) AS entries',
+            )
+            ->innerJoin('w.customer', 'c')
+            ->andWhere('c.store = :store')
+            ->setParameter('store', $store)
+            ->groupBy('w.cardName', 'w.finish')
+            ->orderBy('quantity', 'DESC')
+            ->addOrderBy('wanters', 'DESC')
+            ->addOrderBy('w.cardName', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static function (array $row): array {
+            return [
+                'cardName' => (string) ($row['cardName'] ?? ''),
+                'setCode' => isset($row['setCode']) && '' !== (string) $row['setCode'] ? (string) $row['setCode'] : null,
+                'finish' => (string) ($row['finish'] ?? FinishVocabulary::DEFAULT_PLAIN),
+                'quantity' => (int) ($row['quantity'] ?? 0),
+                'wanters' => (int) ($row['wanters'] ?? 0),
+                'entries' => (int) ($row['entries'] ?? 0),
+            ];
+        }, $rows);
     }
 }

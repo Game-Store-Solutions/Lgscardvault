@@ -67,7 +67,8 @@ export default function LoginPage() {
   const sso = useSsoStatus()
   const forgotTo = storeSlug ? `/forgot-password?store=${encodeURIComponent(storeSlug)}` : '/forgot-password'
 
-  const from = (location.state as { from?: string } | null)?.from ?? (storeSlug ? `/s/${storeSlug}` : '/')
+  const from = (location.state as { from?: string; sessionExpired?: boolean } | null)?.from ?? (storeSlug ? `/s/${storeSlug}` : '/')
+  const sessionExpired = Boolean((location.state as { sessionExpired?: boolean } | null)?.sessionExpired)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -120,6 +121,11 @@ export default function LoginPage() {
             </Link>
           </p>
 
+          {sessionExpired && (
+            <p role="status" className="mt-6 rounded-btn bg-brand-50 px-3 py-2 text-sm font-medium text-fg">
+              Your session expired. Sign in again to keep working.
+            </p>
+          )}
           {resetOk && (
             <p role="status" className="mt-6 rounded-btn bg-brand-50 px-3 py-2 text-sm font-medium text-fg">
               Password updated. Sign in with your new password.

@@ -1,0 +1,21 @@
+email,displayName,password,roles,emailVerified,dateOfBirth
+riley.jameson@example.com,Riley Jameson,,ROLE_USER,true,1994-02-18
+camila.rojas@example.com,Camila Rojas,,ROLE_USER,true,1991-06-03
+finn.gallagher@example.com,Finn Gallagher,,ROLE_USER,true,1998-09-27
+aisha.okonkwo@example.com,Aisha Okonkwo,,ROLE_USER,true,1989-12-11
+bennet.shaw@example.com,Bennet Shaw,,ROLE_USER,true,1996-04-05
+lucia.moretti@example.com,Lucia Moretti,,ROLE_USER,true,1993-08-22
+kai.nakamura@example.com,Kai Nakamura,,ROLE_USER,true,2000-01-14
+sara.lindqvist@example.com,Sara Lindqvist,,ROLE_USER,true,1987-07-29
+malik.thompson@example.com,Malik Thompson,,ROLE_USER,true,1995-11-08
+grace.holloway@example.com,Grace Holloway,,ROLE_USER,true,1992-03-25
+ivan.petrov@example.com,Ivan Petrov,,ROLE_USER,true,1988-10-16
+zoe.carter@example.com,Zoe Carter,,ROLE_USER,true,1999-05-01
+andre.duval@example.com,Andre Duval,,ROLE_USER,true,1990-12-19
+mei.lin@example.com,Mei Lin,,ROLE_USER,true,1997-02-07
+cole.brennan@example.com,Cole Brennan,,ROLE_USER,true,1986-06-30
+fatima.rahman@example.com,Fatima Rahman,,ROLE_USER,true,1994-09-13
+wyatt.cole@example.com,Wyatt Cole,,ROLE_USER,true,2001-04-21
+noor.alami@example.com,Noor Alami,,ROLE_USER,true,1993-01-28
+jasper.quinn@example.com,Jasper Quinn,,ROLE_USER,true,1991-08-09
+tessa.monroe@example.com,Tessa Monroe,,ROLE_USER,true,1996-11-17

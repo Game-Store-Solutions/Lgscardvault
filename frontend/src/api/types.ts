@@ -9,6 +9,16 @@ export interface ApiError {
 
 export type CardDisplayStyle = 'gallery' | 'marketplace'
 
+export type StoreFeatureKey =
+  | 'events'
+  | 'sellTrade'
+  | 'sealed'
+  | 'caseCards'
+  | 'massSearch'
+  | 'deckBuilder'
+  | 'spotlight'
+  | 'storeCredit'
+
 export interface StoreCommunityEventItem {
   id: string
   title: string
@@ -16,6 +26,7 @@ export interface StoreCommunityEventItem {
   description?: string
   location?: string
   externalUrl?: string
+  imageUrl?: string
   pinned?: boolean
 }
 
@@ -69,6 +80,8 @@ export interface Store {
   slug: string
   isActive?: boolean
   featured?: boolean
+  isListed?: boolean
+  features?: Partial<Record<StoreFeatureKey, boolean>>
   spotlightMinPriceCents?: number
   spotlightMinItems?: number
   spotlightMaxItems?: number
@@ -310,13 +323,31 @@ export interface PaymentClientConfig {
 export interface StoreSubscriptionStatus extends PaymentClientConfig {
   planKey?: string | null
   planName?: string | null
+  billingModel?: 'flat' | 'usage' | 'legacy_monthly' | string | null
   priceCents: number
+  capCents: number
+  /** This calendar month's $450 obligation. */
+  monthObligationCents?: number
+  feePercentBps: number
+  requiresVault: boolean
+  platformFeesPaidCents: number
+  remainingCapCents: number
+  progressPercent: number
+  /** True when this month's $450 is already paid (not lifetime). */
+  capReached: boolean
+  /** Usage: remaining will auto-charge at period end. */
+  willAutoChargeRemainder?: boolean
+  todayGrossCents: number
+  todayFeeCents: number
+  todayFeePercent: number
+  canBuyout: boolean
+  buyoutCents: number
   subscriptionStatus: string
   billingProvider?: 'square' | 'paypal' | string | null
   paymentMethodType?: PaymentMethodType | null
   paymentLast4?: string | null
   paymentConfigured: boolean
-  /** End of the paid period, and therefore the date of the next charge. */
+  /** End of the current billing month (Pacific). */
   currentPeriodEnd?: string | null
   lastChargedAt?: string | null
   /** Consecutive declined renewals; non-zero means the card needs attention. */
@@ -629,6 +660,8 @@ export interface CustomerWantListEntry {
   notes?: string | null
   /** Store listing to open on the storefront, when one matches this want. */
   inventoryItemId?: number | null
+  /** True when that store currently has copies in stock. */
+  inStock?: boolean
   createdAt: string
   storeSlug?: string | null
   storeName?: string | null
@@ -754,6 +787,8 @@ export interface UserProfile {
   email: string
   displayName: string
   avatarUrl?: string | null
+  coverImageUrl?: string | null
+  coverColor?: string | null
   roles: string[]
   emailVerified?: boolean
   ageVerified?: boolean
@@ -790,6 +825,38 @@ export interface AdminUserImportResult {
   dryRun: boolean
   errors: AdminUserImportIssue[]
   warnings: AdminUserImportIssue[]
+}
+
+export interface AdminOrderHistoryImportIssue {
+  row: number
+  orderId: string | null
+  message: string
+}
+
+export interface AdminOrderHistoryImportResult {
+  imported: number
+  skipped: number
+  matchedUsers: number
+  matchedOrders: number
+  cardsLinked?: number
+  dryRun: boolean
+  storeSlug: string
+  errors: AdminOrderHistoryImportIssue[]
+  warnings: AdminOrderHistoryImportIssue[]
+}
+
+export interface StoreWantListReportItem {
+  cardName: string
+  setCode: string | null
+  finish: string
+  quantity: number
+  wanters: number
+  entries: number
+}
+
+export interface StoreWantListReport {
+  storeSlug: string
+  items: StoreWantListReportItem[]
 }
 
 export interface ScryfallSyncResult {
@@ -839,7 +906,13 @@ export interface OrderLine {
     png?: string
   } | null
   setCode?: string | null
+  setName?: string | null
   collectorNumber?: string | null
+  rarity?: string | null
+  finish?: string | null
+  condition?: string | null
+  printingTags?: string[]
+  isSealed?: boolean
 }
 
 export type OrderFulfillment = 'pickup' | 'shipping'

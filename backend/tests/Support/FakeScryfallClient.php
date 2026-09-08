@@ -53,4 +53,9 @@ final class FakeScryfallClient extends ScryfallClient
             yield $page;
         }
     }
+
+    public function upsertPrintingsSearch(string $query, int $limit = 200): void
+    {
+        // Network-free: tests exercise the local catalog, not Scryfall paging.
+    }
 }

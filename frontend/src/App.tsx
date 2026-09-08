@@ -35,6 +35,7 @@ import ImportRunDetailsPage from './pages/store-admin/ImportRunDetailsPage'
 import FixFailedCardsPage from './pages/store-admin/recovery/FixFailedCardsPage'
 import PlatformAdminPage from './pages/PlatformAdminPage'
 import PlatformUsersPage from './pages/platform-admin/PlatformUsersPage'
+import OrderHistoryImportPage from './pages/platform-admin/OrderHistoryImportPage'
 import SyncJobsPage from './pages/platform-admin/SyncJobsPage'
 import PlatformReportsPage from './pages/platform-admin/PlatformReportsPage'
 import PatchNotesTab from './pages/store-admin/PatchNotesTab'
@@ -46,8 +47,11 @@ import PricingPage from './pages/PricingPage'
 // import PublicDeckBuilderPage from './pages/PublicDeckBuilderPage'
 import NewsletterAdminPage from './pages/platform-admin/NewsletterAdminPage'
 import NewsletterUnsubscribePage from './pages/NewsletterUnsubscribePage'
+import { StoreFeatureRoute } from './components/store/StoreFeatureRoute'
 import { CookieConsentBanner } from './components/CookieConsentBanner'
 import { AnalyticsLoader } from './components/AnalyticsLoader'
+import { SessionExpiredModal } from './components/auth/SessionExpiredModal'
+import { httpStatus } from './api/client'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,8 +65,13 @@ const queryClient = new QueryClient({
        * making tab-to-tab navigation instant.
        */
       staleTime: 30_000,
-      // Three retries tripled the wait before a failure surfaced.
-      retry: 1,
+      retry: (failureCount, error) => {
+        if (httpStatus(error) === 401) return false
+        return failureCount < 1
+      },
+    },
+    mutations: {
+      retry: false,
     },
   },
 })
@@ -75,6 +84,7 @@ export default function App() {
         <BrowserRouter>
           <ScrollToTop />
           <AnalyticsLoader />
+          <SessionExpiredModal />
           <Routes>
             {/* Full-screen auth flow (no app navbar) */}
             <Route element={<AuthLayout />}>
@@ -111,17 +121,59 @@ export default function App() {
               <Route path="merchant-terms" element={<LegalPage />} />
               <Route path="fan-content" element={<LegalPage />} />
               <Route path="s/:slug" element={<StorePage />} />
-              <Route path="s/:slug/sealed" element={<SealedBrowsePage />} />
-              <Route path="s/:slug/mass-search" element={<MassSearchPage />} />
-              <Route path="s/:slug/deck-builder" element={<CommanderSynergyPage />} />
-              <Route path="s/:slug/sell" element={<SellTradePage />} />
+              <Route
+                path="s/:slug/sealed"
+                element={
+                  <StoreFeatureRoute feature="sealed">
+                    <SealedBrowsePage />
+                  </StoreFeatureRoute>
+                }
+              />
+              <Route
+                path="s/:slug/mass-search"
+                element={
+                  <StoreFeatureRoute feature="massSearch">
+                    <MassSearchPage />
+                  </StoreFeatureRoute>
+                }
+              />
+              <Route
+                path="s/:slug/deck-builder"
+                element={
+                  <StoreFeatureRoute feature="deckBuilder">
+                    <CommanderSynergyPage />
+                  </StoreFeatureRoute>
+                }
+              />
+              <Route
+                path="s/:slug/sell"
+                element={
+                  <StoreFeatureRoute feature="sellTrade">
+                    <SellTradePage />
+                  </StoreFeatureRoute>
+                }
+              />
               <Route path="s/:slug/cart" element={<CartPage />} />
               <Route path="s/:slug/sets/:setCode" element={<SetBrowsePage />} />
               <Route path="s/:slug/artists" element={<ArtistBrowsePage />} />
               <Route path="s/:slug/artists/:artist" element={<ArtistLegacyRedirect />} />
               <Route path="s/:slug/cards/:id" element={<CardDetailsPage />} />
-              <Route path="s/:slug/case-cards" element={<CaseCardsPage />} />
-              <Route path="s/:slug/events" element={<StoreEventsPage />} />
+              <Route
+                path="s/:slug/case-cards"
+                element={
+                  <StoreFeatureRoute feature="caseCards">
+                    <CaseCardsPage />
+                  </StoreFeatureRoute>
+                }
+              />
+              <Route
+                path="s/:slug/events"
+                element={
+                  <StoreFeatureRoute feature="events">
+                    <StoreEventsPage />
+                  </StoreFeatureRoute>
+                }
+              />
               <Route path="pay-order/:slug/:orderId" element={<GuestOrderBalancePage />} />
               <Route
                 path="s/:slug/account"
@@ -157,6 +209,7 @@ export default function App() {
             >
               <Route index element={<PlatformAdminPage />} />
               <Route path="users" element={<PlatformUsersPage />} />
+              <Route path="order-history" element={<OrderHistoryImportPage />} />
               <Route path="reports" element={<PlatformReportsPage />} />
               <Route path="patch-notes" element={<PatchNotesTab />} />
               <Route path="newsletter" element={<NewsletterAdminPage />} />

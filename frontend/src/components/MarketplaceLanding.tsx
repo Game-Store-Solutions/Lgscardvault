@@ -5,6 +5,8 @@ import { ArrowRight, PackageSearch, ShieldCheck, Store, Wallet } from 'lucide-re
 import { BrandLogo } from './BrandLogo'
 import { FloatingCardsBackdrop } from './FloatingCardsBackdrop'
 import { useAuth } from '../context/AuthContext'
+import { useOnboardingDraft } from '../hooks/useOnboardingDraft'
+import { isOnboardingDraftInProgress } from '../pages/onboarding/draftStorage'
 import { useGameShowcase, useShowcaseCards } from '../hooks'
 import { useAppShellFlush } from './layout/AppShellLayout'
 import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
@@ -36,6 +38,8 @@ const TRUST_POINTS = [
 
 export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
+  const onboardingDraft = useOnboardingDraft()
+  const continueApplication = isOnboardingDraftInProgress(onboardingDraft)
   const { data: games = [], isLoading: gamesLoading } = useGameShowcase()
   // Each game's signature cards behind the hero, resolved from our catalog.
   // 12 per game fills the 60 layout slots when all five games are stocked.
@@ -145,6 +149,11 @@ export default function MarketplaceLanding() {
               <Link to="/platform/admin" className={secondaryCta}>
                 <Store aria-hidden className="size-4" />
                 Platform admin
+              </Link>
+            ) : continueApplication ? (
+              <Link to="/register/owner" className={secondaryCta}>
+                <Store aria-hidden className="size-4" />
+                Continue application
               </Link>
             ) : (
               <Link to="/register/owner" className={secondaryCta}>

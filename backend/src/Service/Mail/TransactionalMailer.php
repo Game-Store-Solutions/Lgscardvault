@@ -142,8 +142,8 @@ final class TransactionalMailer
         );
     }
 
-    /** Platform — one-time password reset link. */
-    public function sendPasswordReset(User $user, string $rawToken): void
+    /** Platform or store-branded — one-time password reset / set-password link. */
+    public function sendPasswordReset(User $user, string $rawToken, ?Store $store = null, bool $untilUsed = false): void
     {
         $email = $user->getEmail();
         if (null === $email || '' === $email) {
@@ -152,21 +152,233 @@ final class TransactionalMailer
 
         $name = $user->getDisplayName() ?: 'there';
         $resetUrl = $this->frontendUrl().'/reset-password?token='.rawurlencode($rawToken);
+        $brandName = $store?->getName() ?: 'LGS Card Vault';
+        $expiryCopy = $untilUsed
+            ? 'It stays valid until you use it, and can only be used once.'
+            : 'It expires in one hour and can only be used once.';
+
+        if ($store instanceof Store) {
+            $bodyIntro = sprintf('Your account is ready on LGS Card Vault. %s has sent this link', $brandName);
+            $preheader = sprintf('%s invited you to set your password on LGS Card Vault.', $brandName);
+            $subject = sprintf('Set your %s password', $brandName);
+            $footerNote = sprintf("You're receiving this because %s imported your account onto LGS Card Vault.", $brandName);
+            $textBody = sprintf(
+                "Hi %s,\n\nYour account is ready on LGS Card Vault. %s has sent this link — %s\n\n%s\n\nIf you did not expect this, you can ignore this email.\n",
+                $name,
+                $brandName,
+                lcfirst($expiryCopy),
+                $resetUrl,
+            );
+        } else {
+            $bodyIntro = 'We received a request to reset the password for your LGS Card Vault account';
+            $preheader = $untilUsed
+                ? 'Choose a new password. This link stays valid until you use it.'
+                : 'Choose a new password. This link expires in one hour.';
+            $subject = 'Reset your LGS Card Vault password';
+            $footerNote = "You're receiving this because a password reset was requested for this account.";
+            $textBody = sprintf(
+                "Hi %s,\n\nReset your LGS Card Vault password. %s\n\n%s\n\nIf you did not ask for this, you can ignore this email.\n",
+                $name,
+                $expiryCopy,
+                $resetUrl,
+            );
+        }
 
         $this->sendHtml(
             to: $email,
-            subject: 'Reset your LGS Card Vault password',
+            subject: $subject,
             htmlTemplate: 'emails/platform/password_reset.html.twig',
             context: [
-                'preheader' => 'Choose a new password. This link expires in one hour.',
+                'preheader' => $preheader,
                 'displayName' => $name,
                 'resetUrl' => $resetUrl,
-                'footerNote' => "You're receiving this because a password reset was requested for this account.",
+                'brandName' => $brandName,
+                'bodyIntro' => $bodyIntro,
+                'expiryCopy' => $expiryCopy,
+                'footerNote' => $footerNote,
+                // Static HTML confetti for store import invites (email clients can't run JS).
+                'celebrate' => $store instanceof Store && $untilUsed,
+            ],
+            textBody: $textBody,
+            store: $store,
+        );
+    }
+
+    /** Platform — days left before month-end auto-charge / renewal. */
+    public function sendBillingPeriodWarning(Store $store, int $daysLeft, int $amountDueCents, \DateTimeImmutable $periodEnd): void
+    {
+        $owner = $store->getOwner();
+        $to = $owner?->getEmail();
+        if (null === $to || '' === $to) {
+            return;
+        }
+
+        $name = $store->getName() ?? 'Your store';
+        $amount = number_format($amountDueCents / 100, 2);
+        $when = $periodEnd->setTimezone(new \DateTimeZone('America/Los_Angeles'))->format('F j, Y');
+        $paymentsUrl = $this->frontendUrl().'/s/'.$store->getSlug().'/admin/payments';
+        $dayLabel = 1 === $daysLeft ? '1 day' : $daysLeft.' days';
+
+        $this->sendHtml(
+            to: $to,
+            subject: sprintf('%s platform fee — %s left', $name, $dayLabel),
+            htmlTemplate: 'emails/platform/billing_period_warning.html.twig',
+            context: [
+                'preheader' => sprintf('$%s is due on %s. Your card on file will be charged.', $amount, $when),
+                'displayName' => $owner?->getDisplayName() ?: 'there',
+                'storeName' => $name,
+                'daysLeft' => $daysLeft,
+                'dayLabel' => $dayLabel,
+                'amountDue' => $amount,
+                'periodEndLabel' => $when,
+                'paymentsUrl' => $paymentsUrl,
+                'footerNote' => "You're receiving this because you operate a store on LGS Card Vault.",
             ],
             textBody: sprintf(
-                "Hi %s,\n\nReset your LGS Card Vault password (expires in one hour):\n%s\n\nIf you did not ask for this, you can ignore this email.\n",
+                "Hi %s,\n\n%s has $%s remaining toward this month's $450 platform fee.\nIn %s (by %s) we will charge the card on file for that balance.\n\nPay early or update your card: %s\n\nIf the charge fails, your storefront will be suspended after retries.\n",
+                $owner?->getDisplayName() ?: 'there',
                 $name,
-                $resetUrl,
+                $amount,
+                $dayLabel,
+                $when,
+                $paymentsUrl,
+            ),
+            store: null,
+        );
+    }
+
+    public function sendBillingRemainderCharged(Store $store, int $amountCents): void
+    {
+        $this->sendBillingChargeReceipt(
+            $store,
+            $amountCents,
+            sprintf('%s — month remainder charged', $store->getName() ?? 'Store'),
+            'emails/platform/billing_remainder_charged.html.twig',
+            'We charged the remaining balance for this month\'s platform fee.',
+        );
+    }
+
+    public function sendBillingRenewalCharged(Store $store, int $amountCents): void
+    {
+        $this->sendBillingChargeReceipt(
+            $store,
+            $amountCents,
+            sprintf('%s — monthly platform fee charged', $store->getName() ?? 'Store'),
+            'emails/platform/billing_renewal_charged.html.twig',
+            'We charged this month\'s $450 platform fee to the card on file.',
+        );
+    }
+
+    public function sendBillingChargeFailed(Store $store, int $amountCents, string $reason): void
+    {
+        $owner = $store->getOwner();
+        $to = $owner?->getEmail();
+        if (null === $to || '' === $to) {
+            return;
+        }
+
+        $name = $store->getName() ?? 'Your store';
+        $amount = number_format($amountCents / 100, 2);
+        $paymentsUrl = $this->frontendUrl().'/s/'.$store->getSlug().'/admin/payments';
+
+        $this->sendHtml(
+            to: $to,
+            subject: sprintf('%s platform fee could not be charged', $name),
+            htmlTemplate: 'emails/platform/billing_charge_failed.html.twig',
+            context: [
+                'preheader' => sprintf('We could not charge $%s. Update your payment method to avoid suspension.', $amount),
+                'displayName' => $owner?->getDisplayName() ?: 'there',
+                'storeName' => $name,
+                'amountDue' => $amount,
+                'reason' => $reason,
+                'paymentsUrl' => $paymentsUrl,
+                'footerNote' => "You're receiving this because a platform fee charge failed for your store.",
+            ],
+            textBody: sprintf(
+                "Hi %s,\n\nWe could not charge $%s for %s.\nReason: %s\n\nUpdate your payment method: %s\nWe will retry; repeated failures suspend the storefront.\n",
+                $owner?->getDisplayName() ?: 'there',
+                $amount,
+                $name,
+                $reason,
+                $paymentsUrl,
+            ),
+            store: null,
+        );
+    }
+
+    public function sendBillingSuspended(Store $store): void
+    {
+        $owner = $store->getOwner();
+        $to = $owner?->getEmail();
+        if (null === $to || '' === $to) {
+            return;
+        }
+
+        $name = $store->getName() ?? 'Your store';
+        $paymentsUrl = $this->frontendUrl().'/s/'.$store->getSlug().'/admin/payments';
+
+        $this->sendHtml(
+            to: $to,
+            subject: sprintf('%s storefront suspended — payment required', $name),
+            htmlTemplate: 'emails/platform/billing_suspended.html.twig',
+            context: [
+                'preheader' => 'Your storefront is offline until the platform fee is paid.',
+                'displayName' => $owner?->getDisplayName() ?: 'there',
+                'storeName' => $name,
+                'paymentsUrl' => $paymentsUrl,
+                'footerNote' => "You're receiving this because platform billing failed for your store.",
+            ],
+            textBody: sprintf(
+                "Hi %s,\n\n%s has been suspended because we could not collect this month's platform fee.\nUpdate your card and pay the balance here: %s\n",
+                $owner?->getDisplayName() ?: 'there',
+                $name,
+                $paymentsUrl,
+            ),
+            store: null,
+        );
+    }
+
+    private function sendBillingChargeReceipt(
+        Store $store,
+        int $amountCents,
+        string $subject,
+        string $template,
+        string $intro,
+    ): void {
+        $owner = $store->getOwner();
+        $to = $owner?->getEmail();
+        if (null === $to || '' === $to) {
+            return;
+        }
+
+        $name = $store->getName() ?? 'Your store';
+        $amount = number_format($amountCents / 100, 2);
+        $paymentsUrl = $this->frontendUrl().'/s/'.$store->getSlug().'/admin/payments';
+        $periodEnd = $store->getCurrentPeriodEnd()
+            ?->setTimezone(new \DateTimeZone('America/Los_Angeles'))
+            ->format('F j, Y');
+
+        $this->sendHtml(
+            to: $to,
+            subject: $subject,
+            htmlTemplate: $template,
+            context: [
+                'preheader' => sprintf('Charged $%s to the card on file.', $amount),
+                'displayName' => $owner?->getDisplayName() ?: 'there',
+                'storeName' => $name,
+                'intro' => $intro,
+                'amountCharged' => $amount,
+                'periodEndLabel' => $periodEnd,
+                'paymentsUrl' => $paymentsUrl,
+                'footerNote' => "You're receiving this because a platform fee was charged for your store.",
+            ],
+            textBody: sprintf(
+                "Hi %s,\n\n%s\nAmount: $%s\n%s\n\nBilling: %s\n",
+                $owner?->getDisplayName() ?: 'there',
+                $intro,
+                $amount,
+                $periodEnd ? 'Next period ends '.$periodEnd.'.' : '',
+                $paymentsUrl,
             ),
             store: null,
         );

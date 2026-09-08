@@ -94,6 +94,9 @@ final class CatalogFixtures
         $card->setEdhrecRank(isset($data['edhrec_rank']) ? (int) $data['edhrec_rank'] : null);
         $card->setArtist(isset($data['artist']) ? (string) $data['artist'] : null);
         $card->setScryfallData($data);
+        if (isset($data['image_uris']) && \is_array($data['image_uris'])) {
+            $card->setImageUris($data['image_uris']);
+        }
         $this->em->persist($card);
         $this->em->flush();
 

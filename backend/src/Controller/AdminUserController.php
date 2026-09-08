@@ -25,10 +25,17 @@ final class AdminUserController extends AbstractController
     private const ALLOWED_MIME_TYPES = [
         'text/csv',
         'text/plain',
+        'text/x-csv',
+        'text/comma-separated-values',
         'application/csv',
+        'application/x-csv',
+        'application/excel',
         'application/vnd.ms-excel',
         'application/octet-stream',
     ];
+
+    /** @var list<string> */
+    private const SPREADSHEET_EXTENSIONS = ['xlsx', 'xls', 'xlsm', 'ods'];
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -42,7 +49,7 @@ final class AdminUserController extends AbstractController
      * Import shoppers (and optional store owners) from a previous site CSV.
      * Existing emails are skipped; old password hashes cannot be reused.
      */
-    #[Route('/import', name: 'api_admin_users_import', methods: ['POST'])]
+    #[Route('/import', name: 'api_admin_users_import', methods: ['POST'], priority: 10)]
     public function import(Request $request): JsonResponse
     {
         $file = $request->files->get('file');
@@ -60,8 +67,24 @@ final class AdminUserController extends AbstractController
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if (in_array($extension, self::SPREADSHEET_EXTENSIONS, true)) {
+            return $this->json(
+                ['error' => 'Excel workbooks are not accepted. Export the sheet as CSV and try again.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+            );
+        }
         if (!$this->looksLikeCsv($file)) {
             return $this->json(['error' => 'Only CSV files are accepted.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $brandStore = null;
+        $storeSlug = trim((string) $request->request->get('storeSlug', ''));
+        if ('' !== $storeSlug) {
+            $brandStore = $this->stores->findOneBySlug($storeSlug);
+            if (null === $brandStore) {
+                return $this->json(['error' => 'Store not found.'], Response::HTTP_NOT_FOUND);
+            }
         }
 
         try {
@@ -70,6 +93,7 @@ final class AdminUserController extends AbstractController
                 $request->request->getBoolean('dryRun'),
                 $request->request->getBoolean('sendResetEmails', true),
                 $request->request->getBoolean('allowPlatformAdmins'),
+                $brandStore,
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -118,12 +142,15 @@ final class AdminUserController extends AbstractController
     private function looksLikeCsv(UploadedFile $file): bool
     {
         $extension = strtolower((string) $file->getClientOriginalExtension());
-        if ('' !== $extension && 'csv' !== $extension && 'txt' !== $extension) {
+        if (in_array($extension, ['csv', 'txt'], true)) {
+            return true;
+        }
+        if ('' !== $extension) {
             return false;
         }
 
-        $mime = (string) $file->getClientMimeType();
+        $mime = strtolower((string) $file->getClientMimeType());
 
-        return '' === $mime || in_array(strtolower($mime), self::ALLOWED_MIME_TYPES, true);
+        return '' === $mime || in_array($mime, self::ALLOWED_MIME_TYPES, true);
     }
 }

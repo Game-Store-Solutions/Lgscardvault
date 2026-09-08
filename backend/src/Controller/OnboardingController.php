@@ -270,13 +270,14 @@ class OnboardingController extends AbstractController
             ->setPaymentCardId($subscription['cardId']);
 
         if ($this->planCatalog->isFlatPlan($planKey) && $upfrontCents > 0) {
-            $store->markPlatformCapReached();
+            $store->beginCurrentBillingMonth(new \DateTimeImmutable(), monthPrepaid: true);
             $store->setLastChargedAt(new \DateTimeImmutable());
             $this->entityManager->persist(SubscriptionCharge::paid($store, $upfrontCents, $subscription['reference']));
         } elseif ($this->planCatalog->isUsagePlan($planKey)) {
-            $store->setSubscriptionStatus(Store::SUBSCRIPTION_ACTIVE);
-            if ($upfrontCents > 0 && 'paypal' === $methodType) {
-                $this->entityManager->persist(SubscriptionCharge::paid($store, min($upfrontCents, 100), $subscription['reference']));
+            $store->beginCurrentBillingMonth(new \DateTimeImmutable(), monthPrepaid: false);
+            // PayPal usage onboarding captures $1 to vault — keep it on the ledger.
+            if ('paypal' === $methodType) {
+                $this->entityManager->persist(SubscriptionCharge::paid($store, 100, $subscription['reference']));
             }
         } elseif ($upfrontCents > 0) {
             $store->markSubscriptionCharged(new \DateTimeImmutable());

@@ -197,4 +197,26 @@ final class SubscriptionRenewerTest extends KernelTestCase
         self::assertCount(1, $results);
         self::assertSame('would_charge', $results[0]['outcome']);
     }
+
+    public function testFlatPlanIsSkippedByLegacyRenewer(): void
+    {
+        $store = $this->subscribedStore(plan: 'flat', periodEnd: '-1 day');
+        $store->markMonthObligationMet();
+        $this->em->flush();
+
+        $results = $this->renewer->run();
+
+        self::assertSame([], $this->billing->charges);
+        self::assertSame('skipped', $results[0]['outcome'] ?? null);
+    }
+
+    public function testUsagePlanIsSkippedByLegacyRenewer(): void
+    {
+        $this->subscribedStore(plan: 'usage', periodEnd: '-1 day');
+
+        $results = $this->renewer->run();
+
+        self::assertSame([], $this->billing->charges);
+        self::assertSame('skipped', $results[0]['outcome'] ?? null);
+    }
 }

@@ -92,6 +92,7 @@ final class CatalogSynchronizerTest extends KernelTestCase
                         ['name' => 'Number', 'value' => 'OP01-003'],
                         ['name' => 'Rarity', 'value' => 'L'],
                         ['name' => 'CardType', 'value' => 'Leader'],
+                        ['name' => 'Color', 'value' => 'Red'],
                         ['name' => 'Power', 'value' => '5000'],
                         ['name' => 'Description', 'value' => '[Activate: Main] Give this Leader +1000 power.'],
                     ],
@@ -141,6 +142,8 @@ final class CatalogSynchronizerTest extends KernelTestCase
         self::assertSame('OP01-003', $card->getCollectorNumber());
         self::assertSame('L', $card->getRarity());
         self::assertSame('Leader', $card->getTypeLine());
+        self::assertSame(['Red'], $card->getColors());
+        self::assertSame(['Red'], $card->getColorIdentity());
         self::assertSame(450001, $card->getTcgplayerProductId());
         self::assertSame(['usd' => '2.50', 'usd_foil' => '12.34'], $card->getPrices());
         self::assertNull($card->getScryfallData(), 'TCGCSV cards must never look Scryfall-sourced');

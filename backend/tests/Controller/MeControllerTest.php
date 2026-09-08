@@ -66,6 +66,10 @@ final class MeControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSame('New Name', $body['displayName']);
         self::assertSame('https://cdn.example/me.png', $body['avatarUrl']);
+        self::assertArrayHasKey('coverImageUrl', $body);
+        self::assertArrayHasKey('coverColor', $body);
+        self::assertNull($body['coverImageUrl']);
+        self::assertNull($body['coverColor']);
         self::assertArrayHasKey('ageVerified', $body);
         self::assertArrayNotHasKey('dateOfBirth', $body);
 
@@ -73,6 +77,32 @@ final class MeControllerTest extends WebTestCase
         $body = $this->jsonRequest('PATCH', '/api/me', ['avatarUrl' => '']);
         self::assertNull($body['avatarUrl']);
         $this->jsonRequest('PATCH', '/api/me', ['avatarUrl' => 'javascript:alert(1)']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testProfileCoverImageAndColor(): void
+    {
+        $user = $this->fixtures->user(['ROLE_USER']);
+        $this->authenticate($user);
+
+        $body = $this->jsonRequest('PATCH', '/api/me', [
+            'coverImageUrl' => 'https://cdn.example/cover.jpg',
+            'coverColor' => 'DC2626',
+        ]);
+        self::assertResponseIsSuccessful();
+        self::assertSame('https://cdn.example/cover.jpg', $body['coverImageUrl']);
+        self::assertSame('#dc2626', $body['coverColor']);
+
+        $body = $this->jsonRequest('PATCH', '/api/me', [
+            'coverImageUrl' => '',
+            'coverColor' => '',
+        ]);
+        self::assertNull($body['coverImageUrl']);
+        self::assertNull($body['coverColor']);
+
+        $this->jsonRequest('PATCH', '/api/me', ['coverColor' => 'red']);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        $this->jsonRequest('PATCH', '/api/me', ['coverImageUrl' => 'javascript:alert(1)']);
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
     }
 
@@ -211,10 +241,17 @@ final class MeControllerTest extends WebTestCase
             'cardName' => $card->getName(),
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        $cardB = $this->fixtures->card(961);
         $this->jsonRequest('POST', "/api/stores/{$storeB->getSlug()}/customer/want-list", [
-            'cardName' => 'Sol Ring',
+            'cardId' => (string) $cardB->getId(),
+            'cardName' => $cardB->getName(),
         ]);
         self::assertSame(201, $this->client->getResponse()->getStatusCode());
+
+        $this->jsonRequest('POST', "/api/stores/{$storeA->getSlug()}/customer/want-list", [
+            'cardName' => 's',
+        ]);
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
 
         $all = $this->jsonRequest('GET', '/api/me/want-list');
         self::assertSame(2, $all['total'] ?? null);
@@ -228,6 +265,7 @@ final class MeControllerTest extends WebTestCase
         self::assertCount(1, $filtered['items'] ?? []);
         self::assertSame($storeA->getSlug(), $filtered['items'][0]['storeSlug'] ?? null);
         self::assertSame($card->getName(), $filtered['items'][0]['cardName'] ?? null);
+        self::assertFalse($filtered['items'][0]['inStock'] ?? true);
     }
 
     public function testMarkingNotificationsReadClearsUnreadList(): void

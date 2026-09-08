@@ -24,10 +24,10 @@ export function SealedProductCard({
   const lowStock = line.quantity <= 3
 
   return (
-    <article className={cx('group relative w-full', className)}>
+    <article className={cx('group relative min-w-0', className ?? 'w-full')}>
       <div
         className={cx(
-          'relative flex aspect-[5/7] w-full items-center justify-center overflow-hidden rounded-xl store-frame store-frame-tile p-3',
+          'relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-white p-2 store-frame store-frame-tile',
           'transition-colors group-hover:border-brand-500/40',
         )}
       >

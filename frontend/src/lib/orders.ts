@@ -32,6 +32,11 @@ export function normalizeWorkflowStatus(status: OrderStatus): OrderStatus {
   return status
 }
 
+/** Cancelled and refunded orders never continue the pickup pipeline. */
+export function isClosedOrderStatus(status: OrderStatus): boolean {
+  return status === 'cancelled' || status === 'refunded'
+}
+
 export function orderItemCount(order: Pick<Order, 'lines'>): number {
   return (order.lines ?? []).reduce((sum, line) => sum + line.quantity, 0)
 }

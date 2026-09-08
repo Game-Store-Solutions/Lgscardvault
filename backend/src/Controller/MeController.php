@@ -37,6 +37,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class MeController extends AbstractController
 {
     private const URL_PATTERN = '#^(https?://|/)#';
+    private const HEX_PATTERN = '/^#[0-9A-Fa-f]{6}$/';
     private const MIN_PASSWORD_LENGTH = 8;
 
     public function __construct(
@@ -65,7 +66,7 @@ class MeController extends AbstractController
         return $this->json($this->serializeMe($this->requireUser()));
     }
 
-    /** Update own profile: display name and avatar URL. */
+    /** Update own profile: name, avatar, and cover. */
     #[Route('/me', name: 'api_me_update', methods: ['PATCH'])]
     #[IsGranted('ROLE_USER')]
     public function update(Request $request): JsonResponse
@@ -85,14 +86,27 @@ class MeController extends AbstractController
         }
 
         if (array_key_exists('avatarUrl', $payload)) {
-            $url = trim((string) ($payload['avatarUrl'] ?? ''));
-            if ('' === $url) {
-                $user->setAvatarUrl(null);
-            } elseif (1 === preg_match(self::URL_PATTERN, $url)) {
-                $user->setAvatarUrl(mb_substr($url, 0, 1024));
-            } else {
-                return $this->json(['detail' => 'avatarUrl must be an http(s) URL or a path starting with "/".'], 422);
+            $error = $this->applyPublicUrl($payload['avatarUrl'], 'avatarUrl');
+            if (null !== $error) {
+                return $error;
             }
+            $user->setAvatarUrl($this->normalizePublicUrl($payload['avatarUrl']));
+        }
+
+        if (array_key_exists('coverImageUrl', $payload)) {
+            $error = $this->applyPublicUrl($payload['coverImageUrl'], 'coverImageUrl');
+            if (null !== $error) {
+                return $error;
+            }
+            $user->setCoverImageUrl($this->normalizePublicUrl($payload['coverImageUrl']));
+        }
+
+        if (array_key_exists('coverColor', $payload)) {
+            $color = $this->normalizeCoverColor($payload['coverColor']);
+            if (false === $color) {
+                return $this->json(['detail' => 'coverColor must be a 6-digit hex color, e.g. #0a1627.'], 422);
+            }
+            $user->setCoverColor($color);
         }
 
         $this->entityManager->flush();
@@ -462,6 +476,45 @@ class MeController extends AbstractController
         return $user;
     }
 
+    /** @return JsonResponse|null 422 when the URL is present but not http(s) or site-relative */
+    private function applyPublicUrl(mixed $raw, string $field): ?JsonResponse
+    {
+        $url = trim((string) ($raw ?? ''));
+        if ('' === $url || 1 === preg_match(self::URL_PATTERN, $url)) {
+            return null;
+        }
+
+        return $this->json(['detail' => $field.' must be an http(s) URL or a path starting with "/".'], 422);
+    }
+
+    private function normalizePublicUrl(mixed $raw): ?string
+    {
+        $url = trim((string) ($raw ?? ''));
+
+        return '' === $url ? null : mb_substr($url, 0, 1024);
+    }
+
+    /**
+     * Empty string clears the tint. Invalid hex is false so the caller can 422.
+     *
+     * @return string|null|false
+     */
+    private function normalizeCoverColor(mixed $raw): string|false|null
+    {
+        $value = trim((string) ($raw ?? ''));
+        if ('' === $value) {
+            return null;
+        }
+        if (!str_starts_with($value, '#')) {
+            $value = '#'.$value;
+        }
+        if (1 !== preg_match(self::HEX_PATTERN, $value)) {
+            return false;
+        }
+
+        return strtolower($value);
+    }
+
     /**
      * Optional `?store=slug` filter. Returns a 404 JsonResponse when the slug
      * is present but unknown; null when the caller wants every store.
@@ -537,6 +590,8 @@ class MeController extends AbstractController
             'email' => $user->getEmail(),
             'displayName' => $user->getDisplayName(),
             'avatarUrl' => $user->getAvatarUrl(),
+            'coverImageUrl' => $user->getCoverImageUrl(),
+            'coverColor' => $user->getCoverColor(),
             'roles' => $user->getRoles(),
             'emailVerified' => $user->isEmailVerified(),
             'ageVerified' => $user->isAgeVerified(),

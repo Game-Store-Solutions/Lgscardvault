@@ -34,11 +34,7 @@ export function ImageUploadField({
     try {
       const form = new FormData()
       form.append('file', file)
-      // The api client defaults Content-Type to application/json; multipart
-      // needs the real form type (axios fills in the boundary).
-      const { data } = await api.post<{ url: string }>('/uploads', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      const { data } = await api.post<{ url: string }>('/uploads', form)
       onChange(data.url)
       onUploadComplete?.(data.url)
     } catch (uploadError) {

@@ -2,6 +2,7 @@
 
 namespace App\Service\User;
 
+use App\Entity\Store;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\AgeAttestation;
@@ -24,11 +25,19 @@ final class UserCsvImporter
     public const MAX_RESET_EMAILS = 200;
     public const MIN_PASSWORD_LENGTH = 8;
 
+    /** Shared bcrypt/argon hash for accounts that will set a password via reset email. */
+    private ?string $sharedUnusablePasswordHash = null;
+
     /** @var array<string, string> */
     private const HEADER_ALIASES = [
         'email' => 'email',
         'emailaddress' => 'email',
         'useremail' => 'email',
+        'customeremail' => 'email',
+        'memberemail' => 'email',
+        'custemail' => 'email',
+        'mail' => 'email',
+        'login' => 'email',
         'displayname' => 'displayName',
         'name' => 'displayName',
         'fullname' => 'displayName',
@@ -77,7 +86,15 @@ final class UserCsvImporter
         bool $dryRun = false,
         bool $sendResetEmails = true,
         bool $allowPlatformAdmins = false,
+        ?Store $brandStore = null,
     ): array {
+        // Bulk imports hash passwords and may email resets — avoid the default 30s cap.
+        if (\function_exists('set_time_limit')) {
+            @set_time_limit(300);
+        }
+
+        $this->sharedUnusablePasswordHash = null;
+        $csv = $this->decodeCsvBytes($csv);
         $grid = $this->grid->toRows($csv, self::MAX_ROWS);
         if (count($grid) < 2) {
             throw new \InvalidArgumentException('CSV must have a header row and at least one data row.');
@@ -147,7 +164,19 @@ final class UserCsvImporter
             }
 
             $password = $cell('password');
+            if ($this->isBlankPassword($password)) {
+                $password = '';
+            }
             $needsReset = '' === $password;
+            if (!$needsReset && $this->looksLikePasswordHash($password)) {
+                $needsReset = true;
+                $password = '';
+                $warnings[] = [
+                    'row' => $rowNumber,
+                    'email' => $email,
+                    'message' => 'Password hash from another site cannot be reused. A reset link will be emailed (or they can use Forgot password).',
+                ];
+            }
             if (!$needsReset && mb_strlen($password) < self::MIN_PASSWORD_LENGTH) {
                 $errors[] = ['row' => $rowNumber, 'email' => $email, 'message' => 'Password must be at least 8 characters.'];
                 continue;
@@ -160,7 +189,7 @@ final class UserCsvImporter
             $dateOfBirth = null;
             if ('' !== $dobRaw) {
                 try {
-                    $dateOfBirth = AgeAttestation::parse($dobRaw);
+                    $dateOfBirth = AgeAttestation::parse($this->normalizeDob($dobRaw));
                 } catch (\InvalidArgumentException $e) {
                     $errors[] = ['row' => $rowNumber, 'email' => $email, 'message' => $e->getMessage()];
                     continue;
@@ -193,10 +222,19 @@ final class UserCsvImporter
             if ($dateOfBirth instanceof \DateTimeImmutable) {
                 $user->setDateOfBirth($dateOfBirth);
             }
-            $plain = $needsReset ? bin2hex(random_bytes(24)) : $password;
-            $user->setPassword($this->passwordHasher->hashPassword($user, $plain));
+            // Blank / foreign-hash passwords get one shared disposable hash so we
+            // do not burn ~200ms of bcrypt per row (that timed out ~100+ imports).
+            if ($needsReset) {
+                $user->setPassword($this->unusablePasswordHash($user));
+            } else {
+                $user->setPassword($this->passwordHasher->hashPassword($user, $password));
+            }
             $this->entityManager->persist($user);
             ++$created;
+
+            if (0 === $created % 50) {
+                $this->entityManager->flush();
+            }
 
             if ($needsReset && $sendResetEmails) {
                 $pendingResets[] = ['user' => $user, 'row' => $rowNumber, 'email' => $email];
@@ -214,8 +252,9 @@ final class UserCsvImporter
             }
 
             try {
-                $token = $this->passwordReset->issueToken($pending['user']);
-                $this->mail->sendPasswordReset($pending['user'], $token);
+                // Import links stay valid until used — shoppers may take days to open mail.
+                $token = $this->passwordReset->issueToken($pending['user'], null);
+                $this->mail->sendPasswordReset($pending['user'], $token, $brandStore, untilUsed: true);
                 ++$resetEmailsSent;
             } catch (\Throwable) {
                 ++$resetEmailsOmitted;
@@ -315,5 +354,106 @@ final class UserCsvImporter
             '0', 'false', 'no', 'n', 'off' => false,
             default => $default,
         };
+    }
+
+    /** Excel "Unicode CSV" and UTF-8 BOM exports otherwise fail header matching. */
+    private function decodeCsvBytes(string $csv): string
+    {
+        if (str_starts_with($csv, "\xEF\xBB\xBF")) {
+            return substr($csv, 3);
+        }
+        if (str_starts_with($csv, "\xFF\xFE") || str_starts_with($csv, "\xFE\xFF")) {
+            $converted = @mb_convert_encoding($csv, 'UTF-8', 'UTF-16');
+
+            return \is_string($converted) ? $converted : $csv;
+        }
+        if (str_contains(substr($csv, 0, 80), "\x00")) {
+            $converted = @mb_convert_encoding($csv, 'UTF-8', 'UTF-16LE');
+            if (\is_string($converted) && !str_contains($converted, "\x00")) {
+                return $converted;
+            }
+        }
+
+        return $csv;
+    }
+
+    private function isBlankPassword(string $password): bool
+    {
+        return in_array(strtolower(trim($password)), ['', 'null', 'n/a', 'na', 'none', 'nil', '-'], true);
+    }
+
+    /**
+     * Previous-site exports often put bcrypt/argon/hex hashes in the password
+     * column. Those cannot be verified here, so the row must get a reset.
+     */
+    private function looksLikePasswordHash(string $password): bool
+    {
+        if (str_starts_with($password, '$2y$')
+            || str_starts_with($password, '$2a$')
+            || str_starts_with($password, '$2b$')
+            || str_starts_with($password, '$argon2')
+            || str_starts_with($password, '$pbkdf2')
+            || str_starts_with($password, '$5$')
+            || str_starts_with($password, '$6$')) {
+            return true;
+        }
+        if (1 === preg_match('/^\{(?:SSHA|SHA|MD5)\}/i', $password)) {
+            return true;
+        }
+
+        $length = strlen($password);
+
+        return in_array($length, [32, 40, 64], true) && ctype_xdigit($password);
+    }
+
+    /**
+     * Accepts YYYY-MM-DD plus the date shapes spreadsheet exports actually use.
+     * Ambiguous numeric dates prefer month/day/year (US exports).
+     */
+    private function normalizeDob(string $raw): string
+    {
+        $raw = trim($raw);
+        if (1 === preg_match('/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/', $raw, $match)) {
+            return sprintf('%04d-%02d-%02d', (int) $match[1], (int) $match[2], (int) $match[3]);
+        }
+        if (1 === preg_match('/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/', $raw, $match)) {
+            $first = (int) $match[1];
+            $second = (int) $match[2];
+            $year = (int) $match[3];
+            if ($first > 12) {
+                return sprintf('%04d-%02d-%02d', $year, $second, $first);
+            }
+
+            return sprintf('%04d-%02d-%02d', $year, $first, $second);
+        }
+        if (1 === preg_match('/^\d{5,6}$/', $raw)) {
+            $serial = (int) $raw;
+            if ($serial >= 15000 && $serial <= 80000) {
+                $unix = ($serial - 25569) * 86400;
+
+                return (new \DateTimeImmutable('@'.$unix))
+                    ->setTimezone(new \DateTimeZone('UTC'))
+                    ->format('Y-m-d');
+            }
+        }
+
+        return $raw;
+    }
+
+    /**
+     * One expensive hash for every import row that will set a real password via
+     * reset email. The shared value is never a login credential — issueToken
+     * + Forgot password remain the only paths in.
+     */
+    private function unusablePasswordHash(User $prototype): string
+    {
+        if (null === $this->sharedUnusablePasswordHash) {
+            $this->sharedUnusablePasswordHash = $this->passwordHasher->hashPassword(
+                $prototype,
+                bin2hex(random_bytes(32)),
+            );
+        }
+
+        return $this->sharedUnusablePasswordHash;
     }
 }

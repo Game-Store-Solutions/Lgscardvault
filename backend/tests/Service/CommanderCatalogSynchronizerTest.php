@@ -4,6 +4,7 @@ namespace App\Tests\Service;
 
 use App\Entity\Commander;
 use App\Repository\CommanderRepository;
+use App\Service\Doctrine\SqlDebugLogPruner;
 use App\Service\Recommend\CommanderCatalogSynchronizer;
 use App\Service\Scryfall\ScryfallCardUpserter;
 use App\Tests\Support\CatalogFixtures;
@@ -58,6 +59,7 @@ final class CommanderCatalogSynchronizerTest extends KernelTestCase
             $em->getRepository(\App\Entity\Card::class),
             $container->get(CommanderRepository::class),
             $em,
+            new SqlDebugLogPruner(),
         );
 
         $result = $sync->sync();

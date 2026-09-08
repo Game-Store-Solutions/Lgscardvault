@@ -3,7 +3,6 @@ import { ReceiptText } from 'lucide-react'
 import type { PaginatedOrders } from '../../api/types'
 import { CustomerOrderCard } from './CustomerOrderCard'
 import { Card, CardBody, CardHeader, EmptyState, ErrorState, LoadingPanel, Pagination } from '../ui'
-import { ProfilePanelCard } from '../profile'
 import type { UseQueryResult } from '@tanstack/react-query'
 
 type OrdersQuery = UseQueryResult<PaginatedOrders>
@@ -39,8 +38,19 @@ export function PaginatedCustomerOrdersList({
     setExpandedId(highlightOrderId)
   }, [page, highlightOrderId])
 
+  useEffect(() => {
+    if (!highlightOrderId || !query.data) return
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`account-order-${highlightOrderId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [highlightOrderId, query.data])
+
   if (query.isLoading && !query.data) {
-    return <LoadingPanel label="Loading orders…" />
+    return <LoadingPanel bare label="Loading orders…" />
   }
   if (query.isError) {
     return <ErrorState title="Could not load orders." onRetry={() => void query.refetch()} />
@@ -59,13 +69,15 @@ export function PaginatedCustomerOrdersList({
 
   const list = (
     <>
-      <ul className={compact ? 'divide-y divide-border' : 'grid gap-3'}>
+      {headerSubtitle && !wrapInCard ? <p className="mb-4 text-sm text-fg-muted">{headerSubtitle}</p> : null}
+      <ul className={compact ? 'space-y-1.5' : 'grid gap-3'}>
         {orders.map((order) => (
-          <li key={order.id} className={compact ? undefined : ''}>
+          <li key={order.id}>
             <CustomerOrderCard
               order={order}
               compact={compact}
               expanded={expandedId === order.id}
+              highlighted={highlightOrderId === order.id}
               onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
             />
           </li>
@@ -90,10 +102,5 @@ export function PaginatedCustomerOrdersList({
     )
   }
 
-  return (
-    <ProfilePanelCard>
-      <CardHeader title={headerTitle} subtitle={headerSubtitle} />
-      <CardBody className={compact ? 'p-0' : undefined}>{list}</CardBody>
-    </ProfilePanelCard>
-  )
+  return list
 }

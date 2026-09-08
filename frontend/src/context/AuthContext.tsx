@@ -5,18 +5,23 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import api from '../api/client'
+import api, { httpStatus } from '../api/client'
 import type { UserProfile } from '../api/types'
 import { manageableStores } from '../lib/manageableStores'
+import { readJwtExpiryMs } from '../lib/jwtExpiry'
+import { announceSessionExpired, onSessionExpired, resetSessionExpiry } from '../lib/sessionExpiry'
 
 interface AuthContextValue {
   user: UserProfile | null
   token: string | null
   loading: boolean
+  /** True after the JWT expires while this tab still had a signed-in user. */
+  sessionExpired: boolean
   login: (email: string, password: string) => Promise<UserProfile | null>
   loginWithToken: (token: string) => Promise<UserProfile | null>
   register: (
@@ -39,7 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
   const [loading, setLoading] = useState(true)
+  const [sessionExpired, setSessionExpired] = useState(false)
   const queryClient = useQueryClient()
+  const userRef = useRef<UserProfile | null>(null)
+  userRef.current = user
 
   const refreshUser = useCallback(async (): Promise<UserProfile | null> => {
     if (!localStorage.getItem('token')) {
@@ -52,8 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await api.get<UserProfile>('/me')
       setUser(data)
       return data
-    } catch {
+    } catch (error) {
       localStorage.removeItem('token')
+      if (httpStatus(error) === 401 && userRef.current) {
+        announceSessionExpired()
+        setToken(null)
+        setSessionExpired(true)
+        return userRef.current
+      }
       setToken(null)
       setUser(null)
       return null
@@ -66,12 +80,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshUser()
   }, [refreshUser])
 
+  useEffect(() => {
+    return onSessionExpired(() => {
+      if (!userRef.current) {
+        resetSessionExpiry()
+        return
+      }
+      localStorage.removeItem('token')
+      setToken(null)
+      setSessionExpired(true)
+      void queryClient.cancelQueries()
+    })
+  }, [queryClient])
+
+  useEffect(() => {
+    if (!token) return
+    const expiresAt = readJwtExpiryMs(token)
+    if (expiresAt == null) return
+    const wait = Math.max(0, expiresAt - Date.now())
+    const timer = window.setTimeout(() => announceSessionExpired(), wait)
+    return () => window.clearTimeout(timer)
+  }, [token])
+
   // Wipe every cached query when the identity changes, so one user never sees
   // data fetched for another (the store-admin, inventory, orders and import
   // caches are all keyed by store slug and would otherwise leak across a
   // logout → login in the same tab).
   const startFreshSession = useCallback((nextToken: string) => {
     queryClient.clear()
+    resetSessionExpiry()
+    setSessionExpired(false)
     localStorage.setItem('token', nextToken)
     setToken(nextToken)
   }, [queryClient])
@@ -100,10 +138,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    resetSessionExpiry()
+    setSessionExpired(false)
     localStorage.removeItem('token')
     setToken(null)
     setUser(null)
-    // Drop all cached queries so the next user starts from a clean slate.
     queryClient.clear()
   }, [queryClient])
 
@@ -112,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       token,
       loading,
+      sessionExpired,
       login,
       loginWithToken,
       register,
@@ -122,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (user?.roles.includes('ROLE_STORE_OWNER') ?? false) ||
         manageableStores(user).length > 0,
     }),
-    [user, token, loading, login, loginWithToken, register, logout, refreshUser],
+    [user, token, loading, sessionExpired, login, loginWithToken, register, logout, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

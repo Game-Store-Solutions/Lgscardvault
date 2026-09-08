@@ -161,7 +161,7 @@ export default function SellTradePage() {
     queryKey: ['sell-card-search', debouncedSearch],
     enabled: Boolean(user) && debouncedSearch.trim().length >= 2,
     queryFn: async () => {
-      const { data } = await api.get<CardSummary[]>('/catalog/search', { params: { q: debouncedSearch.trim() } })
+      const { data } = await api.get<CardSummary[]>('/catalog/search', { params: { q: debouncedSearch.trim(), unique: 'cards' } })
       return data
     },
   })

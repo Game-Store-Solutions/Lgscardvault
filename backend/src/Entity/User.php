@@ -28,6 +28,9 @@ use Symfony\Component\Validator\Constraints as Assert;
             uriTemplate: '/admin/users',
             security: "is_granted('ROLE_SUPER_ADMIN')",
             normalizationContext: ['groups' => ['user:read', 'user:admin']],
+            // Platform admin UI shows a full user directory / owner picker —
+            // default API Platform page size (30) silently truncated imports.
+            paginationEnabled: false,
         ),
         new Post(
             uriTemplate: '/admin/users',
@@ -38,6 +41,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Patch(
             uriTemplate: '/admin/users/{id}',
+            requirements: ['id' => '\d+'],
             security: "is_granted('ROLE_SUPER_ADMIN')",
             normalizationContext: ['groups' => ['user:read', 'user:admin']],
             denormalizationContext: ['groups' => ['user:admin_write']],
@@ -45,6 +49,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Get(
             uriTemplate: '/admin/users/{id}',
+            requirements: ['id' => '\d+'],
             security: "is_granted('ROLE_SUPER_ADMIN')",
             normalizationContext: ['groups' => ['user:read', 'user:admin']],
         ),
@@ -111,6 +116,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 1024, nullable: true)]
     #[Groups(['user:read', 'user:admin'])]
     private ?string $avatarUrl = null;
+
+    /** Cover photo for the account profile; null uses the default wave. */
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['user:read', 'user:admin'])]
+    private ?string $coverImageUrl = null;
+
+    /** Optional #rrggbb tint for the default cover or photo overlay. */
+    #[ORM\Column(length: 7, nullable: true)]
+    #[Groups(['user:read', 'user:admin'])]
+    private ?string $coverColor = null;
 
     #[ORM\Column(length: 40, nullable: true)]
     private ?string $paymentBrand = null;
@@ -303,6 +318,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setAvatarUrl(?string $avatarUrl): static
     {
         $this->avatarUrl = $avatarUrl;
+
+        return $this;
+    }
+
+    public function getCoverImageUrl(): ?string
+    {
+        return $this->coverImageUrl;
+    }
+
+    public function setCoverImageUrl(?string $coverImageUrl): static
+    {
+        $this->coverImageUrl = $coverImageUrl;
+
+        return $this;
+    }
+
+    public function getCoverColor(): ?string
+    {
+        return $this->coverColor;
+    }
+
+    public function setCoverColor(?string $coverColor): static
+    {
+        $this->coverColor = $coverColor;
 
         return $this;
     }

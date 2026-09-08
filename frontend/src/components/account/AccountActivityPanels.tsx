@@ -6,7 +6,7 @@ import api, { ACCOUNT_PAGE_SIZE, cardImage, formatPrice, formatScryfallPrice } f
 import type { CustomerFavorite, CustomerNotification, PaginatedList, SellSubmission, StoreCreditBalance, StoreCreditSummary, StoreCreditTransaction } from '../../api/types'
 import { customerKeys, useMarkAllNotificationsRead, useMarkNotificationRead, useMyFavorites, useMyNotifications, useMySellSubmissions } from '../../hooks'
 import { NotificationList } from '../notifications/NotificationList'
-import { Badge, Button, buttonVariants, Card, CardBody, CardHeader, EmptyState, ErrorState, LoadingPanel, Pagination, Select } from '../ui'
+import { Badge, Button, buttonVariants, EmptyState, ErrorState, LoadingPanel, Pagination, Select } from '../ui'
 import { cx } from '../../lib/cx'
 
 function pageCount(total: number, pageSize = ACCOUNT_PAGE_SIZE) {
@@ -50,7 +50,7 @@ export function FavoritesPanel({ storeSlug }: { storeSlug?: string }) {
     },
   })
 
-  if (query.isLoading) return <LoadingPanel label="Loading favorites…" />
+  if (query.isLoading) return <LoadingPanel bare label="Loading favorites…" />
   if (query.isError) return <ErrorState title="Could not load favorites." onRetry={() => void query.refetch()} />
 
   const favorites = query.data?.items ?? []
@@ -70,7 +70,7 @@ export function FavoritesPanel({ storeSlug }: { storeSlug?: string }) {
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="divide-y divide-border">
       {favorites.map((favorite) => {
         const item = favorite.inventoryItem
         const slug = favorite.storeSlug
@@ -78,7 +78,7 @@ export function FavoritesPanel({ storeSlug }: { storeSlug?: string }) {
         return (
           <div
             key={`${slug ?? 'store'}-${favorite.id}`}
-            className="flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-sm ring-1 ring-border/80"
+            className="flex items-center gap-3 py-3"
           >
             <Link to={href ?? '/stores'} className="flex min-w-0 flex-1 items-center gap-3">
               <div className="grid h-[4.25rem] w-[3.1rem] shrink-0 place-items-center overflow-hidden rounded-lg bg-bg ring-1 ring-border/60">
@@ -136,44 +136,40 @@ export function SellTradeHistoryPanel({
     setPage(1)
   }, [storeSlug])
 
-  if (query.isLoading) return <LoadingPanel label="Loading your sell/trade history…" />
+  if (query.isLoading) return <LoadingPanel bare label="Loading your sell/trade history…" />
   if (query.isError) return <ErrorState title="Could not load your sell/trade history." onRetry={() => void query.refetch()} />
 
   const submissions = query.data?.items ?? []
   const otherStoreCount = Math.max(0, (allQuery.data?.total ?? 0) - (query.data?.total ?? 0))
   if (submissions.length === 0) {
     return (
-      <Card>
-        <CardBody>
-          <EmptyState
-            icon={WalletCards}
-            title="No sell/trade submissions yet"
-            description={
-              storeSlug && otherStoreCount > 0
-                ? `No sell/trades at this store. You have ${otherStoreCount} at other stores.`
-                : 'Cards you offer to sell at any store will show up here.'
-            }
-            action={
-              storeSlug && otherStoreCount > 0 && onClearStoreFilter ? (
-                <button type="button" onClick={onClearStoreFilter} className="text-sm font-bold text-brand-600 hover:underline">
-                  View all sell/trades
-                </button>
-              ) : (
-                <Link to="/stores" className="text-sm font-bold text-brand-600 hover:underline">
-                  Find a store →
-                </Link>
-              )
-            }
-          />
-        </CardBody>
-      </Card>
+      <EmptyState
+        icon={WalletCards}
+        title="No sell/trade submissions yet"
+        description={
+          storeSlug && otherStoreCount > 0
+            ? `No sell/trades at this store. You have ${otherStoreCount} at other stores.`
+            : 'Cards you offer to sell at any store will show up here.'
+        }
+        action={
+          storeSlug && otherStoreCount > 0 && onClearStoreFilter ? (
+            <button type="button" onClick={onClearStoreFilter} className="text-sm font-bold text-brand-600 hover:underline">
+              View all sell/trades
+            </button>
+          ) : (
+            <Link to="/stores" className="text-sm font-bold text-brand-600 hover:underline">
+              Find a store →
+            </Link>
+          )
+        }
+      />
     )
   }
 
   return (
     <div className="space-y-4">
       {storeSlug && otherStoreCount > 0 && onClearStoreFilter ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 text-sm">
           <p className="text-fg-muted">
             Showing this store only. {otherStoreCount} more sell/trade
             {otherStoreCount === 1 ? '' : 's'} at other stores.
@@ -183,15 +179,22 @@ export function SellTradeHistoryPanel({
           </button>
         </div>
       ) : null}
-      {submissions.map((submission) => (
-        <Card key={`${submission.storeSlug ?? 'store'}-${submission.id}`}>
-          <CardHeader
-            title={`${submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)} cards · store pays ${formatPrice(submission.totalOfferCents)} in ${submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}`}
-            subtitle={`${submission.storeName ? `${submission.storeName} · ` : ''}${new Date(submission.createdAt).toLocaleString()}`}
-            actions={<Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">{submission.status}</Badge>}
-          />
-          <CardBody>
-            <ul className="space-y-1 text-sm">
+      <ul className="divide-y divide-border">
+        {submissions.map((submission) => (
+          <li key={`${submission.storeSlug ?? 'store'}-${submission.id}`} className="py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-bold text-fg">
+                  {submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)} cards · store pays {formatPrice(submission.totalOfferCents)} in {submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}
+                </p>
+                <p className="mt-0.5 text-sm text-fg-muted">
+                  {submission.storeName ? `${submission.storeName} · ` : ''}
+                  {new Date(submission.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">{submission.status}</Badge>
+            </div>
+            <ul className="mt-3 space-y-1 text-sm">
               {submission.items.map((item) => (
                 <li key={item.id} className="flex items-center justify-between gap-3">
                   <span className="min-w-0 truncate text-fg">
@@ -207,9 +210,9 @@ export function SellTradeHistoryPanel({
                 Open this store’s buy list →
               </Link>
             ) : null}
-          </CardBody>
-        </Card>
-      ))}
+          </li>
+        ))}
+      </ul>
       <Pagination
         page={page}
         pageCount={pageCount(query.data?.total ?? 0)}
@@ -253,7 +256,7 @@ export function StoreCreditPanel({
     setLedgerPage(1)
   }, [storeSlug])
 
-  if (balancesQuery.isLoading) return <LoadingPanel label="Loading your store credit…" />
+  if (balancesQuery.isLoading) return <LoadingPanel bare label="Loading your store credit…" />
 
   const kindLabel = (kind: string) =>
     kind === 'sell_submission' ? 'Sell/trade payout' : kind === 'order' ? 'Order' : 'Store adjustment'
@@ -273,47 +276,38 @@ export function StoreCreditPanel({
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardBody className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="grid size-12 place-items-center rounded-full bg-bg text-fg-muted">
-              <Wallet className="size-6" />
-            </span>
-            <div>
-              <p className="text-sm text-fg-muted">
-                {storeSlug
-                  ? `Credit at ${selected?.storeName ?? ledgerQuery.data?.storeName ?? 'this store'}`
-                  : `Credit across ${balances.length} store${balances.length === 1 ? '' : 's'}`}
-              </p>
-              <p className="font-display text-3xl font-extrabold text-fg">
-                {formatPrice(storeSlug ? (ledgerQuery.data?.balanceCents ?? selected?.balanceCents ?? 0) : totalCents)}
-              </p>
-            </div>
-          </div>
-          {storeSlug && (
-            <Link to={`/s/${storeSlug}`} className="text-sm font-bold text-brand-600 hover:underline">
-              Spend it in the shop →
-            </Link>
-          )}
-        </CardBody>
-      </Card>
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-4">
+        <div>
+          <p className="text-sm text-fg-muted">
+            {storeSlug
+              ? `Credit at ${selected?.storeName ?? ledgerQuery.data?.storeName ?? 'this store'}`
+              : `Credit across ${balances.length} store${balances.length === 1 ? '' : 's'}`}
+          </p>
+          <p className="mt-1 font-display text-3xl font-extrabold text-fg">
+            {formatPrice(storeSlug ? (ledgerQuery.data?.balanceCents ?? selected?.balanceCents ?? 0) : totalCents)}
+          </p>
+        </div>
+        {storeSlug && (
+          <Link to={`/s/${storeSlug}`} className="text-sm font-bold text-brand-600 hover:underline">
+            Spend it in the shop →
+          </Link>
+        )}
+      </div>
 
       {balances.length > 0 && (
-        <Card>
-          <CardHeader
-            title="By store"
-            subtitle="Each balance can only be spent at the store that issued it."
-          />
-          <CardBody className="space-y-2">
+        <section>
+          <h3 className="text-sm font-extrabold text-fg">By store</h3>
+          <p className="mt-1 text-sm text-fg-muted">Each balance can only be spent at the store that issued it.</p>
+          <ul className="mt-4 divide-y divide-border">
             {balances.slice((balancePage - 1) * ACCOUNT_PAGE_SIZE, balancePage * ACCOUNT_PAGE_SIZE).map((row) => {
               const active = storeSlug === row.storeSlug
               return (
-                <div
+                <li
                   key={row.storeSlug}
                   className={cx(
-                    'flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-3',
-                    active ? 'border-brand-400 bg-brand-50/50 dark:bg-brand-500/10' : 'border-border bg-bg/50',
+                    'flex flex-wrap items-center justify-between gap-3 py-3',
+                    active && 'text-brand-700',
                   )}
                 >
                   <div>
@@ -334,25 +328,27 @@ export function StoreCreditPanel({
                       Shop
                     </Link>
                   </div>
-                </div>
+                </li>
               )
             })}
-            <Pagination
-              page={balancePage}
-              pageCount={pageCount(balances.length)}
-              onPageChange={setBalancePage}
-              totalItems={balances.length}
-            />
-          </CardBody>
-        </Card>
+          </ul>
+          <Pagination
+            className="mt-3"
+            page={balancePage}
+            pageCount={pageCount(balances.length)}
+            onPageChange={setBalancePage}
+            totalItems={balances.length}
+          />
+        </section>
       )}
 
       {storeSlug && (
-        <Card>
-          <CardHeader title="History" subtitle="Sell/trade payouts add credit; checkout spends it; refunds bring it back." />
-          <CardBody>
+        <section>
+          <h3 className="text-sm font-extrabold text-fg">History</h3>
+          <p className="mt-1 text-sm text-fg-muted">Sell/trade payouts add credit; checkout spends it; refunds bring it back.</p>
+          <div className="mt-4">
             {ledgerQuery.isLoading ? (
-              <LoadingPanel label="Loading this store's ledger…" />
+              <LoadingPanel bare label="Loading this store's ledger…" />
             ) : creditTransactions(ledgerQuery.data).total === 0 ? (
               <EmptyState
                 icon={Wallet}
@@ -362,7 +358,7 @@ export function StoreCreditPanel({
             ) : (
               <ul className="divide-y divide-border text-sm">
                 {creditTransactions(ledgerQuery.data).items.map((transaction) => (
-                  <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
+                  <li key={transaction.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
                       <p className="font-bold text-fg">
                         {kindLabel(transaction.kind)}
@@ -388,8 +384,8 @@ export function StoreCreditPanel({
               onPageChange={setLedgerPage}
               totalItems={creditTransactions(ledgerQuery.data).total}
             />
-          </CardBody>
-        </Card>
+          </div>
+        </section>
       )}
     </div>
   )
@@ -415,49 +411,41 @@ export function NotificationsPanel({ storeSlug }: { storeSlug?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate on first unread batch only
   }, [query.isSuccess, unread.length, storeSlug])
 
-  if (query.isLoading) return <LoadingPanel label="Loading notifications…" />
+  if (query.isLoading) return <LoadingPanel bare label="Loading notifications…" />
   if (all.length === 0) {
     return (
-      <Card>
-        <CardBody>
-          <EmptyState
-            icon={Bell}
-            title="No notifications yet"
-            description="Order updates, sell/trade completions, and want-list matches from every store will show up here."
-          />
-        </CardBody>
-      </Card>
+      <EmptyState
+        icon={Bell}
+        title="No notifications yet"
+        description="Order updates, sell/trade completions, and want-list matches from every store will show up here."
+      />
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {unread.length > 0 && (
-        <Card>
-          <CardHeader title={`Unread (${unread.length})`} />
-          <CardBody>
-            <NotificationList notifications={unread} pendingId={markRead.variables} onMarkRead={(id) => markRead.mutate(id)} />
-          </CardBody>
-        </Card>
+        <section>
+          <h3 className="mb-3 text-sm font-extrabold text-fg">Unread ({unread.length})</h3>
+          <NotificationList compact notifications={unread} pendingId={markRead.variables} onMarkRead={(id) => markRead.mutate(id)} />
+        </section>
       )}
       {read.length > 0 && (
-        <Card>
-          <CardHeader title="Earlier" />
-          <CardBody>
-            <ul className="space-y-2">
-              {read.map((notification) => (
-                <li key={notification.id} className="rounded-btn border border-border bg-bg px-3 py-2 opacity-80">
-                  <p className="truncate text-sm font-bold text-fg">{notification.title}</p>
-                  <p className="text-xs text-fg-muted">{notification.body}</p>
-                  <p className="mt-0.5 text-xs text-fg-muted">
-                    {notification.storeName ? `${notification.storeName} · ` : ''}
-                    {new Date(notification.createdAt).toLocaleString()}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </CardBody>
-        </Card>
+        <section>
+          <h3 className="mb-1 text-sm font-extrabold text-fg">Earlier</h3>
+          <ul className="divide-y divide-border">
+            {read.map((notification) => (
+              <li key={notification.id} className="py-3 opacity-80">
+                <p className="truncate text-sm font-bold text-fg">{notification.title}</p>
+                <p className="text-xs text-fg-muted">{notification.body}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">
+                  {notification.storeName ? `${notification.storeName} · ` : ''}
+                  {new Date(notification.createdAt).toLocaleString()}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       <Pagination
         page={page}

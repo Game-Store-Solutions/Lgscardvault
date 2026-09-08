@@ -3,6 +3,7 @@
 namespace App\Tests\Controller;
 
 use App\Tests\Support\CatalogFixtures;
+use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -24,6 +25,7 @@ final class CardSearchControllerTest extends WebTestCase
     private EntityManagerInterface $em;
     private CatalogFixtures $fixtures;
     private object $client;
+    private User $user;
 
     protected function setUp(): void
     {
@@ -31,11 +33,13 @@ final class CardSearchControllerTest extends WebTestCase
         $c = static::getContainer();
         $this->em = $c->get('doctrine')->getManager();
         $this->fixtures = new CatalogFixtures($this->em);
-        $this->client->loginUser($this->fixtures->user(['ROLE_USER']));
+        $this->user = $this->fixtures->user(['ROLE_USER']);
+        $this->client->loginUser($this->user);
     }
 
     private function search(array $params): array
     {
+        $this->client->loginUser($this->user);
         $this->client->request('GET', '/api/catalog/search?'.http_build_query($params));
         self::assertResponseIsSuccessful();
 
@@ -106,6 +110,79 @@ final class CardSearchControllerTest extends WebTestCase
 
         self::assertNotEmpty($results);
         self::assertSame('Counterspell', $results[0]['name']);
+    }
+
+    public function testNameSearchRanksTheIntendedCardFirst(): void
+    {
+        $this->fixtures->card(10, ['name' => 'Consolation', 'edhrec_rank' => 5000]);
+        $this->fixtures->card(11, ['name' => 'Sol Ring', 'edhrec_rank' => 12]);
+        $this->fixtures->card(12, ['name' => 'Solar Blaze', 'edhrec_rank' => 9000]);
+
+        $results = $this->search(['q' => 'sol', 'unique' => 'cards']);
+
+        self::assertSame('Sol Ring', $results[0]['name'] ?? null);
+        self::assertCount(1, array_filter($results, static fn (array $row): bool => ($row['name'] ?? '') === 'Sol Ring'));
+    }
+
+    public function testShortPrefixIsNotBuriedUnderAlphabeticalSubstringHits(): void
+    {
+        for ($i = 0; $i < 24; ++$i) {
+            $this->fixtures->card(200 + $i, [
+                'name' => sprintf('Animar %d, Soul of Elements', $i),
+                'edhrec_rank' => 80 + $i,
+            ]);
+        }
+        $sharedOracle = CatalogFixtures::oracleIdFor(11);
+        for ($i = 0; $i < 40; ++$i) {
+            $this->fixtures->card(400 + $i, [
+                'name' => 'Sol Ring',
+                'set' => sprintf('sr%d', $i),
+                'collector_number' => (string) $i,
+                'edhrec_rank' => 12,
+                'oracle_id' => $sharedOracle,
+            ]);
+        }
+        $this->fixtures->card(12, ['name' => 'Solar Blaze', 'edhrec_rank' => 9000]);
+
+        $results = $this->search(['q' => 'so', 'unique' => 'cards']);
+
+        self::assertSame('Sol Ring', $results[0]['name'] ?? null);
+        self::assertSame('Solar Blaze', $results[1]['name'] ?? null);
+    }
+
+    public function testNonMagicNameSearchRanksAndCollapsesPrintings(): void
+    {
+        $pokemon = $this->em->getRepository(\App\Entity\Game::class)->findOneBy(['code' => 'pokemon']);
+        self::assertNotNull($pokemon);
+
+        $base = $this->fixtures->card(40, [
+            'name' => 'Pikachu',
+            'set' => 'base1',
+            'collector_number' => '58',
+            'prices' => ['usd' => '40.00'],
+        ]);
+        $base->setGame($pokemon);
+        $jungle = $this->fixtures->card(41, [
+            'name' => 'Pikachu',
+            'set' => 'jungle',
+            'collector_number' => '60',
+            'prices' => ['usd' => '8.00'],
+        ]);
+        $jungle->setGame($pokemon);
+        $vmax = $this->fixtures->card(42, [
+            'name' => 'Pikachu V',
+            'set' => 'swsh4',
+            'collector_number' => '43',
+            'prices' => ['usd' => '5.00'],
+        ]);
+        $vmax->setGame($pokemon);
+        $this->em->flush();
+
+        $results = $this->search(['q' => 'pika', 'game' => 'pokemon', 'unique' => 'cards']);
+
+        self::assertSame('Pikachu', $results[0]['name'] ?? null);
+        self::assertCount(1, array_filter($results, static fn (array $row): bool => ($row['name'] ?? '') === 'Pikachu'));
+        self::assertContains('Pikachu V', array_column($results, 'name'));
     }
 
     public function testFindsCardWhenQueryOmitsAccents(): void
@@ -189,6 +266,40 @@ final class CardSearchControllerTest extends WebTestCase
         $sets = array_column($payload['items'] ?? [], 'setCode');
         sort($sets);
         self::assertSame(['soa', 'xln'], $sets);
+    }
+
+    public function testNonMagicPrintingsReturnEveryExactNameVariant(): void
+    {
+        $pokemon = $this->em->getRepository(\App\Entity\Game::class)->findOneBy(['code' => 'pokemon']);
+        self::assertNotNull($pokemon);
+
+        $base = $this->fixtures->card(90, [
+            'name' => 'Pikachu',
+            'set' => 'base1',
+            'collector_number' => '58',
+        ]);
+        $base->setGame($pokemon);
+        $this->fixtures->card(91, [
+            'name' => 'Pikachu',
+            'set' => 'jungle',
+            'collector_number' => '60',
+        ])->setGame($pokemon);
+        $this->fixtures->card(92, [
+            'name' => 'Pikachu V',
+            'set' => 'swsh4',
+            'collector_number' => '43',
+        ])->setGame($pokemon);
+        $this->em->flush();
+
+        $this->client->loginUser($this->user);
+        $this->client->request('GET', '/api/catalog/cards/'.$base->getId().'/printings');
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $names = array_column($payload['items'] ?? [], 'name');
+        $sets = array_column($payload['items'] ?? [], 'setCode');
+        sort($sets);
+        self::assertSame(['Pikachu', 'Pikachu'], $names);
+        self::assertSame(['base1', 'jungle'], $sets);
     }
 
     public function testPrintingsRejectsAnInvalidCardId(): void

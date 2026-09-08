@@ -4,6 +4,7 @@ namespace App\Service\Scryfall;
 
 use App\Entity\Card;
 use App\Repository\CardRepository;
+use App\Service\Doctrine\SqlDebugLogPruner;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -45,6 +46,7 @@ class ScryfallClient
         private readonly ScryfallCardUpserter $cardUpserter,
         private readonly ScryfallRateLimiter $rateLimiter,
         private readonly ScryfallBulkFileReader $bulkFileReader,
+        private readonly SqlDebugLogPruner $sqlDebugLogPruner,
     ) {
     }
 
@@ -173,6 +175,9 @@ class ScryfallClient
                 $updated += $result['updated'];
                 $processed += count($batch);
                 $batch = [];
+                // Dev Doctrine profiler retains every SQL + backtrace; without
+                // pruning, default_cards (~450k rows) OOMs the CLI worker.
+                $this->sqlDebugLogPruner->prune();
 
                 if (null !== $onProgress) {
                     $onProgress($processed, $inserted + $updated);
@@ -184,6 +189,7 @@ class ScryfallClient
                 $inserted += $result['inserted'];
                 $updated += $result['updated'];
                 $processed += count($batch);
+                $this->sqlDebugLogPruner->prune();
 
                 if (null !== $onProgress) {
                     $onProgress($processed, $inserted + $updated);
@@ -256,6 +262,23 @@ class ScryfallClient
         }
 
         return $cards;
+    }
+
+    /**
+     * Walk every page of a `unique=prints` search and upsert locally.
+     * Used when inventory add needs every paper printing of one oracle id —
+     * the first-page slice in searchRemoteAndUpsert is not enough for Sol Ring.
+     */
+    public function upsertPrintingsSearch(string $query, int $limit = 200): void
+    {
+        $count = 0;
+        foreach ($this->iterateSearchPages($query, 'prints') as $page) {
+            $this->cardUpserter->upsertMany($page);
+            $count += count($page);
+            if ($count >= $limit) {
+                return;
+            }
+        }
     }
 
     /**

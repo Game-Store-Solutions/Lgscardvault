@@ -188,23 +188,57 @@ export function useOpenStoreOrderCount(slug: string, enabled = true) {
 
 /** Walk pages for reports that need the full set (bounded). */
 const MAX_AGGREGATE_PAGES = 100
+/** Parallel page fetches after the first — cuts wall-clock vs sequential paging. */
+const AGGREGATE_PARALLEL = 6
 
 export function useAllStoreOrders(slug: string, enabled = true) {
   return useQuery({
     queryKey: [...ordersKey(slug), 'aggregate'],
     enabled: Boolean(slug) && enabled,
     retry: false,
+    // Reports recompute client-side; keep aggregate warm across tab switches.
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
     queryFn: async () => {
-      const orders: Order[] = []
       const itemsPerPage = 200
-      for (let page = 1; page <= MAX_AGGREGATE_PAGES; page++) {
-        const { data } = await api.get(`/stores/${slug}/orders`, {
-          params: { page, itemsPerPage },
-        })
-        const chunk = parseStoreOrdersPage(data, page, itemsPerPage).items
-        orders.push(...chunk)
-        if (chunk.length < itemsPerPage) break
+      const { data: firstData } = await api.get(`/stores/${slug}/orders`, {
+        params: { page: 1, itemsPerPage },
+      })
+      const first = parseStoreOrdersPage(firstData, 1, itemsPerPage)
+      const orders: Order[] = [...first.items]
+
+      const totalPages = Math.min(
+        MAX_AGGREGATE_PAGES,
+        Math.max(1, Math.ceil((first.total || first.items.length) / itemsPerPage)),
+      )
+      // If total is missing/under-reported, fall back to sequential until a short page.
+      if (first.total <= 0 && first.items.length >= itemsPerPage) {
+        for (let page = 2; page <= MAX_AGGREGATE_PAGES; page++) {
+          const { data } = await api.get(`/stores/${slug}/orders`, {
+            params: { page, itemsPerPage },
+          })
+          const chunk = parseStoreOrdersPage(data, page, itemsPerPage).items
+          orders.push(...chunk)
+          if (chunk.length < itemsPerPage) break
+        }
+        return orders
       }
+
+      for (let start = 2; start <= totalPages; start += AGGREGATE_PARALLEL) {
+        const batch: Promise<Order[]>[] = []
+        for (let page = start; page < start + AGGREGATE_PARALLEL && page <= totalPages; page++) {
+          batch.push(
+            api
+              .get(`/stores/${slug}/orders`, { params: { page, itemsPerPage } })
+              .then(({ data }) => parseStoreOrdersPage(data, page, itemsPerPage).items),
+          )
+        }
+        const chunks = await Promise.all(batch)
+        for (const chunk of chunks) orders.push(...chunk)
+      }
+
+      // Newest-first pages can arrive out of order within a batch — re-sort by createdAt.
+      orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       return orders
     },
   })

@@ -1,0 +1,21 @@
+email,displayName,password,roles,emailVerified,dateOfBirth
+harper.nolan@example.com,Harper Nolan,,ROLE_USER,true,1995-03-08
+miles.okada@example.com,Miles Okada,,ROLE_USER,true,1990-07-14
+clara.weiss@example.com,Clara Weiss,,ROLE_USER,true,1998-11-22
+dante.rivera@example.com,Dante Rivera,,ROLE_USER,true,1992-01-05
+sienna.park@example.com,Sienna Park,,ROLE_USER,true,1987-09-19
+leo.francis@example.com,Leo Francis,,ROLE_USER,true,1999-04-27
+amara.diallo@example.com,Amara Diallo,,ROLE_USER,true,1994-06-12
+rhys.coleman@example.com,Rhys Coleman,,ROLE_USER,true,1988-12-03
+yuki.tanaka@example.com,Yuki Tanaka,,ROLE_USER,true,1996-08-30
+opal.bennett@example.com,Opal Bennett,,ROLE_USER,true,2000-02-16
+felix.grant@example.com,Felix Grant,,ROLE_USER,true,1991-10-09
+nadia.solis@example.com,Nadia Solis,,ROLE_USER,true,1993-05-21
+omar.hadid@example.com,Omar Hadid,,ROLE_USER,true,1989-07-07
+piper.shaw@example.com,Piper Shaw,,ROLE_USER,true,1997-01-28
+enzo.marino@example.com,Enzo Marino,,ROLE_USER,true,1995-09-04
+lana.cho@example.com,Lana Cho,,ROLE_USER,true,1992-11-15
+beatrice.knox@example.com,Beatrice Knox,,ROLE_USER,true,1986-03-26
+julio.mendez@example.com,Julio Mendez,,ROLE_USER,true,1998-06-18
+iris.feldman@example.com,Iris Feldman,,ROLE_USER,true,1994-12-01
+sean.obrien@example.com,Sean O'Brien,,ROLE_USER,true,1990-04-13

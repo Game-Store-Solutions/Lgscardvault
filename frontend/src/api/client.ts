@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { announceSessionExpired } from '../lib/sessionExpiry'
+import { jwtIsExpired } from '../lib/jwtExpiry'
 
 const api = axios.create({
   baseURL: '/api',
@@ -11,18 +13,37 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    if (jwtIsExpired(token)) {
+      localStorage.removeItem('token')
+      announceSessionExpired()
+    } else {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+  // Instance default is application/json. FormData must let the browser set
+  // multipart/form-data with a boundary, or PHP never sees the uploaded file.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    const headers = config.headers
+    if (headers && typeof headers.delete === 'function') {
+      headers.delete('Content-Type')
+    } else if (headers) {
+      delete (headers as { 'Content-Type'?: string })['Content-Type']
+    }
   }
   return config
 })
 
-// On 401, drop a stale token so public pages (cart, storefront) keep working as a guest.
-// Protected routes send users to login via ProtectedRoute — no global redirect here.
+// Expired JWTs used to keep hitting the API and surface as generic failures.
+// Drop the token and tell Auth to prompt before signing out.
 api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
-    if (httpStatus(error) === 401) {
+    const status = httpStatus(error)
+    const url = axiosRequestUrl(error)
+    const isCredentialRequest = /\/login(?:\?|$)|\/register(?:\?|$)|\/auth\//.test(url)
+    if (!isCredentialRequest && shouldPromptSessionExpiry(status, error)) {
       localStorage.removeItem('token')
+      announceSessionExpired()
     }
     return Promise.reject(error)
   },
@@ -35,6 +56,46 @@ export function httpStatus(error: unknown): number | undefined {
     return response?.status
   }
   return undefined
+}
+
+function axiosRequestUrl(error: unknown): string {
+  if (error && typeof error === 'object' && 'config' in error) {
+    const config = (error as { config?: { url?: string } }).config
+    return config?.url ?? ''
+  }
+  return ''
+}
+
+function authorizationBearer(error: unknown): string | null {
+  if (!error || typeof error !== 'object' || !('config' in error)) return null
+  const headers = (error as { config?: { headers?: unknown } }).config?.headers
+  if (!headers || typeof headers !== 'object') return null
+
+  let raw: unknown
+  if ('get' in headers && typeof headers.get === 'function') {
+    raw = headers.get('Authorization') ?? headers.get('authorization')
+  } else {
+    const record = headers as Record<string, unknown>
+    raw = record.Authorization ?? record.authorization
+  }
+  if (typeof raw !== 'string') return null
+  const match = raw.match(/^Bearer\s+(\S+)/i)
+  return match?.[1] ?? null
+}
+
+function shouldPromptSessionExpiry(status: number | undefined, error: unknown): boolean {
+  if (status === 401) {
+    return Boolean(localStorage.getItem('token') || authorizationBearer(error))
+  }
+  // Expired JWTs sometimes surface as 500s instead of 401s depending on the
+  // authenticator. Only treat those as a session expiry when the request
+  // actually carried an expired Bearer token.
+  if (status === 500) {
+    const bearer = authorizationBearer(error)
+    const stored = localStorage.getItem('token')
+    return Boolean((bearer && jwtIsExpired(bearer)) || (stored && jwtIsExpired(stored)))
+  }
+  return false
 }
 
 /**
@@ -53,6 +114,9 @@ export const CUSTOMER_ORDERS_PAGE_SIZE = 15
 
 /** Profile activity lists (want list, favorites, notifications, sell/trade, credit). */
 export const ACCOUNT_PAGE_SIZE = 20
+
+/** Compact activity feed on the profile overview. */
+export const PROFILE_ACTIVITY_PAGE_SIZE = 8
 
 export function unwrapCollection<T>(data: T[] | { member?: T[]; 'hydra:member'?: T[] }): T[] {
   if (Array.isArray(data)) {

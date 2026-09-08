@@ -3,6 +3,7 @@
 namespace App\Service\Catalog;
 
 use App\Entity\Card;
+use App\Entity\Game;
 use App\Repository\CardRepository;
 use App\Service\Scryfall\ScryfallClient;
 
@@ -13,7 +14,7 @@ use App\Service\Scryfall\ScryfallClient;
  */
 final class CardPrintingsFinder
 {
-    public const LIMIT = 80;
+    public const LIMIT = 400;
 
     public function __construct(
         private readonly CardRepository $cards,
@@ -31,7 +32,7 @@ final class CardPrintingsFinder
 
         if ($isMtg) {
             try {
-                $this->scryfall->searchRemoteAndUpsert(
+                $this->scryfall->upsertPrintingsSearch(
                     'oracleid:'.$card->getOracleId()->toRfc4122(),
                     self::LIMIT,
                 );
@@ -40,14 +41,14 @@ final class CardPrintingsFinder
             }
 
             $printings = $this->cards->findPrintingsByOracleId($card->getOracleId(), self::LIMIT);
+        } elseif ($game instanceof Game) {
+            $printings = $this->cards->findPrintingsByExactNameForGame(
+                $game,
+                (string) $card->getName(),
+                self::LIMIT,
+            );
         } else {
-            $printings = array_values(array_filter(
-                $this->cards->searchByNameForGame($game, (string) $card->getName(), self::LIMIT),
-                static fn (Card $candidate): bool => 0 === strcasecmp(
-                    (string) $candidate->getName(),
-                    (string) $card->getName(),
-                ),
-            ));
+            $printings = [];
         }
 
         $byId = [];

@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api, { extractErrorMessage } from '../../api/client'
 import type { GeocodeSuggestion, Plan } from '../../api/types'
 import { useAuth } from '../../context/AuthContext'
 import { STEPS, stepIndex } from './config'
+import {
+  clampOnboardingStep,
+  clearOnboardingDraft,
+  draftBelongsTo,
+  loadOnboardingDraft,
+  saveOnboardingDraft,
+} from './draftStorage'
 import { isStepValid } from './validation'
 import {
   EMPTY_ONBOARDING,
@@ -19,36 +26,85 @@ import {
  * thin view: it reads this hook's values and wires actions to buttons/steps.
  */
 export function useOnboarding() {
-  const { register, user, refreshUser, loginWithToken } = useAuth()
+  const { register, user, refreshUser, loginWithToken, loading: authLoading } = useAuth()
 
-  const [data, setData] = useState<OnboardingData>(() => ({
-    ...EMPTY_ONBOARDING,
-    displayName: user?.displayName ?? '',
-    email: user?.email ?? '',
-  }))
+  const [data, setData] = useState<OnboardingData>(() => {
+    const draft = loadOnboardingDraft()
+    if (draft && draftBelongsTo(draft, user?.email)) {
+      return {
+        ...draft.data,
+        password: '',
+        displayName: draft.data.displayName || user?.displayName || '',
+        email: user?.email || draft.data.email,
+      }
+    }
+    return {
+      ...EMPTY_ONBOARDING,
+      displayName: user?.displayName ?? '',
+      email: user?.email ?? '',
+    }
+  })
   const [step, setStep] = useState(0)
   const [accountCreated, setAccountCreated] = useState(Boolean(user))
   const [emailVerified, setEmailVerified] = useState(Boolean(user?.emailVerified))
-  const [slugEdited, setSlugEdited] = useState(false)
+  const [slugEdited, setSlugEdited] = useState(() => loadOnboardingDraft()?.slugEdited === true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState<{ name: string; slug: string } | null>(null)
+  const [hydrated, setHydrated] = useState(() => !authLoading)
+  const restoredRef = useRef(false)
+  const persistDraft = useRef(true)
 
   // AuthContext resolves the user asynchronously (via /me), so on a direct
   // page load a signed-in owner appears anonymous at first render. Catch up
-  // once the user arrives: skip account creation and prefill their details.
+  // once the user arrives: skip account creation, restore the draft step, and
+  // prefill their details.
   useEffect(() => {
-    if (!user) return
-    setAccountCreated(true)
-    if (user.emailVerified) {
-      setEmailVerified(true)
+    if (authLoading) return
+
+    const verified = Boolean(user?.emailVerified)
+    const signedIn = Boolean(user)
+    if (user) {
+      setAccountCreated(true)
+      if (verified) setEmailVerified(true)
     }
+
+    if (!restoredRef.current) {
+      restoredRef.current = true
+      const draft = loadOnboardingDraft()
+      if (draft && draftBelongsTo(draft, user?.email)) {
+        setSlugEdited(draft.slugEdited)
+        setData((d) => ({
+          ...draft.data,
+          password: '',
+          displayName: draft.data.displayName || d.displayName || user?.displayName || '',
+          email: user?.email || draft.data.email || d.email,
+        }))
+        setStep(clampOnboardingStep(draft.step, { signedIn, emailVerified: verified }))
+      } else {
+        setStep(clampOnboardingStep(0, { signedIn, emailVerified: verified }))
+      }
+      setHydrated(true)
+      return
+    }
+
+    if (!user) return
     setData((d) => ({
       ...d,
       displayName: d.displayName || (user.displayName ?? ''),
       email: d.email || user.email,
     }))
-  }, [user])
+  }, [authLoading, user])
+
+  useEffect(() => {
+    if (!hydrated || !restoredRef.current || !persistDraft.current) return
+    saveOnboardingDraft({
+      email: user?.email || data.email,
+      step,
+      slugEdited,
+      data,
+    })
+  }, [hydrated, data, step, slugEdited, user?.email])
 
   const plansQuery = useQuery({
     queryKey: ['plans'],
@@ -180,6 +236,8 @@ export function useOnboarding() {
         documentIds: data.complianceDocuments.map((d) => d.id),
       })
       await refreshUser()
+      persistDraft.current = false
+      clearOnboardingDraft()
       setSubmitted({ name: data.storeName, slug: data.slug })
     } catch (e) {
       setError(
@@ -200,6 +258,7 @@ export function useOnboarding() {
     currentKey,
     isLast,
     canProceed,
+    hydrating: authLoading || !hydrated,
     busy,
     error,
     submitted,

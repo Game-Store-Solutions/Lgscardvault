@@ -80,19 +80,26 @@ export function LicensesStep({ data, patch }: { data: OnboardingData; patch: Pat
           <span>
             My store is in {data.address.region}, which has no statewide sales tax. I still configure
             any local Square tax that applies.
+            <span className="text-danger-500"> *</span>
           </span>
         </label>
       ) : (
         <div className="space-y-3">
           <Input
-            label="Seller’s permit / sales-tax license number"
-            hint="Required unless you upload the permit document below."
+            label={
+              <>
+                Seller’s permit / sales-tax license number
+                <span className="text-danger-500"> *</span>
+              </>
+            }
+            hint="Enter the number, or upload the permit below. One of the two is required."
             value={c.sellerPermitNumber}
             onChange={(e) => setCompliance({ sellerPermitNumber: e.target.value })}
           />
           <DocumentUpload
             kind="seller_permit"
             label="Upload seller’s permit"
+            required
             documents={data.complianceDocuments}
             onUploaded={(doc) => patch({ complianceDocuments: [...data.complianceDocuments, doc] })}
           />
@@ -101,7 +108,8 @@ export function LicensesStep({ data, patch }: { data: OnboardingData; patch: Pat
 
       <div className="space-y-3">
         <Input
-          label="City business license number (optional)"
+          label="City business license number"
+          hint="Optional. Number or upload — neither is required to continue."
           value={c.cityLicenseNumber}
           onChange={(e) => setCompliance({ cityLicenseNumber: e.target.value })}
         />
@@ -147,13 +155,20 @@ export function LicensesStep({ data, patch }: { data: OnboardingData; patch: Pat
           {c.secondhandStatus === 'licensed' && (
             <>
               <Input
-                label="Secondhand / pawn license number"
+                label={
+                  <>
+                    Secondhand / pawn license number
+                    <span className="text-danger-500"> *</span>
+                  </>
+                }
+                hint="Enter the number, or upload the license below. One of the two is required."
                 value={c.secondhandLicenseNumber}
                 onChange={(e) => setCompliance({ secondhandLicenseNumber: e.target.value })}
               />
               <DocumentUpload
                 kind="secondhand"
                 label="Upload secondhand-dealer license"
+                required
                 documents={data.complianceDocuments}
                 onUploaded={(doc) => patch({ complianceDocuments: [...data.complianceDocuments, doc] })}
               />
@@ -175,6 +190,7 @@ export function LicensesStep({ data, patch }: { data: OnboardingData; patch: Pat
           I carry business insurance appropriate for an in-person retail shop (general liability at
           minimum). Forming the legal entity, EIN with the IRS, and a registered agent are my
           responsibility as the store owner — not the platform’s.
+          <span className="text-danger-500"> *</span>
         </span>
       </label>
     </div>
@@ -184,11 +200,13 @@ export function LicensesStep({ data, patch }: { data: OnboardingData; patch: Pat
 function DocumentUpload({
   kind,
   label,
+  required = false,
   documents,
   onUploaded,
 }: {
   kind: ComplianceDocumentMeta['kind']
   label: string
+  required?: boolean
   documents: ComplianceDocumentMeta[]
   onUploaded: (doc: ComplianceDocumentMeta) => void
 }) {
@@ -217,8 +235,15 @@ function DocumentUpload({
 
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">{label}</p>
-      <p className="mt-1 text-xs text-fg-muted">PDF, JPEG, PNG, or WebP · 8 MB max. Stored privately, not on the public site.</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">
+        {label}
+        {required ? <span className="text-danger-500"> *</span> : null}
+      </p>
+      <p className="mt-1 text-xs text-fg-muted">
+        {required
+          ? 'Required if you did not enter the number above. PDF, JPEG, PNG, or WebP · 8 MB max. Stored privately, not on the public site.'
+          : 'Optional. PDF, JPEG, PNG, or WebP · 8 MB max. Stored privately, not on the public site.'}
+      </p>
       {existing.map((doc) => (
         <p key={doc.id} className="mt-2 flex items-center gap-2 text-sm text-success-700">
           <CheckCircle2 aria-hidden className="size-4" />

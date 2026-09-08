@@ -16,7 +16,6 @@ import {
   ReceiptText,
   RotateCcw,
   Search,
-  SlidersHorizontal,
   X,
   XCircle,
   type LucideIcon,
@@ -41,7 +40,8 @@ import {
   percentChange,
   type OrderListTab,
 } from '../../lib/orderManagementUi'
-import { ORDER_STATUS_LABELS, formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
+import { formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
+import { printOrderSheet } from '../../lib/printOrderSheet'
 
 const PAGE_SIZE = 8
 /** Keeps pagination from jumping when the last page has fewer rows. */
@@ -336,13 +336,6 @@ export default function OrdersTab({ slug }: { slug: string }) {
               <option value="online">Online</option>
               <option value="kiosk">Kiosk</option>
             </Select>
-            <button
-              type="button"
-              aria-label="Filter options"
-              className="grid size-10 place-items-center rounded-xl border border-border text-fg-muted hover:bg-bg"
-            >
-              <SlidersHorizontal aria-hidden className="size-4" />
-            </button>
           </div>
         </div>
 
@@ -1247,126 +1240,4 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
       </div>
     </Modal>
   )
-}
-
-function printOrderSheet(order: Order) {
-  const preTaxTotalCents = order.totalCents
-  const taxCents = order.taxCents ?? 0
-  const postTaxTotalCents = preTaxTotalCents + taxCents
-  const iframe = document.createElement('iframe')
-  iframe.setAttribute('title', `Print ${order.reference}`)
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'
-
-  document.body.appendChild(iframe)
-
-  const frameWindow = iframe.contentWindow
-  const frameDocument = frameWindow?.document
-  if (!frameWindow || !frameDocument) {
-    iframe.remove()
-    return
-  }
-
-  frameWindow.addEventListener('afterprint', () => iframe.remove(), { once: true })
-  const rows = (order.lines ?? [])
-    .map((line) => {
-      const setCode = line.setCode ? line.setCode.toUpperCase() : '-'
-      const collectorNumber = line.collectorNumber ?? '-'
-      const lineTotal = formatPrice(line.quantity * line.priceCents)
-      const caseQuantity = line.caseQuantity ?? 0
-      const caseBadge =
-        caseQuantity > 0
-          ? `<div class="case-badge">CASE CARD. ${escapeHtml(line.caseName ?? 'Case')} / ${escapeHtml(line.sectionTitle ?? 'Section')}${
-              caseQuantity < line.quantity ? ` · pull ${caseQuantity} of ${line.quantity} from case` : ''
-            }</div>`
-          : ''
-      return `
-        <tr>
-          <td>${escapeHtml(line.cardName)}${caseBadge}</td>
-          <td>${escapeHtml(setCode)}</td>
-          <td>${escapeHtml(collectorNumber)}</td>
-          <td>${line.quantity}</td>
-          <td>${formatPrice(line.priceCents)}</td>
-          <td>${lineTotal}</td>
-        </tr>
-      `
-    })
-    .join('')
-
-  frameDocument.open()
-  frameDocument.write(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Order ${escapeHtml(order.reference)}</title>
-        <style>
-          * { box-sizing: border-box; }
-          body { color: #111827; font-family: Arial, sans-serif; margin: 32px; }
-          header { border-bottom: 2px solid #111827; margin-bottom: 24px; padding-bottom: 16px; }
-          h1 { font-size: 28px; margin: 0 0 8px; }
-          .muted { color: #4b5563; }
-          .grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-bottom: 24px; }
-          .box { border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; }
-          .label { color: #6b7280; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-          .value { font-size: 14px; font-weight: 700; margin-top: 4px; }
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 8px; text-align: left; vertical-align: top; }
-          th { color: #4b5563; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
-          td:nth-child(4), td:nth-child(5), td:nth-child(6), th:nth-child(4), th:nth-child(5), th:nth-child(6) { text-align: right; }
-          .totals { margin-left: auto; margin-top: 20px; width: 320px; }
-          .total-row { align-items: baseline; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; padding: 8px 0; }
-          .total-row.final { border-bottom: 0; font-weight: 700; }
-          .total-row.final strong { font-size: 24px; }
-          .case-badge { background: #111827; border-radius: 4px; color: #ffffff; display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em; margin-top: 4px; padding: 2px 6px; text-transform: uppercase; }
-          @media print { body { margin: 18mm; } }
-        </style>
-      </head>
-      <body>
-        <header>
-          <h1>Order Sheet</h1>
-          <div class="muted">${escapeHtml(order.reference)} · ${escapeHtml(formatOrderDate(order.createdAt))}</div>
-        </header>
-        <section class="grid">
-          <div class="box">
-            <div class="label">Customer</div>
-            <div class="value">${escapeHtml(order.customerName ?? 'Customer')}</div>
-            <div class="muted">${escapeHtml(order.customerEmail ?? '-')}</div>
-          </div>
-          <div class="box">
-            <div class="label">Status</div>
-            <div class="value">${escapeHtml(ORDER_STATUS_LABELS[order.status])}</div>
-            <div class="muted">${orderItemCount(order)} ${orderItemCount(order) === 1 ? 'item' : 'items'}</div>
-          </div>
-        </section>
-        <table>
-          <thead>
-            <tr>
-              <th>Card</th>
-              <th>Set</th>
-              <th>Collector #</th>
-              <th>Qty</th>
-              <th>Unit</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <div class="totals">
-          <div class="total-row"><span>Pre-tax total</span><strong>${formatPrice(preTaxTotalCents)}</strong></div>
-          <div class="total-row"><span>Tax</span><strong>${formatPrice(taxCents)}</strong></div>
-          <div class="total-row final"><span>Post-tax total</span><strong>${formatPrice(postTaxTotalCents)}</strong></div>
-        </div>
-      </body>
-    </html>
-  `)
-  frameDocument.close()
-
-  window.setTimeout(() => {
-    frameWindow.focus()
-    frameWindow.print()
-    window.setTimeout(() => iframe.remove(), 1000)
-  }, 100)
-}
-
-function escapeHtml(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;')
 }

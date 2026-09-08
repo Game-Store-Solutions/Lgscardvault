@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { ArrowRight, Search, Store } from 'lucide-react'
 import type { Store as StoreType } from '../api/types'
 import { BackButton, EmptyState, ErrorState, PageHeader, Select } from '../components/ui'
+import { ContinueApplicationBanner } from '../components/onboarding/ContinueApplicationBanner'
 import { StoreHero, StoreCard, StoreCardSkeleton } from '../components/store'
 import { BrandLogo } from '../components/BrandLogo'
 import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
@@ -92,6 +93,7 @@ export default function StoreDirectoryPage() {
   if (stores.length === 0) {
     return (
       <div className="space-y-6">
+        <ContinueApplicationBanner />
         {!user && <BackButton to="/">Home</BackButton>}
         <EmptyState
           icon={Store}
@@ -104,6 +106,7 @@ export default function StoreDirectoryPage() {
 
   return (
     <div>
+      <ContinueApplicationBanner />
       {!user && (
         <div className="mb-6">
           <BackButton to="/">Home</BackButton>

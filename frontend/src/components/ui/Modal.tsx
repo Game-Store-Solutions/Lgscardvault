@@ -12,12 +12,24 @@ export interface ModalProps {
   children: ReactNode
   footer?: ReactNode
   className?: string
+  /** Applied to the full-screen overlay (e.g. raise above cookie banners). */
+  overlayClassName?: string
 }
 
-export function Modal({ open, onClose, title, children, footer, className }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, className, overlayClassName }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const hasMaxWidth = className != null && /\bmax-w-/.test(className)
+
+  useEffect(() => {
+    if (!open) return
+    panelRef.current?.focus()
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -25,20 +37,13 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
-    // Focus the panel when it opens.
-    panelRef.current?.focus()
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50">
+        <div className={cx('fixed inset-0 z-50', overlayClassName)}>
           {/* Backdrop. A true dim that works on light and dark themes alike. */}
           <motion.div
             className="absolute inset-0 bg-black/50"

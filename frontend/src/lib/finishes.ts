@@ -58,7 +58,30 @@ const GAME_DEFAULTS: Record<string, { plain: string; foil: string }> = {
   riftbound: { plain: 'Normal', foil: 'Foil' },
 }
 
-type FinishSource = Pick<CardSummary, 'finishes' | 'gameCode'> | null | undefined
+type FinishSource = Pick<CardSummary, 'finishes' | 'gameCode' | 'prices'> | null | undefined
+
+function hasUsdPrice(value?: string | null): boolean {
+  if (!value) return false
+  const parsed = Number(value)
+  return !Number.isNaN(parsed) && parsed > 0
+}
+
+function finishesFromPrices(
+  prices: CardSummary['prices'] | undefined,
+  defaults: { plain: string; foil: string },
+): string[] {
+  if (!prices) return []
+  const names: string[] = []
+  if (hasUsdPrice(prices.usd)) names.push(defaults.plain)
+  if (hasUsdPrice(prices.usd_foil)) names.push(defaults.foil)
+  if (hasUsdPrice(prices.usd_etched)) names.push('Etched Foil')
+  return names
+}
+
+function uniqueFinishNames(names: string[]): string[] {
+  const seen = new Set<string>()
+  return names.filter((name) => (seen.has(name) ? false : (seen.add(name), true)))
+}
 
 export interface FinishOption {
   value: string
@@ -68,19 +91,17 @@ export interface FinishOption {
 /**
  * Every treatment this printing can be stocked as, in catalog order.
  *
- * A card whose treatments were never synced still offers its game's two, so
- * the picker is never empty.
+ * Uses the catalog finish list when present. If that was never synced,
+ * infers from which market prices exist so a foil-only promo does not
+ * offer Nonfoil. Both game defaults are a last resort only.
  */
 export function finishOptions(card: FinishSource, gameCode?: string): FinishOption[] {
   const defaults = GAME_DEFAULTS[card?.gameCode ?? gameCode ?? 'mtg'] ?? GAME_DEFAULTS.mtg
-
   const published = (card?.finishes ?? []).map(finishLabel).filter(Boolean)
-  const names = published.length > 0 ? published : [defaults.plain, defaults.foil]
+  const inferred = uniqueFinishNames(finishesFromPrices(card?.prices, defaults))
+  const names = published.length > 0 ? published : inferred.length > 0 ? inferred : [defaults.plain, defaults.foil]
 
-  const seen = new Set<string>()
-  return names
-    .filter((name) => (seen.has(name) ? false : (seen.add(name), true)))
-    .map((value) => ({ value, isFoil: isFoilFinish(value) }))
+  return uniqueFinishNames(names).map((value) => ({ value, isFoil: isFoilFinish(value) }))
 }
 
 export interface FinishChoices {
@@ -99,17 +120,15 @@ export interface FinishChoices {
  */
 export function finishChoices(card: FinishSource, gameCode?: string): FinishChoices {
   const defaults = GAME_DEFAULTS[card?.gameCode ?? gameCode ?? 'mtg'] ?? GAME_DEFAULTS.mtg
-  const published = (card?.finishes ?? []).map(finishLabel).filter(Boolean)
-  const plainNames = published.filter((name) => !isFoilFinish(name))
-  const foilNames = published.filter(isFoilFinish)
+  const options = finishOptions(card, gameCode)
+  const plainNames = options.filter((option) => !option.isFoil).map((option) => option.value)
+  const foilNames = options.filter((option) => option.isFoil).map((option) => option.value)
 
   return {
     plain: plainNames[0] ?? defaults.plain,
     foil: foilNames[0] ?? defaults.foil,
-    // A card with nothing recorded is treated as printable both ways rather
-    // than locked to one — the catalog simply hasn't told us.
-    hasPlain: published.length === 0 || plainNames.length > 0,
-    hasFoil: published.length === 0 || foilNames.length > 0,
+    hasPlain: plainNames.length > 0,
+    hasFoil: foilNames.length > 0,
   }
 }
 

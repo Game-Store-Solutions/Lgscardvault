@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\OrderLineRepository;
+use App\Service\Catalog\PrintingTags;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -287,8 +288,45 @@ class OrderLine
     }
 
     #[Groups(['order:read'])]
+    public function getSetName(): ?string
+    {
+        return $this->card?->getSetName();
+    }
+
+    #[Groups(['order:read'])]
     public function getCollectorNumber(): ?string
     {
         return $this->card?->getCollectorNumber();
+    }
+
+    #[Groups(['order:read'])]
+    public function getRarity(): ?string
+    {
+        return $this->card?->getRarity();
+    }
+
+    /** Listing treatment at sale time; null if the listing was later deleted. */
+    #[Groups(['order:read'])]
+    public function getFinish(): ?string
+    {
+        return $this->inventoryItem?->getFinish();
+    }
+
+    /** Listing grade code (NM, LP, …); null if the listing was later deleted. */
+    #[Groups(['order:read'])]
+    public function getCondition(): ?string
+    {
+        return $this->inventoryItem?->getCondition()->value;
+    }
+
+    /**
+     * Showcase / Inverted / Booster Fun / Legendary and similar pick-sheet tags.
+     *
+     * @return list<string>
+     */
+    #[Groups(['order:read'])]
+    public function getPrintingTags(): array
+    {
+        return PrintingTags::fromCard($this->card);
     }
 }

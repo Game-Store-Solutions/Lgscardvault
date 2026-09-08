@@ -32,7 +32,7 @@ export const HERO_LAYOUT_OPTIONS: HeroLayoutOption[] = [
   {
     id: 'event-board',
     title: 'Event board',
-    description: 'Community cork board on the hero. Customize events under Storefront → Events.',
+    description: 'Upcoming events beside store copy. Customize the list under Storefront → Events.',
     emoji: '📅',
   },
   {

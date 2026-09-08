@@ -8,7 +8,7 @@ namespace App\Service\Payments;
  * First period captures a shopper-approved PayPal order id. Renewals charge a
  * vaulted PayPal payment token when PayPal returned one on capture.
  */
-final class PaypalSubscriptionBilling
+class PaypalSubscriptionBilling
 {
     public function __construct(
         private readonly PaypalClient $client,
@@ -79,7 +79,7 @@ final class PaypalSubscriptionBilling
     /**
      * @param array{email?: string, name?: string, reference?: string} $buyer
      *
-     * @return array{reference: string, customerId: string|null, cardId: string|null, last4: string|null, brand: string|null, status: string}
+     * @return array{reference: string, customerId: string|null, cardId: string|null, last4: string|null, brand: string|null, status: string, chargedCents?: int}
      */
     public function startSubscription(string $orderId, int $priceCents, array $buyer = []): array
     {
@@ -91,6 +91,7 @@ final class PaypalSubscriptionBilling
                 'last4' => null,
                 'brand' => null,
                 'status' => 'active',
+                'chargedCents' => 0,
             ];
         }
 
@@ -102,7 +103,17 @@ final class PaypalSubscriptionBilling
                 'last4' => null,
                 'brand' => 'PAYPAL',
                 'status' => 'active',
+                'chargedCents' => $priceCents,
             ];
+        }
+
+        // Match shopper checkout: never capture until the approved order amount
+        // equals the amount we intend to credit / charge.
+        $existing = $this->client->request('GET', '/v2/checkout/orders/'.rawurlencode($orderId));
+        $expected = $this->formatAmount($priceCents);
+        $actual = (string) ($existing['purchase_units'][0]['amount']['value'] ?? '');
+        if ($actual !== $expected) {
+            throw new \RuntimeException('PayPal order amount does not match this payment. Refresh and try again.');
         }
 
         $captured = $this->client->request(
@@ -117,6 +128,11 @@ final class PaypalSubscriptionBilling
             throw new \RuntimeException('PayPal could not complete the subscription payment.');
         }
 
+        $captureValue = is_array($capture) ? (string) ($capture['amount']['value'] ?? $actual) : $actual;
+        if ($captureValue !== $expected) {
+            throw new \RuntimeException('PayPal captured a different amount than expected. Contact support before retrying.');
+        }
+
         $payerId = (string) ($captured['payer']['payer_id'] ?? $captured['payment_source']['paypal']['account_id'] ?? 'paypal');
         $vaultId = $this->vaultIdFromCapture($captured, is_array($capture) ? $capture : []);
 
@@ -127,6 +143,7 @@ final class PaypalSubscriptionBilling
             'last4' => null,
             'brand' => 'PAYPAL',
             'status' => 'active',
+            'chargedCents' => $priceCents,
         ];
     }
 
@@ -192,5 +209,10 @@ final class PaypalSubscriptionBilling
             ?? null;
 
         return is_string($vault) && '' !== $vault ? $vault : null;
+    }
+
+    private function formatAmount(int $cents): string
+    {
+        return number_format(max(0, $cents) / 100, 2, '.', '');
     }
 }

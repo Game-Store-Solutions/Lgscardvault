@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import type { EventClickArg, EventInput } from '@fullcalendar/core'
+import type { DateClickArg } from '@fullcalendar/interaction'
 import { ExternalLink, MapPin, Pin, X } from 'lucide-react'
 import type { StoreCommunityEventItem } from '../../../api/types'
 import { cx } from '../../../lib/cx'
@@ -24,7 +25,10 @@ function toFullCalendarEvents(items: StoreCommunityEventItem[]): EventInput[] {
       start,
       end: new Date(start.getTime() + DEFAULT_DURATION_MS),
       extendedProps: { storeEvent: item },
-      classNames: item.pinned ? ['fc-event-pinned'] : undefined,
+      classNames: [
+        item.pinned ? 'fc-event-pinned' : '',
+        item.imageUrl?.trim() ? 'fc-event-has-image' : '',
+      ].filter(Boolean),
     })
   }
   return rows
@@ -40,6 +44,13 @@ function EventDetailPanel({
   return (
     <Card aria-live="polite">
       <CardBody className="space-y-3">
+        {event.imageUrl?.trim() ? (
+          <img
+            src={event.imageUrl}
+            alt=""
+            className="max-h-40 w-full rounded-xl object-cover ring-1 ring-border"
+          />
+        ) : null}
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-2 font-display text-lg font-bold text-fg">
@@ -78,12 +89,19 @@ function EventDetailPanel({
 export function StoreEventsCalendar({
   items,
   className,
+  onEventSelect,
+  onDateSelect,
+  showListView = true,
 }: {
   items: StoreCommunityEventItem[]
   className?: string
+  onEventSelect?: (event: StoreCommunityEventItem) => void
+  onDateSelect?: (date: Date) => void
+  showListView?: boolean
 }) {
   const [selected, setSelected] = useState<StoreCommunityEventItem | null>(null)
   const calendarEvents = useMemo(() => toFullCalendarEvents(items), [items])
+  const managed = Boolean(onEventSelect || onDateSelect)
 
   return (
     <div className={cx('store-events-calendar space-y-4', className)}>
@@ -94,7 +112,7 @@ export function StoreEventsCalendar({
           headerToolbar={{
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,listMonth',
+            right: showListView ? 'dayGridMonth,listMonth' : '',
           }}
           buttonText={{
             today: 'Today',
@@ -106,19 +124,46 @@ export function StoreEventsCalendar({
           eventClick={(info: EventClickArg) => {
             info.jsEvent.preventDefault()
             const storeEvent = info.event.extendedProps.storeEvent as StoreCommunityEventItem | undefined
-            if (storeEvent) setSelected(storeEvent)
+            if (!storeEvent) return
+            if (onEventSelect) onEventSelect(storeEvent)
+            else setSelected(storeEvent)
           }}
+          dateClick={
+            onDateSelect
+              ? (info: DateClickArg) => {
+                  onDateSelect(info.date)
+                }
+              : undefined
+          }
           dayMaxEvents={3}
-          navLinks
+          navLinks={!onDateSelect}
           nowIndicator
           eventTimeFormat={{
             hour: 'numeric',
             minute: '2-digit',
             meridiem: 'short',
           }}
+          eventContent={(arg) => {
+            const storeEvent = arg.event.extendedProps.storeEvent as StoreCommunityEventItem | undefined
+            const imageUrl = storeEvent?.imageUrl?.trim()
+            return (
+              <span className="flex min-w-0 items-center gap-1 overflow-hidden">
+                {imageUrl ? <img src={imageUrl} alt="" className="fc-event-thumb" /> : null}
+                <span className="truncate">
+                  {arg.timeText ? `${arg.timeText} ` : ''}
+                  {arg.event.title}
+                </span>
+              </span>
+            )
+          }}
         />
+        {managed ? (
+          <p className="mt-3 text-xs text-fg-muted">
+            Click a day to add an event. Click an event to edit it.
+          </p>
+        ) : null}
       </div>
-      {selected ? <EventDetailPanel event={selected} onClose={() => setSelected(null)} /> : null}
+      {!onEventSelect && selected ? <EventDetailPanel event={selected} onClose={() => setSelected(null)} /> : null}
     </div>
   )
 }

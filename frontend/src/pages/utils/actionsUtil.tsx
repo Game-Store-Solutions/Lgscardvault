@@ -1,4 +1,5 @@
 import { Calendar, ClipboardList, Crown, GalleryHorizontalEnd, Search, WalletCards } from 'lucide-react'
+import type { StoreFeatureKey } from '../../api/types'
 
 type FinishFilter = 'all' | 'foil' | 'nonfoil'
 type SortKey = 'featured' | 'price-desc' | 'price-asc' | 'name' | 'newest'
@@ -48,18 +49,18 @@ const SORTS: { value: SortKey; label: string }[] = [
 // Themed shortcut tiles shown above the spotlight. Entries with a `path` link
 // to a store-relative page; the rest are placeholders until their destinations
 // are built.
-type QuickAction = { label: string; icon: typeof Search; path?: string; action?: 'search' }
+type QuickAction = { label: string; icon: typeof Search; path?: string; action?: 'search'; feature?: StoreFeatureKey }
 
 /** Canonical storefront copy — import instead of hardcoding strings. */
 export const CASE_CARDS_LABEL = 'Case Cards'
 
 const QUICK_ACTIONS: QuickAction[] = [
     { label: 'Search Cards', icon: Search, action: 'search' },
-    { label: CASE_CARDS_LABEL, icon: GalleryHorizontalEnd, path: 'case-cards' },
-    { label: 'Mass Search', icon: ClipboardList, path: 'mass-search' },
-    { label: 'Event calendar', icon: Calendar, path: 'events' },
-    { label: 'Deck Builder', icon: Crown, path: 'deck-builder' },
-    { label: 'Sell/Trade', icon: WalletCards, path: 'sell' },
+    { label: CASE_CARDS_LABEL, icon: GalleryHorizontalEnd, path: 'case-cards', feature: 'caseCards' },
+    { label: 'Mass Search', icon: ClipboardList, path: 'mass-search', feature: 'massSearch' },
+    { label: 'Event calendar', icon: Calendar, path: 'events', feature: 'events' },
+    { label: 'Deck Builder', icon: Crown, path: 'deck-builder', feature: 'deckBuilder' },
+    { label: 'Sell/Trade', icon: WalletCards, path: 'sell', feature: 'sellTrade' },
 ]
 
 export {QUICK_ACTIONS, SORTS, CARD_TYPES, FINISH_OPTIONS, COLORS, DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS, SPOTLIGHT_MIN_ITEMS_DEFAULT, SPOTLIGHT_MAX_ITEMS, SPOTLIGHT_ITEMS_CAP, RESULTS_PAGE_SIZE};

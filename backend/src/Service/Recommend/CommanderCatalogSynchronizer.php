@@ -6,6 +6,7 @@ use App\Entity\Card;
 use App\Entity\Commander;
 use App\Repository\CardRepository;
 use App\Repository\CommanderRepository;
+use App\Service\Doctrine\SqlDebugLogPruner;
 use App\Service\Scryfall\ScryfallCardUpserter;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
@@ -28,6 +29,7 @@ final class CommanderCatalogSynchronizer
         private readonly CardRepository $cards,
         private readonly CommanderRepository $commanders,
         private readonly EntityManagerInterface $entityManager,
+        private readonly SqlDebugLogPruner $sqlDebugLogPruner,
     ) {
     }
 
@@ -68,6 +70,7 @@ final class CommanderCatalogSynchronizer
 
             $this->entityManager->flush();
             $this->entityManager->clear();
+            $this->sqlDebugLogPruner->prune();
 
             if (null !== $onPage) {
                 $onPage($pages, count($batch), $upserted);

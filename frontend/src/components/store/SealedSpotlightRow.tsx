@@ -86,7 +86,7 @@ export function SealedSpotlightRow({ slug, gameCode }: { slug: string; gameCode?
             {lines.map((line) => (
               <SealedProductCard
                 key={line.id}
-                className="w-40 shrink-0 snap-start sm:w-52"
+                className="w-36 shrink-0 snap-start sm:w-44"
                 line={line}
                 cartQty={cart.find((entry) => entry.sealedItem?.id === line.id)?.quantity ?? 0}
                 pending={setSealedItem.isPending}

@@ -43,15 +43,17 @@ export function Spinner({ size, className, label = 'Loading' }: SpinnerProps) {
 export interface LoadingPanelProps {
   label?: string
   className?: string
+  /** Skip the boxed panel chrome (profile pages sit on the page background). */
+  bare?: boolean
 }
 
-export function LoadingPanel({ label = 'Loading…', className }: LoadingPanelProps) {
+export function LoadingPanel({ label = 'Loading…', className, bare = false }: LoadingPanelProps) {
   return (
     <motion.div
       {...panelEntrance}
       className={cx(
         'flex flex-col items-center justify-center gap-3 py-14 px-6 sm:py-16',
-        'rounded-card border border-border bg-surface dark:glass-card',
+        !bare && 'rounded-card border border-border bg-surface dark:glass-card',
         className,
       )}
     >

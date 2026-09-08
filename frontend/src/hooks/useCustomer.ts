@@ -24,7 +24,8 @@ export const customerKeys = {
   /** @deprecated use storeOrders(slug, page) — invalidates all pages with prefix */
   ordersPrefix: (slug: string) => ['customer-orders', slug] as const,
   storeOrders: (slug: string, page: number) => ['customer-orders', slug, page] as const,
-  myOrders: (page: number, store?: string) => ['my-orders', page, store ?? 'all'] as const,
+  myOrders: (page: number, store?: string, itemsPerPage?: number) =>
+    ['my-orders', page, store ?? 'all', itemsPerPage ?? CUSTOMER_ORDERS_PAGE_SIZE] as const,
   myWantList: (page: number, store?: string) => ['my-want-list', page, store ?? 'all'] as const,
   myFavorites: (page: number, store?: string) => ['my-favorites', page, store ?? 'all'] as const,
   myNotifications: (page: number, store?: string) => ['my-notifications', page, store ?? 'all'] as const,
@@ -135,14 +136,19 @@ export function useCustomerOrders(slug: string, page: number, enabled = true) {
   })
 }
 
-export function useMyOrders(page: number, enabled = true, storeSlug?: string) {
+export function useMyOrders(
+  page: number,
+  enabled = true,
+  storeSlug?: string,
+  itemsPerPage = CUSTOMER_ORDERS_PAGE_SIZE,
+) {
   return useQuery({
-    queryKey: customerKeys.myOrders(page, storeSlug),
+    queryKey: customerKeys.myOrders(page, storeSlug, itemsPerPage),
     queryFn: async () => {
       const { data } = await api.get<PaginatedOrders>('/me/orders', {
         params: {
           page,
-          itemsPerPage: CUSTOMER_ORDERS_PAGE_SIZE,
+          itemsPerPage,
           ...(storeSlug ? { store: storeSlug } : {}),
         },
       })

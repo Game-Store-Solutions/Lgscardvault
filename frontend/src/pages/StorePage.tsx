@@ -28,14 +28,14 @@ import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { SealedSpotlightRow } from '../components/store/SealedSpotlightRow'
 import { cx } from '../lib/cx'
+import { isStoreFeatureEnabled } from '../lib/storeFeatures'
 import { colorIdentityKey } from '../lib/mtg'
+import { gameSearchVocab, isManaPipGame } from '../lib/gameSearch'
+import { finishChoices } from '../lib/finishes'
 import { ManaSymbol } from '../components/mtg/ManaSymbol'
 import {
     QUICK_ACTIONS,
     SORTS,
-    CARD_TYPES,
-    FINISH_OPTIONS,
-    COLORS,
     DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,
     RESULTS_PAGE_SIZE,
     type FinishFilter,
@@ -131,6 +131,19 @@ export default function StorePage() {
   const minPriceCents = parsePriceInput(minPrice)
   const maxPriceCents = parsePriceInput(maxPrice)
   const catalogEnabled = Boolean(gameFilter) || (!gamesLoading && storeGames.length === 0)
+  const searchVocab = gameSearchVocab(gameFilter || 'mtg')
+  const gameFinishes = finishChoices(null, gameFilter || 'mtg')
+  const finishOptions: { key: FinishFilter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'nonfoil', label: gameFinishes.plain },
+    { key: 'foil', label: gameFinishes.foil },
+  ]
+  const colorQuery =
+    selectedColors.length === 0
+      ? undefined
+      : isManaPipGame(gameFilter)
+        ? colorIdentityKey(selectedColors)
+        : selectedColors.join(',')
 
   const catalog = useInventoryPage(slug, {
     inStockOnly: true,
@@ -139,7 +152,7 @@ export default function StorePage() {
     set: setFilter,
     type: typeFilter,
     finish: finishFilter,
-    colors: selectedColors.length > 0 ? colorIdentityKey(selectedColors) : undefined,
+    colors: colorQuery,
     minPriceCents,
     maxPriceCents,
     sort,
@@ -147,7 +160,8 @@ export default function StorePage() {
     itemsPerPage: RESULTS_PAGE_SIZE,
     enabled: catalogEnabled,
   })
-  const spotlight = useStoreSpotlight(slug, gameFilter || undefined, catalogEnabled)
+  const spotlightEnabled = catalogEnabled && isStoreFeatureEnabled(store, 'spotlight')
+  const spotlight = useStoreSpotlight(slug, gameFilter || undefined, spotlightEnabled)
   // Broader in-stock pool to fill hero slots after spotlight (no min-price gate).
   const heroStock = useInventoryPage(slug, {
     inStockOnly: true,
@@ -331,9 +345,9 @@ export default function StorePage() {
   if (typeFilter.trim()) chips.push({ label: `Type: ${typeFilter.trim()}`, onClear: () => setTypeFilter('') })
 
   if (finishFilter !== 'all')
-    chips.push({ label: FINISH_OPTIONS.find((f) => f.key === finishFilter)!.label, onClear: () => setFinishFilter('all') })
+    chips.push({ label: finishOptions.find((f) => f.key === finishFilter)!.label, onClear: () => setFinishFilter('all') })
   for (const c of selectedColors) {
-    const label = COLORS.find((x) => x.key === c)?.label ?? c
+    const label = searchVocab.colors.find((x) => x.key === c)?.label ?? c
     chips.push({ label, onClear: () => toggleColor(c) })
   }
 
@@ -354,7 +368,7 @@ export default function StorePage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, type, color, or set"
+            placeholder={searchVocab.placeholder}
             aria-label="Search inventory"
             className="h-10 w-full rounded-btn border border-border bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           />
@@ -381,7 +395,7 @@ export default function StorePage() {
         <div>
           <p className="mb-2 text-sm font-bold text-fg">Finish</p>
           <div className="grid grid-cols-3 overflow-hidden rounded-btn border border-border">
-            {FINISH_OPTIONS.map((option) => (
+            {finishOptions.map((option) => (
               <button
                 key={option.key}
                 type="button"
@@ -399,10 +413,11 @@ export default function StorePage() {
           </div>
         </div>
 
+        {searchVocab.colors.length > 0 ? (
         <div>
-          <p className="mb-2 text-sm font-bold text-fg">Color</p>
+          <p className="mb-2 text-sm font-bold text-fg">{searchVocab.colorLabel}</p>
           <div className="flex flex-wrap gap-2">
-            {COLORS.map((color) => {
+            {searchVocab.colors.map((color) => {
               const active = selectedColors.includes(color.key)
               return (
                 <button
@@ -417,12 +432,22 @@ export default function StorePage() {
                     active ? 'scale-110 ring-2 ring-brand-500 ring-offset-2 ring-offset-bg' : 'opacity-85 hover:opacity-100',
                   )}
                 >
-                  <ManaSymbol symbol={color.key} className="size-8" />
+                  {isManaPipGame(gameFilter) ? (
+                    <ManaSymbol symbol={color.key} className="size-8" />
+                  ) : (
+                    <span
+                      className="grid size-8 place-items-center rounded-full text-[10px] font-bold text-white shadow-sm ring-1 ring-black/15"
+                      style={{ backgroundColor: color.swatch, color: color.dark ? '#1c1917' : '#fff' }}
+                    >
+                      {color.label.slice(0, 1)}
+                    </span>
+                  )}
                 </button>
               )
             })}
           </div>
         </div>
+        ) : null}
 
         <div className="space-y-3 border-t border-border pt-5">
           <Select label="Set" value={setFilter} onChange={(e) => setSetFilter(e.target.value)} wrapperClassName="w-full">
@@ -433,14 +458,16 @@ export default function StorePage() {
               </option>
             ))}
           </Select>
+          {searchVocab.types.length > 0 ? (
           <Select label="Card type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} wrapperClassName="w-full">
             <option value="">All types</option>
-            {CARD_TYPES.map((type) => (
+            {searchVocab.types.map((type) => (
               <option key={type} value={type}>
                 {type}
               </option>
             ))}
           </Select>
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <Input label="Min price" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" />
             <Input label="Max price" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="50" />
@@ -498,10 +525,12 @@ export default function StorePage() {
         showcaseCards={heroShowcaseCards}
         actions={
           <>
-            <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-              <Calendar aria-hidden className="size-4" />
-              Event calendar
-            </Link>
+            {isStoreFeatureEnabled(store, 'events') && (
+              <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                <Calendar aria-hidden className="size-4" />
+                Event calendar
+              </Link>
+            )}
             {user && (
               <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
                 <UserCircle aria-hidden className="size-4" />
@@ -518,19 +547,24 @@ export default function StorePage() {
         }
       />
 
-      <TradePromoBanner slug={slug} showSellLink />
+      {isStoreFeatureEnabled(store, 'sellTrade') && <TradePromoBanner slug={slug} showSellLink />}
 
       {/* Slim stat line */}
       <p className="text-sm text-fg-muted">
         <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings ·{' '}
         <span className="font-bold text-fg">{shelf?.copies ?? 0}</span> cards ·{' '}
-        <span className="font-bold text-fg">{availableSets.length}</span> sets ·{' '}
-        <Link
-          to={`/s/${slug}/events`}
-          className="font-bold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
-        >
-          Event calendar
-        </Link>
+        <span className="font-bold text-fg">{availableSets.length}</span> sets
+        {isStoreFeatureEnabled(store, 'events') && (
+          <>
+            {' · '}
+            <Link
+              to={`/s/${slug}/events`}
+              className="font-bold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
+            >
+              Event calendar
+            </Link>
+          </>
+        )}
       </p>
 
       {/* Quick actions. Themed shortcut tiles over the spotlight */}
@@ -539,7 +573,7 @@ export default function StorePage() {
           Browse thousands of in-stock singles, build decks, sell or trade your collection.
         </p>
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
-          {QUICK_ACTIONS.map(({ label, icon: Icon, path, action }) => {
+          {QUICK_ACTIONS.filter(({ feature }) => !feature || isStoreFeatureEnabled(store, feature)).map(({ label, icon: Icon, path, action }) => {
             const tileClass =
               'group flex flex-col items-center justify-center gap-2 rounded-card px-2 py-3 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
             const content = (
@@ -578,7 +612,7 @@ export default function StorePage() {
       ) : null}
 
       {/* Spotlight. Holographic cards in a lively persistent rail */}
-      {(spotlightLoading || spotlightItems.length > 0) && (
+      {spotlightEnabled && (spotlightLoading || spotlightItems.length > 0) && (
         <section>
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
@@ -640,7 +674,7 @@ export default function StorePage() {
       )}
 
       {/* Sealed spotlight. Scoped to the same game as everything else */}
-      <SealedSpotlightRow slug={slug} gameCode={gameFilter} />
+      {isStoreFeatureEnabled(store, 'sealed') && <SealedSpotlightRow slug={slug} gameCode={gameFilter} />}
 
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">

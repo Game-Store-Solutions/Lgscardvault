@@ -1,9 +1,9 @@
-import { Plus } from 'lucide-react'
-import { formatScryfallPrice } from '../../../api/client'
+import { ChevronLeft, Plus } from 'lucide-react'
 import type { CardSummary } from '../../../api/types'
 import { Button, Input } from '../../../components/ui'
 import { plainCardText } from '../../../lib/cardText'
 import { finishOptions, isFoilFinish } from '../../../lib/finishes'
+import { listingMarketSummary } from '../../../lib/marketFinishes'
 import { ConditionSegmented, FinishPicker, QuantityStepper, type Condition } from '../../../components/inventory'
 
 export interface SelectedCardEditorProps {
@@ -21,6 +21,9 @@ export interface SelectedCardEditorProps {
   onConditionChange: (value: Condition) => void
   onFinishChange: (finish: string) => void
   onAdd: () => void
+  /** Return to the printing picker without running search again. */
+  onBack?: () => void
+  backLabel?: string
 }
 
 /** Draft editor for the printing selected from catalog search, before adding it. */
@@ -38,19 +41,30 @@ export function SelectedCardEditor({
   onConditionChange,
   onFinishChange,
   onAdd,
+  onBack,
+  backLabel = 'Back to printings',
 }: SelectedCardEditorProps) {
   // Every treatment this printing is sold in, from the game's own catalog:
   // "Normal / Holofoil / Reverse Holofoil", not Magic's two.
   const finishes = finishOptions(card)
-  // Mana cost is a Magic concept; showing it (empty) on a One Piece leader is
-  // noise. Games outside Magic get the attributes they actually have.
   const isMagic = (card.gameCode ?? 'mtg') === 'mtg'
-  const marketPrice = formatScryfallPrice(card, isFoilFinish(finish) ? 'foil' : 'nonfoil')
-  const hasMarketPrice = marketPrice !== '-'
+  const market = listingMarketSummary(card, isFoilFinish(finish), finish)
+  const marketPrice = market.priceCents != null ? market.display : '—'
+  const hasMarketPrice = market.priceCents != null
   return (
     <div className="rounded-card border border-border bg-bg p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-500"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+              {backLabel}
+            </button>
+          )}
           <h3 className="font-bold text-fg">{card.name}</h3>
           <p className="text-sm text-fg-muted">
             {(card.setCode ?? '---').toUpperCase()} #{card.collectorNumber ?? '---'}
@@ -83,7 +97,13 @@ export function SelectedCardEditor({
         </div>
         <div>
           <p className="mb-1.5 text-sm font-bold text-fg">Finish</p>
-          <FinishPicker value={finish} options={finishes} onChange={onFinishChange} />
+          {finishes.length > 1 ? (
+            <FinishPicker value={finish} options={finishes} onChange={onFinishChange} />
+          ) : (
+            <p className="flex h-11 items-center rounded-btn border border-border bg-surface px-3 text-sm font-bold text-fg">
+              {finishes[0]?.value ?? finish}
+            </p>
+          )}
         </div>
         <div className="sm:col-span-2">
           <p className="mb-1.5 text-sm font-bold text-fg">Condition</p>

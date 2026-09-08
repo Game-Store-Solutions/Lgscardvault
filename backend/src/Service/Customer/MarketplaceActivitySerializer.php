@@ -48,6 +48,7 @@ final readonly class MarketplaceActivitySerializer
             'quantity' => $entry->getQuantity(),
             'notes' => $entry->getNotes(),
             'inventoryItemId' => $listing?->getId(),
+            'inStock' => $listing instanceof InventoryItem && $listing->getQuantity() > 0,
             'createdAt' => $entry->getCreatedAt()->format(DATE_ATOM),
             'storeSlug' => $store?->getSlug(),
             'storeName' => $store?->getName(),

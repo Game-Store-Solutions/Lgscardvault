@@ -12,6 +12,7 @@ export const avatarVariants = tv({
       sm: 'size-7 text-xs',
       md: 'size-9 text-sm',
       lg: 'size-12 text-base',
+      profile: 'size-32 text-2xl sm:size-40 sm:text-3xl',
     },
   },
   defaultVariants: { size: 'md' },

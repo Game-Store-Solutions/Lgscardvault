@@ -10,7 +10,7 @@ namespace App\Service\Inventory;
 final readonly class InventoryCatalogFilters
 {
     /**
-     * @param list<string> $colors Canonical identity letters (WUBRG) or ['C']
+     * @param list<string> $colors Canonical identity letters (WUBRG) or named colors (Fire, Red, …)
      */
     public function __construct(
         public string $q = '',
@@ -77,21 +77,38 @@ final readonly class InventoryCatalogFilters
      */
     private static function parseColors(string $raw): array
     {
-        $raw = strtoupper(str_replace([',', ' ', '/'], '', trim($raw)));
+        $raw = trim($raw);
         if ('' === $raw) {
             return [];
         }
-        if ('C' === $raw) {
+
+        if (str_contains($raw, ',')) {
+            $out = [];
+            foreach (explode(',', $raw) as $token) {
+                $token = trim($token);
+                if ('' !== $token) {
+                    $out[] = $token;
+                }
+            }
+
+            return array_values(array_unique($out));
+        }
+
+        $compact = strtoupper(str_replace([',', ' ', '/'], '', $raw));
+        if ('C' === $compact) {
             return ['C'];
         }
-
-        $out = [];
-        foreach (str_split('WUBRG') as $letter) {
-            if (str_contains($raw, $letter)) {
-                $out[] = $letter;
+        if (1 === preg_match('/^[WUBRGC]+$/', $compact)) {
+            $out = [];
+            foreach (str_split('WUBRG') as $letter) {
+                if (str_contains($compact, $letter)) {
+                    $out[] = $letter;
+                }
             }
+
+            return $out;
         }
 
-        return $out;
+        return [$raw];
     }
 }

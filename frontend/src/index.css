@@ -771,9 +771,30 @@ textarea {
   @apply transition;
 }
 
-/* Square Web Payments card iframe — match host dark mode. */
-.sq-card-host .sq-card-iframe-container {
-  color-scheme: light dark;
+/*
+ * Square card fields live in a PCI iframe. `color-scheme: dark` on the host
+ * makes Chromium paint those controls as white text while Square still uses a
+ * light field background — typed digits disappear. Pin light, same as PayPal.
+ */
+.sq-card-host,
+.sq-card-host .sq-card-iframe-container,
+.sq-card-host iframe {
+  color-scheme: light;
+  background-color: #ffffff;
+}
+
+.sq-card-host {
+  min-height: 3.25rem;
+}
+
+.sq-card-host iframe {
+  display: block;
+  width: 100%;
+}
+
+/* Square always reserves a message slot under the fields; hide it until it has copy. */
+.sq-card-host .sq-card-message:empty {
+  display: none;
 }
 
 /*
@@ -792,14 +813,6 @@ textarea {
 .paypal-checkout-host iframe {
   color-scheme: light;
   background-color: transparent !important;
-}
-
-.sq-card-host {
-  min-height: 7.25rem;
-}
-
-.dark .sq-card-host .sq-card-iframe-container {
-  color-scheme: dark;
 }
 
 @keyframes ripple {

@@ -1,0 +1,21 @@
+email,displayName,password,roles,emailVerified,dateOfBirth
+ava.chen92@example.com,Ava Chen,,ROLE_USER,true,1992-03-14
+marcus.reed@example.net,Marcus Reed,,ROLE_USER,true,1988-11-02
+sofia.nguyen@example.com,Sofia Nguyen,,ROLE_USER,true,1995-07-21
+jake.morrison@example.com,Jake Morrison,,ROLE_USER,true,2001-01-09
+priya.patel@example.com,Priya Patel,,ROLE_USER,true,1990-05-30
+liam.oconnor@example.com,Liam O'Connor,,ROLE_USER,true,1987-09-18
+maya.brooks@example.com,Maya Brooks,,ROLE_USER,true,1998-12-04
+noah.kim@example.com,Noah Kim,,ROLE_USER,true,1993-04-27
+elena.vasquez@example.com,Elena Vasquez,,ROLE_USER,true,1985-08-11
+owen.hart@example.com,Owen Hart,,ROLE_USER,true,1999-02-15
+zara.ali@example.com,Zara Ali,,ROLE_USER,true,1996-06-08
+caleb.foster@example.com,Caleb Foster,,ROLE_USER,true,1991-10-23
+nina.volkov@example.com,Nina Volkov,,ROLE_USER,true,1994-01-31
+ethan.blake@example.com,Ethan Blake,,ROLE_USER,true,2000-07-07
+isla.macdonald@example.com,Isla MacDonald,,ROLE_USER,true,1989-03-19
+diego.santos@example.com,Diego Santos,,ROLE_USER,true,1997-11-26
+hannah.lee@example.com,Hannah Lee,,ROLE_USER,true,1992-09-03
+theo.wright@example.com,Theo Wright,,ROLE_USER,true,1986-05-12
+amira.hassan@example.com,Amira Hassan,,ROLE_USER,true,1995-12-28
+jordan.price@example.com,Jordan Price,,ROLE_USER,true,1993-08-16

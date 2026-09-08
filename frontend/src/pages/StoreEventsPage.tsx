@@ -32,7 +32,7 @@ export default function StoreEventsPage() {
         </div>
       </div>
 
-      <CommunityBoard events={events} slug={slug} className="rotate-0 shadow-lg" compact />
+      <CommunityBoard events={events} slug={slug} compact />
 
       <section className="space-y-3">
         <h2 className="font-display text-lg font-bold text-fg">Schedule</h2>
