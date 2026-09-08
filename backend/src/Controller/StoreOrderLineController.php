@@ -10,6 +10,7 @@ use App\Repository\StoreRepository;
 use App\Service\Order\OrderBalanceDueNotifier;
 use App\Service\Order\OrderCreditReconciler;
 use App\Service\Order\OrderLineEditor;
+use App\Service\Checkout\PickupOrderTaxSync;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +28,7 @@ final class StoreOrderLineController extends AbstractController
         private readonly OrderLineEditor $editor,
         private readonly OrderCreditReconciler $creditReconciler,
         private readonly OrderBalanceDueNotifier $notifier,
+        private readonly PickupOrderTaxSync $pickupOrderTaxSync,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -51,14 +53,13 @@ final class StoreOrderLineController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
-        return $this->finishLineEdit($order);
+        return $this->finishLineEdit($store, $order);
     }
 
     #[Route('/lines/{lineId}', name: 'api_store_order_line_update', methods: ['PATCH'])]
     public function update(Request $request, string $slug, int $id, int $lineId): JsonResponse
     {
         [$store, $order] = $this->managedOrder($slug, $id);
-        unset($store);
         $line = $this->lineOnOrder($order, $lineId);
         if (!$line instanceof OrderLine) {
             return $this->json(['detail' => 'Line not found on this order.'], 404);
@@ -76,14 +77,13 @@ final class StoreOrderLineController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
-        return $this->finishLineEdit($order);
+        return $this->finishLineEdit($store, $order);
     }
 
     #[Route('/lines/{lineId}', name: 'api_store_order_line_remove', methods: ['DELETE'])]
     public function remove(string $slug, int $id, int $lineId): JsonResponse
     {
         [$store, $order] = $this->managedOrder($slug, $id);
-        unset($store);
         $line = $this->lineOnOrder($order, $lineId);
         if (!$line instanceof OrderLine) {
             return $this->json(['detail' => 'Line not found on this order.'], 404);
@@ -95,10 +95,10 @@ final class StoreOrderLineController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
-        return $this->finishLineEdit($order);
+        return $this->finishLineEdit($store, $order);
     }
 
-    private function finishLineEdit(Order $order): JsonResponse
+    private function finishLineEdit(Store $store, Order $order): JsonResponse
     {
         try {
             $this->creditReconciler->reconcile($order);
@@ -106,6 +106,7 @@ final class StoreOrderLineController extends AbstractController
             return $this->json(['detail' => $e->getMessage()], 422);
         }
 
+        $this->pickupOrderTaxSync->sync($store, $order);
         $this->entityManager->flush();
         $this->notifier->sync($order);
         $this->entityManager->flush();

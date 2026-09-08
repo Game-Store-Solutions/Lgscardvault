@@ -6,6 +6,7 @@ use App\Entity\InventoryItem;
 use App\Entity\Store;
 use App\Entity\User;
 use App\Tests\Support\CatalogFixtures;
+use App\Tests\Support\FakeCheckoutGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -208,5 +209,38 @@ final class StoreOrderLineTest extends WebTestCase
             'inventoryItemId' => $second->getId(),
         ]);
         self::assertContains($this->responseCode(), [403, 404]);
+    }
+
+    public function testKioskOrderStoresSquareLocationTax(): void
+    {
+        $gateway = static::getContainer()->get(FakeCheckoutGateway::class);
+        self::assertInstanceOf(FakeCheckoutGateway::class, $gateway);
+        $gateway->addedTaxCents = 87;
+
+        [$store, $first, , $owner] = $this->storeWithTwoListings();
+        $this->authenticate($owner);
+        $order = $this->placeKioskOrder($store, $first, 1);
+
+        self::assertSame(87, $order['taxCents'] ?? null);
+        self::assertSame(1000, $order['totalCents'] ?? null);
+        self::assertNotEmpty($gateway->quotes);
+    }
+
+    public function testSyncTaxRefreshesLocationTaxOnExistingOrder(): void
+    {
+        $gateway = static::getContainer()->get(FakeCheckoutGateway::class);
+        self::assertInstanceOf(FakeCheckoutGateway::class, $gateway);
+        $gateway->addedTaxCents = 0;
+
+        [$store, $first, , $owner] = $this->storeWithTwoListings();
+        $this->authenticate($owner);
+        $order = $this->placeKioskOrder($store, $first, 2);
+        self::assertSame(0, $order['taxCents'] ?? null);
+
+        $gateway->addedTaxCents = 160;
+        $synced = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders/{$order['id']}/sync-tax");
+        self::assertSame(200, $this->responseCode(), (string) ($synced['detail'] ?? ''));
+        self::assertSame(160, $synced['taxCents'] ?? null);
+        self::assertSame(2000, $synced['totalCents'] ?? null);
     }
 }

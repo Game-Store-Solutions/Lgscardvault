@@ -32,7 +32,7 @@ export function OrderLineList({
           <div
             key={line.id}
             className={cx(
-              'flex items-center justify-between gap-3',
+              'flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3',
               compact ? 'px-0 py-2.5' : 'rounded-btn border border-border bg-surface px-3 py-2',
             )}
           >
@@ -40,7 +40,7 @@ export function OrderLineList({
               <span
                 className={cx(
                   'grid shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-bg',
-                  compact ? 'h-12 w-9' : 'h-16 w-12',
+                  compact ? 'h-12 w-9' : 'h-14 w-10 sm:h-16 sm:w-12',
                 )}
               >
                 {image ? (
@@ -57,14 +57,14 @@ export function OrderLineList({
                   {formatPrice(line.priceCents)}
                 </p>
                 {(line.caseQuantity ?? 0) > 0 && (
-                  <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-brand-700">
+                  <p className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-brand-50 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-brand-700">
                     Case card · {line.caseName ?? 'Case'} / {line.sectionTitle ?? 'Section'}
                     {(line.caseQuantity ?? 0) < line.quantity ? ` (${line.caseQuantity} of ${line.quantity})` : ''}
                   </p>
                 )}
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center justify-between gap-2 pl-[3.25rem] sm:justify-end sm:pl-0">
               {editing && onQuantityChange ? (
                 <div className="flex items-center gap-1 rounded-lg border border-border bg-bg p-0.5">
                   <button

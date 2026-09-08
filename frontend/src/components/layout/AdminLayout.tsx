@@ -457,9 +457,9 @@ export default function AdminLayout() {
 
 
 
-      <div className="lg:pl-64">
+      <div className="min-w-0 lg:pl-64">
 
-        <header className={`${APP_CHROME_CLASS} sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border/60 bg-surface/90 px-4 backdrop-blur-md`}>
+        <header className={`${APP_CHROME_CLASS} sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-border/60 bg-surface/90 px-3 backdrop-blur-md sm:gap-4 sm:px-4`}>
 
           <div className="flex items-center gap-3">
 
@@ -553,9 +553,9 @@ export default function AdminLayout() {
 
             fullWidthAdmin
 
-              ? `${APP_CHROME_CLASS} w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8`
+              ? `${APP_CHROME_CLASS} w-full min-w-0 px-3 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8`
 
-              : `${APP_CHROME_CLASS} mx-auto max-w-7xl px-4 py-8`
+              : `${APP_CHROME_CLASS} mx-auto max-w-7xl min-w-0 px-4 py-8`
 
           }
 
