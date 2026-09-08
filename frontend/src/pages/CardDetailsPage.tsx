@@ -1,12 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   ChevronRight,
   Heart,
   ListPlus,
-  Minus,
-  Plus,
   RefreshCw,
   RotateCw,
   Settings,
@@ -139,6 +137,7 @@ export default function CardDetailsPage() {
   // Which face of a multi-faced card is currently shown (0 = front).
   const [faceIndex, setFaceIndex] = useState(0)
   const [infoTab, setInfoTab] = useState<'details' | 'legality'>('details')
+  const [buyQty, setBuyQty] = useState(1)
 
   const { data: store } = useStore(slug)
   useStoreTheme(store)
@@ -158,6 +157,11 @@ export default function CardDetailsPage() {
       return data
     },
   })
+
+  useEffect(() => {
+    if (!item) return
+    setBuyQty((qty) => Math.min(Math.max(1, qty), Math.max(1, item.quantity)))
+  }, [item?.id, item?.quantity])
 
   usePageMeta({
     title: item?.card.name
@@ -213,6 +217,13 @@ export default function CardDetailsPage() {
   const { data: favorites = [] } = useCustomerFavorites(slug, Boolean(user))
   const { data: wantList = [] } = useCustomerWantList(slug, Boolean(user))
   const { query: cartQuery, setItem: cartSetItem } = useStoreCart(slug, Boolean(user))
+
+  const cartQtyForItem =
+    (cartQuery.data ?? []).find((entry) => entry.inventoryItem?.id === item?.id)?.quantity ?? 0
+
+  useEffect(() => {
+    if (cartQtyForItem > 0) setBuyQty(cartQtyForItem)
+  }, [cartQtyForItem])
 
   const favoriteMutation = useMutation({
     mutationFn: async ({ inventoryItem, favorite }: { inventoryItem: InventoryItem; favorite: boolean }) => {
@@ -355,11 +366,18 @@ export default function CardDetailsPage() {
   const inCart = Boolean(cartEntry)
   const cartQty = cartEntry?.quantity ?? 0
   const outOfStock = item.quantity < 1
-  const atStockCap = cartQty >= item.quantity
+  const maxQty = Math.max(1, item.quantity)
+  const qtyOptions = Array.from({ length: maxQty }, (_, i) => i + 1)
 
   function setCartQuantity(next: number) {
     const clamped = Math.max(1, Math.min(next, item.quantity))
     cartSetItem.mutate({ item, quantity: clamped })
+  }
+
+  function onBuyQtyChange(next: number) {
+    const clamped = Math.max(1, Math.min(next, maxQty))
+    setBuyQty(clamped)
+    if (inCart) setCartQuantity(clamped)
   }
 
   const related = (relatedQuery.data?.items ?? [])
@@ -594,39 +612,33 @@ export default function CardDetailsPage() {
                   </p>
 
                   <div className="mt-4 flex min-w-0">
-                    <div className="flex h-11 shrink-0 items-center gap-0.5 rounded-l-md border border-r-0 border-border bg-bg px-1.5 text-sm text-fg-muted">
-                      <button
-                        type="button"
-                        aria-label="Decrease quantity"
-                        disabled={outOfStock || !inCart || cartQty <= 1 || cartSetItem.isPending}
-                        onClick={() => setCartQuantity(cartQty - 1)}
-                        className="grid size-8 place-items-center rounded-btn text-fg disabled:opacity-40"
+                    <label className="relative flex h-11 shrink-0 items-center rounded-l-md border border-r-0 border-border bg-bg">
+                      <span className="sr-only">Quantity</span>
+                      <select
+                        value={buyQty}
+                        disabled={outOfStock || cartSetItem.isPending}
+                        onChange={(e) => onBuyQtyChange(Number(e.target.value))}
+                        className="h-full appearance-none bg-transparent py-0 pl-3 pr-8 text-sm font-semibold tabular-nums text-fg outline-none disabled:opacity-40"
                       >
-                        <Minus aria-hidden className="size-3.5" />
-                      </button>
-                      <span className="min-w-[3.25rem] text-center tabular-nums">
-                        <span className="font-semibold text-fg">{Math.max(inCart ? cartQty : 1, 1)}</span>
-                        <span className="text-xs"> of {Math.max(1, item.quantity)}</span>
+                        {qtyOptions.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <span aria-hidden className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-fg-muted">
+                        <ChevronRight className="size-3.5 rotate-90" />
                       </span>
-                      <button
-                        type="button"
-                        aria-label="Increase quantity"
-                        disabled={outOfStock || !inCart || atStockCap || cartSetItem.isPending}
-                        onClick={() => setCartQuantity(cartQty + 1)}
-                        className="grid size-8 place-items-center rounded-btn text-fg disabled:opacity-40"
-                      >
-                        <Plus aria-hidden className="size-3.5" />
-                      </button>
-                    </div>
+                    </label>
                     <Button
                       variant="primary"
                       size="lg"
                       className="h-11 min-w-0 flex-1 rounded-l-none rounded-r-md shadow-none"
                       loading={cartSetItem.isPending}
-                      disabled={cartSetItem.isPending || outOfStock || atStockCap}
-                      onClick={() => setCartQuantity(cartQty + 1)}
+                      disabled={cartSetItem.isPending || outOfStock || (inCart && cartQty === buyQty)}
+                      onClick={() => setCartQuantity(buyQty)}
                     >
-                      {outOfStock ? 'Out of stock' : atStockCap ? 'In cart' : 'Add to Cart'}
+                      {outOfStock ? 'Out of stock' : inCart && cartQty === buyQty ? 'In cart' : 'Add to Cart'}
                     </Button>
                   </div>
 
