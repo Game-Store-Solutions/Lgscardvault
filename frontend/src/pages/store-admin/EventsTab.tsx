@@ -183,7 +183,7 @@ export default function EventsTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-card bg-surface px-4 py-3 shadow-card ring-1 ring-border dark:ring-white/10 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -243,7 +243,7 @@ export default function EventsTab({ slug }: { slug: string }) {
         showListView={false}
       />
 
-      <Card animateIn={false}>
+      <Card flat animateIn={false}>
         <CardHeader
           title="Schedule"
           subtitle={`${form.items.length} of ${MAX_EVENTS} events. Pinned nights stay at the top of Upcoming.`}
@@ -277,7 +277,7 @@ export default function EventsTab({ slug }: { slug: string }) {
         )}
       </Card>
 
-      <Card animateIn={false}>
+      <Card flat animateIn={false}>
         <button
           type="button"
           aria-expanded={settingsOpen}

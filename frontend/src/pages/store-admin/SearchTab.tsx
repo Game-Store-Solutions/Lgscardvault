@@ -124,7 +124,7 @@ export default function SearchTab({ slug }: { slug: string }) {
       const { data } = await api.get<CardSummary[]>('/catalog/search', {
         params: {
           q: catalogSearch,
-          // Scoped to the game being managed, so a Pokémon search never
+          // Scoped to the game being managed, so a PokÃ©mon search never
           // returns Magic printings (and never hits Scryfall for them).
           ...(gameFilter ? { game: gameFilter } : {}),
           // Name-only search stays unique so "sol" can list Sol Ring vs Solar
@@ -356,7 +356,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         loading={statsLoading}
       />
 
-      <Card>
+      <Card flat>
         <CardHeader
           title={`Add ${activeGameName} inventory`}
           subtitle={`Searches the ${activeGameName} catalog. Every printing that exists, not just what you stock. Results are limited to ${activeGameName}.`}
@@ -584,7 +584,7 @@ export default function SearchTab({ slug }: { slug: string }) {
         </CardBody>
       </Card>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title={`${activeGameName} inventory`}
           subtitle={
