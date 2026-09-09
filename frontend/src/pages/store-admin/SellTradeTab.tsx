@@ -107,6 +107,18 @@ function sellStatusPresentation(status: SellSubmissionStatus): { label: string; 
   }
 }
 
+/** Queue row CTA — opens the same modal; label matches the next staff action. */
+function submissionQueueActionLabel(status: SellSubmissionStatus): string {
+  switch (status) {
+    case 'pending':
+      return 'Review'
+    case 'accepted':
+      return 'Complete & stock'
+    default:
+      return 'View'
+  }
+}
+
 /**
  * Admin Sell/Trade: payout rate settings, buy-list curation, and the
  * submission review workflow (partial accepts, print sheet, and completion
@@ -1125,7 +1137,7 @@ function SubmissionTableRow({
             </Button>
           ) : null}
           <Button size="sm" variant="secondary" onClick={onReview}>
-            {submission.status === 'pending' ? 'Review' : 'Details'}
+            {submissionQueueActionLabel(submission.status)}
           </Button>
         </div>
       </td>
