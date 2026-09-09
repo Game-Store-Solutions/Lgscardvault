@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Search, X } from 'lucide-react'
+import { LayoutGrid, List, Search, X } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
 import { inventoryKey, inventoryPageKey, useCardPrintings, useCatalogGames, useDebouncedValue, useInventoryPage, useStoreGameStats } from '../../hooks'
 import { GameWorkspaceHeader, PrintingGrid } from '../../components/catalog'
+import { AnimatePresence, EASE_PREMIUM, motion, Stagger, StaggerItem } from '../../components/motion'
 import {
   Card,
   CardHeader,
@@ -29,6 +30,7 @@ import { foldSearchText, catalogNamesMatch, typeaheadNameTier, rankSetSearch } f
 import {
   CatalogResultCard,
   EditInventoryModal,
+  InventoryFloatingCard,
   InventoryResultCard,
   SelectedCardEditor,
   type InventoryEditPayload,
@@ -38,6 +40,18 @@ import {
 const INVENTORY_PAGE_SIZE = 24
 /** Suggestions pulled for the Search stock name typeahead (inventory only). */
 const INVENTORY_TYPEAHEAD_SIZE = 48
+/** Persist layout so returning to Search stock stays on the chosen view. */
+const STOCK_VIEW_KEY = 'lgs.admin.inventoryStockView'
+
+type StockView = 'list' | 'cards'
+
+function readStockView(): StockView {
+  try {
+    return localStorage.getItem(STOCK_VIEW_KEY) === 'cards' ? 'cards' : 'list'
+  } catch {
+    return 'list'
+  }
+}
 
 function printingHasFinish(card: CardSummary, finish: 'foil' | 'nonfoil'): boolean {
   const choices = finishChoices(card)
@@ -74,9 +88,19 @@ export default function SearchTab({ slug }: { slug: string }) {
   }
 
   const [invPage, setInvPage] = useState(1)
+  const [stockView, setStockView] = useState<StockView>(readStockView)
   const [typeaheadIndex, setTypeaheadIndex] = useState(0)
   const [typeaheadOpen, setTypeaheadOpen] = useState(false)
   const typeaheadRef = useRef<HTMLDivElement>(null)
+
+  function chooseStockView(next: StockView) {
+    setStockView(next)
+    try {
+      localStorage.setItem(STOCK_VIEW_KEY, next)
+    } catch {
+      /* private mode / quota — preference just won't stick */
+    }
+  }
   const [invTypeaheadIndex, setInvTypeaheadIndex] = useState(0)
   const [invTypeaheadOpen, setInvTypeaheadOpen] = useState(false)
   const invTypeaheadRef = useRef<HTMLDivElement>(null)
@@ -671,7 +695,7 @@ export default function SearchTab({ slug }: { slug: string }) {
           }
         />
         <CardBody className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_minmax(12rem,16rem)_10rem_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_minmax(12rem,16rem)_10rem_auto_auto] lg:items-end">
             <Field label="Search stock">
               {({ id }) => (
                 <div ref={invTypeaheadRef} className="relative">
@@ -886,6 +910,38 @@ export default function SearchTab({ slug }: { slug: string }) {
               <X className="size-4" aria-hidden />
               Clear
             </Button>
+            <div
+              className="inline-flex h-11 overflow-hidden rounded-btn border border-border self-end"
+              role="group"
+              aria-label="Inventory layout"
+            >
+              <button
+                type="button"
+                onClick={() => chooseStockView('list')}
+                aria-pressed={stockView === 'list'}
+                aria-label="List view"
+                title="List view"
+                className={cx(
+                  'grid size-11 place-items-center transition-colors',
+                  stockView === 'list' ? 'bg-brand-50 text-brand-700' : 'bg-surface text-fg-muted hover:text-fg',
+                )}
+              >
+                <List aria-hidden className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseStockView('cards')}
+                aria-pressed={stockView === 'cards'}
+                aria-label="Floating cards view"
+                title="Floating cards"
+                className={cx(
+                  'grid size-11 place-items-center border-l border-border transition-colors',
+                  stockView === 'cards' ? 'bg-brand-50 text-brand-700' : 'bg-surface text-fg-muted hover:text-fg',
+                )}
+              >
+                <LayoutGrid aria-hidden className="size-4" />
+              </button>
+            </div>
           </div>
 
           {listingsLoading ? (
@@ -909,17 +965,46 @@ export default function SearchTab({ slug }: { slug: string }) {
             />
           ) : (
             <div className={listingsRefreshing ? 'space-y-4 opacity-70' : 'space-y-4'}>
-              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-                {inventory.map((item) => (
-                  <InventoryResultCard
-                    key={item.id}
-                    item={item}
-                    onEdit={() => setEditingItem(item)}
-                    onDelete={() => deleteMutation.mutate(item.id)}
-                    deleting={deleteMutation.isPending}
-                  />
-                ))}
-              </div>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={stockView}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.28, ease: EASE_PREMIUM }}
+                >
+                  {stockView === 'cards' ? (
+                    <Stagger
+                      immediate
+                      gap={0.03}
+                      className="grid grid-cols-2 justify-start gap-x-3 gap-y-4 sm:grid-cols-[repeat(auto-fill,minmax(14.5rem,14.5rem))] sm:gap-x-4 sm:gap-y-5"
+                    >
+                      {inventory.map((item) => (
+                        <StaggerItem key={item.id} y={12} className="min-w-0">
+                          <InventoryFloatingCard
+                            item={item}
+                            onEdit={() => setEditingItem(item)}
+                            onDelete={() => deleteMutation.mutate(item.id)}
+                            deleting={deleteMutation.isPending}
+                          />
+                        </StaggerItem>
+                      ))}
+                    </Stagger>
+                  ) : (
+                    <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                      {inventory.map((item) => (
+                        <InventoryResultCard
+                          key={item.id}
+                          item={item}
+                          onEdit={() => setEditingItem(item)}
+                          onDelete={() => deleteMutation.mutate(item.id)}
+                          deleting={deleteMutation.isPending}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
               <Pagination
                 page={currentInvPage}
                 pageCount={invPageCount}
