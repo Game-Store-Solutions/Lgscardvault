@@ -843,7 +843,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                 </div>
                 <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Phone crop</p>
                 <p className="text-xs text-fg-muted">
-                  Fine-tune how the photo is cropped inside the same banner on phones. The hero box does not change size.
+                  Optional overrides stored for phones. The live storefront uses one focal point at every width so the banner does not jump while resizing — set Desktop crop for the framing shoppers see.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <RangeField
