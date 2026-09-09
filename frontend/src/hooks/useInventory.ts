@@ -26,6 +26,8 @@ export type InventoryPageFilters = {
   page?: number
   itemsPerPage?: number
   enabled?: boolean
+  /** Keep showing the last page while filters change (grids). Search typeaheads should set false. */
+  keepPreviousData?: boolean
 }
 
 export interface InventoryPage {
@@ -116,7 +118,7 @@ export function useInventoryPage(slug: string, filters: InventoryPageFilters) {
     ],
     enabled: (filters.enabled ?? true) && Boolean(slug),
     staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
+    placeholderData: filters.keepPreviousData === false ? undefined : keepPreviousData,
     queryFn: async () => {
       const { data } = await api.get(`/stores/${slug}/inventory`, {
         params: catalogRequestParams(filters, page, itemsPerPage),
