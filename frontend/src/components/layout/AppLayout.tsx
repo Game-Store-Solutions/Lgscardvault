@@ -438,8 +438,8 @@ export default function AppLayout() {
             )}
           </nav>
 
-          {/* Cart. Always visible top-right when inside a store */}
-          {user && storeSlug && <NotificationBell slug={storeSlug} />}
+          {/* Notifications — always when signed in (every store’s alerts) */}
+          {user && <NotificationBell />}
           {cartLink}
 
           {/* Theme toggle (desktop) */}

@@ -187,7 +187,12 @@ export function useMyFavorites(page = 1, storeSlug?: string, enabled = true) {
   })
 }
 
-export function useMyNotifications(page = 1, storeSlug?: string, enabled = true) {
+export function useMyNotifications(
+  page = 1,
+  storeSlug?: string,
+  enabled = true,
+  options?: { poll?: boolean },
+) {
   return useQuery({
     queryKey: customerKeys.myNotifications(page, storeSlug),
     queryFn: async () => {
@@ -200,6 +205,8 @@ export function useMyNotifications(page = 1, storeSlug?: string, enabled = true)
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: 'always',
+    refetchInterval: options?.poll ? 15_000 : false,
+    refetchIntervalInBackground: Boolean(options?.poll),
     placeholderData: keepPreviousData,
   })
 }
