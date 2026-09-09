@@ -71,8 +71,6 @@ const STATUS_TONE: Record<SellSubmissionStatus, 'brand' | 'success' | 'danger' |
   declined: 'danger',
 }
 
-type SubmissionQueueTab = 'review' | 'accepted'
-
 const SUBMISSIONS_PAGE_SIZE = 8
 const SUBMISSION_TABLE_ROW_H = 'h-[4.75rem]'
 
@@ -138,7 +136,6 @@ export default function SellTradeTab({ slug }: { slug: string }) {
   })
 
   const [reviewing, setReviewing] = useState<SellSubmission | null>(null)
-  const [queueTab, setQueueTab] = useState<SubmissionQueueTab>('review')
   const [queuePage, setQueuePage] = useState(1)
   const [showArchive, setShowArchive] = useState(false)
   const [archivePage, setArchivePage] = useState(1)
@@ -154,22 +151,30 @@ export default function SellTradeTab({ slug }: { slug: string }) {
     },
   })
 
-  const { needsReview, awaitingComplete, archived } = useMemo(() => {
-    const needsReview = submissions.filter((s) => s.status === 'pending' && !s.archivedAt)
-    const awaitingComplete = submissions.filter((s) => s.status === 'accepted' && !s.archivedAt)
+  const { activeQueue, awaitingCompleteCount, archived } = useMemo(() => {
+    const active = submissions
+      .filter((s) => (s.status === 'pending' || s.status === 'accepted') && !s.archivedAt)
+      .sort((a, b) => {
+        // Pending first so new offers stay at the top of the single queue.
+        if (a.status !== b.status) return a.status === 'pending' ? -1 : 1
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
     const archived = submissions.filter((s) => submissionIsArchived(s))
-    return { needsReview, awaitingComplete, archived }
+    return {
+      activeQueue: active,
+      awaitingCompleteCount: active.filter((s) => s.status === 'accepted').length,
+      archived,
+    }
   }, [submissions])
 
-  useEffect(() => setQueuePage(1), [queueTab])
   useEffect(() => setArchivePage(1), [archiveSearch, archiveStatus, showArchive])
 
   useEffect(() => {
     const archivedAccepted = archived.filter((s) => s.status === 'accepted')
-    if (archivedAccepted.length > 0 && awaitingComplete.length === 0) {
+    if (archivedAccepted.length > 0 && awaitingCompleteCount === 0) {
       setShowArchive(true)
     }
-  }, [archived, awaitingComplete.length])
+  }, [archived, awaitingCompleteCount])
 
   const visibleArchive = useMemo(() => {
     const q = archiveSearch.trim().toLowerCase()
@@ -184,13 +189,11 @@ export default function SellTradeTab({ slug }: { slug: string }) {
     })
   }, [archived, archiveSearch, archiveStatus])
 
-  const pendingCount = needsReview.length
-  const acceptedCount = awaitingComplete.length
-
-  const activeQueue =
-    queueTab === 'review' ? needsReview : awaitingComplete
   const queueTotalPages = Math.max(1, Math.ceil(activeQueue.length / SUBMISSIONS_PAGE_SIZE))
   const queuePageClamped = Math.min(queuePage, queueTotalPages)
+  useEffect(() => {
+    if (queuePage !== queuePageClamped) setQueuePage(queuePageClamped)
+  }, [queuePage, queuePageClamped])
   const queuePageRows = activeQueue.slice(
     (queuePageClamped - 1) * SUBMISSIONS_PAGE_SIZE,
     queuePageClamped * SUBMISSIONS_PAGE_SIZE,
@@ -232,60 +235,20 @@ export default function SellTradeTab({ slug }: { slug: string }) {
             <div className="px-5 py-8">
               <LoadingPanel />
             </div>
+          ) : activeQueue.length === 0 ? (
+            <p className="px-5 py-16 text-center text-sm text-fg-muted">
+              No open submissions. Completed and declined deals may be in the archive below.
+            </p>
           ) : (
             <>
-              <div className="-mx-5 flex flex-wrap gap-2 border-b border-border px-5 py-4">
-                {(
-                  [
-                    { id: 'review' as const, label: 'Needs review', count: pendingCount },
-                    { id: 'accepted' as const, label: 'Accepted', count: acceptedCount },
-                  ] as const
-                ).map((item) => {
-                  const active = queueTab === item.id
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setQueueTab(item.id)}
-                      className={cx(
-                        'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
-                        active ? 'bg-brand-500 text-white shadow-sm' : 'text-fg-muted hover:bg-bg',
-                      )}
-                    >
-                      <span>{item.label}</span>
-                      {item.id === 'review' && item.count > 0 ? (
-                        <span
-                          className={cx(
-                            'grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-bold tabular-nums leading-none',
-                            active ? 'bg-white/25 text-white' : 'bg-brand-700 text-brand-100',
-                          )}
-                        >
-                          {item.count > 99 ? '99+' : item.count}
-                        </span>
-                      ) : null}
-                    </button>
-                  )
-                })}
+              <div className="-mx-5 min-w-0 overflow-x-auto">
+                <SubmissionsTable rows={queuePageRows} getRowActions={(submission) => rowActions(submission, false)} />
               </div>
-
-              {activeQueue.length === 0 ? (
-                <p className="px-5 py-16 text-center text-sm text-fg-muted">
-                  {queueTab === 'review'
-                    ? 'No new submissions waiting for review.'
-                    : 'No accepted submissions awaiting payout. Completed deals may be in the archive below. Use Restore on archived accepted rows.'}
-                </p>
-              ) : (
-                <>
-                  <div className="-mx-5 min-w-0 overflow-x-auto">
-                    <SubmissionsTable rows={queuePageRows} getRowActions={(submission) => rowActions(submission, false)} />
-                  </div>
-                  <SubmissionsPagination
-                    page={queuePageClamped}
-                    totalPages={queueTotalPages}
-                    onPageChange={setQueuePage}
-                  />
-                </>
-              )}
+              <SubmissionsPagination
+                page={queuePageClamped}
+                totalPages={queueTotalPages}
+                onPageChange={setQueuePage}
+              />
             </>
           )}
 
