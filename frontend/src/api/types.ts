@@ -1281,6 +1281,8 @@ export interface StoreGameStats {
   gameName: string
   singles: { listings: number; copies: number }
   sealed: { products: number; units: number }
+  /** Distinct sets in this store's inventory for the game (staff stats). */
+  sets?: { code: string; name: string }[]
 }
 
 /** Public in-stock shelf for the storefront (counts + set list). */

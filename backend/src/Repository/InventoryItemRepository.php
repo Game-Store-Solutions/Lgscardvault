@@ -62,7 +62,7 @@ class InventoryItemRepository extends ServiceEntityRepository
     ): array {
         $qb = $this->listingQuery($store, $inStockOnly, $gameCode);
         $this->applyCatalogFilters($qb, $filters);
-        $this->applyCatalogSort($qb, $filters->sort);
+        $this->applyCatalogSort($qb, $filters);
 
         return $qb->setFirstResult($offset)->setMaxResults($limit)->getQuery()->getResult();
     }
@@ -297,8 +297,11 @@ class InventoryItemRepository extends ServiceEntityRepository
 
         if ('' !== $filters->set) {
             $set = mb_strtolower($filters->set);
-            $qb->andWhere('LOWER(c.setCode) = :setExact OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setLike')
+            $qb->andWhere(
+                'LOWER(c.setCode) = :setExact OR LOWER(c.setCode) LIKE :setPrefix OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setLike',
+            )
                 ->setParameter('setExact', $set)
+                ->setParameter('setPrefix', $set.'%')
                 ->setParameter('setLike', '%'.$set.'%')
                 ->setParameter('emptySet', '');
         }
@@ -428,8 +431,66 @@ class InventoryItemRepository extends ServiceEntityRepository
         return true;
     }
 
-    private function applyCatalogSort(QueryBuilder $qb, string $sort): void
+    private function applyCatalogSort(QueryBuilder $qb, InventoryCatalogFilters $filters): void
     {
+        $sort = $filters->sort;
+
+        // Name / set search used to dump substring hits A–Z. Mirror typeahead
+        // tiers on the default name sort so pages stay relevance-ordered.
+        if ('name' === $sort && ('' !== $filters->q || '' !== $filters->set)) {
+            $ordered = false;
+
+            if ('' !== $filters->set) {
+                $set = mb_strtolower($filters->set);
+                $qb->addSelect(
+                    '(CASE
+                        WHEN LOWER(c.setCode) = :setRelExact THEN 0
+                        WHEN LOWER(c.setCode) LIKE :setRelPrefix THEN 1
+                        WHEN LOWER(COALESCE(c.setName, :setRelEmpty)) LIKE :setRelNamePrefix THEN 2
+                        ELSE 3
+                    END) AS HIDDEN setTier',
+                )
+                    ->setParameter('setRelExact', $set)
+                    ->setParameter('setRelPrefix', $set.'%')
+                    ->setParameter('setRelNamePrefix', $set.'%')
+                    ->setParameter('setRelEmpty', '')
+                    ->orderBy('setTier', 'ASC');
+                $ordered = true;
+            }
+
+            if ('' !== $filters->q) {
+                $needle = mb_strtolower($filters->q);
+                $qb->addSelect(
+                    '(CASE
+                        WHEN LOWER(c.name) = :relExact THEN 0
+                        WHEN LOWER(c.setCode) = :relExact THEN 0
+                        WHEN LOWER(c.name) LIKE :relPrefix THEN 1
+                        WHEN LOWER(c.name) LIKE :relWordSpace
+                            OR LOWER(c.name) LIKE :relWordHyphen
+                            OR LOWER(c.name) LIKE :relWordSlash
+                            OR LOWER(c.name) LIKE :relWordComma THEN 2
+                        ELSE 3
+                    END) AS HIDDEN relTier',
+                )
+                    ->setParameter('relExact', $needle)
+                    ->setParameter('relPrefix', $needle.'%')
+                    ->setParameter('relWordSpace', '% '.$needle.'%')
+                    ->setParameter('relWordHyphen', '%-'.$needle.'%')
+                    ->setParameter('relWordSlash', '%/'.$needle.'%')
+                    ->setParameter('relWordComma', '%, '.$needle.'%');
+
+                if ($ordered) {
+                    $qb->addOrderBy('relTier', 'ASC');
+                } else {
+                    $qb->orderBy('relTier', 'ASC');
+                }
+            }
+
+            $qb->addOrderBy('c.name', 'ASC')->addOrderBy('i.id', 'ASC');
+
+            return;
+        }
+
         match ($sort) {
             'price-desc' => $qb->orderBy('i.priceCents', 'DESC')->addOrderBy('c.name', 'ASC')->addOrderBy('i.id', 'ASC'),
             'price-asc' => $qb->orderBy('i.priceCents', 'ASC')->addOrderBy('c.name', 'ASC')->addOrderBy('i.id', 'ASC'),

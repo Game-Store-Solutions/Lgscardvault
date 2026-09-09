@@ -1,12 +1,10 @@
 import { Pencil, Sparkles, Trash2 } from 'lucide-react'
-import { cardImage, formatPrice, formatScryfallPrice } from '../../../api/client'
+import { formatPrice, formatScryfallPrice } from '../../../api/client'
 import type { InventoryItem } from '../../../api/types'
 import { Badge, Button } from '../../../components/ui'
-import { cx } from '../../../lib/cx'
 import { parseInventoryNotes } from '../../../lib/inventoryNotes'
 import { FOIL_GRADIENT, rarityAccent } from '../../../lib/mtg'
 import { finishName } from '../../../lib/finishes'
-import { FoilOverlays } from '../../../components/cards/FoilOverlays'
 
 export interface InventoryResultCardProps {
   item: InventoryItem
@@ -15,10 +13,9 @@ export interface InventoryResultCardProps {
   deleting: boolean
 }
 
-/** One listing tile in the store-inventory grid, with edit/remove actions. */
+/** One listing row in Search stock — text-first, no card art. */
 export function InventoryResultCard({ item, onEdit, onDelete, deleting }: InventoryResultCardProps) {
   const accent = rarityAccent(item.card.rarity)
-  const image = cardImage(item.card)
   const notes = parseInventoryNotes(item.notes)
   // The badge shows THIS listing's treatment — a Reverse Holofoil line must
   // not borrow the card's first foil label ("Holofoil").
@@ -39,18 +36,6 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
       }}
       className="group flex cursor-pointer gap-4 rounded-card border border-border bg-surface p-4 shadow-card transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_16px_40px_-16px_rgb(16_24_40_/0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
-      <div
-        className={cx('relative h-40 w-[7rem] flex-shrink-0 overflow-hidden rounded-btn border-2 bg-black/90', item.isFoil && 'foil-card')}
-        style={{ borderColor: accent }}
-      >
-        {image ? (
-          <img src={image} alt={item.card.name} loading="lazy" decoding="async" className="h-full w-full object-contain" />
-        ) : (
-          <div className="grid h-full place-items-center px-2 text-center text-xs text-fg-muted">No image</div>
-        )}
-        {item.isFoil && <FoilOverlays foil glare={false} />}
-      </div>
-
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
