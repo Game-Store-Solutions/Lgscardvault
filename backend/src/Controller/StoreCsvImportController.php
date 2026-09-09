@@ -962,9 +962,16 @@ final class StoreCsvImportController extends AbstractController
         if ('' !== $rowStatus && $requestedOffset < 0) {
             $rowOffset = 0;
         }
+
+        $setFilter = trim((string) $request->query->get('set', ''));
+        $statusFilter = '' !== $rowStatus ? $rowStatus : null;
+        $setNeedle = '' !== $setFilter ? $setFilter : null;
         $rows = 0 === $rowLimit
             ? []
-            : $this->rowRepository->findWindow($job, $rowOffset, $rowLimit, '' !== $rowStatus ? $rowStatus : null);
+            : $this->rowRepository->findWindow($job, $rowOffset, $rowLimit, $statusFilter, $setNeedle);
+        $filteredRowCount = null !== $setNeedle
+            ? $this->rowRepository->countWindow($job, $statusFilter, $setNeedle)
+            : null;
 
         return [
             'id' => $job->getId(),
@@ -987,6 +994,11 @@ final class StoreCsvImportController extends AbstractController
             'finishedAt' => $job->getFinishedAt()?->format(DATE_ATOM),
             'rowOffset' => $rowOffset,
             'rowLimit' => $rowLimit,
+            'setFilter' => $setNeedle,
+            'filteredRowCount' => $filteredRowCount,
+            // Distinct sets are only needed for typeahead — skip the extra
+            // DISTINCT scan on every paginated / polled row window.
+            'sets' => 0 === $rowLimit ? $this->rowRepository->findDistinctSets($job) : [],
             'rows' => array_map($this->serializeRow(...), $rows),
         ];
     }

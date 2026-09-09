@@ -718,6 +718,12 @@ export interface CsvImportJob {
   finishedAt?: string | null
   rowOffset: number
   rowLimit: number
+  /** Active `set=` query when browsing import rows. */
+  setFilter?: string | null
+  /** Rows matching status + set filter; present when set search is active. */
+  filteredRowCount?: number | null
+  /** Distinct set values from the sheet (for typeahead). */
+  sets?: { code: string; name: string }[]
   rows: CsvImportRow[]
 }
 

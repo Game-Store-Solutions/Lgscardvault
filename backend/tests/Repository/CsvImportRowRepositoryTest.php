@@ -112,4 +112,54 @@ final class CsvImportRowRepositoryTest extends KernelTestCase
         self::assertSame(3, $this->rows->requeueProcessingRows($job));
         self::assertSame(3, $this->rows->countByStatus($job)['queued']);
     }
+
+    public function testFindWindowFiltersBySetPrefixWithoutMidWordHits(): void
+    {
+        $store = (new CatalogFixtures($this->em))->store();
+        $job = new CsvImportJob();
+        $job->setStore($store);
+        $job->setStatus(CsvImportJob::STATUS_COMPLETED);
+        $job->setOriginalFilename('sets.csv');
+        $job->setStoragePath('');
+        $job->setTotalRows(3);
+        $this->em->persist($job);
+
+        foreach (
+            [
+                [0, 'eve', CsvImportRow::STATUS_IMPORTED],
+                [1, '7ed', CsvImportRow::STATUS_IMPORTED],
+                [2, 'mh2', CsvImportRow::STATUS_IMPORTED],
+            ] as [$index, $set, $status]
+        ) {
+            $row = new CsvImportRow();
+            $row->setJob($job);
+            $row->setRowIndex($index);
+            $row->setName('Card '.$index);
+            $row->setSetCode($set);
+            // Seventh Edition stored as the expansion name must not match "eve".
+            if ('7ed' === $set) {
+                $row->setSetCode('Seventh Edition');
+            }
+            $row->setCollectorNumber((string) $index);
+            $row->setQuantity(1);
+            $row->setStatus($status);
+            $this->em->persist($row);
+        }
+        $this->em->flush();
+
+        $page = $this->rows->findWindow($job, 0, 50, CsvImportRow::STATUS_IMPORTED, 'eve');
+        self::assertCount(1, $page);
+        self::assertSame('eve', $page[0]->getSetCode());
+        self::assertSame(1, $this->rows->countWindow($job, CsvImportRow::STATUS_IMPORTED, 'eve'));
+
+        $mh = $this->rows->findWindow($job, 0, 50, CsvImportRow::STATUS_IMPORTED, 'mh');
+        self::assertCount(1, $mh);
+        self::assertSame('mh2', $mh[0]->getSetCode());
+
+        $sets = $this->rows->findDistinctSets($job);
+        $codes = array_map(static fn (array $set): string => $set['code'], $sets);
+        self::assertContains('eve', $codes);
+        self::assertContains('mh2', $codes);
+        self::assertContains('Seventh Edition', $codes);
+    }
 }

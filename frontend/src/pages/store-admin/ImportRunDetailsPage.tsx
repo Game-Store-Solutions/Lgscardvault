@@ -1,9 +1,12 @@
-import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { Wrench } from 'lucide-react'
+import { Wrench, X } from 'lucide-react'
 import api, { cardImage } from '../../api/client'
 import type { CsvImportJob, CsvImportRow } from '../../api/types'
+import { useDebouncedValue } from '../../hooks'
+import { catalogNamesMatch, foldSearchText, rankSetSearch, typeaheadNameTier } from '../../lib/searchText'
+import { cx } from '../../lib/cx'
 import {
   BackButton,
   Card,
@@ -18,18 +21,58 @@ import {
   EmptyRow,
   Badge,
   Button,
+  Field,
+  Input,
   buttonVariants,
+  dropdownItemClass,
+  dropdownPanelClass,
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice, canOpenRecovery, skippedRowCount } from './csv-shared'
 import { FailedRowsTable } from './FailedRowsTable'
 
 const ROW_LIMIT = 100
 
+/** Same prefix / word-start rules as the import set API filter. */
+function importRowMatchesSet(row: CsvImportRow, rawQuery: string): boolean {
+  const needle = foldSearchText(rawQuery)
+  if (!needle) return true
+  return typeaheadNameTier(row.set || '', rawQuery) <= 2
+}
+
 export default function ImportRunDetailsPage() {
   const { slug = '', importId = '' } = useParams()
   const queryClient = useQueryClient()
   const [rowOffset, setRowOffset] = useState(0)
+  const [setFilter, setSetFilter] = useState('')
+  const debouncedSet = useDebouncedValue(setFilter.trim(), 150)
+  /** Set applied to the API immediately on typeahead pick (skip debounce wait). */
+  const [immediateSet, setImmediateSet] = useState<string | null>(null)
+  const activeSet = immediateSet ?? debouncedSet
+  const [importSetTypeaheadIndex, setImportSetTypeaheadIndex] = useState(0)
+  const [importSetTypeaheadOpen, setImportSetTypeaheadOpen] = useState(false)
+  const importSetTypeaheadRef = useRef<HTMLDivElement>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setRowOffset(0)
+  }, [activeSet])
+
+  useEffect(() => {
+    // Typing again clears a pinned typeahead selection so debounce resumes.
+    if (immediateSet !== null && foldSearchText(setFilter) !== foldSearchText(immediateSet)) {
+      setImmediateSet(null)
+    }
+  }, [setFilter, immediateSet])
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (importSetTypeaheadRef.current && !importSetTypeaheadRef.current.contains(event.target as Node)) {
+        setImportSetTypeaheadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
 
   const summaryQueryKey = ['csv-import-run', slug, importId, 'summary']
   const {
@@ -46,30 +89,45 @@ export default function ImportRunDetailsPage() {
       return data
     },
     enabled: importId !== '',
+    staleTime: 5_000,
     refetchInterval: (query) => (isActive(query.state.data?.status) ? 3000 : false),
   })
 
   const { data: importedPage, refetch: refetchImported } = useQuery({
-    queryKey: ['csv-import-run', slug, importId, 'imported', rowOffset],
+    queryKey: ['csv-import-run', slug, importId, 'imported', rowOffset, activeSet],
     queryFn: async () => {
       const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
-        params: { rowOffset, rowLimit: ROW_LIMIT, rowStatus: 'imported' },
+        params: {
+          rowOffset,
+          rowLimit: ROW_LIMIT,
+          rowStatus: 'imported',
+          ...(activeSet ? { set: activeSet } : {}),
+        },
       })
       return data
     },
     enabled: importId !== '',
+    placeholderData: keepPreviousData,
+    staleTime: 5_000,
     refetchInterval: () => (isActive(summary?.status) ? 3000 : false),
   })
 
+  // Fetch failed rows once (no set param); filter locally so set typing does
+  // not fire a second server round-trip on every keystroke.
   const { data: failedJob, refetch: refetchFailed } = useQuery({
     queryKey: ['csv-import-run', slug, importId, 'failed'],
     queryFn: async () => {
       const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
-        params: { rowOffset: 0, rowLimit: 250, rowStatus: 'error' },
+        params: {
+          rowOffset: 0,
+          rowLimit: 250,
+          rowStatus: 'error',
+        },
       })
       return data
     },
     enabled: importId !== '',
+    staleTime: 5_000,
     refetchInterval: () => (isActive(summary?.status) ? 3000 : false),
   })
 
@@ -102,9 +160,35 @@ export default function ImportRunDetailsPage() {
   const processedRows = job?.processedRows ?? 0
   const progress = totalRows === 0 ? 0 : Math.min(processedRows / totalRows, 1)
   const rows = importedPage?.rows ?? []
-  const failedRows = failedJob?.rows ?? []
+  const failedRows = useMemo(() => {
+    const all = failedJob?.rows ?? []
+    if (!activeSet) return all
+    return all.filter((row) => importRowMatchesSet(row, activeSet))
+  }, [failedJob?.rows, activeSet])
+  const importedTotal =
+    importedPage?.filteredRowCount ?? (activeSet ? 0 : (job?.importedRows ?? 0))
   const canPrevious = rowOffset > 0
-  const canNext = rowOffset + ROW_LIMIT < (job?.importedRows ?? 0)
+  const canNext = rowOffset + ROW_LIMIT < importedTotal
+  const setSearchActive = Boolean(activeSet)
+  const importSets = summary?.sets ?? []
+  const importSetTypeaheadReady = setFilter.trim().length >= 1
+  const importSetTypeaheadOptions = useMemo(() => {
+    if (!importSetTypeaheadReady) return []
+    return rankSetSearch(importSets, setFilter).slice(0, 12)
+  }, [importSets, setFilter, importSetTypeaheadReady])
+  const showImportSetTypeahead =
+    importSetTypeaheadOpen && importSetTypeaheadReady && importSetTypeaheadOptions.length > 0
+
+  useEffect(() => {
+    setImportSetTypeaheadIndex(importSetTypeaheadOptions.length > 0 ? 0 : -1)
+  }, [setFilter, importSetTypeaheadOptions])
+
+  function autofillImportSet(code: string) {
+    setSetFilter(code)
+    setImmediateSet(code)
+    setImportSetTypeaheadOpen(false)
+    setImportSetTypeaheadIndex(-1)
+  }
 
   return (
     <div className="space-y-6">
@@ -213,10 +297,14 @@ export default function ImportRunDetailsPage() {
           title="Failed cards"
           subtitle={
             failedRows.length === 0
-              ? job && skippedRowCount(job) > 0
+              ? job && skippedRowCount(job) > 0 && !setSearchActive
                 ? `${skippedRowCount(job)} skipped card${skippedRowCount(job) === 1 ? '' : 's'}. Open the workspace to review or restore them.`
-                : 'No failed cards in this run.'
-              : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}. Open the workspace to match them to real printings.`
+                : setSearchActive
+                  ? `No failed cards match set “${activeSet}”.`
+                  : 'No failed cards in this run.'
+              : setSearchActive
+                ? `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'} matching set “${activeSet}”.`
+                : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}. Open the workspace to match them to real printings.`
           }
           actions={
             job && canOpenRecovery(job) ? (
@@ -241,10 +329,12 @@ export default function ImportRunDetailsPage() {
         <CardHeader
           title="Succeeded cards"
           subtitle={`Showing ${
-            (job?.importedRows ?? 0) === 0 && rows.length === 0
+            importedTotal === 0 && rows.length === 0
               ? 0
               : rowOffset + 1
-          }-${rowOffset + rows.length} of ${job?.importedRows ?? 0}`}
+          }-${rowOffset + rows.length} of ${importedTotal}${
+            setSearchActive ? ` matching set “${activeSet}”` : ''
+          }`}
           actions={
             <div className="flex items-center gap-2">
               <Button
@@ -266,8 +356,116 @@ export default function ImportRunDetailsPage() {
             </div>
           }
         />
-        <CardBody className="p-0">
-          <ImportRowsTable rows={rows} />
+        <CardBody className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3 px-1">
+            <Field label="Search by set" className="min-w-[14rem] flex-1 sm:max-w-xs">
+              {({ id }) => (
+                <div ref={importSetTypeaheadRef} className="relative">
+                  <Input
+                    id={id}
+                    value={setFilter}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={showImportSetTypeahead}
+                    aria-controls="import-set-typeahead"
+                    aria-activedescendant={
+                      showImportSetTypeahead && importSetTypeaheadIndex >= 0
+                        ? `import-set-typeahead-${importSetTypeaheadIndex}`
+                        : undefined
+                    }
+                    onFocus={() => {
+                      if (importSetTypeaheadOptions.length > 0) setImportSetTypeaheadOpen(true)
+                    }}
+                    onChange={(e) => {
+                      setSetFilter(e.target.value)
+                      setImportSetTypeaheadOpen(true)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowDown' && importSetTypeaheadOptions.length > 0) {
+                        e.preventDefault()
+                        setImportSetTypeaheadOpen(true)
+                        setImportSetTypeaheadIndex((index) => (index + 1) % importSetTypeaheadOptions.length)
+                        return
+                      }
+                      if (e.key === 'ArrowUp' && importSetTypeaheadOptions.length > 0) {
+                        e.preventDefault()
+                        setImportSetTypeaheadOpen(true)
+                        setImportSetTypeaheadIndex((index) =>
+                          index <= 0 ? importSetTypeaheadOptions.length - 1 : index - 1,
+                        )
+                        return
+                      }
+                      if (e.key === 'Escape') {
+                        setImportSetTypeaheadOpen(false)
+                        return
+                      }
+                      if (e.key === 'Tab' && showImportSetTypeahead) {
+                        const set = importSetTypeaheadOptions[importSetTypeaheadIndex] ?? importSetTypeaheadOptions[0]
+                        if (set) autofillImportSet(set.code)
+                        return
+                      }
+                      if (e.key === 'Enter' && showImportSetTypeahead) {
+                        const set = importSetTypeaheadOptions[importSetTypeaheadIndex] ?? importSetTypeaheadOptions[0]
+                        if (set && !catalogNamesMatch(set.code, setFilter)) {
+                          e.preventDefault()
+                          autofillImportSet(set.code)
+                        } else {
+                          setImportSetTypeaheadOpen(false)
+                        }
+                      }
+                    }}
+                    placeholder="Set code or name…"
+                    className="uppercase min-h-11"
+                  />
+                  {showImportSetTypeahead ? (
+                    <ul
+                      id="import-set-typeahead"
+                      role="listbox"
+                      aria-label="Matching import sets"
+                      className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
+                    >
+                      {importSetTypeaheadOptions.map((set, index) => (
+                        <li
+                          key={set.code}
+                          id={`import-set-typeahead-${index}`}
+                          role="option"
+                          aria-selected={index === importSetTypeaheadIndex}
+                        >
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => autofillImportSet(set.code)}
+                            onMouseEnter={() => setImportSetTypeaheadIndex(index)}
+                            className={dropdownItemClass({ active: index === importSetTypeaheadIndex })}
+                          >
+                            <span className="truncate font-semibold uppercase">{set.code}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              )}
+            </Field>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!setFilter.trim()}
+              onClick={() => {
+                setSetFilter('')
+                setImmediateSet(null)
+                setImportSetTypeaheadOpen(false)
+              }}
+              className="min-h-11"
+            >
+              <X className="size-4" aria-hidden />
+              Clear
+            </Button>
+          </div>
+          <div className="-mx-5 border-t border-border sm:-mx-6">
+            <ImportRowsTable rows={rows} emptyLabel={setSearchActive ? 'No succeeded cards match that set.' : 'No cards to display.'} />
+          </div>
         </CardBody>
       </Card>
 
@@ -288,7 +486,7 @@ function RowStatus({ row }: { row: CsvImportRow }) {
   return <Badge tone="neutral">Queued</Badge>
 }
 
-function ImportRowsTable({ rows }: { rows: CsvImportRow[] }) {
+function ImportRowsTable({ rows, emptyLabel = 'No cards to display.' }: { rows: CsvImportRow[]; emptyLabel?: string }) {
   return (
     <div className="max-h-[32rem] overflow-auto">
       <Table>
@@ -337,7 +535,7 @@ function ImportRowsTable({ rows }: { rows: CsvImportRow[] }) {
               </TD>
             </TR>
           ))}
-          {rows.length === 0 && <EmptyRow colSpan={9}>No cards to display.</EmptyRow>}
+          {rows.length === 0 && <EmptyRow colSpan={9}>{emptyLabel}</EmptyRow>}
         </TBody>
       </Table>
     </div>
