@@ -168,7 +168,7 @@ export default function AdminSettingsTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card flat>
         <CardHeader
           title="Marketplace listing"
           subtitle="Public stores appear in the directory and sitemap. Private stores stay off the list; anyone with your link can still visit."
@@ -212,7 +212,7 @@ export default function AdminSettingsTab({ slug }: { slug: string }) {
         )}
       </Card>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title="Kiosk mode"
           subtitle="Customer-facing terminals stay on shopping only. Staff need this exit code to leave kiosk mode and reach admin tools."
@@ -299,7 +299,7 @@ export default function AdminSettingsTab({ slug }: { slug: string }) {
         </CardBody>
       </Card>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title="Storefront features"
           subtitle="Turn shopper-facing tools on or off. Admin pages stay available so you can set things up before going live."
@@ -331,7 +331,7 @@ export default function AdminSettingsTab({ slug }: { slug: string }) {
         </CardBody>
       </Card>
 
-      <Card className="border-danger-500/40">
+      <Card flat className="border-danger-500/40">
         <CardHeader
           title="Delete all inventory"
           subtitle="Permanently removes every singles listing and sealed product from this store. Case cards, carts, and favorites for those listings are removed too. Past orders stay on file, but they will no longer point at the listings. This cannot be undone."

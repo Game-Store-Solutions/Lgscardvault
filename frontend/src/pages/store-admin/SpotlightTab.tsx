@@ -190,7 +190,7 @@ export default function SpotlightTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+      <div className="overflow-hidden border border-border bg-surface">
         <div className="relative px-5 py-6 sm:px-7 sm:py-8">
           <div
             aria-hidden
@@ -217,7 +217,7 @@ export default function SpotlightTab({ slug }: { slug: string }) {
         </div>
       </div>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title={
             <span className="inline-flex flex-wrap items-center gap-2">
@@ -361,7 +361,7 @@ export default function SpotlightTab({ slug }: { slug: string }) {
         </SettingCard>
       </div>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title="Featured singles"
           subtitle="These listings always lead the spotlight, in this order. Search your in-stock inventory to add more."
@@ -522,7 +522,7 @@ function SettingCard({
   children: ReactNode
 }) {
   return (
-    <Card>
+    <Card flat>
       <CardBody className="space-y-4">
         <div>
           <p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-brand-600">{kicker}</p>

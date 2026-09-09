@@ -23,12 +23,12 @@ import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
 import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
 import { cx } from '../../lib/cx'
 
-/** Rarities the auto-fill filter accepts — must mirror the backend allow-list. */
+/** Rarities the auto-fill filter accepts ΓÇö must mirror the backend allow-list. */
 const RARITIES = ['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus'] as const
 
 /**
  * Color-filter suggestions for the datalist. The backend parser accepts far
- * more (letter combos, aliases, "sans X", …) — these are just the common
+ * more (letter combos, aliases, "sans X", ΓÇª) ΓÇö these are just the common
  * names to get owners started.
  */
 const COLOR_SUGGESTIONS = [
@@ -84,8 +84,8 @@ function freeCaseCopies(
 }
 
 /**
- * "In case" stepper — digit slides with the click; parent keeps quantity
- * optimistic so it never snaps 2→1→2 while the PATCH refetches.
+ * "In case" stepper ΓÇö digit slides with the click; parent keeps quantity
+ * optimistic so it never snaps 2ΓåÆ1ΓåÆ2 while the PATCH refetches.
  */
 function CasePoolQuantityInput({
   quantity,
@@ -171,7 +171,7 @@ function CasePoolQuantityInput({
 
 /**
  * Case Cards admin: manage display cases, divide each into sections, and run
- * each section as its own inventory pool — filled by hand or auto-pulled with
+ * each section as its own inventory pool ΓÇö filled by hand or auto-pulled with
  * smart filters (color identity terms, set, card type, price, rarity). Every
  * section exposes a live, printable pull sheet for staff.
  */
@@ -192,7 +192,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card flat>
         <CardHeader
           title="Display cases"
           subtitle="A case is a physical display in your store. Divide each one into sections. Every section tracks its own cards, quantities, and pull sheet."
@@ -209,7 +209,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
               label="New case name"
               value={caseName}
               onChange={(e) => setCaseName(e.target.value)}
-              placeholder="Front counter case, wall case…"
+              placeholder="Front counter case, wall caseΓÇª"
               maxLength={120}
             />
             <Button type="submit" loading={createCase.isPending} disabled={!caseName.trim()}>
@@ -306,7 +306,7 @@ function CaseEditor({
           label={`Add a section to ${storeCase.name}`}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Black, Azorius, Rares $20+…"
+          placeholder="Black, Azorius, Rares $20+ΓÇª"
           maxLength={120}
         />
         <Select label="Fill mode" value={mode} onChange={(e) => setMode(e.target.value as StoreSectionMode)}>
@@ -459,11 +459,11 @@ function SectionEditor({
   })
 
   return (
-    <Card>
+    <Card flat>
       <CardHeader
         title={section.title}
         subtitle={
-          `${section.mode === 'auto' ? 'Auto-filled' : 'Hand-picked'} · ` +
+          `${section.mode === 'auto' ? 'Auto-filled' : 'Hand-picked'} ┬╖ ` +
           `${section.availableQuantity} card${section.availableQuantity === 1 ? '' : 's'} available in this section`
         }
         actions={
@@ -530,8 +530,8 @@ function SectionEditor({
                   </option>
                 ))}
               </Select>
-              <Input label="Set code" value={setCode} onChange={(e) => setSetCode(e.target.value)} placeholder="neo, mh2…" />
-              <Input label="Card type" value={cardType} onChange={(e) => setCardType(e.target.value)} placeholder="Creature, Instant…" />
+              <Input label="Set code" value={setCode} onChange={(e) => setSetCode(e.target.value)} placeholder="neo, mh2ΓÇª" />
+              <Input label="Card type" value={cardType} onChange={(e) => setCardType(e.target.value)} placeholder="Creature, InstantΓÇª" />
               <Input label="Min price ($)" value={min} onChange={(e) => setMin(e.target.value)} inputMode="decimal" placeholder="0" />
               <Input label="Max price ($)" value={max} onChange={(e) => setMax(e.target.value)} inputMode="decimal" placeholder="Any" />
               <Input
@@ -581,7 +581,7 @@ function SectionEditor({
             </div>
             <span className="pb-2 text-xs text-fg-muted">
               {visibleCards.length} in section
-              {section.cardLimit != null ? ` · limit ${section.cardLimit}` : ''}
+              {section.cardLimit != null ? ` ┬╖ limit ${section.cardLimit}` : ''}
             </span>
           </div>
         )}
@@ -622,7 +622,7 @@ function SectionEditor({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-fg">{card?.name ?? 'Unknown card'}</p>
                     <p className="text-xs text-fg-muted">
-                      {card?.setCode?.toUpperCase()} · {formatPrice(entry.inventoryItem.priceCents)}
+                      {card?.setCode?.toUpperCase()} ┬╖ {formatPrice(entry.inventoryItem.priceCents)}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                       <CasePoolQuantityInput
@@ -730,12 +730,12 @@ function PullSheetModal({ slug, section, onClose }: { slug: string; section: Sto
                   <tr key={row.lineId} className="border-b border-border/60">
                     <td className="py-2 pr-3 font-bold text-fg">{row.cardName}</td>
                     <td className="py-2 pr-3 text-fg-muted">
-                      {row.setCode?.toUpperCase() ?? '—'}
+                      {row.setCode?.toUpperCase() ?? 'ΓÇö'}
                       {row.collectorNumber ? ` #${row.collectorNumber}` : ''}
                     </td>
                     <td className="py-2 pr-3 text-right font-bold text-fg">{row.quantity}</td>
-                    <td className="py-2 pr-3 text-fg-muted">{row.orderReference ?? '—'}</td>
-                    <td className="py-2 text-fg-muted">{row.customerName ?? row.customerEmail ?? '—'}</td>
+                    <td className="py-2 pr-3 text-fg-muted">{row.orderReference ?? 'ΓÇö'}</td>
+                    <td className="py-2 text-fg-muted">{row.customerName ?? row.customerEmail ?? 'ΓÇö'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -841,16 +841,16 @@ function StockingSheetModal({
                   <tr key={row.sectionCardId} className="border-b border-border/60">
                     <td className="py-2 pr-3 font-bold text-fg">{row.cardName}</td>
                     <td className="py-2 pr-3 text-fg-muted">
-                      {row.setCode?.toUpperCase() ?? '—'}
+                      {row.setCode?.toUpperCase() ?? 'ΓÇö'}
                       {row.collectorNumber ? ` #${row.collectorNumber}` : ''}
                     </td>
                     <td className="py-2 pr-3 text-fg-muted">
                       {row.finish}
-                      {row.condition ? ` · ${row.condition}` : ''}
+                      {row.condition ? ` ┬╖ ${row.condition}` : ''}
                     </td>
                     <td className="py-2 pr-3 text-right font-bold text-fg">{row.copies}</td>
                     <td className="py-2 text-right text-fg-muted">
-                      {row.priceCents != null ? formatPrice(row.priceCents) : '—'}
+                      {row.priceCents != null ? formatPrice(row.priceCents) : 'ΓÇö'}
                     </td>
                   </tr>
                 ))}
@@ -889,7 +889,7 @@ function printStockingSheet(sheet: StockingSheet) {
         <tr>
           <td>${escapeHtml(row.cardName)}</td>
           <td>${escapeHtml(row.setCode?.toUpperCase() ?? '-')}${row.collectorNumber ? ' #' + escapeHtml(row.collectorNumber) : ''}</td>
-          <td>${escapeHtml(row.finish)}${row.condition ? ' · ' + escapeHtml(row.condition) : ''}</td>
+          <td>${escapeHtml(row.finish)}${row.condition ? ' ┬╖ ' + escapeHtml(row.condition) : ''}</td>
           <td>${row.copies}</td>
           <td>[&nbsp;&nbsp;]</td>
         </tr>`,
@@ -917,7 +917,7 @@ function printStockingSheet(sheet: StockingSheet) {
       <body>
         <header>
           <h1>Stocking Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
-          <div class="muted">${sheet.totalCards} cop${sheet.totalCards === 1 ? 'y' : 'ies'} to place in the case · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
+          <div class="muted">${sheet.totalCards} cop${sheet.totalCards === 1 ? 'y' : 'ies'} to place in the case ┬╖ generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
         </header>
         <table>
           <thead>
@@ -991,7 +991,7 @@ function printPullSheet(sheet: PullSheet) {
       <body>
         <header>
           <h1>Pull Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
-          <div class="muted">${sheet.totalCards} card${sheet.totalCards === 1 ? '' : 's'} to pull · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
+          <div class="muted">${sheet.totalCards} card${sheet.totalCards === 1 ? '' : 's'} to pull ┬╖ generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
         </header>
         <table>
           <thead>
@@ -1064,7 +1064,7 @@ function InventoryPicker({
     [section.cards],
   )
 
-  // Same ranked catalog typeahead as Singles → Add (prefix / exact / word tiers).
+  // Same ranked catalog typeahead as Singles ΓåÆ Add (prefix / exact / word tiers).
   const typeaheadReady = debounced.length >= 2 && Boolean(game) && !pickedCard
   const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
     queryKey: ['card-search', 'typeahead', 'section-picker', debounced, game],
@@ -1174,7 +1174,7 @@ function InventoryPicker({
     <Modal
       open
       onClose={onClose}
-      title={`Add cards to “${section.title}”`}
+      title={`Add cards to ΓÇ£${section.title}ΓÇ¥`}
       className="max-w-5xl min-h-[min(42rem,90vh)]"
     >
       <div className="flex min-h-[min(32rem,70vh)] flex-col gap-4">
@@ -1198,7 +1198,7 @@ function InventoryPicker({
             onFocus={() => {
               if (!pickedCard) setTypeaheadOpen(true)
             }}
-            placeholder="Card name (same search as Singles)…"
+            placeholder="Card name (same search as Singles)ΓÇª"
             autoFocus
           />
           {showTypeahead && (
@@ -1238,7 +1238,7 @@ function InventoryPicker({
                 )
               })}
               {typeaheadFetching && (
-                <li className="px-2.5 py-1.5 text-xs text-fg-muted">Searching…</li>
+                <li className="px-2.5 py-1.5 text-xs text-fg-muted">SearchingΓÇª</li>
               )}
             </ul>
           )}
@@ -1260,10 +1260,10 @@ function InventoryPicker({
                 <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">Selected card</p>
                 <p className="text-xl font-bold text-fg">{pickedCard.name}</p>
                 <p className="text-sm text-fg-muted">
-                  {[pickedCard.setCode?.toUpperCase(), pickedCard.setName].filter(Boolean).join(' · ') || 'Catalog match'}
+                  {[pickedCard.setCode?.toUpperCase(), pickedCard.setName].filter(Boolean).join(' ┬╖ ') || 'Catalog match'}
                   {primaryListing
-                    ? ` · ${primaryListing.card.setCode?.toUpperCase() ?? '—'} · ${formatPrice(primaryListing.priceCents)} · ${primaryListing.quantity ?? 0} in stock · ${primaryFree} free for cases`
-                    : ' · Choose a store listing below to add it to this case section.'}
+                    ? ` ┬╖ ${primaryListing.card.setCode?.toUpperCase() ?? 'ΓÇö'} ┬╖ ${formatPrice(primaryListing.priceCents)} ┬╖ ${primaryListing.quantity ?? 0} in stock ┬╖ ${primaryFree} free for cases`
+                    : ' ┬╖ Choose a store listing below to add it to this case section.'}
                 </p>
                 {addMutation.isError && (
                   <p className="text-sm font-medium text-danger-700" role="alert">
@@ -1315,7 +1315,7 @@ function InventoryPicker({
               title={pickedCard ? 'Not in inventory' : 'No matching listings'}
               description={
                 pickedCard
-                  ? `${pickedCard.name} isn’t in this store’s inventory. Import or add the listing in Singles first.`
+                  ? `${pickedCard.name} isnΓÇÖt in this storeΓÇÖs inventory. Import or add the listing in Singles first.`
                   : 'Try another name, or pick a suggestion from the catalog search above.'
               }
             />
@@ -1323,7 +1323,7 @@ function InventoryPicker({
             <div className="space-y-3">
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-sm font-bold text-fg">
-                  {pickedCard ? `Store listings · ${pickedCard.name}` : 'Matching stock'}
+                  {pickedCard ? `Store listings ┬╖ ${pickedCard.name}` : 'Matching stock'}
                 </h3>
                 <p className="text-xs text-fg-muted">{results.length} listing{results.length === 1 ? '' : 's'}</p>
               </div>
@@ -1349,9 +1349,9 @@ function InventoryPicker({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-base font-bold text-fg">{item.card.name}</p>
                         <p className="text-sm text-fg-muted">
-                          {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
-                          {item.isFoil ? ` · ${item.finish}` : ''}
-                          {` · ${item.quantity ?? 0} in stock · ${free} free for cases`}
+                          {item.card.setCode?.toUpperCase()} ┬╖ {formatPrice(item.priceCents)}
+                          {item.isFoil ? ` ┬╖ ${item.finish}` : ''}
+                          {` ┬╖ ${item.quantity ?? 0} in stock ┬╖ ${free} free for cases`}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">

@@ -76,7 +76,7 @@ export default function PatchNotesTab() {
       </div>
 
       {isSuperAdmin && (
-        <Card>
+        <Card flat>
           <CardHeader
             title={editing ? `Editing “${editing.title}”` : 'Write a patch note'}
             actions={
@@ -117,7 +117,7 @@ export default function PatchNotesTab() {
       {isLoading ? (
         <LoadingPanel />
       ) : notes.length === 0 ? (
-        <Card>
+        <Card flat>
           <CardBody>
             <EmptyState icon={Megaphone} title="No patch notes yet" description="Platform updates will be posted here." />
           </CardBody>
@@ -125,7 +125,7 @@ export default function PatchNotesTab() {
       ) : (
         <div className="space-y-4">
           {notes.map((note) => (
-            <Card key={note.id}>
+            <Card flat key={note.id}>
               <CardHeader
                 title={note.title}
                 subtitle={`${formatDate(note.createdAt)}${note.updatedAt ? ` · edited ${formatDate(note.updatedAt)}` : ''}`}

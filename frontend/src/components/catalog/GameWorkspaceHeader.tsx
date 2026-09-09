@@ -1,7 +1,6 @@
 import { Layers, Package } from 'lucide-react'
 import type { CatalogGame, StoreGameStats } from '../../api/types'
 import { GameSelector } from './GameSelector'
-import { Card, CardBody } from '../ui'
 
 export interface GameWorkspaceHeaderProps {
   games: Pick<CatalogGame, 'code' | 'name'>[]
@@ -36,31 +35,19 @@ export function GameWorkspaceHeader({
   const activeGame = games.find((game) => game.code === value)
 
   return (
-    <Card>
-      <CardBody className="space-y-4 py-4">
-        <GameSelector games={games} value={value} onChange={onChange} label={label} />
+    <header className="min-w-0 space-y-4 border-b border-border pb-5">
+      <GameSelector games={games} value={value} onChange={onChange} label={label} />
 
-        {activeGame && (
-          <div>
-            <h2 className="font-display text-lg font-bold tracking-tight text-fg">{activeGame.name}</h2>
-            <dl className="mt-2 grid gap-3 sm:grid-cols-2">
-              <Stat
-                icon={Layers}
-                label="Singles"
-                value={stats?.singles.listings}
-                loading={loading}
-              />
-              <Stat
-                icon={Package}
-                label="Sealed products"
-                value={stats?.sealed.units}
-                loading={loading}
-              />
-            </dl>
-          </div>
-        )}
-      </CardBody>
-    </Card>
+      {activeGame ? (
+        <div>
+          <h2 className="font-display text-lg font-bold tracking-tight text-fg">{activeGame.name}</h2>
+          <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:max-w-md">
+            <Stat icon={Layers} label="Singles" value={stats?.singles.listings} loading={loading} />
+            <Stat icon={Package} label="Sealed products" value={stats?.sealed.units} loading={loading} />
+          </dl>
+        </div>
+      ) : null}
+    </header>
   )
 }
 
@@ -76,15 +63,13 @@ function Stat({
   loading?: boolean
 }) {
   return (
-    <div className="rounded-card border border-border bg-bg px-4 py-3">
-      <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-fg-muted">
+    <div>
+      <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-fg-muted">
         <Icon aria-hidden className="size-3.5" />
         {label}
       </dt>
-      <dd className="mt-1">
-        <span className="font-display text-2xl font-extrabold text-fg">
-          {loading || undefined === value ? '—' : NUMBER.format(value)}
-        </span>
+      <dd className="mt-1 font-display text-2xl font-extrabold tabular-nums text-fg">
+        {loading || undefined === value ? '—' : NUMBER.format(value)}
       </dd>
     </div>
   )

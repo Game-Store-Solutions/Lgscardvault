@@ -118,7 +118,7 @@ export default function SealedTab({ slug }: { slug: string }) {
       />
 
       {/* The store's sealed stock */}
-      <Card>
+      <Card flat>
         <CardHeader
           title={`${activeGameName} sealed in stock`}
           subtitle="Boxes, bundles, and decks this store carries. Prices default to the TCGplayer market snapshot."
@@ -160,7 +160,7 @@ export default function SealedTab({ slug }: { slug: string }) {
       </Card>
 
       {/* Catalog browser */}
-      <Card>
+      <Card flat>
         <CardHeader
           title={`${activeGameName} sealed catalog`}
           subtitle={`Every ${activeGameName} sealed product in the catalog. Add what you stock.`}

@@ -76,7 +76,7 @@ export default function CsvTab({ slug }: { slug: string }) {
       <ImportWizard slug={slug} busy={isActive(job?.status)} onImported={refreshImports} />
 
       {job && (
-        <Card>
+        <Card flat>
           <CardHeader
             title="Latest import"
             subtitle={
@@ -168,7 +168,7 @@ export default function CsvTab({ slug }: { slug: string }) {
       )}
 
       {rows.length > 0 && (
-        <Card>
+        <Card flat>
           <CardHeader
             title={`Import rows ${job ? `${job.rowOffset + 1}-${job.rowOffset + rows.length} of ${totalRows}` : ''}`}
             subtitle={job ? `Updated ${new Date(job.updatedAt).toLocaleTimeString()}` : undefined}
@@ -216,7 +216,7 @@ export default function CsvTab({ slug }: { slug: string }) {
         </Card>
       )}
 
-      <Card>
+      <Card flat>
         <CardHeader
           title="Import run audit"
           subtitle="Review every CSV import run, open row details, or manage active work."

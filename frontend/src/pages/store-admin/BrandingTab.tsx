@@ -503,7 +503,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         />
 
         <TabPanel when="colors" value={section} className="space-y-6 pt-5">
-          <Card>
+          <Card flat>
             <CardHeader
               title={previewMode === 'dark' ? 'Dark theme library' : 'Theme library'}
               subtitle={
@@ -533,7 +533,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
           </Card>
           {previewMode === 'light' ? (
             <>
-              <Card>
+              <Card flat>
                 <CardHeader title="Brand colors" subtitle="Buttons, links, and accents shoppers see first." />
                 <CardBody className="space-y-5">
                   <BrandingPreviewIsland
@@ -559,7 +559,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
                   </div>
                 </CardBody>
               </Card>
-              <Card>
+              <Card flat>
                 <CardHeader title="Page & text" subtitle="Background, cards, and readable type — not borders." />
                 <CardBody className="space-y-5">
                   <BrandingPreviewIsland
@@ -588,7 +588,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
               </Card>
             </>
           ) : (
-            <Card>
+            <Card flat>
               <CardHeader title="Dark colors" subtitle="Leave a field blank to inherit from the light theme." />
               <CardBody className="space-y-5">
                 <BrandingPreviewIsland
@@ -632,7 +632,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </TabPanel>
 
         <TabPanel when="backgrounds" value={section} className="space-y-6 pt-5">
-          <Card>
+          <Card flat>
             <CardHeader
               title="Page backgrounds"
               subtitle={
@@ -696,7 +696,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </TabPanel>
 
         <TabPanel when="borders" value={section} className="space-y-6 pt-5">
-          <Card>
+          <Card flat>
             <CardHeader
               title="Storefront frames"
               subtitle={
@@ -756,7 +756,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </TabPanel>
 
         <TabPanel when="hero" value={section} className="pt-5">
-          <Card>
+          <Card flat>
             <CardHeader
               title="Hero banner"
               subtitle="Layout, images, headline copy, and photo framing. Uploads and crop sliders save when you release them."
@@ -956,7 +956,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </TabPanel>
 
         <TabPanel when="cards" value={section} className="pt-5">
-          <Card>
+          <Card flat>
             <CardHeader
               title="Inventory cards"
               subtitle="How singles appear on your public storefront."
@@ -990,7 +990,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
         </TabPanel>
 
         <TabPanel when="footer" value={section} className="pt-5">
-          <Card>
+          <Card flat>
             <CardHeader
               title="Store info & footer"
               subtitle="Hours, contact, and social links. Your onboarding address appears automatically."
@@ -1016,7 +1016,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
           <StoreMarketingToolkit slug={slug} storeName={store?.name ?? slug} />
         </TabPanel>
 
-        <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-4 rounded-card border border-border bg-surface/95 px-4 py-3 shadow-card backdrop-blur-md">
+        <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-4 border border-border bg-surface/95 px-4 py-3 backdrop-blur-md">
           <Button onClick={() => mutation.mutate()} loading={mutation.isPending} disabled={isLoading}>
             <Palette aria-hidden className="size-4" />
             Save branding

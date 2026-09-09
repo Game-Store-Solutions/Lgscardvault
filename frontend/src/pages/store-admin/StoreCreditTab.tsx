@@ -63,7 +63,7 @@ export default function StoreCreditTab({ slug }: { slug: string }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
+        <Card flat>
           <CardBody>
             <p className="text-sm text-fg-muted">Outstanding credit</p>
             <p className="mt-1 font-display text-3xl font-extrabold text-fg">
@@ -71,7 +71,7 @@ export default function StoreCreditTab({ slug }: { slug: string }) {
             </p>
           </CardBody>
         </Card>
-        <Card>
+        <Card flat>
           <CardBody>
             <p className="text-sm text-fg-muted">Customers with a balance</p>
             <p className="mt-1 font-display text-3xl font-extrabold text-fg">{ledger?.customerCount ?? 0}</p>
@@ -79,7 +79,7 @@ export default function StoreCreditTab({ slug }: { slug: string }) {
         </Card>
       </div>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title="Customer balances"
           subtitle="Credit stays at this store. Adjustments are for counter corrections and goodwill."

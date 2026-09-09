@@ -36,7 +36,7 @@ function AccordionPanel({
   const panelId = `${id}-panel`
 
   return (
-    <Card>
+    <Card flat>
       <div className="flex items-start gap-2 px-4 py-4 sm:px-5">
         <button
           type="button"
@@ -706,7 +706,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
     if (!rates) return 'premium rate'
     const percent = rates.buylistCashPercent
     const market = entry.card ? scryfallPriceCents(entry.card, entry.wantsFoil ? 'foil' : 'nonfoil') : null
-    return market == null ? `${percent}% of market` : `${percent}% ≈ ${formatPrice(Math.floor((market * percent) / 100))} cash`
+    return market == null ? `${percent}% of market` : `${percent}% â‰ˆ ${formatPrice(Math.floor((market * percent) / 100))} cash`
   }
 
   return (
@@ -1279,7 +1279,7 @@ function ReviewSubmissionModal({
                     <td className="p-2">
                       <p className="font-bold text-fg">
                         {item.cardName}
-                        {item.isFoil ? ' ✨' : ''}
+                        {item.isFoil ? ' âœ¨' : ''}
                         {item.isFromBuylist && (
                           <Badge tone="brand" className="ml-2">
                             Buy list

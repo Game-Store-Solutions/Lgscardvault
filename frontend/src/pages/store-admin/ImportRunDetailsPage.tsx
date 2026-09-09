@@ -108,7 +108,7 @@ export default function ImportRunDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card flat>
         <CardHeader>
           <div className="min-w-0">
             <BackButton to={`/s/${slug}/admin`}>Back to admin</BackButton>
@@ -208,7 +208,7 @@ export default function ImportRunDetailsPage() {
         )}
       </Card>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title="Failed cards"
           subtitle={
@@ -237,7 +237,7 @@ export default function ImportRunDetailsPage() {
         )}
       </Card>
 
-      <Card>
+      <Card flat>
         <CardHeader
           title="Succeeded cards"
           subtitle={`Showing ${
