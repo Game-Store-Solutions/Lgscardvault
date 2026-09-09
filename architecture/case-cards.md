@@ -10,7 +10,7 @@ This is a separate area from the price-threshold **Spotlight** rail (see [stores
 |--------|-------|-------|
 | `StoreCase` | `store_cases` | A named physical display case. Store-scoped, positioned, cascades away with the store. |
 | `StoreSection` | `store_sections` | A labeled area inside a case (`case_id`, CASCADE). `mode` is `manual` or `auto`; auto criteria: `auto_min_price_cents`, `auto_max_price_cents`, `auto_rarity`, `auto_color_identity` (canonical code), `auto_set_code`, `auto_card_type`. Keeps a redundant `store_id` for scoping. |
-| `StoreSectionCard` | `store_section_cards` | One `InventoryItem` in a section's pool: `quantity` (copies allocated to the case, default 1 = one display slot) and `sold_quantity`. `remaining = quantity - sold` is what the section can still sell. Unique on `(section_id, inventory_item_id)`. |
+| `StoreSectionCard` | `store_section_cards` | One `InventoryItem` in a section's pool: `quantity` (copies allocated to the case, default 1 = one display slot) and `sold_quantity`. `remaining = quantity - sold` is what the section can still sell. Pool size cannot exceed free inventory stock (on-hand minus other sections' unsold claims). Unique on `(section_id, inventory_item_id)`. |
 | `OrderLine` (additions) | `order_lines` | Case provenance: `section_card_id` (SET NULL — pool restore on cancel), `case_name` + `section_title` snapshots (survive dismantled cases on paperwork), `case_quantity` (copies of the line pulled from the case). |
 
 Existing v1 sections were migrated into a default "Display Case" per store (`Version20260720032341`).
@@ -71,8 +71,8 @@ All mutations require `STORE_MANAGE`; public reads back the storefront.
 | Color vocabulary (public) | `GET /cases/filter-suggestions` |
 | List sections (flat, public) | `GET /api/stores/{slug}/sections` |
 | Section CRUD (create requires `caseId`) | `POST /sections`, `PATCH /sections/{id}`, `DELETE /sections/{id}` |
-| Manual add (idempotent, optional pool `quantity`) | `POST /sections/{id}/items` |
-| Edit pool size (clamped ≥ sold) | `PATCH /sections/{id}/items/{cardId}` |
+| Manual add (idempotent, optional pool `quantity`; capped by free stock) | `POST /sections/{id}/items` |
+| Edit pool size (clamped ≥ sold, ≤ free inventory) | `PATCH /sections/{id}/items/{cardId}` |
 | Remove card | `DELETE /sections/{id}/items/{cardId}` |
 | Auto-fill (saves criteria + pulls) | `POST /sections/{id}/auto-fill` |
 | Pull sheet | `GET /sections/{id}/pull-sheet` |
@@ -80,7 +80,7 @@ All mutations require `STORE_MANAGE`; public reads back the storefront.
 ## Frontend
 
 - **Storefront** (`CaseCardsPage`, `/s/{slug}/case-cards`): cases as headings, sections as labeled rails of holographic tiles; sold-out pool cards, empty sections, and empty cases are hidden.
-- **Admin** (`CaseCardsTab`): create/delete cases; per-case section creation; per-section filter row (color datalist, rarity, set, type, price range) with "Pull from inventory"; per-card pool editing ("In case" count, sold/remaining badges); pull-sheet modal with print.
+- **Admin** (`CaseCardsTab`): create/delete cases; per-case section creation; per-section filter row (color datalist, rarity, set, type, price range) with "Pull from inventory"; per-card pool editing ("In case" count capped by free inventory stock, sold/remaining badges); add-from-inventory quantity picker; pull-sheet modal with print.
 - **Orders** (`OrderLineList`, `printOrderSheet`): case badges on screen and on the printed sheet.
 
 ## Tests

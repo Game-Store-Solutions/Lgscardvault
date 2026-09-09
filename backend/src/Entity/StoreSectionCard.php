@@ -34,7 +34,8 @@ class StoreSectionCard
     /**
      * Copies of this listing physically allocated to the section — the
      * section's own inventory pool for this card (default 1: one display-case
-     * slot). Independent of the listing's total stock.
+     * slot). Capped by free inventory stock (on-hand minus other sections'
+     * unsold claims) when owners add or edit the pool.
      */
     #[ORM\Column(options: ['default' => 1])]
     private int $quantity = 1;
