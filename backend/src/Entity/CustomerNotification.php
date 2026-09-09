@@ -12,6 +12,7 @@ class CustomerNotification
 {
     public const TYPE_ORDER_FULFILLED = 'order_fulfilled';
     public const TYPE_ORDER_BALANCE_DUE = 'order_balance_due';
+    public const TYPE_ORDER_CANCELLED = 'order_cancelled';
     public const TYPE_WANT_LIST_MATCH = 'want_list_match';
     public const TYPE_SELL_TRADE_ACCEPTED = 'sell_trade_accepted';
     public const TYPE_SELL_TRADE_DECLINED = 'sell_trade_declined';
@@ -21,6 +22,7 @@ class CustomerNotification
     public const TYPES = [
         self::TYPE_ORDER_FULFILLED,
         self::TYPE_ORDER_BALANCE_DUE,
+        self::TYPE_ORDER_CANCELLED,
         self::TYPE_WANT_LIST_MATCH,
         self::TYPE_SELL_TRADE_ACCEPTED,
         self::TYPE_SELL_TRADE_DECLINED,

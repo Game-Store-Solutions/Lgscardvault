@@ -523,6 +523,45 @@ final class TransactionalMailer
         );
     }
 
+    /** Store-branded — staff declined / cancelled the shopper's order. */
+    public function sendOrderCancelled(\App\Entity\Order $order, Store $store, ?User $user = null): void
+    {
+        $email = $order->getCustomerEmail();
+        if (null === $email || '' === $email) {
+            return;
+        }
+
+        $storeName = $store->getName() ?? 'Store';
+        $ref = $order->getReference() ?? (string) $order->getId();
+        $total = number_format($order->getTotalCents() / 100, 2);
+        $orderUrl = $this->frontendUrl().'/s/'.$store->getSlug().'/account';
+        $customerName = $user?->getDisplayName()
+            ?: ($order->getCustomerName() ?: 'there');
+
+        $this->sendHtml(
+            to: $email,
+            subject: sprintf('Order declined: %s', $ref),
+            htmlTemplate: 'emails/store/order_cancelled.html.twig',
+            context: [
+                'preheader' => sprintf('%s declined your order %s.', $storeName, $ref),
+                'customerName' => $customerName,
+                'storeName' => $storeName,
+                'orderReference' => $ref,
+                'totalFormatted' => $total,
+                'orderUrl' => $orderUrl,
+                'footerNote' => sprintf('Order updates from %s.', $storeName),
+            ],
+            textBody: sprintf(
+                "%s declined your order %s.\n\nTotal: $%s\nView: %s\n",
+                $storeName,
+                $ref,
+                $total,
+                $orderUrl,
+            ),
+            store: $store,
+        );
+    }
+
     /** Store-branded — staff added cards; shopper must approve the extra on PayPal. */
     public function sendOrderBalanceDue(\App\Entity\Order $order, User $user, Store $store, int $dueCents): void
     {

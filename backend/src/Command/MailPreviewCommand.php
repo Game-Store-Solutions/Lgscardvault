@@ -86,6 +86,9 @@ final class MailPreviewCommand extends Command
         $io->section('Store — order fulfilled [store branding / ready for pickup]');
         $this->mail->sendOrderFulfilled($order, $customer, $brandedStore);
 
+        $io->section('Store — order declined [store branding]');
+        $this->mail->sendOrderCancelled($order, $brandedStore, $customer);
+
         $io->section('Store — PayPal extra approval [store branding]');
         $this->mail->sendOrderBalanceDue($order, $customer, $brandedStore, 1850);
 
@@ -102,7 +105,7 @@ final class MailPreviewCommand extends Command
         $this->mail->sendSellTradeDeclined($sellTrade, $customer, $brandedStore);
 
         $io->success(sprintf(
-            'Sent 9 sample emails to %s. Open Mailpit at http://127.0.0.1:8025',
+            'Sent 10 sample emails to %s. Open Mailpit at http://127.0.0.1:8025',
             $to,
         ));
         $io->writeln('Platform mails: LGS logo + navy/gold. Store mail: store colors/name (and store logo when set).');

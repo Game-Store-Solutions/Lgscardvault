@@ -71,7 +71,7 @@ function statusActions(status: OrderStatus): { status: OrderStatus; label: strin
   if (status === 'pending') {
     return [
       { status: 'received', label: 'Accept order', icon: CheckCircle2 },
-      { status: 'cancelled', label: 'Cancel', icon: XCircle },
+      { status: 'cancelled', label: 'Decline order', icon: XCircle },
     ]
   }
   if (status === 'received' || status === 'paid' || status === 'shipped') {
@@ -283,15 +283,19 @@ function OrderStatusSelect({
 function PendingAcceptQueue({
   orders,
   totalCount,
-  acceptingOrderId,
+  busyOrderId,
+  busyStatus,
   onAccept,
+  onDecline,
   onOpenDetail,
   onViewAll,
 }: {
   orders: Order[]
   totalCount: number
-  acceptingOrderId: number | null
+  busyOrderId: number | null
+  busyStatus: OrderStatus | null
   onAccept: (order: Order) => void
+  onDecline: (order: Order) => void
   onOpenDetail: (order: Order) => void
   onViewAll: () => void
 }) {
@@ -307,7 +311,7 @@ function PendingAcceptQueue({
               {totalCount > 99 ? '99+' : totalCount}
             </span>
           </div>
-          <p className="mt-1 text-sm text-fg-muted">Accept to start pulling cards</p>
+          <p className="mt-1 text-sm text-fg-muted">Accept to start pulling, or decline to notify the shopper</p>
         </div>
         {totalCount > orders.length ? (
           <Button size="sm" variant="ghost" onClick={onViewAll}>
@@ -319,7 +323,8 @@ function PendingAcceptQueue({
         {orders.map((order) => {
           const firstLine = order.lines?.[0]
           const thumb = firstLine ? orderLineImage(firstLine) : undefined
-          const accepting = acceptingOrderId === order.id
+          const busy = busyOrderId === order.id
+          const rowLocked = busyOrderId != null && !busy
           return (
             <motion.li
               key={order.id}
@@ -354,18 +359,32 @@ function PendingAcceptQueue({
                   <span className="block text-sm font-semibold tabular-nums text-fg">{formatPrice(order.totalCents)}</span>
                 </span>
               </button>
-              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.16, ease: EASE_PREMIUM }}>
-                <Button
-                  size="sm"
-                  loading={accepting}
-                  disabled={acceptingOrderId != null && !accepting}
-                  onClick={() => onAccept(order)}
-                  className="shrink-0"
-                >
-                  <CheckCircle2 aria-hidden className="size-4" />
-                  Accept
-                </Button>
-              </motion.div>
+              <div className="flex shrink-0 items-center gap-2">
+                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.16, ease: EASE_PREMIUM }}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={busy && busyStatus === 'cancelled'}
+                    disabled={rowLocked}
+                    onClick={() => onDecline(order)}
+                    className="text-danger-700 hover:bg-danger-50 hover:text-danger-800"
+                  >
+                    <XCircle aria-hidden className="size-4" />
+                    Decline
+                  </Button>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.16, ease: EASE_PREMIUM }}>
+                  <Button
+                    size="sm"
+                    loading={busy && busyStatus === 'received'}
+                    disabled={rowLocked}
+                    onClick={() => onAccept(order)}
+                  >
+                    <CheckCircle2 aria-hidden className="size-4" />
+                    Accept
+                  </Button>
+                </motion.div>
+              </div>
             </motion.li>
           )
         })}
@@ -614,12 +633,20 @@ export default function OrdersTab({ slug }: { slug: string }) {
         <PendingAcceptQueue
           orders={needsAcceptOrders}
           totalCount={pendingTotal}
-          acceptingOrderId={
-            updateStatus.isPending && updateStatus.variables?.status === 'received'
+          busyOrderId={
+            updateStatus.isPending
+            && (updateStatus.variables?.status === 'received' || updateStatus.variables?.status === 'cancelled')
               ? updateStatus.variables.order.id
               : null
           }
+          busyStatus={
+            updateStatus.isPending
+            && (updateStatus.variables?.status === 'received' || updateStatus.variables?.status === 'cancelled')
+              ? updateStatus.variables.status
+              : null
+          }
           onAccept={(order) => updateStatus.mutate({ order, status: 'received' })}
+          onDecline={(order) => updateStatus.mutate({ order, status: 'cancelled' })}
           onOpenDetail={(order) => setDetailOrder(order)}
           onViewAll={viewAllPending}
         />

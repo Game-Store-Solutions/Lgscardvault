@@ -49,7 +49,7 @@ export function NotificationList({
           ? Coins
           : notification.type === 'want_list_match'
             ? ShoppingBag
-            : notification.type === 'order_balance_due'
+            : notification.type === 'order_balance_due' || notification.type === 'order_cancelled'
               ? CreditCard
               : Bell
         return (
@@ -61,7 +61,9 @@ export function NotificationList({
                 ? 'border-transparent bg-transparent hover:bg-bg'
                 : sellTrade
                   ? 'border-brand-500/30 bg-brand-50'
-                  : 'border-success-500/30 bg-success-50',
+                  : notification.type === 'order_cancelled'
+                    ? 'border-danger-500/30 bg-danger-50'
+                    : 'border-success-500/30 bg-success-50',
             )}
           >
             <Link

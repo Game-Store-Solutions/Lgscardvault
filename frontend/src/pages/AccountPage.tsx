@@ -64,7 +64,7 @@ const SECTIONS: AccountSection[] = [
 
 /** Opening a related tab marks those alerts read so the badge actually clears. */
 const SECTION_ALERT_TYPES: Partial<Record<AccountSection, string[]>> = {
-  orders: ['order_fulfilled'],
+  orders: ['order_fulfilled', 'order_cancelled', 'order_balance_due'],
   selltrade: ['sell_trade_accepted', 'sell_trade_declined', 'sell_trade_completed'],
   wantlist: ['want_list_match'],
 }
