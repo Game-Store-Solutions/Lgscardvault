@@ -53,9 +53,9 @@ export function Modal({ open, onClose, title, children, footer, className, overl
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: EASE_PREMIUM }}
           />
-          {/* Scroll container: centers short modals, lets tall ones be reached. */}
+          {/* Centers the panel; panel itself scrolls so tall content never grows the dialog past the viewport. */}
           <div
-            className="absolute inset-0 flex items-center justify-center overflow-y-auto overscroll-contain p-2 landscape:p-2 sm:p-4"
+            className="absolute inset-0 flex items-center justify-center overflow-hidden p-3 sm:p-6"
             onMouseDown={(e) => {
               // click-outside closes (only when the backdrop area itself is pressed)
               if (e.target === e.currentTarget) onClose()
@@ -72,7 +72,7 @@ export function Modal({ open, onClose, title, children, footer, className, overl
               exit={{ opacity: 0, y: 10, scale: 0.985 }}
               transition={{ duration: 0.24, ease: EASE_PREMIUM }}
               className={cx(
-                'relative z-10 my-auto flex max-h-[calc(100dvh-1rem)] w-full flex-col sm:max-h-[calc(100dvh-2rem)]',
+                'relative z-10 flex max-h-[min(40rem,calc(100dvh-2.5rem))] w-full flex-col overflow-hidden',
                 'bg-surface border border-border rounded-card shadow-card',
                 'focus-visible:outline-none',
                 !hasMaxWidth && 'max-w-lg',
