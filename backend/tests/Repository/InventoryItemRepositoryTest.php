@@ -144,6 +144,61 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         self::assertSame(1, $this->repo->countCatalog($store, null, true, $filters));
     }
 
+    public function testCatalogPageRanksNamePrefixBeforeLaterSubstring(): void
+    {
+        $store = $this->fixtures->store();
+        // Alphabetically Consolation beats Sol Ring; relevance must flip that.
+        $consolation = $this->fixtures->card(701, [
+            'name' => 'Consolation',
+            'set' => 'unf',
+        ]);
+        $solRing = $this->fixtures->card(702, [
+            'name' => 'Sol Ring',
+            'set' => 'c21',
+        ]);
+        $this->fixtures->inventoryItem($store, $consolation, 1);
+        $this->fixtures->inventoryItem($store, $solRing, 1);
+
+        $filters = new \App\Service\Inventory\InventoryCatalogFilters(q: 'sol');
+        $page = $this->repo->findCatalogPage($store, 0, 24, null, true, $filters);
+
+        self::assertCount(2, $page);
+        self::assertSame('Sol Ring', $page[0]->getCard()?->getName());
+        self::assertSame('Consolation', $page[1]->getCard()?->getName());
+    }
+
+    public function testCatalogPageMatchesSetCodePrefixAndRanksExactFirst(): void
+    {
+        $store = $this->fixtures->store();
+        $mh2 = $this->fixtures->card(801, [
+            'name' => 'Ragavan, Nimble Pilferer',
+            'set' => 'mh2',
+            'set_name' => 'Modern Horizons 2',
+        ]);
+        $mh3 = $this->fixtures->card(802, [
+            'name' => 'Guide of Souls',
+            'set' => 'mh3',
+            'set_name' => 'Modern Horizons 3',
+        ]);
+        $other = $this->fixtures->card(803, [
+            'name' => 'Lightning Bolt',
+            'set' => 'lea',
+            'set_name' => 'Limited Edition Alpha',
+        ]);
+        $this->fixtures->inventoryItem($store, $mh2, 1);
+        $this->fixtures->inventoryItem($store, $mh3, 1);
+        $this->fixtures->inventoryItem($store, $other, 1);
+
+        $prefix = new \App\Service\Inventory\InventoryCatalogFilters(set: 'mh');
+        $prefixed = $this->repo->findCatalogPage($store, 0, 24, null, true, $prefix);
+        self::assertCount(2, $prefixed);
+
+        $exact = new \App\Service\Inventory\InventoryCatalogFilters(set: 'mh2');
+        $page = $this->repo->findCatalogPage($store, 0, 24, null, true, $exact);
+        self::assertCount(1, $page);
+        self::assertSame('mh2', $page[0]->getCard()?->getSetCode());
+    }
+
     public function testCatalogPageFiltersByNamedColor(): void
     {
         $store = $this->fixtures->store();

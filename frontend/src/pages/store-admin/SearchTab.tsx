@@ -24,7 +24,8 @@ import { cx } from '../../lib/cx'
 import { type Condition } from '../../components/inventory'
 import { defaultFinishFor, finishChoices, finishOptions, isFoilFinish } from '../../lib/finishes'
 import { listingMarketSummary } from '../../lib/marketFinishes'
-import { foldSearchText, catalogNamesMatch, typeaheadNameTier } from '../../lib/searchText'
+import { rankInventorySearch } from '../../lib/rankInventorySearch'
+import { foldSearchText, catalogNamesMatch, typeaheadNameTier, rankSetSearch } from '../../lib/searchText'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -35,6 +36,8 @@ import {
 
 /** Inventory cards shown per page in the admin grid. */
 const INVENTORY_PAGE_SIZE = 24
+/** Suggestions pulled for the Search stock name typeahead (inventory only). */
+const INVENTORY_TYPEAHEAD_SIZE = 48
 
 function printingHasFinish(card: CardSummary, finish: 'foil' | 'nonfoil'): boolean {
   const choices = finishChoices(card)
@@ -74,22 +77,58 @@ export default function SearchTab({ slug }: { slug: string }) {
   const [typeaheadIndex, setTypeaheadIndex] = useState(0)
   const [typeaheadOpen, setTypeaheadOpen] = useState(false)
   const typeaheadRef = useRef<HTMLDivElement>(null)
-  const debouncedFilter = useDebouncedValue(filter, 300)
+  const [invTypeaheadIndex, setInvTypeaheadIndex] = useState(0)
+  const [invTypeaheadOpen, setInvTypeaheadOpen] = useState(false)
+  const invTypeaheadRef = useRef<HTMLDivElement>(null)
+  const [invSetTypeaheadIndex, setInvSetTypeaheadIndex] = useState(0)
+  const [invSetTypeaheadOpen, setInvSetTypeaheadOpen] = useState(false)
+  const invSetTypeaheadRef = useRef<HTMLDivElement>(null)
+  const debouncedFilter = useDebouncedValue(filter.trim(), 300)
+  const debouncedInventorySet = useDebouncedValue(inventorySetFilter.trim(), 300)
   const debouncedCatalogSearch = useDebouncedValue(catalogSearch.trim(), 300)
 
   const inventoryQuery = useInventoryPage(slug, {
     game: gameFilter || undefined,
     q: debouncedFilter,
-    set: inventorySetFilter,
+    set: debouncedInventorySet,
     finish: inventoryFinishFilter,
     page: invPage,
     itemsPerPage: INVENTORY_PAGE_SIZE,
     enabled: Boolean(gameFilter),
   })
-  const inventory = inventoryQuery.data?.items ?? []
+  const inventory = useMemo(
+    () => rankInventorySearch(inventoryQuery.data?.items ?? [], debouncedFilter),
+    [inventoryQuery.data?.items, debouncedFilter],
+  )
   const inventoryTotal = inventoryQuery.data?.total ?? 0
   const listingsLoading = inventoryQuery.isPending && !inventoryQuery.data
   const listingsRefreshing = inventoryQuery.isFetching && inventoryQuery.isPlaceholderData
+
+  const invTypeaheadReady = debouncedFilter.length >= 2 && Boolean(gameFilter)
+  const { data: invTypeaheadPage, isFetching: invTypeaheadFetching } = useInventoryPage(slug, {
+    game: gameFilter || undefined,
+    q: debouncedFilter,
+    set: debouncedInventorySet,
+    finish: inventoryFinishFilter,
+    page: 1,
+    itemsPerPage: INVENTORY_TYPEAHEAD_SIZE,
+    enabled: invTypeaheadReady,
+    keepPreviousData: false,
+  })
+  const invTypeaheadNames = useMemo(() => {
+    const query = debouncedFilter
+    const seen = new Set<string>()
+    const names: string[] = []
+    for (const item of rankInventorySearch(invTypeaheadPage?.items ?? [], query)) {
+      const key = foldSearchText(item.card.name)
+      if (seen.has(key)) continue
+      seen.add(key)
+      names.push(item.card.name)
+      if (names.length >= 12) break
+    }
+    return names
+  }, [invTypeaheadPage?.items, debouncedFilter])
+  const showInvTypeahead = invTypeaheadOpen && invTypeaheadReady && invTypeaheadNames.length > 0
 
   const scopedToSet = Boolean(catalogSetFilter.trim())
   const scopedToFinish = catalogFinishFilter !== 'all'
@@ -173,9 +212,19 @@ export default function SearchTab({ slug }: { slug: string }) {
   }, [debouncedCatalogSearch, typeaheadNames])
 
   useEffect(() => {
+    setInvTypeaheadIndex(invTypeaheadNames.length > 0 ? 0 : -1)
+  }, [debouncedFilter, invTypeaheadNames])
+
+  useEffect(() => {
     function onPointerDown(event: MouseEvent) {
       if (typeaheadRef.current && !typeaheadRef.current.contains(event.target as Node)) {
         setTypeaheadOpen(false)
+      }
+      if (invTypeaheadRef.current && !invTypeaheadRef.current.contains(event.target as Node)) {
+        setInvTypeaheadOpen(false)
+      }
+      if (invSetTypeaheadRef.current && !invSetTypeaheadRef.current.contains(event.target as Node)) {
+        setInvSetTypeaheadOpen(false)
       }
     }
     document.addEventListener('mousedown', onPointerDown)
@@ -186,6 +235,18 @@ export default function SearchTab({ slug }: { slug: string }) {
     setCatalogSearch(card.name)
     setTypeaheadOpen(false)
     setTypeaheadIndex(-1)
+  }
+
+  function autofillInventoryName(name: string) {
+    setFilter(name)
+    setInvTypeaheadOpen(false)
+    setInvTypeaheadIndex(-1)
+  }
+
+  function autofillInventorySet(code: string) {
+    setInventorySetFilter(code.toUpperCase())
+    setInvSetTypeaheadOpen(false)
+    setInvSetTypeaheadIndex(-1)
   }
 
   async function startCatalogSearch() {
@@ -314,6 +375,18 @@ export default function SearchTab({ slug }: { slug: string }) {
     [games],
   )
   const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, gameFilter)
+  const inventorySets = gameStats?.sets ?? []
+  const invSetTypeaheadReady = inventorySetFilter.trim().length >= 1 && Boolean(gameFilter)
+  const invSetTypeaheadOptions = useMemo(() => {
+    if (!invSetTypeaheadReady) return []
+    return rankSetSearch(inventorySets, inventorySetFilter).slice(0, 12)
+  }, [inventorySets, inventorySetFilter, invSetTypeaheadReady])
+  const showInvSetTypeahead = invSetTypeaheadOpen && invSetTypeaheadReady && invSetTypeaheadOptions.length > 0
+
+  useEffect(() => {
+    setInvSetTypeaheadIndex(invSetTypeaheadOptions.length > 0 ? 0 : -1)
+  }, [inventorySetFilter, invSetTypeaheadOptions])
+
   const activeGameName = gameOptions.find((game) => game.code === gameFilter)?.name ?? 'this game'
   // The finish filter is worded in the managed game's own terms, so a Pokemon
   // workspace offers "Holofoil only" rather than Magic's "Foil only".
@@ -334,6 +407,8 @@ export default function SearchTab({ slug }: { slug: string }) {
     setFilter('')
     setInventorySetFilter('')
     setInventoryFinishFilter('all')
+    setInvTypeaheadOpen(false)
+    setInvSetTypeaheadOpen(false)
   }
 
   useEffect(() => {
@@ -592,31 +667,199 @@ export default function SearchTab({ slug }: { slug: string }) {
               ? 'Updating listings…'
               : inventoryTotal > 0
                 ? `${inventoryTotal.toLocaleString()} listings in ${activeGameName}.`
-                : `What this store stocks in ${activeGameName}. Art, price, quantity, and quick edits.`
+                : `What this store stocks in ${activeGameName}. Price, quantity, and quick edits.`
           }
         />
         <CardBody className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_8rem_10rem_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_minmax(12rem,16rem)_10rem_auto] lg:items-end">
             <Field label="Search stock">
               {({ id }) => (
-                <Input
-                  id={id}
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  placeholder={`Search ${activeGameName} by name, type…`}
-                  className="min-h-11 text-base"
-                />
+                <div ref={invTypeaheadRef} className="relative">
+                  <div className="relative">
+                    <Input
+                      id={id}
+                      value={filter}
+                      autoComplete="off"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={showInvTypeahead}
+                      aria-controls="inventory-typeahead"
+                      aria-activedescendant={
+                        showInvTypeahead && invTypeaheadIndex >= 0
+                          ? `inventory-typeahead-${invTypeaheadIndex}`
+                          : undefined
+                      }
+                      onFocus={() => {
+                        if (invTypeaheadNames.length > 0) setInvTypeaheadOpen(true)
+                      }}
+                      onChange={(e) => {
+                        setFilter(e.target.value)
+                        setInvTypeaheadOpen(true)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown' && invTypeaheadNames.length > 0) {
+                          e.preventDefault()
+                          setInvTypeaheadOpen(true)
+                          setInvTypeaheadIndex((index) => (index + 1) % invTypeaheadNames.length)
+                          return
+                        }
+                        if (e.key === 'ArrowUp' && invTypeaheadNames.length > 0) {
+                          e.preventDefault()
+                          setInvTypeaheadOpen(true)
+                          setInvTypeaheadIndex((index) =>
+                            index <= 0 ? invTypeaheadNames.length - 1 : index - 1,
+                          )
+                          return
+                        }
+                        if (e.key === 'Escape') {
+                          setInvTypeaheadOpen(false)
+                          return
+                        }
+                        if (e.key === 'Tab' && showInvTypeahead) {
+                          const name = invTypeaheadNames[invTypeaheadIndex] ?? invTypeaheadNames[0]
+                          if (name) autofillInventoryName(name)
+                          return
+                        }
+                        if (e.key === 'Enter' && showInvTypeahead) {
+                          const name = invTypeaheadNames[invTypeaheadIndex] ?? invTypeaheadNames[0]
+                          if (name && !catalogNamesMatch(name, filter)) {
+                            e.preventDefault()
+                            autofillInventoryName(name)
+                          } else {
+                            setInvTypeaheadOpen(false)
+                          }
+                        }
+                      }}
+                      placeholder={`Search ${activeGameName} stock by name…`}
+                      className={cx('min-h-11 text-base', invTypeaheadFetching && 'pr-9')}
+                    />
+                    {invTypeaheadFetching ? (
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                        <Spinner size="sm" />
+                      </span>
+                    ) : null}
+                  </div>
+                  {showInvTypeahead ? (
+                    <ul
+                      id="inventory-typeahead"
+                      role="listbox"
+                      aria-label="Matching inventory cards"
+                      className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
+                    >
+                      {invTypeaheadNames.map((name, index) => (
+                        <li
+                          key={name}
+                          id={`inventory-typeahead-${index}`}
+                          role="option"
+                          aria-selected={index === invTypeaheadIndex}
+                        >
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => autofillInventoryName(name)}
+                            onMouseEnter={() => setInvTypeaheadIndex(index)}
+                            className={dropdownItemClass({ active: index === invTypeaheadIndex })}
+                          >
+                            <span className="truncate">{name}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               )}
             </Field>
             <Field label="Set">
               {({ id }) => (
-                <Input
-                  id={id}
-                  value={inventorySetFilter}
-                  onChange={(e) => setInventorySetFilter(e.target.value)}
-                  placeholder="Set code"
-                  className="uppercase min-h-11"
-                />
+                <div ref={invSetTypeaheadRef} className="relative">
+                  <Input
+                    id={id}
+                    value={inventorySetFilter}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={showInvSetTypeahead}
+                    aria-controls="inventory-set-typeahead"
+                    aria-activedescendant={
+                      showInvSetTypeahead && invSetTypeaheadIndex >= 0
+                        ? `inventory-set-typeahead-${invSetTypeaheadIndex}`
+                        : undefined
+                    }
+                    onFocus={() => {
+                      if (invSetTypeaheadOptions.length > 0) setInvSetTypeaheadOpen(true)
+                    }}
+                    onChange={(e) => {
+                      setInventorySetFilter(e.target.value)
+                      setInvSetTypeaheadOpen(true)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowDown' && invSetTypeaheadOptions.length > 0) {
+                        e.preventDefault()
+                        setInvSetTypeaheadOpen(true)
+                        setInvSetTypeaheadIndex((index) => (index + 1) % invSetTypeaheadOptions.length)
+                        return
+                      }
+                      if (e.key === 'ArrowUp' && invSetTypeaheadOptions.length > 0) {
+                        e.preventDefault()
+                        setInvSetTypeaheadOpen(true)
+                        setInvSetTypeaheadIndex((index) =>
+                          index <= 0 ? invSetTypeaheadOptions.length - 1 : index - 1,
+                        )
+                        return
+                      }
+                      if (e.key === 'Escape') {
+                        setInvSetTypeaheadOpen(false)
+                        return
+                      }
+                      if (e.key === 'Tab' && showInvSetTypeahead) {
+                        const set = invSetTypeaheadOptions[invSetTypeaheadIndex] ?? invSetTypeaheadOptions[0]
+                        if (set) autofillInventorySet(set.code)
+                        return
+                      }
+                      if (e.key === 'Enter' && showInvSetTypeahead) {
+                        const set = invSetTypeaheadOptions[invSetTypeaheadIndex] ?? invSetTypeaheadOptions[0]
+                        if (set && !catalogNamesMatch(set.code, inventorySetFilter)) {
+                          e.preventDefault()
+                          autofillInventorySet(set.code)
+                        } else {
+                          setInvSetTypeaheadOpen(false)
+                        }
+                      }
+                    }}
+                    placeholder="Set code or name"
+                    className="uppercase min-h-11"
+                  />
+                  {showInvSetTypeahead ? (
+                    <ul
+                      id="inventory-set-typeahead"
+                      role="listbox"
+                      aria-label="Matching inventory sets"
+                      className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
+                    >
+                      {invSetTypeaheadOptions.map((set, index) => (
+                        <li
+                          key={set.code}
+                          id={`inventory-set-typeahead-${index}`}
+                          role="option"
+                          aria-selected={index === invSetTypeaheadIndex}
+                        >
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => autofillInventorySet(set.code)}
+                            onMouseEnter={() => setInvSetTypeaheadIndex(index)}
+                            className={dropdownItemClass({ active: index === invSetTypeaheadIndex })}
+                          >
+                            <span className="min-w-0 truncate">
+                              <span className="font-semibold uppercase">{set.code}</span>
+                              {set.name ? <span className="text-fg-muted"> · {set.name}</span> : null}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               )}
             </Field>
             <Field label="Finish">

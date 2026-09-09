@@ -28,3 +28,25 @@ export function searchTextIncludes(haystack: string, needle: string): boolean {
   if (!n) return true
   return foldSearchText(haystack).includes(n)
 }
+
+export type SetSearchOption = { code: string; name: string }
+
+/** Rank store/catalog sets like name typeahead (exact/prefix first). */
+export function rankSetSearch(sets: SetSearchOption[], rawQuery: string): SetSearchOption[] {
+  const needle = foldSearchText(rawQuery)
+  if (!needle) return []
+
+  const scored: Array<{ set: SetSearchOption; score: number; code: string }> = []
+  for (const set of sets) {
+    const code = set.code ?? ''
+    const name = set.name ?? ''
+    // Require code/name prefix or a word-start hit — not mid-word scraps
+    // ("tl" must not match "Battle" inside Commander Legends: Battle…).
+    const score = Math.min(typeaheadNameTier(code, rawQuery), typeaheadNameTier(name, rawQuery))
+    if (score > 2) continue
+    scored.push({ set, score, code: foldSearchText(code) })
+  }
+
+  scored.sort((a, b) => a.score - b.score || a.code.localeCompare(b.code) || a.set.name.localeCompare(b.set.name))
+  return scored.map((entry) => entry.set)
+}

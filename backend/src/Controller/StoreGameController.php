@@ -89,6 +89,8 @@ final class StoreGameController extends AbstractController
             'gameName' => $game->getName(),
             'singles' => $singles,
             'sealed' => $sealed,
+            // Distinct sets across all listings (including qty 0) for admin filters.
+            'sets' => $this->singles->findCatalogSets($store, $game->getCode(), inStockOnly: false),
         ]);
     }
 
