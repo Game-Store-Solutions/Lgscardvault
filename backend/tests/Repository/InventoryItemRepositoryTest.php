@@ -199,6 +199,30 @@ final class InventoryItemRepositoryTest extends KernelTestCase
         self::assertSame('mh2', $page[0]->getCard()?->getSetCode());
     }
 
+    public function testCatalogPageSetFilterIgnoresMidWordNameSubstring(): void
+    {
+        $store = $this->fixtures->store();
+        $eventide = $this->fixtures->card(811, [
+            'name' => 'Batwing Brume',
+            'set' => 'eve',
+            'set_name' => 'Eventide',
+        ]);
+        $seventh = $this->fixtures->card(812, [
+            'name' => 'Call the Skybreaker',
+            'set' => '7ed',
+            'set_name' => 'Seventh Edition',
+        ]);
+        $this->fixtures->inventoryItem($store, $eventide, 1);
+        $this->fixtures->inventoryItem($store, $seventh, 1);
+
+        // "Seventh" contains the letters e-v-e, but must not match set=eve.
+        $filters = new \App\Service\Inventory\InventoryCatalogFilters(set: 'eve');
+        $page = $this->repo->findCatalogPage($store, 0, 24, null, true, $filters);
+
+        self::assertCount(1, $page);
+        self::assertSame('eve', $page[0]->getCard()?->getSetCode());
+    }
+
     public function testCatalogPageFiltersByNamedColor(): void
     {
         $store = $this->fixtures->store();

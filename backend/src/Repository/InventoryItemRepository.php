@@ -297,12 +297,24 @@ class InventoryItemRepository extends ServiceEntityRepository
 
         if ('' !== $filters->set) {
             $set = mb_strtolower($filters->set);
+            // Prefix / word-start only — "%eve%" used to pull Seventh Edition
+            // because "Seve…" contains the letters e-v-e mid-word.
             $qb->andWhere(
-                'LOWER(c.setCode) = :setExact OR LOWER(c.setCode) LIKE :setPrefix OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setLike',
+                'LOWER(c.setCode) = :setExact
+                OR LOWER(c.setCode) LIKE :setPrefix
+                OR LOWER(COALESCE(c.setName, :emptySet)) = :setExact
+                OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setPrefix
+                OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setWordSpace
+                OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setWordHyphen
+                OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setWordColon
+                OR LOWER(COALESCE(c.setName, :emptySet)) LIKE :setWordComma',
             )
                 ->setParameter('setExact', $set)
                 ->setParameter('setPrefix', $set.'%')
-                ->setParameter('setLike', '%'.$set.'%')
+                ->setParameter('setWordSpace', '% '.$set.'%')
+                ->setParameter('setWordHyphen', '%-'.$set.'%')
+                ->setParameter('setWordColon', '%:'.$set.'%')
+                ->setParameter('setWordComma', '%, '.$set.'%')
                 ->setParameter('emptySet', '');
         }
 
