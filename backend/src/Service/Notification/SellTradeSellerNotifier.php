@@ -78,6 +78,15 @@ final class SellTradeSellerNotifier
         $credit = SellSubmission::PAYOUT_CREDIT === $submission->getPayoutMethod();
 
         return match ($submission->getStatus()) {
+            SellSubmission::STATUS_PENDING => [
+                'type' => CustomerNotification::TYPE_SELL_TRADE_SUBMITTED,
+                'title' => sprintf('Sell/trade #%d received', $id),
+                'body' => sprintf(
+                    'Your sell/trade at %s was submitted ($%s offer). Bring the cards to the counter for staff to verify before payout.',
+                    $storeName,
+                    $amount,
+                ),
+            ],
             SellSubmission::STATUS_ACCEPTED => [
                 'type' => CustomerNotification::TYPE_SELL_TRADE_ACCEPTED,
                 'title' => sprintf('Sell/trade #%d accepted', $id),

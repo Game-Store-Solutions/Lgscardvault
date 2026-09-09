@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BadgeCheck,
+  CheckCircle2,
   ClipboardList,
   Repeat,
   Search,
@@ -171,7 +172,6 @@ export default function SellTradePage() {
   const [payoutMethod, setPayoutMethod] = useState<SellPayoutMethod>('credit')
   const [kioskCustomerName, setKioskCustomerName] = useState('')
   const [reviewOpen, setReviewOpen] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
 
   // Card search: text typeahead → pick name → printings (Singles Add style)
   const [searchTerm, setSearchTerm] = useState('')
@@ -179,6 +179,8 @@ export default function SellTradePage() {
   const [selectedPrinting, setSelectedPrinting] = useState<CardSummary | null>(null)
   const [typeaheadOpen, setTypeaheadOpen] = useState(false)
   const [typeaheadIndex, setTypeaheadIndex] = useState(0)
+  const [addNotice, setAddNotice] = useState<string | null>(null)
+  const addNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const typeaheadRef = useRef<HTMLDivElement>(null)
   const skipAutoOpenQuery = useRef<string | null>(null)
   const debouncedSearch = useDebouncedValue(searchTerm, 150)
@@ -217,6 +219,28 @@ export default function SellTradePage() {
   const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
   const printingsQuery = useCardPrintings(nameHit?.id, Boolean(nameHit))
   const printings = printingsQuery.data ?? []
+
+  function clearSearch() {
+    skipAutoOpenQuery.current = null
+    setSearchTerm('')
+    setNameHit(null)
+    setSelectedPrinting(null)
+    setTypeaheadOpen(false)
+    setTypeaheadIndex(-1)
+  }
+
+  function flashAdded(cardName: string, quantity: number) {
+    const label = quantity > 1 ? `Added ${quantity}× ${cardName} to your sell list` : `Added ${cardName} to your sell list`
+    setAddNotice(label)
+    if (addNoticeTimer.current) clearTimeout(addNoticeTimer.current)
+    addNoticeTimer.current = setTimeout(() => setAddNotice(null), 2800)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (addNoticeTimer.current) clearTimeout(addNoticeTimer.current)
+    }
+  }, [])
 
   function pickName(card: CardSummary) {
     skipAutoOpenQuery.current = foldSearchText(card.name)
@@ -342,12 +366,27 @@ export default function SellTradePage() {
       setLines([])
       setKioskCustomerName('')
       setReviewOpen(false)
-      setSubmitted(true)
+      clearSearch()
       await queryClient.invalidateQueries({ queryKey: mySubmissionsKey(slug) })
+      void queryClient.invalidateQueries({ queryKey: ['my-notifications'] })
+      setAddNotice(
+        kioskMode
+          ? 'Submission received. Staff will verify the cards at the counter.'
+          : 'Submission received. Check the notification bell for details.',
+      )
+      if (addNoticeTimer.current) clearTimeout(addNoticeTimer.current)
+      addNoticeTimer.current = setTimeout(() => setAddNotice(null), 4000)
     },
   })
 
-  function addLine(card: CardSummary, entry: BuylistEntry | null, finish: string, condition: Condition, quantity: number) {
+  function addLine(
+    card: CardSummary,
+    entry: BuylistEntry | null,
+    finish: string,
+    condition: Condition,
+    quantity: number,
+    options?: { clearSearch?: boolean; quiet?: boolean },
+  ) {
     const key = lineKey(card, entry, finish, condition)
     setLines((current) => {
       const cap = entry?.maxQuantity ?? Number.POSITIVE_INFINITY
@@ -357,7 +396,8 @@ export default function SellTradePage() {
       }
       return [...current, { key, card, entry, finish, condition, quantity: Math.min(quantity, cap) }]
     })
-    setSubmitted(false)
+    if (!options?.quiet) flashAdded(card.name, quantity)
+    if (options?.clearSearch) clearSearch()
   }
 
   function updateLine(key: string, patch: Partial<Pick<SellLine, 'quantity' | 'condition' | 'card' | 'finish'>>) {
@@ -377,6 +417,7 @@ export default function SellTradePage() {
     if (wanted.size === 0) return
     setBulkBusy(true)
     const misses: string[] = []
+    let added = 0
     try {
       const names = [...wanted.entries()]
       for (let i = 0; i < names.length; i += 4) {
@@ -390,8 +431,10 @@ export default function SellTradePage() {
                 .filter((card) => matchesName(card, name) && scryfallPriceCents(card, 'nonfoil') != null)
                 .sort((a, b) => (scryfallPriceCents(a, 'nonfoil') ?? 0) - (scryfallPriceCents(b, 'nonfoil') ?? 0))
               // A pasted decklist means plain copies — in that printing's own word for it.
-              if (priced.length > 0) addLine(priced[0], null, finishChoices(priced[0], gameFilter).plain, 'NM', quantity)
-              else misses.push(name)
+              if (priced.length > 0) {
+                addLine(priced[0], null, finishChoices(priced[0], gameFilter).plain, 'NM', quantity, { quiet: true })
+                added += 1
+              } else misses.push(name)
             } catch {
               misses.push(name)
             }
@@ -403,6 +446,11 @@ export default function SellTradePage() {
       setBulkText('')
       setBulkOpen(false)
       setBulkBusy(false)
+      if (added > 0) {
+        setAddNotice(added === 1 ? 'Added 1 card to your sell list' : `Added ${added} cards to your sell list`)
+        if (addNoticeTimer.current) clearTimeout(addNoticeTimer.current)
+        addNoticeTimer.current = setTimeout(() => setAddNotice(null), 2800)
+      }
     }
   }
 
@@ -463,22 +511,6 @@ export default function SellTradePage() {
       </div>
 
       <TradePromoBanner slug={slug} />
-
-      {submitted && (
-        <Card className="border-success-500/40">
-          <CardBody className="space-y-2 text-center">
-            <BadgeCheck aria-hidden className="mx-auto size-10 text-success-600" />
-            <h2 className="font-display text-xl font-bold text-fg">Submission received!</h2>
-            <p className="mx-auto max-w-lg text-sm text-fg-muted">
-              Bring your cards to the counter. Staff will verify names and conditions before paying out. All offers
-              are subject to final approval on inspection.
-            </p>
-            <Button variant="secondary" onClick={() => setSubmitted(false)}>
-              Start a new list
-            </Button>
-          </CardBody>
-        </Card>
-      )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="min-w-0 space-y-6">
@@ -557,12 +589,21 @@ export default function SellTradePage() {
                           }
                         }}
                         placeholder="Start typing a card name…"
-                        className={typeaheadFetching ? 'pr-9' : undefined}
+                        className={cx((typeaheadFetching || Boolean(searchTerm)) && 'pr-9')}
                       />
                       {typeaheadFetching ? (
                         <span className="pointer-events-none absolute bottom-3 right-3">
                           <Spinner size="sm" />
                         </span>
+                      ) : searchTerm ? (
+                        <button
+                          type="button"
+                          onClick={clearSearch}
+                          aria-label="Clear card search"
+                          className="absolute bottom-2.5 right-2 grid size-7 place-items-center rounded-btn text-fg-muted hover:bg-bg hover:text-fg"
+                        >
+                          <X aria-hidden className="size-4" />
+                        </button>
                       ) : null}
                     </div>
                     {showTypeahead ? (
@@ -631,6 +672,24 @@ export default function SellTradePage() {
                 </p>
               )}
 
+              <AnimatePresence>
+                {addNotice ? (
+                  <motion.p
+                    key={addNotice}
+                    role="status"
+                    aria-live="polite"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.24, ease: EASE_PREMIUM }}
+                    className="flex items-center gap-2 rounded-btn border border-success-500/30 bg-success-50 px-3 py-2 text-sm font-medium text-success-700"
+                  >
+                    <CheckCircle2 aria-hidden className="size-4 shrink-0" />
+                    {addNotice}
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
+
               <AnimatePresence mode="wait" initial={false}>
                 {selectedPrinting ? (
                   <motion.div
@@ -667,7 +726,7 @@ export default function SellTradePage() {
                         rates={effectiveRates}
                         payoutMethod={payoutMethod}
                         onAdd={(finish, condition, quantity) =>
-                          addLine(selectedPrinting, null, finish, condition, quantity)
+                          addLine(selectedPrinting, null, finish, condition, quantity, { clearSearch: true })
                         }
                       />
                     </ul>

@@ -350,6 +350,8 @@ final class StoreBuylistController extends AbstractController
         $this->entityManager->persist($submission);
         $this->entityManager->flush();
 
+        $this->sellerNotifier->notify($store, $submission);
+
         return $this->json($this->serializeSubmission($submission), 201);
     }
 
