@@ -41,3 +41,13 @@ export function parseInventoryNotes(notes: string | null | undefined): ParsedInv
 
   return { game, variant, text: rest.length > 0 ? rest.join(' · ') : null }
 }
+
+/** Split importer variant lines ("Borderless, Showcase") into discrete chips. */
+export function variantChips(variant: string | null | undefined): string[] {
+  if (!variant?.trim()) return []
+  return variant
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
