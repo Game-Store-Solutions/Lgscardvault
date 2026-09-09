@@ -11,9 +11,9 @@ import type {
   TradeRateSettings,
   TradeRates,
 } from '../../api/types'
-import { useDebouncedValue, useCardPrintings, useSellSubmissionsList, sellSubmissionsKey, useStore } from '../../hooks'
+import { useCatalogGames, useDebouncedValue, useCardPrintings, useSellSubmissionsList, sellSubmissionsKey, useStore } from '../../hooks'
 import { formatDate } from '../../lib/format'
-import { PrintingGrid } from '../../components/catalog'
+import { GameSelector, PrintingGrid } from '../../components/catalog'
 import { Avatar, Badge, Button, Card, EmptyState, Input, LoadingPanel, Modal, Select, Spinner, dropdownItemClass, dropdownPanelClass } from '../../components/ui'
 import { cx } from '../../lib/cx'
 import { finishChoices, isFoilFinish } from '../../lib/finishes'
@@ -517,6 +517,18 @@ function printingHasFinish(card: CardSummary, finish: 'foil' | 'nonfoil'): boole
 /** Buy-list curation: add cards (pinned offer optional), toggle visibility, remove. */
 function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefined }) {
   const queryClient = useQueryClient()
+  const { data: catalogGames = [] } = useCatalogGames()
+  const gameOptions = useMemo(
+    () => catalogGames.map((game) => ({ code: game.code, name: game.name })),
+    [catalogGames],
+  )
+  const [gameFilter, setGameFilter] = useState('')
+
+  useEffect(() => {
+    if (!gameFilter && gameOptions.length > 0) {
+      setGameFilter(gameOptions[0].code)
+    }
+  }, [gameFilter, gameOptions])
 
   const { data: buylist = [], isLoading } = useQuery({
     queryKey: buylistKey(slug),
@@ -549,13 +561,14 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
   const scopedToFinish = catalogFinishFilter !== 'all'
   const typeaheadReady =
     debounced.length >= 2 &&
+    Boolean(gameFilter) &&
     !nameHit &&
     !selected &&
     !scopedToSet
-  const gameFinishes = finishChoices(null)
+  const gameFinishes = finishChoices(null, gameFilter || undefined)
 
   const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
-    queryKey: ['buylist-card-search', 'prefix-rank', slug, debounced, catalogFinishFilter],
+    queryKey: ['buylist-card-search', 'prefix-rank', slug, debounced, catalogFinishFilter, gameFilter],
     enabled: typeaheadReady,
     staleTime: 30_000,
     queryFn: async () => {
@@ -563,21 +576,25 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
         params: {
           q: debounced,
           unique: 'cards',
+          limit: 12,
+          remote: 0,
+          game: gameFilter,
           ...(scopedToFinish ? { finish: catalogFinishFilter } : {}),
         },
       })
-      return data.slice(0, 12)
+      return data
     },
   })
 
   const { data: catalogResults = [], refetch: runCatalogSearch, isFetching: catalogSearching } = useQuery({
-    queryKey: ['buylist-card-search', 'unique-cards', query, catalogSetFilter, catalogFinishFilter],
+    queryKey: ['buylist-card-search', 'unique-cards', query, catalogSetFilter, catalogFinishFilter, gameFilter],
     enabled: false,
     queryFn: async () => {
       if (!query.trim()) return []
       const { data } = await api.get<CardSummary[]>('/catalog/search', {
         params: {
           q: query,
+          game: gameFilter,
           ...(scopedToSet ? { set: catalogSetFilter.trim() } : { unique: 'cards' }),
           ...(scopedToFinish ? { finish: catalogFinishFilter } : {}),
         },
@@ -717,6 +734,19 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
       subtitle="Cards you actively want. Leave the offer blank to pay your premium rate at market; pin a price to lock the per-copy offer."
     >
       <div className="space-y-4">
+        {gameOptions.length > 0 ? (
+          <GameSelector
+            games={gameOptions}
+            value={gameFilter}
+            onChange={(code) => {
+              setGameFilter(code)
+              setNameHit(null)
+              setSelected(null)
+              setTypeaheadOpen(false)
+            }}
+            label="Game for buy list search"
+          />
+        ) : null}
         <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_8rem_10rem_auto] lg:items-end">
           <div ref={typeaheadRef} className="relative min-w-0">
             <Input

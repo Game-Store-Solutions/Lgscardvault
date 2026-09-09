@@ -14,8 +14,8 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { BuylistEntry, CardSummary, SellPayoutMethod, SellSubmission, TradeRates } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { useCardPrintings, useDebouncedValue, useKioskMode, useStore, useStoreTheme } from '../hooks'
-import { PrintingGrid } from '../components/catalog'
+import { useCardPrintings, useCatalogGames, useDebouncedValue, useKioskMode, useStore, useStoreTheme } from '../hooks'
+import { GameSelector, PrintingGrid } from '../components/catalog'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../components/motion'
 import {
   BackButton,
@@ -127,6 +127,18 @@ export default function SellTradePage() {
   const { data: store, isLoading: storeLoading } = useStore(slug)
   useStoreTheme(store)
   const queryClient = useQueryClient()
+  const { data: catalogGames = [] } = useCatalogGames()
+  const gameOptions = useMemo(
+    () => catalogGames.map((game) => ({ code: game.code, name: game.name })),
+    [catalogGames],
+  )
+  const [gameFilter, setGameFilter] = useState('')
+
+  useEffect(() => {
+    if (!gameFilter && gameOptions.length > 0) {
+      setGameFilter(gameOptions[0].code)
+    }
+  }, [gameFilter, gameOptions])
 
   const { data: rates } = useQuery({
     queryKey: tradeRatesKey(slug),
@@ -170,9 +182,9 @@ export default function SellTradePage() {
   const typeaheadRef = useRef<HTMLDivElement>(null)
   const skipAutoOpenQuery = useRef<string | null>(null)
   const debouncedSearch = useDebouncedValue(searchTerm, 150)
-  const typeaheadReady = Boolean(user) && debouncedSearch.trim().length >= 2 && !nameHit
+  const typeaheadReady = Boolean(user) && Boolean(gameFilter) && debouncedSearch.trim().length >= 2 && !nameHit
   const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
-    queryKey: ['sell-card-search', 'typeahead', debouncedSearch],
+    queryKey: ['sell-card-search', 'typeahead', debouncedSearch, gameFilter],
     enabled: typeaheadReady,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
@@ -183,6 +195,7 @@ export default function SellTradePage() {
           unique: 'cards',
           limit: 12,
           remote: 0,
+          game: gameFilter,
         },
       })
       return data
@@ -219,6 +232,15 @@ export default function SellTradePage() {
     setNameHit(null)
     setSelectedPrinting(null)
     setTypeaheadOpen(true)
+  }
+
+  function changeGame(code: string) {
+    if (code === gameFilter) return
+    setGameFilter(code)
+    setNameHit(null)
+    setSelectedPrinting(null)
+    setTypeaheadOpen(false)
+    skipAutoOpenQuery.current = null
   }
 
   useEffect(() => {
@@ -361,12 +383,14 @@ export default function SellTradePage() {
         await Promise.all(
           names.slice(i, i + 4).map(async ([name, quantity]) => {
             try {
-              const { data } = await api.get<CardSummary[]>('/catalog/search', { params: { q: name } })
+              const { data } = await api.get<CardSummary[]>('/catalog/search', {
+                params: { q: name, game: gameFilter || undefined },
+              })
               const priced = data
                 .filter((card) => matchesName(card, name) && scryfallPriceCents(card, 'nonfoil') != null)
                 .sort((a, b) => (scryfallPriceCents(a, 'nonfoil') ?? 0) - (scryfallPriceCents(b, 'nonfoil') ?? 0))
               // A pasted decklist means plain copies — in that printing's own word for it.
-              if (priced.length > 0) addLine(priced[0], null, finishChoices(priced[0]).plain, 'NM', quantity)
+              if (priced.length > 0) addLine(priced[0], null, finishChoices(priced[0], gameFilter).plain, 'NM', quantity)
               else misses.push(name)
             } catch {
               misses.push(name)
@@ -460,8 +484,11 @@ export default function SellTradePage() {
         <div className="min-w-0 space-y-6">
           {/* Find cards */}
           <Card>
-            <CardHeader title="Find your cards" subtitle="Start typing a card name, pick it from the list, then choose your printing." />
+            <CardHeader title="Find your cards" subtitle="Pick a game, start typing a card name, then choose your printing." />
             <CardBody className="space-y-4">
+              {gameOptions.length > 0 ? (
+                <GameSelector games={gameOptions} value={gameFilter} onChange={changeGame} label="Game to search" />
+              ) : null}
               <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-64 flex-1">
                   <div ref={typeaheadRef} className="relative">
