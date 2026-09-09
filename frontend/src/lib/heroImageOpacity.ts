@@ -63,20 +63,18 @@ export function heroImageOpacityCss(percent: number): number {
 
 export const HERO_BANNER_PHOTO_CLASS = 'hero-banner-photo'
 
-/** CSS crop variables: desktop X/Y, with optional phone overrides below 640px. */
+/** CSS crop variables for the hero photo focal point (same at every width). */
 export function heroImageCropVars(
   x: number,
   y: number,
-  mobileX?: number | null,
-  mobileY?: number | null,
+  _mobileX?: number | null,
+  _mobileY?: number | null,
 ): Record<string, string> {
   const posX = clampHeroImagePosition(x)
   const posY = clampHeroImagePosition(y)
   return {
     '--hero-image-pos-x': `${posX}%`,
     '--hero-image-pos-y': `${posY}%`,
-    '--hero-image-pos-mobile-x': `${clampHeroImagePosition(mobileX, posX)}%`,
-    '--hero-image-pos-mobile-y': `${clampHeroImagePosition(mobileY, posY)}%`,
   }
 }
 

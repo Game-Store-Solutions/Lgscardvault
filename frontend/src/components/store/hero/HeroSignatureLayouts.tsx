@@ -114,7 +114,9 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
     <div className={cx('rounded-card', storeFrameClass('hero'), className)}>
     <div
       className={cx(
-        'relative isolate flex min-h-64 items-end overflow-hidden rounded-[inherit] sm:min-h-80 lg:min-h-95',
+        // Fixed aspect ratio so object-fit:cover framing stays stable as the
+        // viewport width changes (min-height breakpoints used to re-crop).
+        'relative isolate flex aspect-[12/5] w-full items-end overflow-hidden rounded-[inherit]',
       )}
     >
       <div aria-hidden className="absolute inset-0 -z-[21] bg-bg" style={{ backgroundColor: primary }} />

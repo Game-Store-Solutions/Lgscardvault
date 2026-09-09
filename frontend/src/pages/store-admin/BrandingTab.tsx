@@ -238,6 +238,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
   const [section, setSection] = useState<BrandingSection>('colors')
   const formRef = useRef(form)
   formRef.current = form
+  const heroSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (isLoading || !store?.slug) return
@@ -246,6 +247,13 @@ export default function BrandingTab({ slug }: { slug: string }) {
     setLoadedSlug(store.slug)
     setFormDirty(false)
   }, [isLoading, loadedSlug, store])
+
+  useEffect(
+    () => () => {
+      if (heroSaveTimer.current) clearTimeout(heroSaveTimer.current)
+    },
+    [],
+  )
 
   const set = <K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) => {
     setFormDirty(true)
@@ -380,8 +388,28 @@ export default function BrandingTab({ slug }: { slug: string }) {
   })
 
   function saveHeroBranding(overrides?: Partial<BrandingForm>) {
+    if (heroSaveTimer.current) {
+      clearTimeout(heroSaveTimer.current)
+      heroSaveTimer.current = null
+    }
     const snapshot = { ...formRef.current, ...overrides }
     heroBrandingMutation.mutate(pickHeroBrandingPayload(snapshot))
+  }
+
+  function queueHeroSave() {
+    if (heroSaveTimer.current) clearTimeout(heroSaveTimer.current)
+    heroSaveTimer.current = setTimeout(() => {
+      heroSaveTimer.current = null
+      saveHeroBranding()
+    }, 400)
+  }
+
+  /** Keep formRef in sync immediately so slider release can save the latest value. */
+  function setHeroField<K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) {
+    setFormDirty(true)
+    const next = { ...formRef.current, [key]: value }
+    formRef.current = next
+    setForm(next)
   }
 
   function onHeroImageChange(value: string) {
@@ -731,7 +759,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
           <Card>
             <CardHeader
               title="Hero banner"
-              subtitle="Layout, images, headline copy, and photo strength. Layout and uploads save automatically."
+              subtitle="Layout, images, headline copy, and photo framing. Uploads and crop sliders save when you release them."
               actions={
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   <ThemeModeSwitch
@@ -790,7 +818,11 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     max={HERO_IMAGE_OPACITY_RANGE.max}
                     unit="%"
                     hint="How visible the banner photo is in light mode."
-                    onChange={(v) => set('heroImageOpacity', v)}
+                    onChange={(v) => {
+                      setHeroField('heroImageOpacity', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                   <RangeField
                     label="Dark image opacity"
@@ -798,11 +830,18 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     min={HERO_IMAGE_OPACITY_RANGE.min}
                     max={HERO_IMAGE_OPACITY_RANGE.max}
                     unit="%"
-                    hint="How visible the banner photo is in dark mode."
-                    onChange={(v) => set('darkHeroImageOpacity', v)}
+                    hint="How visible the banner photo is in dark mode. Switch the preview to Dark to check."
+                    onChange={(v) => {
+                      setHeroField('darkHeroImageOpacity', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                 </div>
                 <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Desktop crop</p>
+                <p className="text-xs text-fg-muted">
+                  Drag to reframe the photo. Switch Light/Dark on the preview to see each crop. Changes save when you release the slider.
+                </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <RangeField
                     label="Light left / right"
@@ -811,7 +850,11 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
                     hint="0 is the left of the photo, 100 is the right."
-                    onChange={(v) => set('heroImagePositionX', v)}
+                    onChange={(v) => {
+                      setHeroField('heroImagePositionX', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                   <RangeField
                     label="Light up / down"
@@ -820,7 +863,11 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
                     hint="0 is the top of the photo, 100 is the bottom."
-                    onChange={(v) => set('heroImagePosition', v)}
+                    onChange={(v) => {
+                      setHeroField('heroImagePosition', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                   <RangeField
                     label="Dark left / right"
@@ -828,8 +875,12 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     min={HERO_IMAGE_POSITION_RANGE.min}
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
-                    hint="Shift the dark photo left or right."
-                    onChange={(v) => set('darkHeroImagePositionX', v)}
+                    hint="Shift the dark photo left or right. Preview must be on Dark."
+                    onChange={(v) => {
+                      setHeroField('darkHeroImagePositionX', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                   <RangeField
                     label="Dark up / down"
@@ -837,13 +888,17 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     min={HERO_IMAGE_POSITION_RANGE.min}
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
-                    hint="Shift the dark photo up or down."
-                    onChange={(v) => set('darkHeroImagePosition', v)}
+                    hint="Shift the dark photo up or down. Preview must be on Dark."
+                    onChange={(v) => {
+                      setHeroField('darkHeroImagePosition', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                 </div>
                 <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Phone crop</p>
                 <p className="text-xs text-fg-muted">
-                  Fine-tune how the photo is cropped inside the same banner on phones. The hero box does not change size.
+                  Optional overrides stored for phones. The live storefront uses one focal point at every width so the banner does not jump while resizing — set Desktop crop for the framing shoppers see.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <RangeField
@@ -852,8 +907,12 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     min={HERO_IMAGE_POSITION_RANGE.min}
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
-                    hint="0 is left, 100 is right. Applies on phones in light and dark."
-                    onChange={(v) => set('heroImagePositionMobileX', v)}
+                    hint="Stored for phones; live storefront currently follows Desktop crop at every width."
+                    onChange={(v) => {
+                      setHeroField('heroImagePositionMobileX', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                   <RangeField
                     label="Phone up / down"
@@ -861,8 +920,12 @@ export default function BrandingTab({ slug }: { slug: string }) {
                     min={HERO_IMAGE_POSITION_RANGE.min}
                     max={HERO_IMAGE_POSITION_RANGE.max}
                     unit="%"
-                    hint="0 is top, 100 is bottom. Applies on phones in light and dark."
-                    onChange={(v) => set('heroImagePositionMobileY', v)}
+                    hint="Stored for phones; live storefront currently follows Desktop crop at every width."
+                    onChange={(v) => {
+                      setHeroField('heroImagePositionMobileY', v)
+                      queueHeroSave()
+                    }}
+                    onChangeEnd={() => saveHeroBranding()}
                   />
                 </div>
               </div>
