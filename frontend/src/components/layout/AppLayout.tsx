@@ -79,7 +79,11 @@ export default function AppLayout() {
   const tryEnterKiosk = async () => {
     setEnterError(null)
     if (!kioskSlug) {
-      setEnterError('Open your storefront first, then enter kiosk mode.')
+      setEnterError(
+        isSuperAdmin
+          ? 'Open a storefront first, then enter kiosk mode for that store.'
+          : 'Open your storefront first, then enter kiosk mode.',
+      )
       return
     }
     if (!kioskStore?.kioskExitCodeSet) {
@@ -350,7 +354,7 @@ export default function AppLayout() {
                       className={dropdownItemClass({})}
                       onNavigate={() => setUserMenuOpen(false)}
                     />
-                    {isStoreOwner && (
+                    {(isStoreOwner || isSuperAdmin) && (
                       <button
                         type="button"
                         role="menuitem"
@@ -509,7 +513,7 @@ export default function AppLayout() {
               )}
               <StoreApplicationMenuLink className={mobileLinkClass} onNavigate={closeMobile} />
 
-              {isStoreOwner && (
+              {(isStoreOwner || isSuperAdmin) && (
                 <button
                   type="button"
                   disabled={enteringKiosk}

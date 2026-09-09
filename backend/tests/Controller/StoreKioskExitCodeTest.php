@@ -101,4 +101,27 @@ final class StoreKioskExitCodeTest extends WebTestCase
         $this->patchSettings(['kioskExitCode' => 'code with spaces']);
         self::assertResponseStatusCodeSame(422);
     }
+
+    public function testPlatformAdminCanStartKioskSession(): void
+    {
+        $this->patchSettings(['kioskExitCode' => 'vault99']);
+        self::assertResponseIsSuccessful();
+
+        $admin = $this->fixtures->user(['ROLE_SUPER_ADMIN']);
+        $adminBearer = static::getContainer()->get(JWTTokenManagerInterface::class)->create($admin);
+
+        $this->client->request(
+            'POST',
+            sprintf('/api/stores/%s/kiosk/start', $this->store->getSlug()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminBearer,
+            ],
+        );
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsString($payload['token'] ?? null);
+        self::assertNotSame('', $payload['token']);
+    }
 }
