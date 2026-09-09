@@ -2,7 +2,7 @@ import { Pencil, Sparkles, Trash2 } from 'lucide-react'
 import { formatPrice, formatScryfallPrice } from '../../../api/client'
 import type { InventoryItem } from '../../../api/types'
 import { Badge, Button } from '../../../components/ui'
-import { parseInventoryNotes } from '../../../lib/inventoryNotes'
+import { parseInventoryNotes, variantChips } from '../../../lib/inventoryNotes'
 import { FOIL_GRADIENT, rarityAccent } from '../../../lib/mtg'
 import { finishName } from '../../../lib/finishes'
 
@@ -20,6 +20,7 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
   // The badge shows THIS listing's treatment — a Reverse Holofoil line must
   // not borrow the card's first foil label ("Holofoil").
   const finishLabel = finishName(item.card, item.isFoil, item.finish)
+  const variants = variantChips(notes.variant)
   return (
     // The whole tile opens the manage-item modal; the action buttons stop
     // the click so delete never falls through to edit.
@@ -91,7 +92,11 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
             <Badge tone="neutral">{finishLabel}</Badge>
           )}
           <Badge tone="brand">{item.quantity} in stock</Badge>
-          {notes.variant && <Badge tone="neutral">{notes.variant}</Badge>}
+          {variants.map((chip) => (
+            <Badge key={chip} tone="neutral" className="max-w-full truncate">
+              {chip}
+            </Badge>
+          ))}
           {notes.game && <Badge tone="neutral">{notes.game}</Badge>}
         </div>
 
