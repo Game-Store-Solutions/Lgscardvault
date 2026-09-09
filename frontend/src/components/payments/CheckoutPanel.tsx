@@ -120,6 +120,13 @@ export function CheckoutPanel({
     [checkout],
   )
 
+  const onSquareTokenized = useCallback(
+    (payment: TokenizedPayment) => {
+      checkout.mutate(payment)
+    },
+    [checkout],
+  )
+
   const payInStore = useMutation({
     mutationFn: async () => {
       const path = isGuest
@@ -247,7 +254,7 @@ export function CheckoutPanel({
               layout="checkout"
               payButtonPlacement="inline"
               showCardForm={false}
-              onTokenized={(payment) => checkout.mutate(payment)}
+              onTokenized={onSquareTokenized}
             />
           ) : null}
           {paypalEnabled && config.paypal ? (
