@@ -93,24 +93,36 @@ class CardSearchController extends AbstractController
             return $this->json(['detail' => 'Unknown game.'], 404);
         }
 
+        // Typeahead callers pass a small limit and remote=0 so we stay on the
+        // local catalog and skip the Scryfall round-trip that makes name search
+        // feel sticky while typing.
+        $resultLimit = min(40, max(1, $request->query->getInt('limit', 40)));
+        $fetchLimit = min(100, max($resultLimit * 4, $resultLimit));
+        $allowRemote = filter_var($request->query->get('remote', '1'), FILTER_VALIDATE_BOOLEAN);
+
         if (!$game->isMtg()) {
             // The same filters the Magic path honors. Skipping them here meant
             // a Pokemon workspace's set / rarity / finish pickers changed
             // nothing at all — the results came back untouched.
             $matches = array_values(array_filter(
-                $this->cardRepository->searchByNameForGame($game, $query, 100),
+                $this->cardRepository->searchByNameForGame($game, $query, $fetchLimit),
                 fn (Card $card): bool => $this->catalogCardResolver
                     ->matchesFilters($card, $setCode, $collectorNumber, $rarity, $finish),
             ));
 
-            return $this->json($this->serializeSearchHits($matches, $query, $this->wantsUniqueCards($request)));
+            return $this->json($this->serializeSearchHits(
+                $matches,
+                $query,
+                $this->wantsUniqueCards($request),
+                $resultLimit,
+            ));
         }
 
         /** @var array<string, \App\Entity\Card> $merged */
         $merged = [];
 
         // 1. Name-based local matches (honoring all filters).
-        foreach ($this->cardRepository->searchByName($query, 100) as $card) {
+        foreach ($this->cardRepository->searchByName($query, $fetchLimit) as $card) {
             if ($this->catalogCardResolver->matchesFilters($card, $setCode, $collectorNumber, $rarity, $finish)) {
                 $merged[(string) $card->getId()] = $card;
             }
@@ -125,7 +137,7 @@ class CardSearchController extends AbstractController
         //    collector already pin the printing.
         if ('' !== $setCode && '' !== $collectorNumber) {
             $exact = $this->cardRepository->findByNaturalKey($setCode, $collectorNumber);
-            if ([] === $exact) {
+            if ([] === $exact && $allowRemote) {
                 try {
                     $exact = array_values($this->scryfallClient->fetchCollectionBySetCollectors([
                         ['set' => $setCode, 'collectorNumber' => $collectorNumber],
@@ -142,11 +154,11 @@ class CardSearchController extends AbstractController
         // 3. Remote name search fallback when local results are still thin.
         //    Wrapped so a Scryfall outage degrades to local-only results
         //    instead of failing the whole request with a 500.
-        if (count($merged) < self::REMOTE_FALLBACK_THRESHOLD) {
+        if ($allowRemote && count($merged) < self::REMOTE_FALLBACK_THRESHOLD) {
             try {
                 $remote = $this->scryfallClient->searchRemoteAndUpsert(
                     $query,
-                    40,
+                    min(40, $fetchLimit),
                     '' !== $setCode ? $setCode : null,
                     '' !== $finish ? $finish : null,
                 );
@@ -175,7 +187,12 @@ class CardSearchController extends AbstractController
                 && PaperPrinting::isPaper($card),
         ));
 
-        return $this->json($this->serializeSearchHits($results, $query, $this->wantsUniqueCards($request)));
+        return $this->json($this->serializeSearchHits(
+            $results,
+            $query,
+            $this->wantsUniqueCards($request),
+            $resultLimit,
+        ));
     }
 
     /**
@@ -183,7 +200,7 @@ class CardSearchController extends AbstractController
      *
      * @return list<array<string, mixed>>
      */
-    private function serializeSearchHits(array $cards, string $query, bool $uniqueCards): array
+    private function serializeSearchHits(array $cards, string $query, bool $uniqueCards, int $limit = 40): array
     {
         $ranked = $this->catalogSearchRanker->rank($cards, $query);
         if ($uniqueCards) {
@@ -192,7 +209,7 @@ class CardSearchController extends AbstractController
 
         return array_map(
             $this->catalogCardResolver->serializeCard(...),
-            array_slice($ranked, 0, 40),
+            array_slice($ranked, 0, max(1, min(40, $limit))),
         );
     }
 

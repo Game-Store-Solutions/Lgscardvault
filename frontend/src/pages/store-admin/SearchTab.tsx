@@ -109,7 +109,7 @@ export default function SearchTab({ slug }: { slug: string }) {
   const invSetTypeaheadRef = useRef<HTMLDivElement>(null)
   const debouncedFilter = useDebouncedValue(filter.trim(), 300)
   const debouncedInventorySet = useDebouncedValue(inventorySetFilter.trim(), 300)
-  const debouncedCatalogSearch = useDebouncedValue(catalogSearch.trim(), 300)
+  const debouncedCatalogSearch = useDebouncedValue(catalogSearch.trim(), 150)
 
   const inventoryQuery = useInventoryPage(slug, {
     game: gameFilter || undefined,
@@ -170,11 +170,13 @@ export default function SearchTab({ slug }: { slug: string }) {
         params: {
           q: debouncedCatalogSearch,
           unique: 'cards',
+          limit: 12,
+          remote: 0,
           ...(gameFilter ? { game: gameFilter } : {}),
           ...(scopedToFinish ? { finish: catalogFinishFilter } : {}),
         },
       })
-      return data.slice(0, 12)
+      return data
     },
     enabled: typeaheadReady,
     staleTime: 30_000,
