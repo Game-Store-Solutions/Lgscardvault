@@ -201,13 +201,15 @@ export default function OrdersTab({ slug }: { slug: string }) {
   const stats = useMemo(() => {
     const today = queueCounts?.today
     const yesterday = queueCounts?.yesterday
+    const fulfilledToday = (today?.completed ?? 0) + (today?.ready ?? 0)
+    const fulfilledYesterday = (yesterday?.completed ?? 0) + (yesterday?.ready ?? 0)
     return {
       newOrders: today?.new ?? 0,
       newTrend: percentChange(today?.new ?? 0, yesterday?.new ?? 0),
       pending: today?.pending ?? 0,
       pendingTrend: percentChange(today?.pending ?? 0, yesterday?.pending ?? 0),
-      completed: today?.completed ?? 0,
-      completedTrend: percentChange(today?.completed ?? 0, yesterday?.completed ?? 0),
+      fulfilled: fulfilledToday,
+      fulfilledTrend: percentChange(fulfilledToday, fulfilledYesterday),
       canceled: today?.canceled ?? 0,
       canceledTrend: percentChange(today?.canceled ?? 0, yesterday?.canceled ?? 0),
     }
@@ -289,9 +291,9 @@ export default function OrdersTab({ slug }: { slug: string }) {
         <StatCard
           icon={CheckCircle2}
           iconClass="bg-success-50 text-success-700"
-          label="Completed today"
-          value={String(stats.completed)}
-          trend={stats.completedTrend}
+          label="Ready / delivered today"
+          value={String(stats.fulfilled)}
+          trend={stats.fulfilledTrend}
         />
         <StatCard
           icon={XCircle}

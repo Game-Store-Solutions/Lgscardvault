@@ -11,6 +11,7 @@ export const openStoreOrdersCountKey = (slug: string) => [...ordersKey(slug), 'o
 export interface StoreOrderDayTotals {
   new: number
   pending: number
+  ready: number
   completed: number
   canceled: number
 }
@@ -32,6 +33,7 @@ export interface StoreOrderQueueCounts {
 const EMPTY_DAY_TOTALS: StoreOrderDayTotals = {
   new: 0,
   pending: 0,
+  ready: 0,
   completed: 0,
   canceled: 0,
 }
@@ -54,6 +56,7 @@ function parseDayTotals(raw: unknown): StoreOrderDayTotals {
   return {
     new: Math.max(0, Number(row.new) || 0),
     pending: Math.max(0, Number(row.pending) || 0),
+    ready: Math.max(0, Number(row.ready) || 0),
     completed: Math.max(0, Number(row.completed) || 0),
     canceled: Math.max(0, Number(row.canceled) || 0),
   }

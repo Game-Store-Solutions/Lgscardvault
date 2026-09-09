@@ -66,6 +66,7 @@ final class StoreOrderDayTotalsTest extends WebTestCase
 
         self::assertSame(2, $payload['today']['new']);
         self::assertSame(1, $payload['today']['pending']);
+        self::assertSame(0, $payload['today']['ready']);
         self::assertSame(1, $payload['today']['completed']);
         self::assertSame(0, $payload['today']['canceled']);
         self::assertSame(1, $payload['yesterday']['new']);
