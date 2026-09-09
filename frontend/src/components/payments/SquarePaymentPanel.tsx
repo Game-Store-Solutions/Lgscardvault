@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ApplePay, Card, GooglePay, TokenResult } from '@square/web-sdk'
+import type { ApplePay, Card, GooglePay, PaymentRequest, TokenResult } from '@square/web-sdk'
 import { CreditCard, Loader2 } from 'lucide-react'
 import type { PaymentMethodType } from '../../api/types'
 import { Button } from '../ui'
@@ -86,6 +86,7 @@ export function SquarePaymentPanel({
 
   const cardRef = useRef<HTMLDivElement>(null)
   const googlePayRef = useRef<HTMLDivElement>(null)
+  const paymentRequestRef = useRef<PaymentRequest | null>(null)
   const [card, setCard] = useState<Card | null>(null)
   const [googlePay, setGooglePay] = useState<GooglePay | null>(null)
   const [applePay, setApplePay] = useState<ApplePay | null>(null)
@@ -96,6 +97,10 @@ export function SquarePaymentPanel({
   const walletsEnabled = layout === 'checkout' && (priceCents > 0 || saveOnly)
   const walletDisplayCents = saveOnly && priceCents <= 0 ? 1 : priceCents
   const amount = (walletDisplayCents / 100).toFixed(2)
+  const amountRef = useRef(amount)
+  amountRef.current = amount
+  const paymentRequestLabelRef = useRef(paymentRequestLabel)
+  paymentRequestLabelRef.current = paymentRequestLabel
   const vaultIntent = saveOnly || priceCents <= 0
   const showExpress = walletsEnabled && (googlePay || applePay)
   const showWalletDivider = showExpress && showCardForm
@@ -150,24 +155,29 @@ export function SquarePaymentPanel({
   }, [payments, darkMode, showCardForm])
 
   useEffect(() => {
-    if (!payments || !walletsEnabled) return
+    if (!payments || !walletsEnabled) {
+      paymentRequestRef.current = null
+      return
+    }
 
     setWalletsChecked(false)
     let cancelled = false
     let google: GooglePay | null = null
     let apple: ApplePay | null = null
 
-    let request
+    let request: PaymentRequest
     try {
       request = payments.paymentRequest({
         countryCode,
         currencyCode: currency,
-        total: { amount, label: paymentRequestLabel },
+        total: { amount: amountRef.current, label: paymentRequestLabelRef.current },
       })
     } catch {
       if (!cancelled) setWalletsChecked(true)
       return
     }
+
+    paymentRequestRef.current = request
 
     void payments
       .googlePay(request)
@@ -200,12 +210,23 @@ export function SquarePaymentPanel({
 
     return () => {
       cancelled = true
+      paymentRequestRef.current = null
       setGooglePay(null)
       setApplePay(null)
       if (google) void google.destroy()
       if (apple) void apple.destroy()
     }
-  }, [payments, walletsEnabled, amount, currency, countryCode, paymentRequestLabel])
+    // Amount changes use PaymentRequest.update below — remounting wallets on every
+    // tax quote / cart tweak made Express checkout flash and reload.
+  }, [payments, walletsEnabled, currency, countryCode])
+
+  useEffect(() => {
+    const request = paymentRequestRef.current
+    if (!request) return
+    request.update({
+      total: { amount, label: paymentRequestLabel },
+    })
+  }, [amount, paymentRequestLabel])
 
   async function verify(token: string): Promise<string> {
     if (!payments) return ''
@@ -216,7 +237,7 @@ export function SquarePaymentPanel({
         token,
         vaultIntent
           ? { intent: 'STORE', billingContact }
-          : { amount, currencyCode: currency, intent: 'CHARGE_AND_STORE', billingContact },
+          : { amount: amountRef.current, currencyCode: currency, intent: 'CHARGE_AND_STORE', billingContact },
       )
       return result?.token ?? ''
     } catch {

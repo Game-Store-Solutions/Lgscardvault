@@ -224,6 +224,7 @@ export default function CartPage() {
       cart.map((entry) => `${entry.inventoryItem?.id ?? `s${entry.sealedItem?.id}`}:${entry.quantity}`).join('|'),
     ],
     enabled: Boolean(slug && cart.length > 0 && !kioskMode && !createdOrder),
+    staleTime: 10_000,
     queryFn: async () => {
       const path = isGuest ? `/stores/${slug}/guest/checkout/quote` : `/stores/${slug}/customer/checkout/quote`
       const { data } = await api.post<CheckoutQuote>(
