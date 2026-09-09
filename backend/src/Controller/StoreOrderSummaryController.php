@@ -6,6 +6,7 @@ use App\Repository\OrderRepository;
 use App\Repository\StoreRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -21,7 +22,7 @@ final class StoreOrderSummaryController extends AbstractController
     /** Admin nav badge + Orders tab counts (store-wide, not current page). */
     #[Route('/api/stores/{slug}/orders-open-count', name: 'api_store_orders_open_count', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    public function openCount(string $slug): JsonResponse
+    public function openCount(string $slug, Request $request): JsonResponse
     {
         $store = $this->storeRepository->findOneBySlug($slug);
         if (null === $store) {
@@ -30,6 +31,13 @@ final class StoreOrderSummaryController extends AbstractController
 
         $this->denyAccessUnlessGranted('STORE_MANAGE', $store);
 
-        return $this->json($this->orderRepository->countQueueSummaryByStore($store));
+        $tzName = trim((string) $request->query->get('tz', 'UTC'));
+        try {
+            $tz = new \DateTimeZone('' !== $tzName ? $tzName : 'UTC');
+        } catch (\Exception) {
+            $tz = new \DateTimeZone('UTC');
+        }
+
+        return $this->json($this->orderRepository->countQueueSummaryByStore($store, $tz));
     }
 }

@@ -8,6 +8,13 @@ export const ordersKey = (slug: string) => ['orders', slug] as const
 
 export const openStoreOrdersCountKey = (slug: string) => [...ordersKey(slug), 'open-count'] as const
 
+export interface StoreOrderDayTotals {
+  new: number
+  pending: number
+  completed: number
+  canceled: number
+}
+
 export interface StoreOrderQueueCounts {
   openCount: number
   pending: number
@@ -17,6 +24,16 @@ export interface StoreOrderQueueCounts {
   delivered: number
   /** Every order in the store (all statuses) — for All tab pagination. */
   total: number
+  /** Orders created today (store browser timezone), by current status. */
+  today: StoreOrderDayTotals
+  yesterday: StoreOrderDayTotals
+}
+
+const EMPTY_DAY_TOTALS: StoreOrderDayTotals = {
+  new: 0,
+  pending: 0,
+  completed: 0,
+  canceled: 0,
 }
 
 const EMPTY_QUEUE_COUNTS: StoreOrderQueueCounts = {
@@ -27,6 +44,19 @@ const EMPTY_QUEUE_COUNTS: StoreOrderQueueCounts = {
   ready: 0,
   delivered: 0,
   total: 0,
+  today: EMPTY_DAY_TOTALS,
+  yesterday: EMPTY_DAY_TOTALS,
+}
+
+function parseDayTotals(raw: unknown): StoreOrderDayTotals {
+  if (!raw || typeof raw !== 'object') return EMPTY_DAY_TOTALS
+  const row = raw as Record<string, unknown>
+  return {
+    new: Math.max(0, Number(row.new) || 0),
+    pending: Math.max(0, Number(row.pending) || 0),
+    completed: Math.max(0, Number(row.completed) || 0),
+    canceled: Math.max(0, Number(row.canceled) || 0),
+  }
 }
 
 function parseQueueCounts(data: unknown): StoreOrderQueueCounts {
@@ -39,7 +69,17 @@ function parseQueueCounts(data: unknown): StoreOrderQueueCounts {
   const delivered = Math.max(0, Number(row.delivered) || 0)
   const total = Math.max(0, Number(row.total) || 0)
   const openCount = Math.max(0, Number(row.openCount) || pending + processing + delivery + ready)
-  return { openCount, pending, processing, delivery, ready, delivered, total }
+  return {
+    openCount,
+    pending,
+    processing,
+    delivery,
+    ready,
+    delivered,
+    total,
+    today: parseDayTotals(row.today),
+    yesterday: parseDayTotals(row.yesterday),
+  }
 }
 
 /** Admin order table page size — must not exceed the API's itemsPerPage cap (200). */
@@ -171,7 +211,9 @@ export function useStoreOrderQueueCounts(slug: string, enabled = true) {
     staleTime: 15_000,
     refetchInterval: 30_000,
     queryFn: async () => {
-      const { data } = await api.get<StoreOrderQueueCounts>(`/stores/${slug}/orders-open-count`)
+      const { data } = await api.get<StoreOrderQueueCounts>(`/stores/${slug}/orders-open-count`, {
+        params: { tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' },
+      })
       return parseQueueCounts(data)
     },
   })

@@ -285,14 +285,15 @@ class OrderRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
-    /** @return array{openCount: int, pending: int, processing: int, delivery: int, ready: int, delivered: int, total: int} */
-    public function countQueueSummaryByStore(Store $store): array
+    /** @return array{openCount: int, pending: int, processing: int, delivery: int, ready: int, delivered: int, total: int, today: array{new: int, pending: int, completed: int, canceled: int}, yesterday: array{new: int, pending: int, completed: int, canceled: int}} */
+    public function countQueueSummaryByStore(Store $store, ?\DateTimeZone $storeDayTz = null): array
     {
         $pending = $this->countByStoreAndStatuses($store, [OrderStatus::PENDING]);
         $processing = $this->countByStoreAndStatuses($store, [OrderStatus::RECEIVED, OrderStatus::PAID]);
         $delivery = $this->countByStoreAndStatuses($store, [OrderStatus::SHIPPED]);
         $ready = $this->countByStoreAndStatuses($store, [OrderStatus::FULFILLED]);
         $delivered = $this->countByStoreAndStatuses($store, [OrderStatus::COMPLETED]);
+        $tz = $storeDayTz ?? new \DateTimeZone('UTC');
 
         return [
             'openCount' => $pending + $processing + $delivery + $ready,
@@ -302,6 +303,58 @@ class OrderRepository extends ServiceEntityRepository
             'ready' => $ready,
             'delivered' => $delivered,
             'total' => $this->countByStore($store),
+            'today' => $this->countDayTotalsByStore($store, $tz, 0),
+            'yesterday' => $this->countDayTotalsByStore($store, $tz, -1),
+        ];
+    }
+
+    /**
+     * Orders created on a calendar day in $tz, bucketed by current status.
+     *
+     * @return array{new: int, pending: int, completed: int, canceled: int}
+     */
+    public function countDayTotalsByStore(Store $store, \DateTimeZone $tz, int $dayOffset = 0): array
+    {
+        $localMidnight = (new \DateTimeImmutable('today', $tz))->modify(sprintf('%+d day', $dayOffset));
+        $startUtc = $localMidnight->setTimezone(new \DateTimeZone('UTC'));
+        $endUtc = $localMidnight->modify('+1 day')->setTimezone(new \DateTimeZone('UTC'));
+
+        $rows = $this->createQueryBuilder('o')
+            ->select('o.status AS status', 'COUNT(o.id) AS cnt')
+            ->andWhere('o.store = :store')
+            ->andWhere('o.createdAt >= :start')
+            ->andWhere('o.createdAt < :end')
+            ->setParameter('store', $store)
+            ->setParameter('start', $startUtc)
+            ->setParameter('end', $endUtc)
+            ->groupBy('o.status')
+            ->getQuery()
+            ->getArrayResult();
+
+        $pending = 0;
+        $completed = 0;
+        $canceled = 0;
+        $new = 0;
+
+        foreach ($rows as $row) {
+            $count = (int) ($row['cnt'] ?? 0);
+            $new += $count;
+            $status = $row['status'] ?? null;
+            $value = $status instanceof OrderStatus ? $status->value : (string) $status;
+            if (OrderStatus::PENDING->value === $value) {
+                $pending += $count;
+            } elseif (OrderStatus::COMPLETED->value === $value) {
+                $completed += $count;
+            } elseif (OrderStatus::CANCELLED->value === $value || OrderStatus::REFUNDED->value === $value) {
+                $canceled += $count;
+            }
+        }
+
+        return [
+            'new' => $new,
+            'pending' => $pending,
+            'completed' => $completed,
+            'canceled' => $canceled,
         ];
     }
 

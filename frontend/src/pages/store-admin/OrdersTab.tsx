@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -30,7 +30,6 @@ import { OrderWorkflow } from '../../components/orders/OrderWorkflow'
 import { cx } from '../../lib/cx'
 import {
   ORDER_LIST_TABS,
-  countOrdersBetween,
   customerTierLabel,
   freshStatusPresentation,
   orderAllowsLineEdits,
@@ -51,6 +50,18 @@ const PAGE_SIZE = 8
 /** Keeps pagination from jumping when the last page has fewer rows. */
 const ORDER_TABLE_ROW_H = 'h-[4.75rem]'
 const ADD_CARD_SEARCH_MIN = 2
+/** Tailwind `lg` — desktop order table vs mobile cards. */
+const LG_MQ = '(min-width: 1024px)'
+
+function subscribeLg(onChange: () => void) {
+  const mq = window.matchMedia(LG_MQ)
+  mq.addEventListener('change', onChange)
+  return () => mq.removeEventListener('change', onChange)
+}
+
+function useIsLg(): boolean {
+  return useSyncExternalStore(subscribeLg, () => window.matchMedia(LG_MQ).matches, () => false)
+}
 
 function tabQueueCount(
   tabId: OrderListTab,
@@ -119,6 +130,11 @@ export default function OrdersTab({ slug }: { slug: string }) {
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [menuOrderId, setMenuOrderId] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const isLg = useIsLg()
+
+  useEffect(() => {
+    setMenuOrderId(null)
+  }, [isLg])
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -183,18 +199,19 @@ export default function OrdersTab({ slug }: { slug: string }) {
   const pageOrders = filtered
 
   const stats = useMemo(() => {
-    const now = Date.now()
-    const day = 86400000
-    const last7 = countOrdersBetween(data, now - 7 * day, now)
-    const prev7 = countOrdersBetween(data, now - 14 * day, now - 7 * day)
+    const today = queueCounts?.today
+    const yesterday = queueCounts?.yesterday
     return {
-      newOrders: tab === 'all' ? (queueCounts?.total ?? orderTotal) : orderTotal,
-      newTrend: percentChange(last7, prev7),
-      pending: queueCounts?.pending ?? data.filter((o) => o.status === 'pending').length,
-      completed: data.filter((o) => o.status === 'completed').length,
-      canceled: data.filter((o) => o.status === 'cancelled' || o.status === 'refunded').length,
+      newOrders: today?.new ?? 0,
+      newTrend: percentChange(today?.new ?? 0, yesterday?.new ?? 0),
+      pending: today?.pending ?? 0,
+      pendingTrend: percentChange(today?.pending ?? 0, yesterday?.pending ?? 0),
+      completed: today?.completed ?? 0,
+      completedTrend: percentChange(today?.completed ?? 0, yesterday?.completed ?? 0),
+      canceled: today?.canceled ?? 0,
+      canceledTrend: percentChange(today?.canceled ?? 0, yesterday?.canceled ?? 0),
     }
-  }, [data, orderTotal, queueCounts?.pending, queueCounts?.total, tab])
+  }, [queueCounts?.today, queueCounts?.yesterday])
 
   const updateStatus = useMutation({
     mutationFn: async ({ order, status }: { order: Order; status: OrderStatus }) => {
@@ -244,7 +261,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
     <div className="-mt-4 w-full min-w-0 space-y-5 pb-10 pt-2 sm:space-y-6">
       <header className="min-w-0">
         <h1 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Order Management</h1>
-        <p className="mt-1 text-sm text-fg-muted">Track and manage all store orders in real time.</p>
+        <p className="mt-1 text-sm text-fg-muted">Today’s order totals and live queue — compared to yesterday.</p>
       </header>
 
       {updateStatus.isError && (
@@ -257,31 +274,32 @@ export default function OrdersTab({ slug }: { slug: string }) {
         <StatCard
           icon={ClipboardList}
           iconClass="bg-brand-50 text-brand-600"
-          label="Total New Orders"
+          label="Orders today"
           value={String(stats.newOrders)}
           trend={stats.newTrend}
         />
         <StatCard
           icon={Package}
           iconClass="bg-warning-50 text-warning-700"
-          label="Total Orders Pending"
+          label="Pending today"
           value={String(stats.pending)}
-          trend={stats.pending > 0 ? -10 : null}
+          trend={stats.pendingTrend}
           trendNegative
         />
         <StatCard
           icon={CheckCircle2}
           iconClass="bg-success-50 text-success-700"
-          label="Total Orders Completed"
+          label="Completed today"
           value={String(stats.completed)}
-          trend={stats.completed > 0 ? 54 : null}
+          trend={stats.completedTrend}
         />
         <StatCard
           icon={XCircle}
           iconClass="bg-danger-50 text-danger-700"
-          label="Total Orders Canceled"
+          label="Canceled today"
           value={String(stats.canceled)}
-          trend={stats.canceled > 0 ? 54 : null}
+          trend={stats.canceledTrend}
+          trendNegative
         />
       </div>
 
@@ -373,44 +391,45 @@ export default function OrdersTab({ slug }: { slug: string }) {
           <p className="px-4 py-12 text-center text-sm text-fg-muted sm:px-5 sm:py-16">No orders match this filter.</p>
         ) : (
           <>
-            <div
-              className={cx(
-                'divide-y divide-border lg:hidden',
-                isFetching && 'opacity-60 transition-opacity duration-150',
-              )}
-            >
-              {pageOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  menuOpen={menuOrderId === order.id}
-                  menuRef={menuOrderId === order.id ? menuRef : undefined}
-                  onToggleMenu={() => setMenuOrderId((id) => (id === order.id ? null : order.id))}
-                  onOpenDetail={() => {
-                    setDetailOrder(order)
-                    setMenuOrderId(null)
-                  }}
-                  onPrint={() => {
-                    void printOrderSheet(order, slug).then((updated) => {
-                      if ((updated.taxCents ?? 0) !== (order.taxCents ?? 0)) {
-                        void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
-                      }
-                    })
-                  }}
-                  onUpdateStatus={(s) => updateStatus.mutate({ order, status: s })}
-                  updatePending={updateStatus.isPending && updateStatus.variables?.order.id === order.id}
-                />
-              ))}
-            </div>
-
-            <div className="relative hidden min-w-0 lg:block">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[44rem] table-fixed text-left text-sm">
-                  <OrdersTableHead />
-                  <tbody
-                    className={cx('min-h-0 transition-opacity duration-150', isFetching && 'opacity-60')}
-                  >
-                    {pageOrders.map((order) => (
+            {!isLg ? (
+              <div
+                className={cx(
+                  'divide-y divide-border',
+                  isFetching && 'opacity-60 transition-opacity duration-150',
+                )}
+              >
+                {pageOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    menuOpen={menuOrderId === order.id}
+                    menuRef={menuOrderId === order.id ? menuRef : undefined}
+                    onToggleMenu={() => setMenuOrderId((id) => (id === order.id ? null : order.id))}
+                    onOpenDetail={() => {
+                      setDetailOrder(order)
+                      setMenuOrderId(null)
+                    }}
+                    onPrint={() => {
+                      void printOrderSheet(order, slug).then((updated) => {
+                        if ((updated.taxCents ?? 0) !== (order.taxCents ?? 0)) {
+                          void queryClient.invalidateQueries({ queryKey: ordersKey(slug) })
+                        }
+                      })
+                    }}
+                    onUpdateStatus={(s) => updateStatus.mutate({ order, status: s })}
+                    updatePending={updateStatus.isPending && updateStatus.variables?.order.id === order.id}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="relative min-w-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[44rem] table-fixed text-left text-sm">
+                    <OrdersTableHead />
+                    <tbody
+                      className={cx('min-h-0 transition-opacity duration-150', isFetching && 'opacity-60')}
+                    >
+                      {pageOrders.map((order) => (
                         <OrderRow
                           key={order.id}
                           order={order}
@@ -431,11 +450,12 @@ export default function OrdersTab({ slug }: { slug: string }) {
                           onUpdateStatus={(s) => updateStatus.mutate({ order, status: s })}
                           updatePending={updateStatus.isPending && updateStatus.variables?.order.id === order.id}
                         />
-                    ))}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
 
             <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
           </>
@@ -799,6 +819,8 @@ function OrderActionsMenu({
       const menu = menuRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
+      // Hidden responsive twin (display:none) reports a zero box — skip it.
+      if (rect.width === 0 && rect.height === 0) return
       const menuHeight = menu?.offsetHeight ?? 120
       const gap = 6
       const left = Math.max(
