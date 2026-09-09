@@ -722,6 +722,8 @@ export interface CsvImportJob {
   setFilter?: string | null
   /** Rows matching status + set filter; present when set search is active. */
   filteredRowCount?: number | null
+  /** Distinct set values from the sheet (for typeahead). */
+  sets?: { code: string; name: string }[]
   rows: CsvImportRow[]
 }
 

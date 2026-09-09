@@ -996,6 +996,7 @@ final class StoreCsvImportController extends AbstractController
             'rowLimit' => $rowLimit,
             'setFilter' => $setNeedle,
             'filteredRowCount' => $filteredRowCount,
+            'sets' => $this->rowRepository->findDistinctSets($job),
             'rows' => array_map($this->serializeRow(...), $rows),
         ];
     }

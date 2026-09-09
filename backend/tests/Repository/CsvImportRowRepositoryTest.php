@@ -155,5 +155,11 @@ final class CsvImportRowRepositoryTest extends KernelTestCase
         $mh = $this->rows->findWindow($job, 0, 50, CsvImportRow::STATUS_IMPORTED, 'mh');
         self::assertCount(1, $mh);
         self::assertSame('mh2', $mh[0]->getSetCode());
+
+        $sets = $this->rows->findDistinctSets($job);
+        $codes = array_map(static fn (array $set): string => $set['code'], $sets);
+        self::assertContains('eve', $codes);
+        self::assertContains('mh2', $codes);
+        self::assertContains('Seventh Edition', $codes);
     }
 }

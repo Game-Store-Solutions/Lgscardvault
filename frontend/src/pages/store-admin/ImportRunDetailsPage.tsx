@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { Wrench, X } from 'lucide-react'
 import api, { cardImage } from '../../api/client'
 import type { CsvImportJob, CsvImportRow } from '../../api/types'
 import { useDebouncedValue } from '../../hooks'
+import { catalogNamesMatch, rankSetSearch } from '../../lib/searchText'
+import { cx } from '../../lib/cx'
 import {
   BackButton,
   Card,
@@ -22,6 +24,8 @@ import {
   Field,
   Input,
   buttonVariants,
+  dropdownItemClass,
+  dropdownPanelClass,
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice, canOpenRecovery, skippedRowCount } from './csv-shared'
 import { FailedRowsTable } from './FailedRowsTable'
@@ -34,11 +38,24 @@ export default function ImportRunDetailsPage() {
   const [rowOffset, setRowOffset] = useState(0)
   const [setFilter, setSetFilter] = useState('')
   const debouncedSet = useDebouncedValue(setFilter.trim(), 300)
+  const [importSetTypeaheadIndex, setImportSetTypeaheadIndex] = useState(0)
+  const [importSetTypeaheadOpen, setImportSetTypeaheadOpen] = useState(false)
+  const importSetTypeaheadRef = useRef<HTMLDivElement>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     setRowOffset(0)
   }, [debouncedSet])
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (importSetTypeaheadRef.current && !importSetTypeaheadRef.current.contains(event.target as Node)) {
+        setImportSetTypeaheadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
 
   const summaryQueryKey = ['csv-import-run', slug, importId, 'summary']
   const {
@@ -127,6 +144,24 @@ export default function ImportRunDetailsPage() {
   const canPrevious = rowOffset > 0
   const canNext = rowOffset + ROW_LIMIT < importedTotal
   const setSearchActive = Boolean(debouncedSet)
+  const importSets = summary?.sets ?? importedPage?.sets ?? []
+  const importSetTypeaheadReady = setFilter.trim().length >= 1
+  const importSetTypeaheadOptions = useMemo(() => {
+    if (!importSetTypeaheadReady) return []
+    return rankSetSearch(importSets, setFilter).slice(0, 12)
+  }, [importSets, setFilter, importSetTypeaheadReady])
+  const showImportSetTypeahead =
+    importSetTypeaheadOpen && importSetTypeaheadReady && importSetTypeaheadOptions.length > 0
+
+  useEffect(() => {
+    setImportSetTypeaheadIndex(importSetTypeaheadOptions.length > 0 ? 0 : -1)
+  }, [setFilter, importSetTypeaheadOptions])
+
+  function autofillImportSet(code: string) {
+    setSetFilter(code)
+    setImportSetTypeaheadOpen(false)
+    setImportSetTypeaheadIndex(-1)
+  }
 
   return (
     <div className="space-y-6">
@@ -298,21 +333,102 @@ export default function ImportRunDetailsPage() {
           <div className="flex flex-wrap items-end gap-3 px-1">
             <Field label="Search by set" className="min-w-[14rem] flex-1 sm:max-w-xs">
               {({ id }) => (
-                <Input
-                  id={id}
-                  value={setFilter}
-                  onChange={(e) => setSetFilter(e.target.value)}
-                  placeholder="Set code or name…"
-                  className="uppercase min-h-11"
-                  autoComplete="off"
-                />
+                <div ref={importSetTypeaheadRef} className="relative">
+                  <Input
+                    id={id}
+                    value={setFilter}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={showImportSetTypeahead}
+                    aria-controls="import-set-typeahead"
+                    aria-activedescendant={
+                      showImportSetTypeahead && importSetTypeaheadIndex >= 0
+                        ? `import-set-typeahead-${importSetTypeaheadIndex}`
+                        : undefined
+                    }
+                    onFocus={() => {
+                      if (importSetTypeaheadOptions.length > 0) setImportSetTypeaheadOpen(true)
+                    }}
+                    onChange={(e) => {
+                      setSetFilter(e.target.value)
+                      setImportSetTypeaheadOpen(true)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowDown' && importSetTypeaheadOptions.length > 0) {
+                        e.preventDefault()
+                        setImportSetTypeaheadOpen(true)
+                        setImportSetTypeaheadIndex((index) => (index + 1) % importSetTypeaheadOptions.length)
+                        return
+                      }
+                      if (e.key === 'ArrowUp' && importSetTypeaheadOptions.length > 0) {
+                        e.preventDefault()
+                        setImportSetTypeaheadOpen(true)
+                        setImportSetTypeaheadIndex((index) =>
+                          index <= 0 ? importSetTypeaheadOptions.length - 1 : index - 1,
+                        )
+                        return
+                      }
+                      if (e.key === 'Escape') {
+                        setImportSetTypeaheadOpen(false)
+                        return
+                      }
+                      if (e.key === 'Tab' && showImportSetTypeahead) {
+                        const set = importSetTypeaheadOptions[importSetTypeaheadIndex] ?? importSetTypeaheadOptions[0]
+                        if (set) autofillImportSet(set.code)
+                        return
+                      }
+                      if (e.key === 'Enter' && showImportSetTypeahead) {
+                        const set = importSetTypeaheadOptions[importSetTypeaheadIndex] ?? importSetTypeaheadOptions[0]
+                        if (set && !catalogNamesMatch(set.code, setFilter)) {
+                          e.preventDefault()
+                          autofillImportSet(set.code)
+                        } else {
+                          setImportSetTypeaheadOpen(false)
+                        }
+                      }
+                    }}
+                    placeholder="Set code or name…"
+                    className="uppercase min-h-11"
+                  />
+                  {showImportSetTypeahead ? (
+                    <ul
+                      id="import-set-typeahead"
+                      role="listbox"
+                      aria-label="Matching import sets"
+                      className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
+                    >
+                      {importSetTypeaheadOptions.map((set, index) => (
+                        <li
+                          key={set.code}
+                          id={`import-set-typeahead-${index}`}
+                          role="option"
+                          aria-selected={index === importSetTypeaheadIndex}
+                        >
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => autofillImportSet(set.code)}
+                            onMouseEnter={() => setImportSetTypeaheadIndex(index)}
+                            className={dropdownItemClass({ active: index === importSetTypeaheadIndex })}
+                          >
+                            <span className="truncate font-semibold uppercase">{set.code}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               )}
             </Field>
             <Button
               type="button"
               variant="secondary"
               disabled={!setFilter.trim()}
-              onClick={() => setSetFilter('')}
+              onClick={() => {
+                setSetFilter('')
+                setImportSetTypeaheadOpen(false)
+              }}
               className="min-h-11"
             >
               <X className="size-4" aria-hidden />

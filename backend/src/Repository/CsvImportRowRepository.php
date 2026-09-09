@@ -86,6 +86,36 @@ class CsvImportRowRepository extends ServiceEntityRepository
     }
 
     /**
+     * Distinct set values from the sheet for typeahead on run details.
+     *
+     * @return list<array{code: string, name: string}>
+     */
+    public function findDistinctSets(CsvImportJob $job): array
+    {
+        $rows = $this->createQueryBuilder('row')
+            ->select('DISTINCT row.setCode AS code')
+            ->andWhere('row.job = :job')
+            ->andWhere("row.setCode <> ''")
+            ->setParameter('job', $job)
+            ->orderBy('row.setCode', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+
+        $sets = [];
+        foreach ($rows as $row) {
+            $code = trim((string) ($row['code'] ?? ''));
+            if ('' === $code) {
+                continue;
+            }
+            // Sheet column may hold a code or an expansion name — surface both
+            // fields the same so client ranking can match either form.
+            $sets[] = ['code' => $code, 'name' => $code];
+        }
+
+        return $sets;
+    }
+
+    /**
      * All rows in any of the given statuses, in sheet order.
      *
      * Backs the recovery queue, which shows failed and skipped rows together
