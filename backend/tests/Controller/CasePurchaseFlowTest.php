@@ -344,4 +344,34 @@ final class CasePurchaseFlowTest extends WebTestCase
         $sheet = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/sections/{$section->getId()}/pull-sheet");
         self::assertCount(0, $sheet['rows']);
     }
+
+    /**
+     * Buying the last on-hand copy exhausts every case pool for that listing so
+     * Case Cards no longer offer a phantom remaining slot.
+     */
+    public function testLastInventoryCopyExhaustsCasePools(): void
+    {
+        [$store, $section, $item] = $this->storeWithCasedListing(stock: 1, pool: 1);
+        $this->placeOrder($store, $this->fixtures->user(['ROLE_USER']), $item->getId(), 1);
+
+        $this->em->clear();
+        $fresh = $this->em->getRepository(\App\Entity\InventoryItem::class)->find($item->getId());
+        self::assertSame(0, $fresh->getQuantity());
+
+        $pool = $this->em->getRepository(StoreSectionCard::class)->findOneBy(['section' => $section->getId()]);
+        self::assertNotNull($pool, 'pool row stays for pull-sheet / cancel restore');
+        self::assertSame(0, $pool->remaining(), 'case display has nothing left to sell');
+        self::assertSame($pool->getQuantity(), $pool->getSoldQuantity());
+    }
+
+    /** Over-allocated case slots also clear when the listing itself is gone. */
+    public function testLastInventoryCopyExhaustsOverAllocatedPool(): void
+    {
+        [$store, $section, $item] = $this->storeWithCasedListing(stock: 1, pool: 2);
+        $this->placeOrder($store, $this->fixtures->user(['ROLE_USER']), $item->getId(), 1);
+
+        $this->em->clear();
+        $pool = $this->em->getRepository(StoreSectionCard::class)->findOneBy(['section' => $section->getId()]);
+        self::assertSame(0, $pool->remaining(), 'phantom remaining slots are cleared when stock hits zero');
+    }
 }

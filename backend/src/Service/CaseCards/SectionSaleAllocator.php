@@ -18,6 +18,11 @@ use App\Repository\StoreSectionCardRepository;
  *
  * A line is attributed to at most ONE section (the first open pool in case /
  * section display order), keeping fulfillment paperwork unambiguous.
+ *
+ * When the listing's on-hand stock hits zero, every case pool for that listing
+ * is exhausted (soldQuantity = quantity) so Case Cards no longer show it.
+ * Rows stay in the database so open pull sheets and cancel/refund can restore
+ * the pool when stock comes back.
  */
 final class SectionSaleAllocator
 {
@@ -30,6 +35,8 @@ final class SectionSaleAllocator
     public function allocateLine(OrderLine $line, InventoryItem $item, int $quantity): void
     {
         if ($quantity < 1) {
+            $this->exhaustPoolsIfOutOfStock($item);
+
             return;
         }
 
@@ -47,8 +54,12 @@ final class SectionSaleAllocator
             $line->setSectionTitle($section?->getTitle());
             $line->setCaseName($section?->getStoreCase()?->getName());
 
-            return;
+            break;
         }
+
+        // Callers decrement InventoryItem before allocate — last copy sold means
+        // the listing must leave every case display.
+        $this->exhaustPoolsIfOutOfStock($item);
     }
 
     /**
@@ -63,5 +74,23 @@ final class SectionSaleAllocator
         }
 
         $pool->setSoldQuantity(max(0, $pool->getSoldQuantity() - $line->getCaseQuantity()));
+    }
+
+    /**
+     * Zero remaining on every case slot for a listing that no longer has stock.
+     * Keeps the row for pull-sheet / cancel restore; storefront + admin hide
+     * remaining === 0.
+     */
+    public function exhaustPoolsIfOutOfStock(InventoryItem $item): void
+    {
+        if ($item->getQuantity() > 0) {
+            return;
+        }
+
+        foreach ($this->sectionCards->findAllForItem($item) as $pool) {
+            if ($pool->remaining() > 0) {
+                $pool->setSoldQuantity($pool->getQuantity());
+            }
+        }
     }
 }

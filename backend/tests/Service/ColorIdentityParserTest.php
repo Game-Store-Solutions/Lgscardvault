@@ -58,6 +58,11 @@ final class ColorIdentityParserTest extends TestCase
         yield 'ub' => ['ub', 'UB'];
         yield 'gw reorders' => ['gw', 'WG'];
         yield 'rgb reorders' => ['rgb', 'BRG'];
+        // Human labels returned by the API (and shown in admin) must round-trip
+        yield 'label golgari' => ['Golgari (BG)', 'BG'];
+        yield 'label azorius' => ['Azorius (WU)', 'WU'];
+        yield 'label mono black' => ['Mono Black (B)', 'B'];
+        yield 'label five color' => ['Five-Color (WUBRG)', 'WUBRG'];
     }
 
     #[DataProvider('termProvider')]
