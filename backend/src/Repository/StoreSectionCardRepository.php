@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Store;
 use App\Entity\StoreSection;
 use App\Entity\StoreSectionCard;
+use App\Entity\InventoryItem;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -100,5 +101,22 @@ class StoreSectionCardRepository extends ServiceEntityRepository
         }
 
         return $allocations;
+    }
+
+    /**
+     * How many of this listing's on-hand copies are still free to allocate to
+     * a case section (optionally excluding one section — e.g. the one being
+     * edited, so its current claim can be resized without double-counting).
+     */
+    public function freeStockForItem(Store $store, InventoryItem $item, ?StoreSection $excludeSection = null): int
+    {
+        $itemId = $item->getId();
+        if (null === $itemId) {
+            return 0;
+        }
+
+        $claimedElsewhere = $this->remainingAllocatedByItem($store, $excludeSection)[$itemId] ?? 0;
+
+        return max(0, $item->getQuantity() - $claimedElsewhere);
     }
 }

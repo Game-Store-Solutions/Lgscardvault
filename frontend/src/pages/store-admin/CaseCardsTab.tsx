@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, Minus, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
 import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases, useStoreGames } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
@@ -19,6 +19,7 @@ import {
   dropdownItemClass,
   dropdownPanelClass,
 } from '../../components/ui'
+import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
 import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
 import { cx } from '../../lib/cx'
 
@@ -50,6 +51,122 @@ function colorFilterSelectValue(section: StoreSection): string {
   if (!code) return ''
   // Exact letter codes that aren't in the friendly list (e.g. custom WUB)
   return code
+}
+
+/** Unsold case copies of a listing claimed by every section except one. */
+function caseCopiesClaimedElsewhere(
+  cases: StoreCaseSummary[],
+  inventoryItemId: number,
+  excludeSectionId: number,
+): number {
+  let claimed = 0
+  for (const storeCase of cases) {
+    for (const section of storeCase.sections) {
+      if (section.id === excludeSectionId) continue
+      for (const entry of section.cards) {
+        if (entry.inventoryItem.id === inventoryItemId) {
+          claimed += entry.remaining
+        }
+      }
+    }
+  }
+  return claimed
+}
+
+/** How many on-hand copies can still be put in this section's pool. */
+function freeCaseCopies(
+  cases: StoreCaseSummary[],
+  inventoryItemId: number,
+  onHand: number,
+  excludeSectionId: number,
+): number {
+  return Math.max(0, onHand - caseCopiesClaimedElsewhere(cases, inventoryItemId, excludeSectionId))
+}
+
+/**
+ * "In case" stepper — digit slides with the click; parent keeps quantity
+ * optimistic so it never snaps 2→1→2 while the PATCH refetches.
+ */
+function CasePoolQuantityInput({
+  quantity,
+  min,
+  max,
+  pending,
+  onCommit,
+}: {
+  quantity: number
+  min: number
+  max: number
+  pending?: boolean
+  onCommit: (quantity: number) => void
+}) {
+  const [direction, setDirection] = useState<1 | -1>(1)
+  const atMin = quantity <= min
+  const atMax = quantity >= max
+  const locked = max < min
+
+  function step(delta: 1 | -1) {
+    const next = Math.min(max, Math.max(min, quantity + delta))
+    if (next === quantity || locked) return
+    setDirection(delta)
+    onCommit(next)
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 text-fg-muted">
+      <span className="shrink-0">In case</span>
+      <div className="flex items-center gap-0.5 rounded-btn border border-border bg-bg p-0.5">
+        <motion.button
+          type="button"
+          aria-label="Fewer copies in case"
+          disabled={locked || atMin}
+          whileTap={locked || atMin ? undefined : { scale: 0.88 }}
+          transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+          onClick={() => step(-1)}
+          className="grid size-7 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
+        >
+          <Minus className="size-3.5" aria-hidden />
+        </motion.button>
+        <span
+          className={cx(
+            'relative inline-grid h-7 min-w-8 place-items-center overflow-hidden text-center text-xs font-bold tabular-nums text-fg',
+            pending && 'opacity-70',
+          )}
+        >
+          <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+            <motion.span
+              key={quantity}
+              custom={direction}
+              variants={{
+                enter: (dir: 1 | -1) => ({ y: dir > 0 ? 16 : -16, opacity: 0 }),
+                center: { y: 0, opacity: 1 },
+                exit: (dir: 1 | -1) => ({ y: dir > 0 ? -16 : 16, opacity: 0 }),
+              }}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.28, ease: EASE_PREMIUM }}
+              className="col-start-1 row-start-1"
+            >
+              {quantity}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+        <motion.button
+          type="button"
+          aria-label="More copies in case"
+          disabled={locked || atMax}
+          title={atMax ? `Max ${max} from current on-hand stock` : undefined}
+          whileTap={locked || atMax ? undefined : { scale: 0.88 }}
+          transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+          onClick={() => step(1)}
+          className="grid size-7 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
+        >
+          <Plus className="size-3.5" aria-hidden />
+        </motion.button>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -119,7 +236,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
       ) : (
         <div className="space-y-8">
           {cases!.map((storeCase) => (
-            <CaseEditor key={storeCase.id} slug={slug} storeCase={storeCase} />
+            <CaseEditor key={storeCase.id} slug={slug} storeCase={storeCase} cases={cases!} />
           ))}
         </div>
       )}
@@ -127,7 +244,15 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
   )
 }
 
-function CaseEditor({ slug, storeCase }: { slug: string; storeCase: StoreCaseSummary }) {
+function CaseEditor({
+  slug,
+  storeCase,
+  cases,
+}: {
+  slug: string
+  storeCase: StoreCaseSummary
+  cases: StoreCaseSummary[]
+}) {
   const queryClient = useQueryClient()
   const invalidate = () => queryClient.invalidateQueries({ queryKey: storeCasesKey(slug) })
   const [title, setTitle] = useState('')
@@ -204,7 +329,7 @@ function CaseEditor({ slug, storeCase }: { slug: string; storeCase: StoreCaseSum
       ) : (
         <div className="space-y-6">
           {storeCase.sections.map((section) => (
-            <SectionEditor key={section.id} slug={slug} section={section} onChanged={invalidate} />
+            <SectionEditor key={section.id} slug={slug} section={section} cases={cases} onChanged={invalidate} />
           ))}
         </div>
       )}
@@ -215,12 +340,15 @@ function CaseEditor({ slug, storeCase }: { slug: string; storeCase: StoreCaseSum
 function SectionEditor({
   slug,
   section,
+  cases,
   onChanged,
 }: {
   slug: string
   section: StoreSection
+  cases: StoreCaseSummary[]
   onChanged: () => void
 }) {
+  const queryClient = useQueryClient()
   const [collapsed, setCollapsed] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pullSheetOpen, setPullSheetOpen] = useState(false)
@@ -268,7 +396,51 @@ function SectionEditor({
     mutationFn: async ({ cardId, quantity }: { cardId: number; quantity: number }) => {
       await api.patch(`/stores/${slug}/sections/${section.id}/items/${cardId}`, { quantity })
     },
-    onSuccess: onChanged,
+    onMutate: async ({ cardId, quantity: nextQty }) => {
+      const key = storeCasesKey(slug)
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData<StoreCaseSummary[]>(key)
+
+      queryClient.setQueryData<StoreCaseSummary[]>(key, (casesData) => {
+        if (!casesData) return casesData
+        return casesData.map((storeCase) => ({
+          ...storeCase,
+          sections: storeCase.sections.map((sec) => {
+            if (sec.id !== section.id) return sec
+            let availableDelta = 0
+            const cards = sec.cards.map((entry) => {
+              if (entry.id !== cardId) return entry
+              const nextQuantity = Math.max(entry.soldQuantity, nextQty)
+              const nextRemaining = Math.max(0, nextQuantity - entry.soldQuantity)
+              availableDelta += nextRemaining - entry.remaining
+              const toppedUp = nextQuantity > entry.quantity
+              return {
+                ...entry,
+                quantity: nextQuantity,
+                remaining: nextRemaining,
+                needsStocking: toppedUp ? true : entry.needsStocking,
+                stockedAt: toppedUp ? null : entry.stockedAt,
+              }
+            })
+            return {
+              ...sec,
+              cards,
+              availableQuantity: Math.max(0, sec.availableQuantity + availableDelta),
+            }
+          }),
+        }))
+      })
+
+      return { previous }
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(storeCasesKey(slug), context.previous)
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: storeCasesKey(slug) })
+    },
   })
 
   const autoFill = useMutation({
@@ -436,11 +608,13 @@ function SectionEditor({
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {visibleCards.map((entry) => {
               const card = entry.inventoryItem.card
-              const soldOut = entry.remaining === 0
+              const onHand = entry.inventoryItem.quantity ?? 0
+              const free = freeCaseCopies(cases, entry.inventoryItem.id, onHand, section.id)
+              const maxInCase = entry.soldQuantity + free
               return (
                 <li
                   key={entry.id}
-                  className={`relative flex gap-3 rounded-card border bg-surface p-2 ${soldOut ? 'border-warning-500/50 opacity-75' : 'border-border'}`}
+                  className={`relative flex gap-3 rounded-card border border-border bg-surface p-2 ${entry.remaining === 0 ? 'opacity-75' : ''}`}
                 >
                   {card && cardImage(card) && (
                     <img src={cardImage(card)} alt={card.name} className="h-16 w-12 flex-shrink-0 rounded object-cover" />
@@ -450,28 +624,21 @@ function SectionEditor({
                     <p className="text-xs text-fg-muted">
                       {card?.setCode?.toUpperCase()} · {formatPrice(entry.inventoryItem.priceCents)}
                     </p>
-                    <div className="mt-1 flex items-center gap-2 text-xs">
-                      <label className="flex items-center gap-1 text-fg-muted">
-                        In case
-                        <input
-                          type="number"
-                          min={entry.soldQuantity}
-                          defaultValue={entry.quantity}
-                          className="w-14 rounded-btn border border-border bg-surface px-1 py-0.5 text-fg"
-                          onBlur={(e) => {
-                            const next = Number(e.target.value)
-                            if (Number.isInteger(next) && next !== entry.quantity) {
-                              updatePool.mutate({ cardId: entry.id, quantity: next })
-                            }
-                          }}
-                        />
-                      </label>
-                      <span className={soldOut ? 'font-bold text-warning-700' : 'text-fg-muted'}>
-                        {soldOut ? 'Sold out' : `${entry.remaining} left`}
-                        {entry.soldQuantity > 0 ? ` · ${entry.soldQuantity} sold` : ''}
-                      </span>
-                      {entry.needsStocking && <Badge tone="warning">To stock</Badge>}
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                      <CasePoolQuantityInput
+                        quantity={entry.quantity}
+                        min={entry.soldQuantity}
+                        max={maxInCase}
+                        pending={updatePool.isPending && updatePool.variables?.cardId === entry.id}
+                        onCommit={(quantity) => updatePool.mutate({ cardId: entry.id, quantity })}
+                      />
+                      {entry.needsStocking && <Badge tone="warning">Needs stocking</Badge>}
                     </div>
+                    {updatePool.isError && updatePool.variables?.cardId === entry.id ? (
+                      <p className="mt-1 text-xs font-medium text-danger-700" role="alert">
+                        {extractErrorMessage(updatePool.error, 'Could not update case copies.')}
+                      </p>
+                    ) : null}
                   </div>
                   <button
                     type="button"
@@ -490,7 +657,13 @@ function SectionEditor({
       )}
 
       {pickerOpen && (
-        <InventoryPicker slug={slug} section={section} onClose={() => setPickerOpen(false)} onChanged={onChanged} />
+        <InventoryPicker
+          slug={slug}
+          section={section}
+          cases={cases}
+          onClose={() => setPickerOpen(false)}
+          onChanged={onChanged}
+        />
       )}
       {pullSheetOpen && (
         <PullSheetModal slug={slug} section={section} onClose={() => setPullSheetOpen(false)} />
@@ -850,11 +1023,13 @@ function escapeHtml(value: string): string {
 function InventoryPicker({
   slug,
   section,
+  cases,
   onClose,
   onChanged,
 }: {
   slug: string
   section: StoreSection
+  cases: StoreCaseSummary[]
   onClose: () => void
   onChanged: () => void
 }) {
@@ -863,6 +1038,7 @@ function InventoryPicker({
   const [query, setQuery] = useState('')
   const [pickedCard, setPickedCard] = useState<CardSummary | null>(null)
   const [typeaheadOpen, setTypeaheadOpen] = useState(false)
+  const [qtyByItem, setQtyByItem] = useState<Record<number, number>>({})
   const typeaheadRef = useRef<HTMLDivElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
   const debounced = useDebouncedValue(query.trim(), 300)
@@ -943,14 +1119,29 @@ function InventoryPicker({
   }, [searchPage?.items, inventoryQuery, pickedCard])
 
   const addMutation = useMutation({
-    mutationFn: async (inventoryItemId: number) => {
-      await api.post(`/stores/${slug}/sections/${section.id}/items`, { inventoryItemId })
+    mutationFn: async ({ inventoryItemId, quantity }: { inventoryItemId: number; quantity: number }) => {
+      await api.post(`/stores/${slug}/sections/${section.id}/items`, { inventoryItemId, quantity })
       return inventoryItemId
     },
     onSuccess: () => {
       onChanged()
     },
   })
+
+  function freeForListing(itemId: number, onHand: number | null | undefined): number {
+    return freeCaseCopies(cases, itemId, onHand ?? 0, section.id)
+  }
+
+  function quantityFor(itemId: number, free: number): number {
+    if (free < 1) return 1
+    const preferred = qtyByItem[itemId] ?? 1
+    return Math.min(free, Math.max(1, preferred))
+  }
+
+  function setQuantityFor(itemId: number, next: number, free: number) {
+    if (free < 1) return
+    setQtyByItem((prev) => ({ ...prev, [itemId]: Math.min(free, Math.max(1, next)) }))
+  }
 
   function pickCatalogCard(card: CardSummary) {
     setQuery(card.name)
@@ -976,6 +1167,8 @@ function InventoryPicker({
   const pickedImage = pickedCard ? cardImage(pickedCard) : undefined
   const primaryListing = results[0] ?? null
   const primaryAdded = primaryListing ? alreadyIn.has(primaryListing.id) : false
+  const primaryFree = primaryListing ? freeForListing(primaryListing.id, primaryListing.quantity) : 0
+  const primaryQty = primaryListing ? quantityFor(primaryListing.id, primaryFree) : 1
 
   return (
     <Modal
@@ -1069,7 +1262,7 @@ function InventoryPicker({
                 <p className="text-sm text-fg-muted">
                   {[pickedCard.setCode?.toUpperCase(), pickedCard.setName].filter(Boolean).join(' · ') || 'Catalog match'}
                   {primaryListing
-                    ? ` · ${primaryListing.card.setCode?.toUpperCase() ?? '—'} · ${formatPrice(primaryListing.priceCents)}${primaryListing.quantity != null ? ` · ${primaryListing.quantity} in stock` : ''}`
+                    ? ` · ${primaryListing.card.setCode?.toUpperCase() ?? '—'} · ${formatPrice(primaryListing.priceCents)} · ${primaryListing.quantity ?? 0} in stock · ${primaryFree} free for cases`
                     : ' · Choose a store listing below to add it to this case section.'}
                 </p>
                 {addMutation.isError && (
@@ -1079,15 +1272,30 @@ function InventoryPicker({
                 )}
               </div>
               <div className="flex shrink-0 flex-col items-stretch gap-2 self-center sm:items-end">
+                {primaryListing && !primaryAdded && primaryFree > 0 ? (
+                  <label className="flex items-center justify-end gap-2 text-sm text-fg-muted">
+                    Copies
+                    <input
+                      type="number"
+                      min={1}
+                      max={primaryFree}
+                      value={primaryQty}
+                      onChange={(e) => setQuantityFor(primaryListing.id, Number(e.target.value) || 1, primaryFree)}
+                      className="w-16 rounded-btn border border-border bg-surface px-2 py-1 text-fg"
+                    />
+                  </label>
+                ) : null}
                 {primaryListing && (
                   <Button
                     type="button"
                     variant={primaryAdded ? 'ghost' : 'primary'}
-                    disabled={primaryAdded}
-                    loading={addMutation.isPending && addMutation.variables === primaryListing.id}
-                    onClick={() => addMutation.mutate(primaryListing.id)}
+                    disabled={primaryAdded || primaryFree < 1}
+                    loading={addMutation.isPending && addMutation.variables?.inventoryItemId === primaryListing.id}
+                    onClick={() =>
+                      addMutation.mutate({ inventoryItemId: primaryListing.id, quantity: primaryQty })
+                    }
                   >
-                    {primaryAdded ? 'In case' : 'Add to case'}
+                    {primaryAdded ? 'In case' : primaryFree < 1 ? 'No free copies' : 'Add to case'}
                   </Button>
                 )}
                 <Button type="button" variant="ghost" size="sm" onClick={clearPickedCard}>
@@ -1123,6 +1331,8 @@ function InventoryPicker({
                 {results.map((item) => {
                   const added = alreadyIn.has(item.id)
                   const image = cardImage(item.card)
+                  const free = freeForListing(item.id, item.quantity)
+                  const qty = quantityFor(item.id, free)
                   return (
                     <li key={item.id} className="flex items-center gap-4 rounded-card border border-border bg-surface p-3">
                       {image ? (
@@ -1141,18 +1351,33 @@ function InventoryPicker({
                         <p className="text-sm text-fg-muted">
                           {item.card.setCode?.toUpperCase()} · {formatPrice(item.priceCents)}
                           {item.isFoil ? ` · ${item.finish}` : ''}
-                          {item.quantity != null ? ` · ${item.quantity} in stock` : ''}
+                          {` · ${item.quantity ?? 0} in stock · ${free} free for cases`}
                         </p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant={added ? 'ghost' : 'primary'}
-                        disabled={added}
-                        loading={addMutation.isPending && addMutation.variables === item.id}
-                        onClick={() => addMutation.mutate(item.id)}
-                      >
-                        {added ? 'In case' : 'Add to case'}
-                      </Button>
+                      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+                        {!added && free > 0 ? (
+                          <label className="flex items-center gap-1 text-xs text-fg-muted">
+                            Copies
+                            <input
+                              type="number"
+                              min={1}
+                              max={free}
+                              value={qty}
+                              onChange={(e) => setQuantityFor(item.id, Number(e.target.value) || 1, free)}
+                              className="w-14 rounded-btn border border-border bg-surface px-1 py-0.5 text-fg"
+                            />
+                          </label>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant={added ? 'ghost' : 'primary'}
+                          disabled={added || free < 1}
+                          loading={addMutation.isPending && addMutation.variables?.inventoryItemId === item.id}
+                          onClick={() => addMutation.mutate({ inventoryItemId: item.id, quantity: qty })}
+                        >
+                          {added ? 'In case' : free < 1 ? 'No free copies' : 'Add to case'}
+                        </Button>
+                      </div>
                     </li>
                   )
                 })}

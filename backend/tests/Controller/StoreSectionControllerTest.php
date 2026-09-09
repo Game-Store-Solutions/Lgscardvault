@@ -142,6 +142,56 @@ final class StoreSectionControllerTest extends WebTestCase
         self::assertSame(3, $body['cards'][0]['quantity']);
     }
 
+    public function testManualAddRejectsPoolLargerThanInventory(): void
+    {
+        $store = $this->fixtures->store();
+        $case = $this->fixtures->storeCase($store);
+        $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(102), 2);
+        $this->authenticate($store->getOwner());
+        $section = $this->createSection($store, $case, 'Tight');
+
+        $body = $this->jsonRequest(
+            'POST',
+            "/api/stores/{$store->getSlug()}/sections/{$section->getId()}/items",
+            ['inventoryItemId' => $item->getId(), 'quantity' => 3],
+        );
+
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('at most 2', $body['detail']);
+    }
+
+    public function testManualUpdateRejectsPoolBeyondFreeStock(): void
+    {
+        $store = $this->fixtures->store();
+        $case = $this->fixtures->storeCase($store);
+        $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(103), 3);
+        $this->authenticate($store->getOwner());
+        $sectionA = $this->createSection($store, $case, 'A');
+        $sectionB = $this->createSection($store, $case, 'B');
+
+        $this->jsonRequest(
+            'POST',
+            "/api/stores/{$store->getSlug()}/sections/{$sectionA->getId()}/items",
+            ['inventoryItemId' => $item->getId(), 'quantity' => 2],
+        );
+        $body = $this->jsonRequest(
+            'POST',
+            "/api/stores/{$store->getSlug()}/sections/{$sectionB->getId()}/items",
+            ['inventoryItemId' => $item->getId(), 'quantity' => 1],
+        );
+        self::assertResponseIsSuccessful();
+        $cardId = $body['cards'][0]['id'];
+
+        // Section B already has the last free copy; cannot grow further.
+        $body = $this->jsonRequest(
+            'PATCH',
+            "/api/stores/{$store->getSlug()}/sections/{$sectionB->getId()}/items/{$cardId}",
+            ['quantity' => 2],
+        );
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('at most 1', $body['detail']);
+    }
+
     /**
      * Stocking sheet lifecycle: freshly added pool cards need physical
      * placement, the sheet lists them with their copy counts, marking stocked

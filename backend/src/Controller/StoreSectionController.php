@@ -221,6 +221,13 @@ final class StoreSectionController extends AbstractController
                 continue;
             }
 
+            $free = $this->sectionCardRepository->freeStockForItem($store, $item, $section);
+            if ($poolQuantity > $free) {
+                return $this->json([
+                    'detail' => $this->poolOverAllocateMessage($item, $poolQuantity, $free, $store, $section),
+                ], 422);
+            }
+
             $section->addCard($this->makeCard($item, $position++, $poolQuantity));
             $existing[$itemId] = true;
             ++$added;
@@ -251,9 +258,30 @@ final class StoreSectionController extends AbstractController
 
         foreach ($section->getCards() as $card) {
             if ($card->getId() === $cardId) {
+                $store = $section->getStore();
+                if (!$store instanceof Store) {
+                    return $this->json(['detail' => 'Section is not attached to a store.'], 409);
+                }
+
+                $item = $card->getInventoryItem();
+                if (!$item instanceof InventoryItem) {
+                    return $this->json(['detail' => 'Case card is missing its inventory listing.'], 409);
+                }
+
+                $requested = (int) $payload['quantity'];
+                $sold = $card->getSoldQuantity();
+                // Exclude this section so its current claim can be resized.
+                $free = $this->sectionCardRepository->freeStockForItem($store, $item, $section);
+                $maxQuantity = $sold + $free;
+                if ($requested > $maxQuantity) {
+                    return $this->json([
+                        'detail' => $this->poolOverAllocateMessage($item, $requested, $maxQuantity, $store, $section),
+                    ], 422);
+                }
+
                 // Never shrink below what's already sold — history must stay consistent.
                 $previous = $card->getQuantity();
-                $card->setQuantity(max($card->getSoldQuantity(), (int) $payload['quantity']));
+                $card->setQuantity(max($sold, $requested));
                 if ($card->getQuantity() > $previous) {
                     // A top-up means more physical copies belong in the case.
                     $card->setStockedAt(null);
@@ -661,6 +689,43 @@ final class StoreSectionController extends AbstractController
         $card->setQuantity($poolQuantity);
 
         return $card;
+    }
+
+    /**
+     * Explain why a pool size was rejected: case copies cannot exceed free
+     * inventory after other sections' unsold claims.
+     */
+    private function poolOverAllocateMessage(
+        InventoryItem $item,
+        int $requested,
+        int $maxAllowed,
+        Store $store,
+        StoreSection $section,
+    ): string {
+        $itemId = $item->getId() ?? 0;
+        $claimedElsewhere = $this->sectionCardRepository->remainingAllocatedByItem($store, $section)[$itemId] ?? 0;
+        $onHand = $item->getQuantity();
+
+        if ($maxAllowed < 1) {
+            if ($onHand < 1) {
+                return 'This listing has no copies in inventory, so it cannot be allocated to a case yet.';
+            }
+
+            return sprintf(
+                'All %d in-stock %s of this listing already allocated to other case sections.',
+                $onHand,
+                1 === $onHand ? 'copy is' : 'copies are',
+            );
+        }
+
+        return sprintf(
+            'Cannot put %d cop%s in this section — at most %d available (%d in stock, %d already in other case sections).',
+            $requested,
+            1 === $requested ? 'y' : 'ies',
+            $maxAllowed,
+            $onHand,
+            $claimedElsewhere,
+        );
     }
 
     private function findManagedStore(string $slug): ?Store

@@ -513,7 +513,7 @@ export type StoreSectionMode = 'manual' | 'auto'
 export interface StoreSectionCard {
   id: number
   position: number
-  /** Copies allocated to this section's pool. */
+  /** Copies allocated to this section's pool (capped by free inventory stock). */
   quantity: number
   /** Copies sold out of the pool. */
   soldQuantity: number
