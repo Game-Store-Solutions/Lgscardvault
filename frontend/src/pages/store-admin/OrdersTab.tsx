@@ -11,6 +11,7 @@ import {
   Package,
   PackageCheck,
   Plus,
+  Minus,
   Printer,
   Banknote,
   ReceiptText,
@@ -43,10 +44,13 @@ import {
 } from '../../lib/orderManagementUi'
 import { formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
 import { printOrderSheet } from '../../lib/printOrderSheet'
+import { rankInventorySearch } from '../../lib/rankInventorySearch'
+import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
 
 const PAGE_SIZE = 8
 /** Keeps pagination from jumping when the last page has fewer rows. */
 const ORDER_TABLE_ROW_H = 'h-[4.75rem]'
+const ADD_CARD_SEARCH_MIN = 2
 
 function tabQueueCount(
   tabId: OrderListTab,
@@ -940,14 +944,16 @@ function OrderDetailModal({
   const [addQuery, setAddQuery] = useState('')
   const [lineError, setLineError] = useState('')
   const [busyLineId, setBusyLineId] = useState<number | null>(null)
-  const addTerm = useDebouncedValue(addQuery, 200)
+  const addTerm = useDebouncedValue(addQuery, 150)
+  const addSearchReady = addTerm.trim().length >= ADD_CARD_SEARCH_MIN
   const { data: addSearch, isFetching: addSearching } = useInventoryPage(slug, {
     q: addTerm.trim(),
     inStockOnly: true,
-    itemsPerPage: 8,
-    enabled: canEdit && addTerm.trim() !== '',
+    itemsPerPage: 24,
+    enabled: canEdit && addSearchReady,
+    keepPreviousData: false,
   })
-  const addResults = addTerm.trim() === '' ? [] : (addSearch?.items ?? [])
+  const addResults = addSearchReady ? rankInventorySearch(addSearch?.items ?? [], addTerm) : []
   const creditOwed = orderCreditOwedCents(order)
   const capturedOnline = (order.paidCents ?? 0) > 0
   const paypalOrder = order.paymentProvider === 'paypal'
@@ -980,16 +986,15 @@ function OrderDetailModal({
   }
 
   const addLine = useMutation({
-    mutationFn: async (item: InventoryItem) => {
+    mutationFn: async ({ item, quantity }: { item: InventoryItem; quantity: number }) => {
       const { data } = await api.post<Order>(`/stores/${slug}/orders/${order.id}/lines`, {
         inventoryItemId: item.id,
-        quantity: 1,
+        quantity,
       })
       return data
     },
     onSuccess: (updated) => {
       setLineError('')
-      setAddQuery('')
       persistOrder(updated)
     },
     onError: (err) => setLineError(extractErrorMessage(err, 'Could not add that card.')),
@@ -1159,42 +1164,74 @@ function OrderDetailModal({
           {canEdit ? (
             <div className="mt-4 space-y-2">
               <Input
-                label="Add a card"
+                label="Add cards"
                 value={addQuery}
                 onChange={(e) => setAddQuery(e.target.value)}
-                placeholder="Search in-stock inventory…"
+                placeholder="Search by card name or set…"
               />
-              {addSearching ? <p className="text-xs text-fg-muted">Searching…</p> : null}
-              {addResults.length > 0 ? (
-                <ul className="max-h-48 space-y-1 overflow-y-auto">
-                  {addResults.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        disabled={addLine.isPending}
-                        onClick={() => addLine.mutate(item)}
-                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-2 text-left transition-colors hover:border-brand-300 disabled:opacity-50"
+              {addQuery.trim().length > 0 && addQuery.trim().length < ADD_CARD_SEARCH_MIN ? (
+                <p className="text-xs text-fg-muted">Type at least {ADD_CARD_SEARCH_MIN} characters.</p>
+              ) : null}
+              <AnimatePresence mode="wait" initial={false}>
+                {addSearching ? (
+                  <motion.p
+                    key="searching"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                    className="text-xs text-fg-muted"
+                  >
+                    Searching…
+                  </motion.p>
+                ) : addResults.length > 0 ? (
+                  <motion.ul
+                    key={`results-${addTerm.trim().toLowerCase()}`}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                    className="max-h-64 space-y-1 overflow-y-auto"
+                  >
+                    {addResults.map((item, index) => (
+                      <motion.li
+                        key={item.id}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.14, ease: EASE_PREMIUM, delay: Math.min(index, 8) * 0.02 }}
                       >
-                        {cardImage(item.card) && (
-                          <img src={cardImage(item.card)} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-fg">{item.card.name}</span>
-                          <span className="block text-xs text-fg-muted">
-                            {item.card.setCode?.toUpperCase()} · {item.condition}
-                            {item.isFoil ? ` · ${item.finish}` : ''} · {item.quantity} in stock
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-sm font-bold text-fg">{formatPrice(item.priceCents)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : addQuery.trim() && !addSearching ? (
-                <p className="text-xs text-fg-muted">No in-stock matches.</p>
-              ) : (
-                <p className="text-xs text-fg-muted">Search inventory to add a card. Stock is pulled from the listing immediately.</p>
-              )}
+                        <AddInventoryResultRow
+                          item={item}
+                          busy={addLine.isPending}
+                          onAdd={(quantity) => addLine.mutate({ item, quantity })}
+                        />
+                      </motion.li>
+                    ))}
+                  </motion.ul>
+                ) : addSearchReady ? (
+                  <motion.p
+                    key="empty"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                    className="text-xs text-fg-muted"
+                  >
+                    No in-stock matches.
+                  </motion.p>
+                ) : addQuery.trim().length === 0 ? (
+                  <motion.p
+                    key="hint"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                    className="text-xs text-fg-muted"
+                  >
+                    Search by name (e.g. Sol Ring), set a quantity, then add. You can keep adding from the same results.
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
             </div>
           ) : (
             <p className="mt-3 text-xs text-fg-muted">Cards can be added or removed until the order is delivered, cancelled, or refunded.</p>
@@ -1246,6 +1283,92 @@ function OrderDetailModal({
   )
 }
 
+function AddInventoryResultRow({
+  item,
+  busy,
+  onAdd,
+}: {
+  item: InventoryItem
+  busy: boolean
+  onAdd: (quantity: number) => void
+}) {
+  const maxQty = Math.max(1, item.quantity)
+  const [qty, setQty] = useState(1)
+
+  useEffect(() => {
+    setQty((current) => Math.min(Math.max(1, current), maxQty))
+  }, [maxQty, item.id])
+
+  return (
+    <motion.div
+      layout
+      className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-2 transition-colors hover:border-brand-300 sm:flex-row sm:items-center sm:gap-3"
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {cardImage(item.card) ? (
+          <img src={cardImage(item.card)} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
+        ) : null}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-bold text-fg">{item.card.name}</span>
+          <span className="block text-xs text-fg-muted">
+            {item.card.setCode?.toUpperCase()} · {item.condition}
+            {item.isFoil ? ` · ${item.finish}` : ''} · {item.quantity} in stock
+          </span>
+        </span>
+        <span className="shrink-0 text-sm font-bold text-fg">{formatPrice(item.priceCents)}</span>
+      </div>
+      <div className="flex items-center justify-end gap-2 pl-[3.25rem] sm:pl-0">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-bg p-0.5">
+          <motion.button
+            type="button"
+            aria-label={`Decrease quantity for ${item.card.name}`}
+            disabled={busy || qty <= 1}
+            whileTap={busy || qty <= 1 ? undefined : { scale: 0.9 }}
+            onClick={() => setQty((current) => Math.max(1, current - 1))}
+            className="grid size-8 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
+          >
+            <Minus className="size-3.5" aria-hidden />
+          </motion.button>
+          <span className="relative inline-grid min-w-6 place-items-center overflow-hidden text-center text-sm font-bold tabular-nums text-fg">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={qty}
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -10, opacity: 0 }}
+                transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                className="col-start-1 row-start-1"
+              >
+                {qty}
+              </motion.span>
+            </AnimatePresence>
+          </span>
+          <motion.button
+            type="button"
+            aria-label={`Increase quantity for ${item.card.name}`}
+            disabled={busy || qty >= maxQty}
+            whileTap={busy || qty >= maxQty ? undefined : { scale: 0.9 }}
+            onClick={() => setQty((current) => Math.min(maxQty, current + 1))}
+            className="grid size-8 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
+          >
+            <Plus className="size-3.5" aria-hidden />
+          </motion.button>
+        </div>
+        <motion.div whileTap={busy || item.quantity < 1 ? undefined : { scale: 0.97 }}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy || item.quantity < 1}
+            onClick={() => onAdd(qty)}
+          >
+            Add
+          </Button>
+        </motion.div>
+      </div>
+    </motion.div>
+  )
+}
+
 interface KioskLine {
   item: InventoryItem
   quantity: number
@@ -1254,7 +1377,7 @@ interface KioskLine {
 function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void }) {
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
-  const debounced = useDebouncedValue(query, 200)
+  const debounced = useDebouncedValue(query, 150)
   const [lines, setLines] = useState<KioskLine[]>([])
   const [kioskUserId, setKioskUserId] = useState('')
   const [created, setCreated] = useState<Order | null>(null)
@@ -1263,13 +1386,15 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
   // entire inventory (paged 500 rows at a time) before the first keystroke could
   // match anything.
   const term = debounced.trim()
+  const searchReady = term.length >= ADD_CARD_SEARCH_MIN
   const { data: searchPage, isFetching: isLoading } = useInventoryPage(slug, {
     q: term,
     inStockOnly: true,
-    itemsPerPage: 12,
-    enabled: term !== '',
+    itemsPerPage: 24,
+    enabled: searchReady,
+    keepPreviousData: false,
   })
-  const results = term === '' ? [] : (searchPage?.items ?? [])
+  const results = searchReady ? rankInventorySearch(searchPage?.items ?? [], term) : []
 
   const totalCents = lines.reduce((sum, line) => sum + line.item.priceCents * line.quantity, 0)
 
@@ -1362,7 +1487,9 @@ function KioskOrderModal({ slug, onClose }: { slug: string; onClose: () => void 
               </li>
             ))}
           </ul>
-        ) : query.trim() ? (
+        ) : query.trim().length > 0 && query.trim().length < ADD_CARD_SEARCH_MIN ? (
+          <p className="text-xs text-fg-muted">Type at least {ADD_CARD_SEARCH_MIN} characters.</p>
+        ) : searchReady ? (
           <EmptyState icon={Search} title="No in-stock matches" description="Try a different name." />
         ) : null}
 
