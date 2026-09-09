@@ -150,7 +150,7 @@ export default function FixFailedCardsPage() {
   if (isLoading) return <LoadingPanel label="Loading failed cards..." />
   if (isError || !data) {
     return (
-      <Card flat>
+      <Card>
         <CardBody>
           <EmptyState title="Could not load this import" description="Refresh and try again." />
         </CardBody>
@@ -243,7 +243,7 @@ export default function FixFailedCardsPage() {
       )}
 
       {outstanding === 0 && data.counts.skipped === 0 ? (
-        <Card flat>
+        <Card>
           <CardBody>
             <EmptyState
               title="Nothing left to fix"
@@ -252,7 +252,7 @@ export default function FixFailedCardsPage() {
           </CardBody>
         </Card>
       ) : (
-        <div className="overflow-hidden border border-border bg-surface lg:grid lg:h-[calc(100vh-11rem)] lg:grid-cols-[20rem_minmax(0,1fr)]">
+        <div className="overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-black/[0.04] dark:ring-white/10 lg:grid lg:h-[calc(100vh-11rem)] lg:grid-cols-[20rem_minmax(0,1fr)]">
           <aside className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r lg:border-border">
             <RecoveryQueueRail
               rows={visibleRows}

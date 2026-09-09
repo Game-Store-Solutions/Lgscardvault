@@ -105,7 +105,7 @@ export default function TeamTab({ slug }: { slug: string }) {
   return (
     <div className="space-y-6">
       {canEdit && (
-        <Card flat>
+        <Card>
           <CardHeader
             title="Add an employee"
             subtitle="Set a password for new accounts. Admin access opens the store dashboard."

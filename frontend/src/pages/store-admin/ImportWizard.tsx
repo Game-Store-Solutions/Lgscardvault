@@ -107,7 +107,7 @@ export default function ImportWizard({
   const sealed = 'sealed' === importType
 
   return (
-    <Card flat>
+    <Card>
       <CardHeader
         title="Import inventory"
         subtitle="Pick a game and what you're importing, upload the sheet, review the preview, then import."
@@ -130,7 +130,7 @@ export default function ImportWizard({
                 {index + 1}
               </span>
               <span className={index <= step ? 'text-fg' : 'text-fg-muted'}>{label}</span>
-              {index < STEPS.length - 1 && <span aria-hidden className="text-fg-muted">â†’</span>}
+              {index < STEPS.length - 1 && <span aria-hidden className="text-fg-muted">→</span>}
             </li>
           ))}
         </ol>

@@ -6,8 +6,6 @@ import { cx } from '../../lib/cx'
 export type CardProps = HTMLAttributes<HTMLDivElement> & {
   /** Opt out of the scroll-in entrance (e.g. inside an already-animated list). */
   animateIn?: boolean
-  /** Border-only panel (profile-style admin). No soft shadow or ring. */
-  flat?: boolean
 }
 
 /**
@@ -20,7 +18,7 @@ export type CardProps = HTMLAttributes<HTMLDivElement> & {
  * until the user scrolled or reloaded. Cards carry the app's actual content, so
  * they must never depend on that.
  */
-export function Card({ className, animateIn = true, flat = false, ...props }: CardProps) {
+export function Card({ className, animateIn = true, ...props }: CardProps) {
   const entrance = animateIn
     ? {
         initial: { opacity: 0, y: 12 },
@@ -32,10 +30,7 @@ export function Card({ className, animateIn = true, flat = false, ...props }: Ca
   return (
     <motion.div
       className={cx(
-        'bg-surface',
-        flat
-          ? 'rounded-none border border-border shadow-none ring-0'
-          : 'rounded-card shadow-card ring-[length:var(--store-border-width)] ring-black/[0.04] dark:ring-white/10',
+        'rounded-card bg-surface shadow-card ring-[length:var(--store-border-width)] ring-black/[0.04] dark:ring-white/10',
         className,
       )}
       {...entrance}

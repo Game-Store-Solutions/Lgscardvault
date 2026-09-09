@@ -21,7 +21,7 @@ const STORE_SALES_CHECKOUT_COPY = 'Customer checkout through these accounts.'
 const SALES_CHECKOUT_METHODS_TIP =
   'Store sales checkout only supports Square and PayPal. The nightly debit card cannot be used for customer checkout.'
 const NIGHTLY_PAYMENT_COPY =
-  'Nightly fees charge a debit card (or PayPal) on our platform account. Square here means enter that debit card through Square, not your store’s Square sales Connect.'
+  'Nightly fees charge a debit card (or PayPal) on our platform account. Square here means enter that debit card through Square — not your store’s Square sales Connect.'
 type BuyoutRequest = {
   amountCents?: number
   source: ChargeSource
@@ -376,7 +376,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
 
   if (error) {
     return (
-      <div className="border border-border bg-surface">
+      <div className="rounded-card border border-border bg-surface">
         <ErrorState title="Could not load payments" description="Payment connections could not be loaded." onRetry={() => void refetch()} />
       </div>
     )
@@ -642,7 +642,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
             ) : (
               <p className="text-sm leading-6 text-fg-muted">
                 {sub.paymentLast4
-                  ? `Debit card •••• ${sub.paymentLast4} is on file. That is what we charge nightly. Use the pencil to replace it.`
+                  ? `Debit card •••• ${sub.paymentLast4} is on file — that is what we charge nightly. Use the pencil to replace it.`
                   : 'Use the pencil on Debit card to enter the card we charge nightly.'}
               </p>
             )}
@@ -702,7 +702,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
           ) : null}
 
           {sub.canBuyout ? (
-            <div className="space-y-4 border border-border bg-surface px-4 py-4">
+            <div className="space-y-4 rounded-card border border-border bg-surface px-4 py-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-fg">Pay toward this month</p>
@@ -859,7 +859,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
           ) : null}
           {chargeSource === 'vault' && !sub?.paymentConfigured ? (
             <p className="text-sm text-fg-muted">
-              Save a debit card (via Square) or vault PayPal first. That is what we charge.
+              Save a debit card (via Square) or vault PayPal first — that is what we charge.
             </p>
           ) : null}
           {buyoutError ? (
@@ -1167,7 +1167,7 @@ function UsageProgress({
   const chargesNightlyFees = sub.billingModel === 'usage' && !sub.capReached
 
   return (
-    <div className="border border-border bg-surface px-4 py-4">
+    <div className="rounded-card border border-border bg-surface px-4 py-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <p className="text-sm font-semibold text-fg">Progress to {formatPrice(cap || 45000)}</p>
         <p className="text-sm tabular-nums text-fg-muted">
@@ -1263,7 +1263,7 @@ function UsageProgress({
           {formatFeePercent(sub.todayFeePercent)} of today&apos;s store sales
           {sub.todayGrossCents > 0 ? ` (${formatPrice(sub.todayGrossCents)})` : ''}
           {' '}will be charged tonight to {feeLabel}
-          {sub.todayFeeCents > 0 ? ` (${formatPrice(sub.todayFeeCents)})` : sub.todayGrossCents < 1 ? ' once you make a sale' : ''}
+          {sub.todayFeeCents > 0 ? ` — ${formatPrice(sub.todayFeeCents)}` : sub.todayGrossCents < 1 ? ' once you make a sale' : ''}
           {sub.currentPeriodEnd && sub.willAutoChargeRemainder
             ? `. Remaining balance auto-charges on ${formatPeriodEnd(sub.currentPeriodEnd)}.`
             : '.'}
@@ -1449,7 +1449,7 @@ function DisabledSalesCardRow() {
       <CenteredBrandIcon brand="card" />
       <div className="min-w-0 flex-1">
         <p className="font-medium text-fg">Debit card</p>
-        <p className="text-xs text-fg-muted">Nightly fees only, not store sales checkout</p>
+        <p className="text-xs text-fg-muted">Nightly fees only — not store sales checkout</p>
       </div>
       <HelpTip label={SALES_CHECKOUT_METHODS_TIP} />
     </div>

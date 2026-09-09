@@ -37,7 +37,7 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
           onEdit()
         }
       }}
-      className="group flex cursor-pointer gap-4 border border-border bg-surface p-4 transition-colors duration-200 hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      className="group flex cursor-pointer gap-4 rounded-card border border-border bg-surface p-4 shadow-card transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_16px_40px_-16px_rgb(16_24_40_/0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
       <div
         className={cx('relative h-40 w-[7rem] flex-shrink-0 overflow-hidden rounded-btn border-2 bg-black/90', item.isFoil && 'foil-card')}

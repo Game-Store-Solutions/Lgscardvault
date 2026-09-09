@@ -20,7 +20,7 @@ import {
 } from '../../lib/reports'
 import type { RevenueChartType } from '../../components/reports/ReportCharts'
 import { DateRangeCalendar } from '../../components/reports/DateRangeCalendar'
-import { AnimatePresence, EASE_PREMIUM, motion, Reveal, Stagger, StaggerItem } from '../../components/motion'
+import { AnimatePresence, EASE_PREMIUM, HoverLift, motion, Reveal, Stagger, StaggerItem } from '../../components/motion'
 import { cx } from '../../lib/cx'
 import {
   Card,
@@ -77,11 +77,15 @@ function ChartFallback({ label = 'Loading chart…' }: { label?: string }) {
 
 function MetricCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="border border-border bg-surface px-5 py-4">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-fg-muted">{label}</p>
-      <p className="mt-2 font-display text-2xl font-extrabold tabular-nums text-fg">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-fg-muted">{hint}</p> : null}
-    </div>
+    <HoverLift>
+      <Card>
+        <CardBody>
+          <p className="text-sm text-fg-muted">{label}</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-fg">{value}</p>
+          {hint && <p className="mt-1 text-xs text-fg-muted">{hint}</p>}
+        </CardBody>
+      </Card>
+    </HoverLift>
   )
 }
 
@@ -181,7 +185,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
 
   if (endpointMissing) {
     return (
-      <Card flat>
+      <Card>
         <CardBody>
           <EmptyState
             icon={TrendingUp}
@@ -224,7 +228,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
       </Reveal>
 
       <Reveal immediate delay={0.04} y={12}>
-        <Card flat>
+        <Card>
           <CardBody className="space-y-4">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Date range preset">
               {PRESETS.map((item) => (
@@ -235,9 +239,9 @@ export default function ReportsTab({ slug }: { slug: string }) {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.18, ease: EASE_PREMIUM }}
                   className={cx(
-                    'rounded-btn border px-3 py-1.5 text-sm font-semibold transition-colors',
+                    'rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors',
                     preset === item.id
-                      ? 'border-brand-700 bg-brand-700 text-white'
+                      ? 'border-brand-500 bg-brand-500 text-white shadow-sm'
                       : 'border-border bg-surface text-fg-muted hover:border-brand-400 hover:text-fg',
                   )}
                 >
@@ -302,10 +306,12 @@ export default function ReportsTab({ slug }: { slug: string }) {
         <div className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="border border-border bg-surface px-5 py-4 space-y-3">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-32" />
-              </div>
+              <Card key={i}>
+                <CardBody className="space-y-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-32" />
+                </CardBody>
+              </Card>
             ))}
           </div>
           <LoadingPanel label="Loading reports…" />
@@ -385,7 +391,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.28, ease: EASE_PREMIUM }}
                 >
-                  <Card flat className="border-dashed">
+                  <Card className="border-dashed">
                     <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm text-fg-muted">
                         Optional: turn on profit metrics if you track what you paid for inventory (&ldquo;your
@@ -402,7 +408,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
 
             <Suspense fallback={<ChartFallback />}>
               <section className="grid gap-6 xl:grid-cols-2">
-                <Card flat>
+                <Card>
                   <CardHeader
                     title="Revenue over time"
                     subtitle={
@@ -450,7 +456,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
                   </CardBody>
                 </Card>
 
-                <Card flat>
+                <Card>
                   <CardHeader title="Sales by channel" subtitle="Revenue-generating orders only" />
                   <CardBody>
                     <DonutChart
@@ -466,7 +472,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
               </section>
 
               <section className="mt-6 grid gap-6 xl:grid-cols-2">
-                <Card flat>
+                <Card>
                   <CardHeader
                     title="Top sellers"
                     subtitle={
@@ -528,7 +534,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
                   </CardBody>
                 </Card>
 
-                <Card flat>
+                <Card>
                   <CardHeader title="Orders by status" subtitle="Total value per status in range" />
                   <CardBody>
                     <StatusBarChart rows={statusChartRows} />
@@ -541,10 +547,10 @@ export default function ReportsTab({ slug }: { slug: string }) {
                 </Card>
               </section>
 
-              <Card flat className="mt-6">
+              <Card className="mt-6">
                 <CardHeader
                   title="Most wanted cards"
-                  subtitle="From customer want lists at this store. Demand signal for buying and stocking"
+                  subtitle="From customer want lists at this store — demand signal for buying and stocking"
                   actions={
                     <Button
                       variant="secondary"
@@ -582,7 +588,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
               </Card>
             </Suspense>
 
-            <Card flat>
+            <Card>
               <CardHeader title="Recent orders in range" />
               <CardBody className="p-0">
                 <Table>

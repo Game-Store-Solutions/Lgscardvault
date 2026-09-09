@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   EllipsisVertical,
   Monitor,
   Package,
@@ -20,6 +21,7 @@ import {
   Search,
   X,
   XCircle,
+  type LucideIcon,
 } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, httpStatus } from '../../api/client'
 import type { InventoryItem, Order, OrderChannel, OrderLine, OrderStatus } from '../../api/types'
@@ -296,12 +298,12 @@ function PendingAcceptQueue({
   if (totalCount <= 0 || orders.length === 0) return null
 
   return (
-    <section className="min-w-0 overflow-hidden border border-border bg-surface">
+    <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:gap-4 sm:px-5 sm:py-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h2 className="text-lg font-extrabold tracking-tight text-fg">New orders</h2>
-            <span className="text-sm font-bold tabular-nums text-fg-muted">
+            <h2 className="text-base font-bold text-fg sm:text-lg">New orders</h2>
+            <span className="grid h-6 min-w-6 place-items-center rounded-full bg-brand-700 px-1.5 text-[11px] font-bold tabular-nums leading-none text-brand-100">
               {totalCount > 99 ? '99+' : totalCount}
             </span>
           </div>
@@ -564,15 +566,9 @@ export default function OrdersTab({ slug }: { slug: string }) {
 
   return (
     <div className="-mt-4 w-full min-w-0 space-y-5 pb-10 pt-2 sm:space-y-6">
-      <header className="min-w-0 border-b border-border pb-5">
+      <header className="min-w-0">
         <h1 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Order Management</h1>
-        <p className="mt-1 text-sm text-fg-muted">Today’s order totals and live queue, compared to yesterday.</p>
-        <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-          <OrderStat label="Orders today" value={String(stats.newOrders)} trend={stats.newTrend} />
-          <OrderStat label="Pending today" value={String(stats.pending)} trend={stats.pendingTrend} trendNegative />
-          <OrderStat label="Ready / delivered" value={String(stats.fulfilled)} trend={stats.fulfilledTrend} />
-          <OrderStat label="Canceled today" value={String(stats.canceled)} trend={stats.canceledTrend} trendNegative />
-        </dl>
+        <p className="mt-1 text-sm text-fg-muted">Today’s order totals and live queue — compared to yesterday.</p>
       </header>
 
       {updateStatus.isError && (
@@ -580,6 +576,39 @@ export default function OrdersTab({ slug }: { slug: string }) {
           {extractErrorMessage(updateStatus.error, 'Could not update order status.')}
         </p>
       )}
+
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+        <StatCard
+          icon={ClipboardList}
+          iconClass="bg-brand-50 text-brand-600"
+          label="Orders today"
+          value={String(stats.newOrders)}
+          trend={stats.newTrend}
+        />
+        <StatCard
+          icon={Package}
+          iconClass="bg-warning-50 text-warning-700"
+          label="Pending today"
+          value={String(stats.pending)}
+          trend={stats.pendingTrend}
+          trendNegative
+        />
+        <StatCard
+          icon={CheckCircle2}
+          iconClass="bg-success-50 text-success-700"
+          label="Ready / delivered today"
+          value={String(stats.fulfilled)}
+          trend={stats.fulfilledTrend}
+        />
+        <StatCard
+          icon={XCircle}
+          iconClass="bg-danger-50 text-danger-700"
+          label="Canceled today"
+          value={String(stats.canceled)}
+          trend={stats.canceledTrend}
+          trendNegative
+        />
+      </div>
 
       {showNeedsAccept ? (
         <PendingAcceptQueue
@@ -596,9 +625,9 @@ export default function OrdersTab({ slug }: { slug: string }) {
         />
       ) : null}
 
-      <section ref={ordersListRef} className="min-w-0 border border-border bg-surface">
-        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-5">
-          <h2 className="text-lg font-extrabold tracking-tight text-fg">Orders</h2>
+      <section ref={ordersListRef} className="min-w-0 rounded-card border border-border bg-surface shadow-card">
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-5">
+          <h2 className="text-base font-bold text-fg sm:text-lg">Orders</h2>
           <Button size="sm" className="w-full sm:w-auto" onClick={() => setKioskOpen(true)}>
             <Plus aria-hidden className="size-4" />
             Add Order
@@ -805,12 +834,16 @@ function OrdersTableSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
   )
 }
 
-function OrderStat({
+function StatCard({
+  icon: Icon,
+  iconClass,
   label,
   value,
   trend,
   trendNegative = false,
 }: {
+  icon: LucideIcon
+  iconClass: string
   label: string
   value: string
   trend: number | null
@@ -818,24 +851,29 @@ function OrderStat({
 }) {
   const showTrend = trend !== null
   const positive = trend !== null && trend >= 0
-  const trendClass = showTrend
+  const badgeClass = showTrend
     ? positive && !trendNegative
-      ? 'text-success-700'
-      : 'text-danger-700'
+      ? 'bg-brand-100 text-brand-700'
+      : 'bg-danger-50 text-danger-700'
     : ''
 
   return (
-    <div>
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-fg-muted">{label}</dt>
-      <dd className="mt-1 flex flex-wrap items-baseline gap-2">
-        <span className="font-display text-2xl font-extrabold tabular-nums text-fg">{value}</span>
-        {showTrend ? (
-          <span className={cx('text-xs font-bold tabular-nums', trendClass)}>
-            {trend > 0 ? '+' : ''}
-            {trend}%
-          </span>
-        ) : null}
-      </dd>
+    <div className="flex items-center gap-3 rounded-card border border-border bg-surface p-4 shadow-card sm:gap-4 sm:p-5">
+      <span className={cx('grid size-10 shrink-0 place-items-center rounded-2xl sm:size-12', iconClass)}>
+        <Icon aria-hidden className="size-5 sm:size-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-fg-muted sm:text-sm">{label}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <p className="font-display text-xl font-bold text-fg sm:text-2xl">{value}</p>
+          {showTrend && (
+            <span className={cx('rounded-md px-1.5 py-0.5 text-xs font-bold', badgeClass)}>
+              {trend > 0 ? '+' : ''}
+              {trend}%
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1324,7 +1362,7 @@ function OrderDetailModal({
                   Waiting for {formatPrice(balanceDue)} on PayPal
                 </p>
                 <p className="text-warning-900/90">
-                  The shopper must approve this. We emailed them a secure PayPal link. Account holders can also pay from{' '}
+                  The shopper must approve this — we emailed them a secure PayPal link. Account holders can also pay from{' '}
                   <span className="font-semibold">Account → Orders</span>.
                 </p>
                 <p className="text-xs text-warning-900/80">

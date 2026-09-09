@@ -327,7 +327,7 @@ export default function AdminLayout() {
 
           APP_CHROME_CLASS,
 
-          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-surface',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border/60 bg-surface shadow-[4px_0_24px_-12px_rgb(28_25_23/0.12)]',
 
           'transition-transform lg:translate-x-0',
 
