@@ -18,8 +18,13 @@ class CsvImportRowRepository extends ServiceEntityRepository
     }
 
     /** @return list<CsvImportRow> */
-    public function findWindow(CsvImportJob $job, int $offset, int $limit, ?string $status = null): array
-    {
+    public function findWindow(
+        CsvImportJob $job,
+        int $offset,
+        int $limit,
+        ?string $status = null,
+        ?string $set = null,
+    ): array {
         $qb = $this->createQueryBuilder('row')
             ->andWhere('row.job = :job')
             ->setParameter('job', $job)
@@ -30,8 +35,54 @@ class CsvImportRowRepository extends ServiceEntityRepository
         if (null !== $status) {
             $qb->andWhere('row.status = :status')->setParameter('status', $status);
         }
+        $this->constrainSet($qb, $set);
 
         return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * How many rows match the same window filters (for pagination totals).
+     */
+    public function countWindow(CsvImportJob $job, ?string $status = null, ?string $set = null): int
+    {
+        $qb = $this->createQueryBuilder('row')
+            ->select('COUNT(row.id)')
+            ->andWhere('row.job = :job')
+            ->setParameter('job', $job);
+
+        if (null !== $status) {
+            $qb->andWhere('row.status = :status')->setParameter('status', $status);
+        }
+        $this->constrainSet($qb, $set);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Prefix / word-start on the sheet's set column (code or expansion name).
+     * Mid-word scraps are ignored so "eve" does not match "Seventh Edition".
+     */
+    private function constrainSet(\Doctrine\ORM\QueryBuilder $qb, ?string $set): void
+    {
+        $needle = null !== $set ? mb_strtolower(trim($set)) : '';
+        if ('' === $needle) {
+            return;
+        }
+
+        $qb->andWhere(
+            'LOWER(row.setCode) = :setExact
+            OR LOWER(row.setCode) LIKE :setPrefix
+            OR LOWER(row.setCode) LIKE :setWordSpace
+            OR LOWER(row.setCode) LIKE :setWordHyphen
+            OR LOWER(row.setCode) LIKE :setWordColon
+            OR LOWER(row.setCode) LIKE :setWordComma',
+        )
+            ->setParameter('setExact', $needle)
+            ->setParameter('setPrefix', $needle.'%')
+            ->setParameter('setWordSpace', '% '.$needle.'%')
+            ->setParameter('setWordHyphen', '%-'.$needle.'%')
+            ->setParameter('setWordColon', '%:'.$needle.'%')
+            ->setParameter('setWordComma', '%, '.$needle.'%');
     }
 
     /**

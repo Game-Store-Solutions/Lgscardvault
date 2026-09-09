@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { Wrench } from 'lucide-react'
+import { Wrench, X } from 'lucide-react'
 import api, { cardImage } from '../../api/client'
 import type { CsvImportJob, CsvImportRow } from '../../api/types'
+import { useDebouncedValue } from '../../hooks'
 import {
   BackButton,
   Card,
@@ -18,6 +19,8 @@ import {
   EmptyRow,
   Badge,
   Button,
+  Field,
+  Input,
   buttonVariants,
 } from '../../components/ui'
 import { ImportStat, RunStatusBadge, isActive, rowMarketPrice, canOpenRecovery, skippedRowCount } from './csv-shared'
@@ -29,7 +32,13 @@ export default function ImportRunDetailsPage() {
   const { slug = '', importId = '' } = useParams()
   const queryClient = useQueryClient()
   const [rowOffset, setRowOffset] = useState(0)
+  const [setFilter, setSetFilter] = useState('')
+  const debouncedSet = useDebouncedValue(setFilter.trim(), 300)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setRowOffset(0)
+  }, [debouncedSet])
 
   const summaryQueryKey = ['csv-import-run', slug, importId, 'summary']
   const {
@@ -50,10 +59,15 @@ export default function ImportRunDetailsPage() {
   })
 
   const { data: importedPage, refetch: refetchImported } = useQuery({
-    queryKey: ['csv-import-run', slug, importId, 'imported', rowOffset],
+    queryKey: ['csv-import-run', slug, importId, 'imported', rowOffset, debouncedSet],
     queryFn: async () => {
       const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
-        params: { rowOffset, rowLimit: ROW_LIMIT, rowStatus: 'imported' },
+        params: {
+          rowOffset,
+          rowLimit: ROW_LIMIT,
+          rowStatus: 'imported',
+          ...(debouncedSet ? { set: debouncedSet } : {}),
+        },
       })
       return data
     },
@@ -62,10 +76,15 @@ export default function ImportRunDetailsPage() {
   })
 
   const { data: failedJob, refetch: refetchFailed } = useQuery({
-    queryKey: ['csv-import-run', slug, importId, 'failed'],
+    queryKey: ['csv-import-run', slug, importId, 'failed', debouncedSet],
     queryFn: async () => {
       const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
-        params: { rowOffset: 0, rowLimit: 250, rowStatus: 'error' },
+        params: {
+          rowOffset: 0,
+          rowLimit: 250,
+          rowStatus: 'error',
+          ...(debouncedSet ? { set: debouncedSet } : {}),
+        },
       })
       return data
     },
@@ -103,8 +122,11 @@ export default function ImportRunDetailsPage() {
   const progress = totalRows === 0 ? 0 : Math.min(processedRows / totalRows, 1)
   const rows = importedPage?.rows ?? []
   const failedRows = failedJob?.rows ?? []
+  const importedTotal =
+    importedPage?.filteredRowCount ?? (debouncedSet ? 0 : (job?.importedRows ?? 0))
   const canPrevious = rowOffset > 0
-  const canNext = rowOffset + ROW_LIMIT < (job?.importedRows ?? 0)
+  const canNext = rowOffset + ROW_LIMIT < importedTotal
+  const setSearchActive = Boolean(debouncedSet)
 
   return (
     <div className="space-y-6">
@@ -213,10 +235,14 @@ export default function ImportRunDetailsPage() {
           title="Failed cards"
           subtitle={
             failedRows.length === 0
-              ? job && skippedRowCount(job) > 0
+              ? job && skippedRowCount(job) > 0 && !setSearchActive
                 ? `${skippedRowCount(job)} skipped card${skippedRowCount(job) === 1 ? '' : 's'}. Open the workspace to review or restore them.`
-                : 'No failed cards in this run.'
-              : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}. Open the workspace to match them to real printings.`
+                : setSearchActive
+                  ? `No failed cards match set “${debouncedSet}”.`
+                  : 'No failed cards in this run.'
+              : setSearchActive
+                ? `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'} matching set “${debouncedSet}”.`
+                : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}. Open the workspace to match them to real printings.`
           }
           actions={
             job && canOpenRecovery(job) ? (
@@ -241,10 +267,12 @@ export default function ImportRunDetailsPage() {
         <CardHeader
           title="Succeeded cards"
           subtitle={`Showing ${
-            (job?.importedRows ?? 0) === 0 && rows.length === 0
+            importedTotal === 0 && rows.length === 0
               ? 0
               : rowOffset + 1
-          }-${rowOffset + rows.length} of ${job?.importedRows ?? 0}`}
+          }-${rowOffset + rows.length} of ${importedTotal}${
+            setSearchActive ? ` matching set “${debouncedSet}”` : ''
+          }`}
           actions={
             <div className="flex items-center gap-2">
               <Button
@@ -266,8 +294,34 @@ export default function ImportRunDetailsPage() {
             </div>
           }
         />
-        <CardBody className="p-0">
-          <ImportRowsTable rows={rows} />
+        <CardBody className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3 px-1">
+            <Field label="Search by set" className="min-w-[14rem] flex-1 sm:max-w-xs">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  value={setFilter}
+                  onChange={(e) => setSetFilter(e.target.value)}
+                  placeholder="Set code or name…"
+                  className="uppercase min-h-11"
+                  autoComplete="off"
+                />
+              )}
+            </Field>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!setFilter.trim()}
+              onClick={() => setSetFilter('')}
+              className="min-h-11"
+            >
+              <X className="size-4" aria-hidden />
+              Clear
+            </Button>
+          </div>
+          <div className="-mx-5 border-t border-border sm:-mx-6">
+            <ImportRowsTable rows={rows} emptyLabel={setSearchActive ? 'No succeeded cards match that set.' : 'No cards to display.'} />
+          </div>
         </CardBody>
       </Card>
 
@@ -288,7 +342,7 @@ function RowStatus({ row }: { row: CsvImportRow }) {
   return <Badge tone="neutral">Queued</Badge>
 }
 
-function ImportRowsTable({ rows }: { rows: CsvImportRow[] }) {
+function ImportRowsTable({ rows, emptyLabel = 'No cards to display.' }: { rows: CsvImportRow[]; emptyLabel?: string }) {
   return (
     <div className="max-h-[32rem] overflow-auto">
       <Table>
@@ -337,7 +391,7 @@ function ImportRowsTable({ rows }: { rows: CsvImportRow[] }) {
               </TD>
             </TR>
           ))}
-          {rows.length === 0 && <EmptyRow colSpan={9}>No cards to display.</EmptyRow>}
+          {rows.length === 0 && <EmptyRow colSpan={9}>{emptyLabel}</EmptyRow>}
         </TBody>
       </Table>
     </div>
