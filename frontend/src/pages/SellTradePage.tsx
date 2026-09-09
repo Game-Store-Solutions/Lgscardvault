@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BadgeCheck,
   ClipboardList,
@@ -14,7 +14,8 @@ import {
 import api, { cardImage, extractErrorMessage, formatPrice, scryfallPriceCents } from '../api/client'
 import type { BuylistEntry, CardSummary, SellPayoutMethod, SellSubmission, TradeRates } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { useDebouncedValue, useKioskMode, useStore, useStoreTheme } from '../hooks'
+import { useCardPrintings, useDebouncedValue, useKioskMode, useStore, useStoreTheme } from '../hooks'
+import { PrintingGrid } from '../components/catalog'
 import {
   BackButton,
   Badge,
@@ -28,12 +29,17 @@ import {
   LoadingPanel,
   Modal,
   Select,
+  Spinner,
   Textarea,
+  dropdownItemClass,
+  dropdownPanelClass,
 } from '../components/ui'
 import { formatDate } from '../lib/format'
 import { finishChoices, finishOptions, isFoilFinish } from '../lib/finishes'
+import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../lib/searchText'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
+import { cx } from '../lib/cx'
 
 const buylistKey = (slug: string) => ['buylist', slug] as const
 const tradeRatesKey = (slug: string) => ['trade-rates', slug] as const
@@ -154,17 +160,104 @@ export default function SellTradePage() {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  // Card search (any card, not just the buy list)
+  // Card search: text typeahead → pick name → printings (Singles Add style)
   const [searchTerm, setSearchTerm] = useState('')
-  const debouncedSearch = useDebouncedValue(searchTerm, 350)
-  const searchQuery = useQuery({
-    queryKey: ['sell-card-search', debouncedSearch],
-    enabled: Boolean(user) && debouncedSearch.trim().length >= 2,
+  const [nameHit, setNameHit] = useState<CardSummary | null>(null)
+  const [selectedPrinting, setSelectedPrinting] = useState<CardSummary | null>(null)
+  const [typeaheadOpen, setTypeaheadOpen] = useState(false)
+  const [typeaheadIndex, setTypeaheadIndex] = useState(0)
+  const typeaheadRef = useRef<HTMLDivElement>(null)
+  const skipAutoOpenQuery = useRef<string | null>(null)
+  const debouncedSearch = useDebouncedValue(searchTerm, 150)
+  const typeaheadReady = Boolean(user) && debouncedSearch.trim().length >= 2 && !nameHit
+  const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
+    queryKey: ['sell-card-search', 'typeahead', debouncedSearch],
+    enabled: typeaheadReady,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
     queryFn: async () => {
-      const { data } = await api.get<CardSummary[]>('/catalog/search', { params: { q: debouncedSearch.trim(), unique: 'cards' } })
+      const { data } = await api.get<CardSummary[]>('/catalog/search', {
+        params: {
+          q: debouncedSearch.trim(),
+          unique: 'cards',
+          limit: 12,
+          remote: 0,
+        },
+      })
       return data
     },
   })
+  const typeaheadNames = useMemo(() => {
+    const query = debouncedSearch.trim()
+    const seen = new Set<string>()
+    return [...typeaheadResults]
+      .filter((card) => {
+        const key = foldSearchText(card.name)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((left, right) => typeaheadNameTier(left.name, query) - typeaheadNameTier(right.name, query))
+      .slice(0, 12)
+  }, [typeaheadResults, debouncedSearch])
+  const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
+  const printingsQuery = useCardPrintings(nameHit?.id, Boolean(nameHit))
+  const printings = printingsQuery.data ?? []
+
+  function pickName(card: CardSummary) {
+    skipAutoOpenQuery.current = foldSearchText(card.name)
+    setSearchTerm(card.name)
+    setTypeaheadOpen(false)
+    setTypeaheadIndex(-1)
+    setNameHit(card)
+    setSelectedPrinting(null)
+  }
+
+  function clearNameHit() {
+    skipAutoOpenQuery.current = foldSearchText(searchTerm)
+    setNameHit(null)
+    setSelectedPrinting(null)
+    setTypeaheadOpen(true)
+  }
+
+  useEffect(() => {
+    setTypeaheadIndex(typeaheadNames.length > 0 ? 0 : -1)
+  }, [debouncedSearch, typeaheadNames])
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (typeaheadRef.current && !typeaheadRef.current.contains(event.target as Node)) {
+        setTypeaheadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
+
+  // Exact typed name (or a single unique hit) opens printings like Singles Add confirm.
+  useEffect(() => {
+    if (!typeaheadReady || typeaheadFetching || nameHit) return
+    const typed = debouncedSearch.trim()
+    if (!typed || foldSearchText(typed) !== foldSearchText(searchTerm)) return
+    const folded = foldSearchText(typed)
+    if (skipAutoOpenQuery.current === folded) return
+    const exact = typeaheadNames.find((card) => catalogNamesMatch(card.name, typed))
+    if (exact) {
+      pickName(exact)
+      return
+    }
+    if (typeaheadNames.length === 1) pickName(typeaheadNames[0])
+  }, [typeaheadReady, typeaheadFetching, nameHit, debouncedSearch, searchTerm, typeaheadNames])
+
+  useEffect(() => {
+    if (!nameHit || selectedPrinting) return
+    if (printingsQuery.isPending || printingsQuery.isFetching) return
+    if (printingsQuery.isError) {
+      setSelectedPrinting(nameHit)
+      return
+    }
+    if (printings.length <= 1) setSelectedPrinting(printings[0] ?? nameHit)
+  }, [nameHit, selectedPrinting, printings, printingsQuery.isPending, printingsQuery.isFetching, printingsQuery.isError])
 
   // Bulk paste
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -361,17 +454,112 @@ export default function SellTradePage() {
         <div className="min-w-0 space-y-6">
           {/* Find cards */}
           <Card>
-            <CardHeader title="Find your cards" subtitle="Search any card to see what we pay, or paste a whole list." />
+            <CardHeader title="Find your cards" subtitle="Start typing a card name, pick it from the list, then choose your printing." />
             <CardBody className="space-y-4">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-64 flex-1">
-                  <Input
-                    label="Card name"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Lightning Bolt…"
-                    disabled={!user}
-                  />
+                  <div ref={typeaheadRef} className="relative">
+                    <div className="relative">
+                      <Input
+                        label="Card name"
+                        value={searchTerm}
+                        autoComplete="off"
+                        role="combobox"
+                        aria-autocomplete="list"
+                        aria-expanded={showTypeahead}
+                        aria-controls="sell-card-typeahead"
+                        aria-activedescendant={
+                          showTypeahead && typeaheadIndex >= 0
+                            ? `sell-card-typeahead-${typeaheadNames[typeaheadIndex]?.id}`
+                            : undefined
+                        }
+                        disabled={!user}
+                        onFocus={() => {
+                          if (typeaheadNames.length > 0) setTypeaheadOpen(true)
+                        }}
+                        onChange={(e) => {
+                          const next = e.target.value
+                          setSearchTerm(next)
+                          setTypeaheadOpen(true)
+                          if (nameHit && foldSearchText(next) !== foldSearchText(nameHit.name)) {
+                            setNameHit(null)
+                            setSelectedPrinting(null)
+                          }
+                          if (skipAutoOpenQuery.current && foldSearchText(next) !== skipAutoOpenQuery.current) {
+                            skipAutoOpenQuery.current = null
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowDown' && typeaheadNames.length > 0) {
+                            e.preventDefault()
+                            setTypeaheadOpen(true)
+                            setTypeaheadIndex((index) => (index + 1) % typeaheadNames.length)
+                            return
+                          }
+                          if (e.key === 'ArrowUp' && typeaheadNames.length > 0) {
+                            e.preventDefault()
+                            setTypeaheadOpen(true)
+                            setTypeaheadIndex((index) => (index <= 0 ? typeaheadNames.length - 1 : index - 1))
+                            return
+                          }
+                          if (e.key === 'Escape') {
+                            setTypeaheadOpen(false)
+                            return
+                          }
+                          if (e.key === 'Tab' && showTypeahead) {
+                            const card = typeaheadNames[typeaheadIndex] ?? typeaheadNames[0]
+                            if (card) pickName(card)
+                            return
+                          }
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (showTypeahead) {
+                              const card = typeaheadNames[typeaheadIndex] ?? typeaheadNames[0]
+                              if (card) pickName(card)
+                              return
+                            }
+                            const exact = typeaheadNames.find((card) => catalogNamesMatch(card.name, searchTerm))
+                            if (exact) pickName(exact)
+                            else if (typeaheadNames.length === 1) pickName(typeaheadNames[0])
+                          }
+                        }}
+                        placeholder="Start typing a card name…"
+                        className={typeaheadFetching ? 'pr-9' : undefined}
+                      />
+                      {typeaheadFetching ? (
+                        <span className="pointer-events-none absolute bottom-3 right-3">
+                          <Spinner size="sm" />
+                        </span>
+                      ) : null}
+                    </div>
+                    {showTypeahead ? (
+                      <ul
+                        id="sell-card-typeahead"
+                        role="listbox"
+                        aria-label="Matching cards"
+                        className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
+                      >
+                        {typeaheadNames.map((card, index) => (
+                          <li
+                            key={card.id}
+                            id={`sell-card-typeahead-${card.id}`}
+                            role="option"
+                            aria-selected={index === typeaheadIndex}
+                          >
+                            <button
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => pickName(card)}
+                              onMouseEnter={() => setTypeaheadIndex(index)}
+                              className={dropdownItemClass({ active: index === typeaheadIndex })}
+                            >
+                              <span className="truncate">{card.name}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
                 </div>
                 <Button variant="secondary" onClick={() => setBulkOpen((v) => !v)} disabled={!user}>
                   <ClipboardList className="size-4" aria-hidden />
@@ -410,23 +598,60 @@ export default function SellTradePage() {
                 </p>
               )}
 
-              {searchQuery.isFetching && <LoadingPanel />}
-              {!searchQuery.isFetching && (searchQuery.data?.length ?? 0) > 0 && (
-                <ul className="space-y-2">
-                  {searchQuery.data!.slice(0, 12).map((card) => (
-                    <SearchResultRow
-                      key={card.id}
-                      card={card}
-                      rates={effectiveRates}
-                      payoutMethod={payoutMethod}
-                      onAdd={(finish, condition, quantity) => addLine(card, null, finish, condition, quantity)}
+              {nameHit ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-fg">{nameHit.name}</p>
+                      <p className="text-xs text-fg-muted">
+                        {selectedPrinting
+                          ? 'Confirm finish, condition, and quantity'
+                          : printings.length > 0
+                            ? `${printings.length} ${printings.length === 1 ? 'printing' : 'printings'} of ${nameHit.name}`
+                            : 'Choose the printing you are selling'}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (selectedPrinting && printings.length > 1) {
+                          setSelectedPrinting(null)
+                          return
+                        }
+                        clearNameHit()
+                      }}
+                    >
+                      {selectedPrinting && printings.length > 1 ? 'Change printing' : 'Change'}
+                    </Button>
+                  </div>
+
+                  {selectedPrinting ? (
+                    <ul className="space-y-2">
+                      <SearchResultRow
+                        key={selectedPrinting.id}
+                        card={selectedPrinting}
+                        rates={effectiveRates}
+                        payoutMethod={payoutMethod}
+                        onAdd={(finish, condition, quantity) =>
+                          addLine(selectedPrinting, null, finish, condition, quantity)
+                        }
+                      />
+                    </ul>
+                  ) : printingsQuery.isPending || printingsQuery.isFetching ? (
+                    <LoadingPanel />
+                  ) : (
+                    <PrintingGrid
+                      items={printings}
+                      selectedId={null}
+                      finish="nonfoil"
+                      onSelect={setSelectedPrinting}
+                      size="sm"
                     />
-                  ))}
-                </ul>
-              )}
-              {!searchQuery.isFetching && debouncedSearch.trim().length >= 2 && searchQuery.data?.length === 0 && (
-                <EmptyState icon={Search} title="No matches" description="Try a different card name." />
-              )}
+                  )}
+                </div>
+              ) : null}
             </CardBody>
           </Card>
 
@@ -900,41 +1125,21 @@ function ChangePrintingModal({
   onClose: () => void
   onSelect: (card: CardSummary) => void
 }) {
-  const printingsQuery = useQuery({
-    queryKey: ['sell-printings', line.card.name],
-    queryFn: async () => {
-      const { data } = await api.get<CardSummary[]>('/catalog/search', { params: { q: line.card.name } })
-      return data.filter((card) => matchesName(card, line.card.name.toLowerCase()))
-    },
-  })
+  const printingsQuery = useCardPrintings(line.card.id)
+  const printings = printingsQuery.data ?? []
 
   return (
     <Modal open onClose={onClose} title={`Printings of ${line.card.name}`}>
       {printingsQuery.isLoading ? (
         <LoadingPanel />
       ) : (
-        <ul className="grid max-h-[60vh] grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-4">
-          {(printingsQuery.data ?? []).map((card) => {
-            const market = scryfallPriceCents(card, isFoilFinish(line.finish) ? 'foil' : 'nonfoil')
-            return (
-              <li key={card.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(card)}
-                  className={`w-full overflow-hidden rounded-card border text-left transition-colors ${
-                    card.id === line.card.id ? 'border-brand-600' : 'border-border hover:border-brand-500/60'
-                  }`}
-                >
-                  {cardImage(card) && <img src={cardImage(card)} alt="" className="aspect-[63/88] w-full object-cover" />}
-                  <div className="p-1.5">
-                    <p className="truncate text-xs font-bold text-fg">{card.setCode?.toUpperCase() ?? '—'}</p>
-                    <p className="text-xs text-fg-muted">{market == null ? 'No price' : formatPrice(market)}</p>
-                  </div>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <PrintingGrid
+          items={printings}
+          selectedId={line.card.id}
+          finish={isFoilFinish(line.finish) ? 'foil' : 'nonfoil'}
+          onSelect={onSelect}
+          size="sm"
+        />
       )}
     </Modal>
   )
