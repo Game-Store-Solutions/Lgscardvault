@@ -996,7 +996,9 @@ final class StoreCsvImportController extends AbstractController
             'rowLimit' => $rowLimit,
             'setFilter' => $setNeedle,
             'filteredRowCount' => $filteredRowCount,
-            'sets' => $this->rowRepository->findDistinctSets($job),
+            // Distinct sets are only needed for typeahead — skip the extra
+            // DISTINCT scan on every paginated / polled row window.
+            'sets' => 0 === $rowLimit ? $this->rowRepository->findDistinctSets($job) : [],
             'rows' => array_map($this->serializeRow(...), $rows),
         ];
     }

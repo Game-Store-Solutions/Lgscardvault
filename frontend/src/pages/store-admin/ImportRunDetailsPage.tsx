@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { Wrench, X } from 'lucide-react'
 import api, { cardImage } from '../../api/client'
 import type { CsvImportJob, CsvImportRow } from '../../api/types'
 import { useDebouncedValue } from '../../hooks'
-import { catalogNamesMatch, rankSetSearch } from '../../lib/searchText'
+import { catalogNamesMatch, foldSearchText, rankSetSearch, typeaheadNameTier } from '../../lib/searchText'
 import { cx } from '../../lib/cx'
 import {
   BackButton,
@@ -32,12 +32,22 @@ import { FailedRowsTable } from './FailedRowsTable'
 
 const ROW_LIMIT = 100
 
+/** Same prefix / word-start rules as the import set API filter. */
+function importRowMatchesSet(row: CsvImportRow, rawQuery: string): boolean {
+  const needle = foldSearchText(rawQuery)
+  if (!needle) return true
+  return typeaheadNameTier(row.set || '', rawQuery) <= 2
+}
+
 export default function ImportRunDetailsPage() {
   const { slug = '', importId = '' } = useParams()
   const queryClient = useQueryClient()
   const [rowOffset, setRowOffset] = useState(0)
   const [setFilter, setSetFilter] = useState('')
-  const debouncedSet = useDebouncedValue(setFilter.trim(), 300)
+  const debouncedSet = useDebouncedValue(setFilter.trim(), 150)
+  /** Set applied to the API immediately on typeahead pick (skip debounce wait). */
+  const [immediateSet, setImmediateSet] = useState<string | null>(null)
+  const activeSet = immediateSet ?? debouncedSet
   const [importSetTypeaheadIndex, setImportSetTypeaheadIndex] = useState(0)
   const [importSetTypeaheadOpen, setImportSetTypeaheadOpen] = useState(false)
   const importSetTypeaheadRef = useRef<HTMLDivElement>(null)
@@ -45,7 +55,14 @@ export default function ImportRunDetailsPage() {
 
   useEffect(() => {
     setRowOffset(0)
-  }, [debouncedSet])
+  }, [activeSet])
+
+  useEffect(() => {
+    // Typing again clears a pinned typeahead selection so debounce resumes.
+    if (immediateSet !== null && foldSearchText(setFilter) !== foldSearchText(immediateSet)) {
+      setImmediateSet(null)
+    }
+  }, [setFilter, immediateSet])
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
@@ -72,40 +89,45 @@ export default function ImportRunDetailsPage() {
       return data
     },
     enabled: importId !== '',
+    staleTime: 5_000,
     refetchInterval: (query) => (isActive(query.state.data?.status) ? 3000 : false),
   })
 
   const { data: importedPage, refetch: refetchImported } = useQuery({
-    queryKey: ['csv-import-run', slug, importId, 'imported', rowOffset, debouncedSet],
+    queryKey: ['csv-import-run', slug, importId, 'imported', rowOffset, activeSet],
     queryFn: async () => {
       const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
         params: {
           rowOffset,
           rowLimit: ROW_LIMIT,
           rowStatus: 'imported',
-          ...(debouncedSet ? { set: debouncedSet } : {}),
+          ...(activeSet ? { set: activeSet } : {}),
         },
       })
       return data
     },
     enabled: importId !== '',
+    placeholderData: keepPreviousData,
+    staleTime: 5_000,
     refetchInterval: () => (isActive(summary?.status) ? 3000 : false),
   })
 
+  // Fetch failed rows once (no set param); filter locally so set typing does
+  // not fire a second server round-trip on every keystroke.
   const { data: failedJob, refetch: refetchFailed } = useQuery({
-    queryKey: ['csv-import-run', slug, importId, 'failed', debouncedSet],
+    queryKey: ['csv-import-run', slug, importId, 'failed'],
     queryFn: async () => {
       const { data } = await api.get<CsvImportJob>(`/stores/${slug}/csv-imports/${importId}`, {
         params: {
           rowOffset: 0,
           rowLimit: 250,
           rowStatus: 'error',
-          ...(debouncedSet ? { set: debouncedSet } : {}),
         },
       })
       return data
     },
     enabled: importId !== '',
+    staleTime: 5_000,
     refetchInterval: () => (isActive(summary?.status) ? 3000 : false),
   })
 
@@ -138,13 +160,17 @@ export default function ImportRunDetailsPage() {
   const processedRows = job?.processedRows ?? 0
   const progress = totalRows === 0 ? 0 : Math.min(processedRows / totalRows, 1)
   const rows = importedPage?.rows ?? []
-  const failedRows = failedJob?.rows ?? []
+  const failedRows = useMemo(() => {
+    const all = failedJob?.rows ?? []
+    if (!activeSet) return all
+    return all.filter((row) => importRowMatchesSet(row, activeSet))
+  }, [failedJob?.rows, activeSet])
   const importedTotal =
-    importedPage?.filteredRowCount ?? (debouncedSet ? 0 : (job?.importedRows ?? 0))
+    importedPage?.filteredRowCount ?? (activeSet ? 0 : (job?.importedRows ?? 0))
   const canPrevious = rowOffset > 0
   const canNext = rowOffset + ROW_LIMIT < importedTotal
-  const setSearchActive = Boolean(debouncedSet)
-  const importSets = summary?.sets ?? importedPage?.sets ?? []
+  const setSearchActive = Boolean(activeSet)
+  const importSets = summary?.sets ?? []
   const importSetTypeaheadReady = setFilter.trim().length >= 1
   const importSetTypeaheadOptions = useMemo(() => {
     if (!importSetTypeaheadReady) return []
@@ -159,6 +185,7 @@ export default function ImportRunDetailsPage() {
 
   function autofillImportSet(code: string) {
     setSetFilter(code)
+    setImmediateSet(code)
     setImportSetTypeaheadOpen(false)
     setImportSetTypeaheadIndex(-1)
   }
@@ -273,10 +300,10 @@ export default function ImportRunDetailsPage() {
               ? job && skippedRowCount(job) > 0 && !setSearchActive
                 ? `${skippedRowCount(job)} skipped card${skippedRowCount(job) === 1 ? '' : 's'}. Open the workspace to review or restore them.`
                 : setSearchActive
-                  ? `No failed cards match set “${debouncedSet}”.`
+                  ? `No failed cards match set “${activeSet}”.`
                   : 'No failed cards in this run.'
               : setSearchActive
-                ? `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'} matching set “${debouncedSet}”.`
+                ? `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'} matching set “${activeSet}”.`
                 : `Showing ${failedRows.length} failed card${failedRows.length === 1 ? '' : 's'}. Open the workspace to match them to real printings.`
           }
           actions={
@@ -306,7 +333,7 @@ export default function ImportRunDetailsPage() {
               ? 0
               : rowOffset + 1
           }-${rowOffset + rows.length} of ${importedTotal}${
-            setSearchActive ? ` matching set “${debouncedSet}”` : ''
+            setSearchActive ? ` matching set “${activeSet}”` : ''
           }`}
           actions={
             <div className="flex items-center gap-2">
@@ -427,6 +454,7 @@ export default function ImportRunDetailsPage() {
               disabled={!setFilter.trim()}
               onClick={() => {
                 setSetFilter('')
+                setImmediateSet(null)
                 setImportSetTypeaheadOpen(false)
               }}
               className="min-h-11"
