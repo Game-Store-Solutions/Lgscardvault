@@ -23,7 +23,7 @@ export function QuantityStepper({ value, onChange }: QuantityStepperProps) {
         value={value}
         onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
         aria-label="Quantity"
-        className="w-14 border-x border-border bg-surface text-center text-sm font-bold text-fg focus-visible:outline-none"
+        className="w-14 border-x border-border bg-surface text-center text-sm font-bold text-fg [appearance:textfield] focus-visible:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       <button
         type="button"
