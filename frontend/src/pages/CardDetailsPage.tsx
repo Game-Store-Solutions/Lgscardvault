@@ -331,7 +331,8 @@ export default function CardDetailsPage() {
     )
   }
 
-  const card = item.card
+  const listing = item
+  const card = listing.card
 
   // Multi-faced cards carry per-face art and text, but they come in two flavors:
   //  • Two-sided (transform / modal_dfc / …): each face has its own art, so the
@@ -360,23 +361,23 @@ export default function CardDetailsPage() {
   const legalFormats = legalFormatsFromScryfall(card.legalities)
   const legalityTotal = scryfallLegalityCount(card.legalities)
   const legalityHasHidden = hasNonLegalScryfallEntries(card.legalities)
-  const isFavorite = favorites.some((favorite) => favorite.inventoryItem?.id === item.id)
+  const isFavorite = favorites.some((favorite) => favorite.inventoryItem?.id === listing.id)
   const isWanted = wantList.some(
     (entry) =>
-      entry.card?.id === item.card.id ||
-      (entry.cardName.toLowerCase() === item.card.name.toLowerCase() && entry.setCode === item.card.setCode),
+      entry.card?.id === listing.card.id ||
+      (entry.cardName.toLowerCase() === listing.card.name.toLowerCase() && entry.setCode === listing.card.setCode),
   )
 
-  const cartEntry = (cartQuery.data ?? []).find((entry) => entry.inventoryItem?.id === item.id)
+  const cartEntry = (cartQuery.data ?? []).find((entry) => entry.inventoryItem?.id === listing.id)
   const inCart = Boolean(cartEntry)
   const cartQty = cartEntry?.quantity ?? 0
-  const outOfStock = item.quantity < 1
-  const maxQty = Math.max(1, item.quantity)
+  const outOfStock = listing.quantity < 1
+  const maxQty = Math.max(1, listing.quantity)
   const qtyOptions = Array.from({ length: maxQty }, (_, i) => i + 1)
 
   function setCartQuantity(next: number) {
-    const clamped = Math.max(1, Math.min(next, item.quantity))
-    cartSetItem.mutate({ item, quantity: clamped })
+    const clamped = Math.max(1, Math.min(next, listing.quantity))
+    cartSetItem.mutate({ item: listing, quantity: clamped })
   }
 
   function onBuyQtyChange(next: number) {
@@ -386,7 +387,7 @@ export default function CardDetailsPage() {
   }
 
   const related = (relatedQuery.data?.items ?? [])
-    .filter((row) => row.id !== item.id && row.quantity > 0)
+    .filter((row) => row.id !== listing.id && row.quantity > 0)
     .slice(0, 10)
 
   const powerToughness = card.power || card.toughness ? `${card.power ?? '—'} / ${card.toughness ?? '—'}` : ''
@@ -621,7 +622,6 @@ export default function CardDetailsPage() {
                     qtyOptions={qtyOptions}
                     outOfStock={outOfStock}
                     inCart={inCart}
-                    cartQty={cartQty}
                     pending={cartSetItem.isPending}
                     onQtyChange={onBuyQtyChange}
                     onAdd={() => setCartQuantity(buyQty)}
@@ -926,7 +926,6 @@ function BuyQtyControl({
   qtyOptions,
   outOfStock,
   inCart,
-  cartQty,
   pending,
   onQtyChange,
   onAdd,
@@ -937,7 +936,6 @@ function BuyQtyControl({
   qtyOptions: number[]
   outOfStock: boolean
   inCart: boolean
-  cartQty: number
   pending: boolean
   onQtyChange: (next: number) => void
   onAdd: () => void
