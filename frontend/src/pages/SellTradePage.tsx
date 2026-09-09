@@ -16,6 +16,7 @@ import type { BuylistEntry, CardSummary, SellPayoutMethod, SellSubmission, Trade
 import { useAuth } from '../context/AuthContext'
 import { useCardPrintings, useDebouncedValue, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { PrintingGrid } from '../components/catalog'
+import { AnimatePresence, EASE_PREMIUM, motion } from '../components/motion'
 import {
   BackButton,
   Badge,
@@ -406,6 +407,11 @@ export default function SellTradePage() {
     />
   )
 
+  const pickingPrintings = Boolean(nameHit && !selectedPrinting)
+  const showPrintingModal =
+    pickingPrintings &&
+    (printingsQuery.isPending || printingsQuery.isFetching || printings.length > 1)
+
   // Full-screen branded loader only while the screen isn't completely
   // loaded — cached revisits render instantly.
   if (storeLoading || buylistLoading) {
@@ -598,39 +604,38 @@ export default function SellTradePage() {
                 </p>
               )}
 
-              {nameHit ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-fg">{nameHit.name}</p>
-                      <p className="text-xs text-fg-muted">
-                        {selectedPrinting
-                          ? 'Confirm finish, condition, and quantity'
-                          : printings.length > 0
-                            ? `${printings.length} ${printings.length === 1 ? 'printing' : 'printings'} of ${nameHit.name}`
-                            : 'Choose the printing you are selling'}
-                      </p>
+              <AnimatePresence mode="wait" initial={false}>
+                {selectedPrinting ? (
+                  <motion.div
+                    key={selectedPrinting.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.28, ease: EASE_PREMIUM }}
+                    className="space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-fg">{selectedPrinting.name}</p>
+                        <p className="text-xs text-fg-muted">Confirm finish, condition, and quantity</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (printings.length > 1) {
+                            setSelectedPrinting(null)
+                            return
+                          }
+                          clearNameHit()
+                        }}
+                      >
+                        {printings.length > 1 ? 'Change printing' : 'Change'}
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (selectedPrinting && printings.length > 1) {
-                          setSelectedPrinting(null)
-                          return
-                        }
-                        clearNameHit()
-                      }}
-                    >
-                      {selectedPrinting && printings.length > 1 ? 'Change printing' : 'Change'}
-                    </Button>
-                  </div>
-
-                  {selectedPrinting ? (
                     <ul className="space-y-2">
                       <SearchResultRow
-                        key={selectedPrinting.id}
                         card={selectedPrinting}
                         rates={effectiveRates}
                         payoutMethod={payoutMethod}
@@ -639,19 +644,9 @@ export default function SellTradePage() {
                         }
                       />
                     </ul>
-                  ) : printingsQuery.isPending || printingsQuery.isFetching ? (
-                    <LoadingPanel />
-                  ) : (
-                    <PrintingGrid
-                      items={printings}
-                      selectedId={null}
-                      finish="nonfoil"
-                      onSelect={setSelectedPrinting}
-                      size="sm"
-                    />
-                  )}
-                </div>
-              ) : null}
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </CardBody>
           </Card>
 
@@ -734,6 +729,25 @@ export default function SellTradePage() {
           </Card>
         </aside>
       </div>
+
+      <Modal
+        open={showPrintingModal}
+        onClose={clearNameHit}
+        title={nameHit ? `Printings of ${nameHit.name}` : 'Printings'}
+        className="w-full max-w-5xl"
+      >
+        {printingsQuery.isPending || printingsQuery.isFetching ? (
+          <LoadingPanel />
+        ) : (
+          <PrintingGrid
+            items={printings}
+            selectedId={null}
+            finish="nonfoil"
+            onSelect={setSelectedPrinting}
+            size="lg"
+          />
+        )}
+      </Modal>
 
       {/* Mobile: floating review pill + modal */}
       {lines.length > 0 && (
@@ -1129,7 +1143,7 @@ function ChangePrintingModal({
   const printings = printingsQuery.data ?? []
 
   return (
-    <Modal open onClose={onClose} title={`Printings of ${line.card.name}`}>
+    <Modal open onClose={onClose} title={`Printings of ${line.card.name}`} className="w-full max-w-5xl">
       {printingsQuery.isLoading ? (
         <LoadingPanel />
       ) : (
@@ -1138,7 +1152,7 @@ function ChangePrintingModal({
           selectedId={line.card.id}
           finish={isFoilFinish(line.finish) ? 'foil' : 'nonfoil'}
           onSelect={onSelect}
-          size="sm"
+          size="lg"
         />
       )}
     </Modal>
