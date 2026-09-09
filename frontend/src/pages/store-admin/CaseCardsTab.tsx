@@ -36,7 +36,21 @@ const COLOR_SUGGESTIONS = [
   'Bant', 'Esper', 'Grixis', 'Jund', 'Naya',
   'Abzan', 'Jeskai', 'Sultai', 'Mardu', 'Temur',
   'Four-Color', 'Five-Color',
-]
+] as const
+
+/** Map API label/code back to a Select option value the parser accepts. */
+function colorFilterSelectValue(section: StoreSection): string {
+  const label = section.autoColorIdentityLabel?.trim() ?? ''
+  if (label) {
+    const name = label.replace(/\s*\([^)]*\)\s*$/, '').trim()
+    const match = COLOR_SUGGESTIONS.find((s) => s.toLowerCase() === name.toLowerCase())
+    if (match) return match
+  }
+  const code = section.autoColorIdentity?.trim() ?? ''
+  if (!code) return ''
+  // Exact letter codes that aren't in the friendly list (e.g. custom WUB)
+  return code
+}
 
 /**
  * Case Cards admin: manage display cases, divide each into sections, and run
@@ -211,14 +225,21 @@ function SectionEditor({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pullSheetOpen, setPullSheetOpen] = useState(false)
   const [stockingSheetOpen, setStockingSheetOpen] = useState(false)
-  const toStockCount = section.cards.filter((entry) => entry.needsStocking).length
+  const toStockCount = section.cards.filter(
+    (entry) => entry.needsStocking && (entry.inventoryItem.quantity ?? 0) > 0,
+  ).length
+  const visibleCards = section.cards.filter((entry) => (entry.inventoryItem.quantity ?? 0) > 0)
   const [min, setMin] = useState(section.autoMinPriceCents != null ? (section.autoMinPriceCents / 100).toFixed(2) : '')
   const [max, setMax] = useState(section.autoMaxPriceCents != null ? (section.autoMaxPriceCents / 100).toFixed(2) : '')
   const [rarity, setRarity] = useState(section.autoRarity ?? '')
-  const [color, setColor] = useState(section.autoColorIdentityLabel ?? '')
+  const [color, setColor] = useState(() => colorFilterSelectValue(section))
   const [setCode, setSetCode] = useState(section.autoSetCode ?? '')
   const [cardType, setCardType] = useState(section.autoCardType ?? '')
   const [cardLimit, setCardLimit] = useState(section.cardLimit != null ? String(section.cardLimit) : '')
+
+  useEffect(() => {
+    setColor(colorFilterSelectValue(section))
+  }, [section.id, section.autoColorIdentity, section.autoColorIdentityLabel])
 
   const parsedCardLimit = cardLimit.trim() === '' ? null : Number(cardLimit)
 
@@ -264,8 +285,6 @@ function SectionEditor({
     },
     onSuccess: onChanged,
   })
-
-  const colorListId = `color-suggestions-${section.id}`
 
   return (
     <Card>
@@ -320,18 +339,17 @@ function SectionEditor({
         {section.mode === 'auto' ? (
           <div className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-              <Input
-                label="Color / identity"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                placeholder="Black, Azorius, 5c…"
-                list={colorListId}
-              />
-              <datalist id={colorListId}>
+              <Select label="Color / identity" value={color} onChange={(e) => setColor(e.target.value)}>
+                <option value="">Any color</option>
                 {COLOR_SUGGESTIONS.map((s) => (
-                  <option key={s} value={s} />
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
-              </datalist>
+                {color && !(COLOR_SUGGESTIONS as readonly string[]).includes(color) ? (
+                  <option value={color}>{color}</option>
+                ) : null}
+              </Select>
               <Select label="Rarity" value={rarity} onChange={(e) => setRarity(e.target.value)}>
                 <option value="">Any rarity</option>
                 {RARITIES.map((r) => (
@@ -390,7 +408,8 @@ function SectionEditor({
               />
             </div>
             <span className="pb-2 text-xs text-fg-muted">
-              {section.cards.length} in section{section.cardLimit != null ? ` · limit ${section.cardLimit}` : ''}
+              {visibleCards.length} in section
+              {section.cardLimit != null ? ` · limit ${section.cardLimit}` : ''}
             </span>
           </div>
         )}
@@ -407,7 +426,7 @@ function SectionEditor({
           </p>
         )}
 
-        {section.cards.length === 0 ? (
+        {visibleCards.length === 0 ? (
           <p className="text-sm text-fg-muted">
             {section.mode === 'auto'
               ? 'No cards yet. Set your filters and pull from inventory.'
@@ -415,7 +434,7 @@ function SectionEditor({
           </p>
         ) : (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {section.cards.map((entry) => {
+            {visibleCards.map((entry) => {
               const card = entry.inventoryItem.card
               const soldOut = entry.remaining === 0
               return (

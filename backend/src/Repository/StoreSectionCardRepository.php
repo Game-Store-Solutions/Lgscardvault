@@ -54,6 +54,22 @@ class StoreSectionCardRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every section pool holding this listing (sold-out included).
+     *
+     * @return list<StoreSectionCard>
+     */
+    public function findAllForItem(\App\Entity\InventoryItem $item): array
+    {
+        return $this->createQueryBuilder('sc')
+            ->join('sc.section', 's')->addSelect('s')
+            ->andWhere('sc.inventoryItem = :item')
+            ->setParameter('item', $item)
+            ->orderBy('sc.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Unsold pool copies claimed per inventory item across ALL of the store's
      * case sections (optionally excluding one — the section being refilled).
      * Auto-fill subtracts these claims from on-hand stock so two sections

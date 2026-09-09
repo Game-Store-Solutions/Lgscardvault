@@ -73,6 +73,19 @@ final class ColorIdentityParser
             return null;
         }
 
+        // Admin UI may re-submit the human label ("Golgari (BG)") — accept name
+        // or parenthetical code so pull-from-inventory doesn't 422 after reload.
+        if (preg_match('/^(.+?)\s*\(([a-z0-9]+)\)$/', $normalized, $matches)) {
+            $fromName = $this->parse($matches[1]);
+            if (null !== $fromName) {
+                return $fromName;
+            }
+            $fromCode = $this->parse($matches[2]);
+            if (null !== $fromCode) {
+                return $fromCode;
+            }
+        }
+
         if (isset(self::NAMES[$normalized])) {
             return self::NAMES[$normalized];
         }
@@ -82,6 +95,9 @@ final class ColorIdentityParser
         $letters = strtoupper(str_replace(' ', '', $normalized));
         if ('C' === $letters) {
             return 'C';
+        }
+        if ('4C' === $letters || 'M' === $letters) {
+            return $letters;
         }
         if (preg_match('/^[WUBRG]{1,5}$/', $letters)) {
             $unique = array_unique(str_split($letters));

@@ -182,7 +182,16 @@ function OrderStatusSelect({
       )}
     >
       {statusUi.label}
-      {canChange ? <ChevronDown aria-hidden className={cx('shrink-0 opacity-80', size === 'md' ? 'size-4' : 'size-3.5')} /> : null}
+      {canChange ? (
+        <motion.span
+          aria-hidden
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.18, ease: EASE_PREMIUM }}
+          className="inline-flex shrink-0"
+        >
+          <ChevronDown className={cx('opacity-80', size === 'md' ? 'size-4' : 'size-3.5')} />
+        </motion.span>
+      ) : null}
     </span>
   )
 
@@ -207,51 +216,63 @@ function OrderStatusSelect({
       >
         {pill}
       </button>
-      {open && typeof document !== 'undefined'
+      {typeof document !== 'undefined'
         ? createPortal(
-            <div
-              ref={menuRef}
-              role="listbox"
-              aria-label="Order status"
-              style={
-                coords
-                  ? { position: 'fixed', top: coords.top, left: coords.left, width: coords.width, zIndex: 80 }
-                  : { position: 'fixed', visibility: 'hidden', zIndex: 80 }
-              }
-              className={cx(dropdownPanelClass, 'p-1.5')}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div role="option" aria-selected className="flex items-center gap-2.5 rounded-lg px-2.5 py-2">
-                <Check aria-hidden className="size-4 shrink-0 text-fg" />
-                <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>
-                  {statusUi.label}
-                </span>
-              </div>
-              <div className="my-1 border-t border-border" />
-              {choices.map(({ status, label, icon: Icon }) => {
-                const nextUi = freshStatusPresentation(status)
-                return (
-                  <button
-                    key={status}
-                    type="button"
-                    role="option"
-                    aria-label={label}
-                    aria-selected={false}
-                    disabled={pending}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-bg disabled:opacity-50"
-                    onClick={() => {
-                      setOpen(false)
-                      onUpdateStatus(status)
-                    }}
-                  >
-                    <Icon aria-hidden className="size-4 shrink-0 text-fg-muted" />
-                    <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', nextUi.className)}>
-                      {nextUi.label}
+            <AnimatePresence>
+              {open ? (
+                <motion.div
+                  ref={menuRef}
+                  role="listbox"
+                  aria-label="Order status"
+                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.985 }}
+                  transition={{ duration: 0.16, ease: EASE_PREMIUM }}
+                  style={
+                    coords
+                      ? { position: 'fixed', top: coords.top, left: coords.left, width: coords.width, zIndex: 80 }
+                      : { position: 'fixed', visibility: 'hidden', zIndex: 80 }
+                  }
+                  className={cx(dropdownPanelClass, 'origin-top p-1.5')}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div role="option" aria-selected className="flex items-center gap-2.5 rounded-lg px-2.5 py-2">
+                    <Check aria-hidden className="size-4 shrink-0 text-fg" />
+                    <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', statusUi.className)}>
+                      {statusUi.label}
                     </span>
-                  </button>
-                )
-              })}
-            </div>,
+                  </div>
+                  <div className="my-1 border-t border-border" />
+                  {choices.map(({ status, label, icon: Icon }, index) => {
+                    const nextUi = freshStatusPresentation(status)
+                    return (
+                      <motion.button
+                        key={status}
+                        type="button"
+                        role="option"
+                        aria-label={label}
+                        aria-selected={false}
+                        disabled={pending}
+                        initial={{ opacity: 0, x: -4 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.14, delay: 0.03 + index * 0.03, ease: EASE_PREMIUM }}
+                        whileHover={{ x: 2 }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-bg disabled:opacity-50"
+                        onClick={() => {
+                          setOpen(false)
+                          onUpdateStatus(status)
+                        }}
+                      >
+                        <Icon aria-hidden className="size-4 shrink-0 text-fg-muted" />
+                        <span className={cx('inline-flex rounded-lg px-2.5 py-1 text-xs font-bold', nextUi.className)}>
+                          {nextUi.label}
+                        </span>
+                      </motion.button>
+                    )
+                  })}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>,
             document.body,
           )
         : null}
@@ -278,15 +299,15 @@ function PendingAcceptQueue({
 
   return (
     <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface shadow-card">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:gap-4 sm:px-5 sm:py-5">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold text-fg">New orders</h2>
-            <span className="grid h-5 min-w-5 place-items-center rounded-full bg-brand-700 px-1.5 text-[10px] font-bold tabular-nums leading-none text-brand-100">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-base font-bold text-fg sm:text-lg">New orders</h2>
+            <span className="grid h-6 min-w-6 place-items-center rounded-full bg-brand-700 px-1.5 text-[11px] font-bold tabular-nums leading-none text-brand-100">
               {totalCount > 99 ? '99+' : totalCount}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-fg-muted">Accept to start pulling cards</p>
+          <p className="mt-1 text-sm text-fg-muted">Accept to start pulling cards</p>
         </div>
         {totalCount > orders.length ? (
           <Button size="sm" variant="ghost" onClick={onViewAll}>
@@ -300,44 +321,57 @@ function PendingAcceptQueue({
           const thumb = firstLine ? orderLineImage(firstLine) : undefined
           const accepting = acceptingOrderId === order.id
           return (
-            <li key={order.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+            <motion.li
+              key={order.id}
+              initial={false}
+              whileHover={{ x: 3 }}
+              transition={{ duration: 0.2, ease: EASE_PREMIUM }}
+              className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-bg/80 sm:gap-4 sm:px-5"
+            >
               <button
                 type="button"
                 onClick={() => onOpenDetail(order)}
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
               >
-                <span className="grid size-9 shrink-0 overflow-hidden rounded-lg bg-bg">
+                <motion.span
+                  className="grid size-11 shrink-0 overflow-hidden rounded-xl bg-bg"
+                  whileHover={{ scale: 1.04 }}
+                  transition={{ duration: 0.2, ease: EASE_PREMIUM }}
+                >
                   {thumb ? (
                     <img src={thumb} alt="" className="size-full object-cover" />
                   ) : (
                     <span className="grid size-full place-items-center text-fg-muted">
-                      <Package aria-hidden className="size-4" />
+                      <Package aria-hidden className="size-5" />
                     </span>
                   )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-fg">{orderPrimaryProductName(order)}</span>
-                  <span className="block truncate text-xs text-fg-muted">
-                    {order.customerName ?? 'Guest'} · {order.reference} · {formatPrice(order.totalCents)}
+                </motion.span>
+                <span className="min-w-0 flex-1 space-y-0.5">
+                  <span className="block truncate font-semibold text-fg">{orderPrimaryProductName(order)}</span>
+                  <span className="block truncate text-sm text-fg-muted">
+                    {order.customerName ?? 'Guest'} · {order.reference}
                   </span>
+                  <span className="block text-sm font-semibold tabular-nums text-fg">{formatPrice(order.totalCents)}</span>
                 </span>
               </button>
-              <Button
-                size="sm"
-                loading={accepting}
-                disabled={acceptingOrderId != null && !accepting}
-                onClick={() => onAccept(order)}
-                className="shrink-0"
-              >
-                <CheckCircle2 aria-hidden className="size-4" />
-                Accept
-              </Button>
-            </li>
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.16, ease: EASE_PREMIUM }}>
+                <Button
+                  size="sm"
+                  loading={accepting}
+                  disabled={acceptingOrderId != null && !accepting}
+                  onClick={() => onAccept(order)}
+                  className="shrink-0"
+                >
+                  <CheckCircle2 aria-hidden className="size-4" />
+                  Accept
+                </Button>
+              </motion.div>
+            </motion.li>
           )
         })}
       </ul>
       {totalCount > orders.length ? (
-        <div className="border-t border-border px-4 py-2.5 sm:px-5">
+        <div className="border-t border-border px-4 py-3.5 sm:px-5">
           <button
             type="button"
             onClick={onViewAll}

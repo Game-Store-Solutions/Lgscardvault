@@ -32,7 +32,10 @@ export default function CaseCardsPage() {
         .map((section) => ({
           ...section,
           cards: section.cards.filter(
-            (entry): entry is RenderableCard => entry.remaining > 0 && Boolean(entry.inventoryItem.card),
+            (entry): entry is RenderableCard =>
+              entry.remaining > 0 &&
+              (entry.inventoryItem.quantity ?? 0) > 0 &&
+              Boolean(entry.inventoryItem.card),
           ),
         }))
         .filter((section) => section.cards.length > 0),
