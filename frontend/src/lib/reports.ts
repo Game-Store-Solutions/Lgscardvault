@@ -18,6 +18,18 @@ function endOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
 }
 
+/** Local calendar day key (YYYY-MM-DD) — never use UTC ISO slice for day buckets. */
+export function localDayKey(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+export function orderLocalDayKey(createdAt: string): string {
+  return localDayKey(new Date(createdAt))
+}
+
 export function resolveDateRange(preset: DateRangePreset, customFrom?: string, customTo?: string): ReportDateRange {
   const today = startOfDay(new Date())
   const to = endOfDay(today)
@@ -67,7 +79,7 @@ export function bucketRevenueByDay(orders: Order[], range: ReportDateRange): Tim
   const cursor = startOfDay(range.from)
   const end = startOfDay(range.to)
   while (cursor <= end) {
-    const key = cursor.toISOString().slice(0, 10)
+    const key = localDayKey(cursor)
     map.set(key, {
       key,
       label: cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
@@ -78,7 +90,7 @@ export function bucketRevenueByDay(orders: Order[], range: ReportDateRange): Tim
   }
 
   for (const order of revenueOrders) {
-    const key = order.createdAt.slice(0, 10)
+    const key = orderLocalDayKey(order.createdAt)
     const bucket = map.get(key)
     if (!bucket) continue
     bucket.revenueCents += order.totalCents

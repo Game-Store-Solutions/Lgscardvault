@@ -285,7 +285,7 @@ class OrderRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
-    /** @return array{openCount: int, pending: int, processing: int, delivery: int, ready: int, delivered: int, total: int, today: array{new: int, pending: int, completed: int, canceled: int}, yesterday: array{new: int, pending: int, completed: int, canceled: int}} */
+    /** @return array{openCount: int, pending: int, processing: int, delivery: int, ready: int, delivered: int, total: int, today: array{new: int, pending: int, ready: int, completed: int, canceled: int}, yesterday: array{new: int, pending: int, ready: int, completed: int, canceled: int}} */
     public function countQueueSummaryByStore(Store $store, ?\DateTimeZone $storeDayTz = null): array
     {
         $pending = $this->countByStoreAndStatuses($store, [OrderStatus::PENDING]);
@@ -311,7 +311,7 @@ class OrderRepository extends ServiceEntityRepository
     /**
      * Orders created on a calendar day in $tz, bucketed by current status.
      *
-     * @return array{new: int, pending: int, completed: int, canceled: int}
+     * @return array{new: int, pending: int, ready: int, completed: int, canceled: int}
      */
     public function countDayTotalsByStore(Store $store, \DateTimeZone $tz, int $dayOffset = 0): array
     {
@@ -332,6 +332,7 @@ class OrderRepository extends ServiceEntityRepository
             ->getArrayResult();
 
         $pending = 0;
+        $ready = 0;
         $completed = 0;
         $canceled = 0;
         $new = 0;
@@ -343,6 +344,8 @@ class OrderRepository extends ServiceEntityRepository
             $value = $status instanceof OrderStatus ? $status->value : (string) $status;
             if (OrderStatus::PENDING->value === $value) {
                 $pending += $count;
+            } elseif (OrderStatus::FULFILLED->value === $value) {
+                $ready += $count;
             } elseif (OrderStatus::COMPLETED->value === $value) {
                 $completed += $count;
             } elseif (OrderStatus::CANCELLED->value === $value || OrderStatus::REFUNDED->value === $value) {
@@ -353,6 +356,7 @@ class OrderRepository extends ServiceEntityRepository
         return [
             'new' => $new,
             'pending' => $pending,
+            'ready' => $ready,
             'completed' => $completed,
             'canceled' => $canceled,
         ];

@@ -138,7 +138,9 @@ export default function ReportsTab({ slug }: { slug: string }) {
       return buckets.map((b) => ({
         label: b.label,
         value: b.revenueCents,
-        secondary: b.orderCount ? `${b.orderCount} order${b.orderCount === 1 ? '' : 's'}` : undefined,
+        secondary: b.orderCount
+          ? `${b.orderCount} revenue order${b.orderCount === 1 ? '' : 's'}`
+          : undefined,
       }))
     }
     const chunkSize = Math.ceil(buckets.length / 24)
@@ -150,7 +152,7 @@ export default function ReportsTab({ slug }: { slug: string }) {
       chunked.push({
         label: slice.length === 1 ? slice[0].label : `${slice[0].label} – ${slice[slice.length - 1].label}`,
         value: revenue,
-        secondary: orderCount ? `${orderCount} orders` : undefined,
+        secondary: orderCount ? `${orderCount} revenue orders` : undefined,
       })
     }
     return chunked
@@ -210,7 +212,8 @@ export default function ReportsTab({ slug }: { slug: string }) {
           <div>
             <h2 className="text-lg font-bold text-fg">Sales reports</h2>
             <p className="mt-1 text-sm text-fg-muted">
-              Revenue includes paid, shipped, completed, and fulfilled orders in the selected range.
+              Revenue includes paid, ready-for-pickup, shipped, and delivered orders in the selected range
+              (not pending or canceled). Day bars use your local calendar date.
               {showProfitMetrics && ' Profit metrics use acquisition cost snapshotted on each order line.'}
             </p>
           </div>
