@@ -129,4 +129,20 @@ class CustomerNotificationRepository extends ServiceEntityRepository
             'title' => $title,
         ]);
     }
+
+    /** Latest notification of a type for this shopper at a store (draft upserts). */
+    public function findLatestOfType(User $user, Store $store, string $type): ?CustomerNotification
+    {
+        return $this->createQueryBuilder('notification')
+            ->andWhere('notification.user = :user')
+            ->andWhere('notification.store = :store')
+            ->andWhere('notification.type = :type')
+            ->setParameter('user', $user)
+            ->setParameter('store', $store)
+            ->setParameter('type', $type)
+            ->orderBy('notification.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }

@@ -1070,6 +1070,25 @@ export interface SellSubmission {
   storeName?: string | null
 }
 
+/** In-progress sell/trade list on the customer profile (not yet submitted). */
+export interface SellTradeDraftSummary {
+  storeSlug: string
+  storeName: string
+  payoutMethod: SellPayoutMethod
+  gameFilter: string
+  cardCount: number
+  lineCount: number
+  updatedAt: string
+  lines: Array<{
+    key: string
+    card: CardSummary
+    finish: string
+    condition: string
+    quantity: number
+    entry?: BuylistEntry | null
+  }>
+}
+
 export interface StoreCreditTransaction {
   id: number
   amountCents: number

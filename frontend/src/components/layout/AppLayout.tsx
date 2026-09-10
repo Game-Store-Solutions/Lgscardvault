@@ -6,6 +6,7 @@ import { useCustomerCart, useGuestCart, useKioskMode, useStore, useTheme, APP_CH
 import { useOnboardingDraft } from '../../hooks/useOnboardingDraft'
 import { isOnboardingDraftInProgress } from '../../pages/onboarding/draftStorage'
 import { StorefrontBackground } from '../store/backgrounds'
+import { SellTradeDraftToast } from '../SellTradeDraftToast'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { StoreFooter } from '../store/StoreFooter'
 import { LegalLinks } from '../legal/LegalLinks'
@@ -224,6 +225,8 @@ export default function AppLayout() {
               {storeSlug ? <StoreFooter slug={storeSlug} /> : <MarketplaceLegalFooter />}
             </div>
           </div>
+
+          <SellTradeDraftToast />
 
           {lockedSlug && (
             <KioskExitModal
@@ -570,6 +573,7 @@ export default function AppLayout() {
           {storeSlug ? <StoreFooter slug={storeSlug} /> : <MarketplaceLegalFooter />}
         </div>
       </div>
+      <SellTradeDraftToast />
     </div>
     </AppShellLayoutProvider>
   )

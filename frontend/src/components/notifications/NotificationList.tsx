@@ -7,10 +7,14 @@ import { cx } from '../../lib/cx'
 function notificationHref(notification: CustomerNotification): string {
   const store = notification.storeSlug ? `&store=${notification.storeSlug}` : ''
   const order = notification.orderId ? `&order=${notification.orderId}` : ''
+  if (notification.type === 'sell_trade_draft_saved' && notification.storeSlug) {
+    return `/s/${notification.storeSlug}/sell`
+  }
   if (
     notification.type === 'sell_trade_completed'
     || notification.type === 'sell_trade_accepted'
     || notification.type === 'sell_trade_declined'
+    || notification.type === 'sell_trade_submitted'
   ) {
     return notification.type === 'sell_trade_completed' && notification.body.toLowerCase().includes('store credit')
       ? `/account?section=credit${store}`

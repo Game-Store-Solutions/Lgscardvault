@@ -40,4 +40,22 @@ class StoreCustomerRepository extends ServiceEntityRepository
     {
         return $this->findBy(['user' => $user], ['updatedAt' => 'DESC']);
     }
+
+    /** Customers with a non-empty in-progress sell/trade draft. */
+    /** @return list<StoreCustomer> */
+    public function findWithSellTradeDraftsForUser(User $user, ?Store $store = null): array
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->join('c.store', 's')->addSelect('s')
+            ->andWhere('c.user = :user')
+            ->andWhere('c.sellTradeDraft IS NOT NULL')
+            ->setParameter('user', $user)
+            ->orderBy('c.updatedAt', 'DESC');
+
+        if ($store instanceof Store) {
+            $qb->andWhere('c.store = :store')->setParameter('store', $store);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

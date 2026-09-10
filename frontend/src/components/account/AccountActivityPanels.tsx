@@ -3,8 +3,8 @@ import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Heart, ImageOff, Trash2, Wallet, WalletCards } from 'lucide-react'
 import api, { ACCOUNT_PAGE_SIZE, cardImage, formatPrice, formatScryfallPrice } from '../../api/client'
-import type { CustomerFavorite, CustomerNotification, PaginatedList, SellSubmission, StoreCreditBalance, StoreCreditSummary, StoreCreditTransaction } from '../../api/types'
-import { customerKeys, useMarkAllNotificationsRead, useMarkNotificationRead, useMyFavorites, useMyNotifications, useMySellSubmissions } from '../../hooks'
+import type { CustomerFavorite, CustomerNotification, PaginatedList, SellSubmission, SellTradeDraftSummary, StoreCreditBalance, StoreCreditSummary, StoreCreditTransaction } from '../../api/types'
+import { customerKeys, useMarkAllNotificationsRead, useMarkNotificationRead, useMyFavorites, useMyNotifications, useMySellSubmissions, useMySellTradeDrafts } from '../../hooks'
 import { NotificationList } from '../notifications/NotificationList'
 import { Badge, Button, buttonVariants, EmptyState, ErrorState, LoadingPanel, Pagination, Select } from '../ui'
 import { cx } from '../../lib/cx'
@@ -131,28 +131,33 @@ export function SellTradeHistoryPanel({
   const [page, setPage] = useState(1)
   const query = useMySellSubmissions(page, storeSlug)
   const allQuery = useMySellSubmissions(1, undefined, Boolean(storeSlug))
+  const draftsQuery = useMySellTradeDrafts(storeSlug)
+  const allDraftsQuery = useMySellTradeDrafts(undefined, Boolean(storeSlug))
 
   useEffect(() => {
     setPage(1)
   }, [storeSlug])
 
-  if (query.isLoading) return <LoadingPanel bare label="Loading your sell/trade history…" />
+  if (query.isLoading || draftsQuery.isLoading) return <LoadingPanel bare label="Loading your sell/trade history…" />
   if (query.isError) return <ErrorState title="Could not load your sell/trade history." onRetry={() => void query.refetch()} />
 
   const submissions = query.data?.items ?? []
+  const drafts = draftsQuery.data ?? []
   const otherStoreCount = Math.max(0, (allQuery.data?.total ?? 0) - (query.data?.total ?? 0))
-  if (submissions.length === 0) {
+  const otherDraftCount = Math.max(0, (allDraftsQuery.data?.length ?? 0) - drafts.length)
+
+  if (submissions.length === 0 && drafts.length === 0) {
     return (
       <EmptyState
         icon={WalletCards}
         title="No sell/trade submissions yet"
         description={
-          storeSlug && otherStoreCount > 0
-            ? `No sell/trades at this store. You have ${otherStoreCount} at other stores.`
-            : 'Cards you offer to sell at any store will show up here.'
+          storeSlug && (otherStoreCount > 0 || otherDraftCount > 0)
+            ? `No sell/trades at this store. You have activity at other stores.`
+            : 'Cards you offer to sell at any store will show up here. Unfinished lists appear here as drafts.'
         }
         action={
-          storeSlug && otherStoreCount > 0 && onClearStoreFilter ? (
+          storeSlug && (otherStoreCount > 0 || otherDraftCount > 0) && onClearStoreFilter ? (
             <button type="button" onClick={onClearStoreFilter} className="text-sm font-bold text-brand-600 hover:underline">
               View all sell/trades
             </button>
@@ -168,58 +173,116 @@ export function SellTradeHistoryPanel({
 
   return (
     <div className="space-y-4">
-      {storeSlug && otherStoreCount > 0 && onClearStoreFilter ? (
+      {storeSlug && (otherStoreCount > 0 || otherDraftCount > 0) && onClearStoreFilter ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 text-sm">
           <p className="text-fg-muted">
-            Showing this store only. {otherStoreCount} more sell/trade
-            {otherStoreCount === 1 ? '' : 's'} at other stores.
+            Showing this store only.
+            {otherStoreCount > 0
+              ? ` ${otherStoreCount} more sell/trade${otherStoreCount === 1 ? '' : 's'} at other stores.`
+              : ''}
+            {otherDraftCount > 0
+              ? ` ${otherDraftCount} draft${otherDraftCount === 1 ? '' : 's'} at other stores.`
+              : ''}
           </p>
           <button type="button" onClick={onClearStoreFilter} className="font-bold text-brand-600 hover:underline">
             View all
           </button>
         </div>
       ) : null}
-      <ul className="divide-y divide-border">
-        {submissions.map((submission) => (
-          <li key={`${submission.storeSlug ?? 'store'}-${submission.id}`} className="py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-bold text-fg">
-                  {submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)} cards · store pays {formatPrice(submission.totalOfferCents)} in {submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}
-                </p>
-                <p className="mt-0.5 text-sm text-fg-muted">
-                  {submission.storeName ? `${submission.storeName} · ` : ''}
-                  {new Date(submission.createdAt).toLocaleString()}
-                </p>
+
+      {drafts.length > 0 ? (
+        <ul className="divide-y divide-border rounded-btn border border-dashed border-brand-300/60 bg-brand-50/40 dark:bg-brand-950/20">
+          {drafts.map((draft) => (
+            <SellTradeDraftRow key={draft.storeSlug} draft={draft} />
+          ))}
+        </ul>
+      ) : null}
+
+      {submissions.length > 0 ? (
+        <ul className="divide-y divide-border">
+          {submissions.map((submission) => (
+            <li key={`${submission.storeSlug ?? 'store'}-${submission.id}`} className="py-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-fg">
+                    {submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)} cards · store pays{' '}
+                    {formatPrice(submission.totalOfferCents)} in {submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}
+                  </p>
+                  <p className="mt-0.5 text-sm text-fg-muted">
+                    {submission.storeName ? `${submission.storeName} · ` : ''}
+                    {new Date(submission.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">
+                  {submission.status}
+                </Badge>
               </div>
-              <Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">{submission.status}</Badge>
-            </div>
-            <ul className="mt-3 space-y-1 text-sm">
-              {submission.items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate text-fg">
-                    {item.quantity}× {item.cardName}
-                    {item.isFoil ? ` (${item.finish})` : ''}
-                  </span>
-                  <span className="shrink-0 text-fg-muted">{formatPrice(item.offerCentsEach)} each</span>
-                </li>
-              ))}
-            </ul>
-            {submission.storeSlug ? (
-              <Link to={`/s/${submission.storeSlug}/sell`} className="mt-3 inline-block text-sm font-bold text-brand-600 hover:underline">
-                Open this store’s buy list →
-              </Link>
-            ) : null}
+              <ul className="mt-3 space-y-1 text-sm">
+                {submission.items.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-fg">
+                      {item.quantity}× {item.cardName}
+                      {item.isFoil ? ` (${item.finish})` : ''}
+                    </span>
+                    <span className="shrink-0 text-fg-muted">{formatPrice(item.offerCentsEach)} each</span>
+                  </li>
+                ))}
+              </ul>
+              {submission.storeSlug ? (
+                <Link to={`/s/${submission.storeSlug}/sell`} className="mt-3 inline-block text-sm font-bold text-brand-600 hover:underline">
+                  Open this store’s buy list →
+                </Link>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {submissions.length > 0 ? (
+        <Pagination
+          page={page}
+          pageCount={pageCount(query.data?.total ?? 0)}
+          onPageChange={setPage}
+          totalItems={query.data?.total}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function SellTradeDraftRow({ draft }: { draft: SellTradeDraftSummary }) {
+  const preview = draft.lines.slice(0, 4)
+  const remaining = Math.max(0, draft.lineCount - preview.length)
+
+  return (
+    <li className="px-3 py-4 sm:px-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-bold text-fg">
+            {draft.cardCount} card{draft.cardCount === 1 ? '' : 's'} · unfinished list
+            {draft.payoutMethod === 'cash' ? ' · cash payout' : ' · store credit'}
+          </p>
+          <p className="mt-0.5 text-sm text-fg-muted">
+            {draft.storeName} · saved {new Date(draft.updatedAt).toLocaleString()}
+          </p>
+        </div>
+        <Badge tone="warning" className="uppercase">
+          Draft
+        </Badge>
+      </div>
+      <ul className="mt-3 space-y-1 text-sm">
+        {preview.map((line) => (
+          <li key={line.key} className="truncate text-fg">
+            {line.quantity}× {line.card.name}
+            {line.finish && line.finish !== 'Nonfoil' ? ` (${line.finish})` : ''}
           </li>
         ))}
+        {remaining > 0 ? <li className="text-fg-muted">+{remaining} more</li> : null}
       </ul>
-      <Pagination
-        page={page}
-        pageCount={pageCount(query.data?.total ?? 0)}
-        onPageChange={setPage}
-        totalItems={query.data?.total}
-      />
-    </div>
+      <Link to={`/s/${draft.storeSlug}/sell`} className="mt-3 inline-block text-sm font-bold text-brand-600 hover:underline">
+        Continue this list →
+      </Link>
+    </li>
   )
 }
 

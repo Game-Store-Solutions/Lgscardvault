@@ -39,6 +39,19 @@ import {
 import { formatDate } from '../lib/format'
 import { finishChoices, finishOptions, isFoilFinish } from '../lib/finishes'
 import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../lib/searchText'
+import {
+  clearSellTradeDraft,
+  deleteSellTradeDraft,
+  fetchSellTradeDraft,
+  flushSellTradeDraftOnLeave,
+  isSellTradeDraftEmpty,
+  loadSellTradeDraft,
+  persistSellTradeDraft,
+  saveSellTradeDraft,
+  type SellTradeDraft,
+  type SellTradeDraftLine,
+} from '../lib/sellTradeDraft'
+import { invalidateCustomerNotifications } from '../hooks'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { cx } from '../lib/cx'
@@ -58,14 +71,7 @@ const STATUS_TONE: Record<SellSubmission['status'], 'brand' | 'success' | 'dange
 }
 
 /** One card the customer is offering to sell. Buy-list lines carry their entry. */
-interface SellLine {
-  key: string
-  card: CardSummary
-  entry: BuylistEntry | null
-  finish: string
-  condition: Condition
-  quantity: number
-}
+type SellLine = SellTradeDraftLine
 
 function lineKey(card: CardSummary, entry: BuylistEntry | null, finish: string, condition: Condition): string {
   return entry ? `entry:${entry.id}:${condition}` : `card:${card.id}:${finish}:${condition}`
@@ -133,7 +139,7 @@ export default function SellTradePage() {
     () => catalogGames.map((game) => ({ code: game.code, name: game.name })),
     [catalogGames],
   )
-  const [gameFilter, setGameFilter] = useState('')
+  const [gameFilter, setGameFilter] = useState(() => loadSellTradeDraft(slug)?.gameFilter ?? '')
 
   useEffect(() => {
     if (!gameFilter && gameOptions.length > 0) {
@@ -168,10 +174,172 @@ export default function SellTradePage() {
     },
   })
 
-  const [lines, setLines] = useState<SellLine[]>([])
-  const [payoutMethod, setPayoutMethod] = useState<SellPayoutMethod>('credit')
-  const [kioskCustomerName, setKioskCustomerName] = useState('')
+  const [hydrated, setHydrated] = useState(false)
+  const [lines, setLines] = useState<SellLine[]>(() => loadSellTradeDraft(slug)?.lines ?? [])
+  const [payoutMethod, setPayoutMethod] = useState<SellPayoutMethod>(
+    () => loadSellTradeDraft(slug)?.payoutMethod ?? 'credit',
+  )
+  const [kioskCustomerName, setKioskCustomerName] = useState(
+    () => loadSellTradeDraft(slug)?.kioskCustomerName ?? '',
+  )
   const [reviewOpen, setReviewOpen] = useState(false)
+  const serverSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipNextServerSync = useRef(true)
+  const draftRef = useRef<SellTradeDraft>({
+    lines: loadSellTradeDraft(slug)?.lines ?? [],
+    payoutMethod: loadSellTradeDraft(slug)?.payoutMethod ?? 'credit',
+    kioskCustomerName: loadSellTradeDraft(slug)?.kioskCustomerName ?? '',
+    gameFilter: loadSellTradeDraft(slug)?.gameFilter ?? '',
+  })
+  const storeNameRef = useRef(store?.name ?? 'the store')
+  const leavingNotified = useRef(false)
+  const leaveMountId = useRef(0)
+
+  useEffect(() => {
+    storeNameRef.current = store?.name ?? 'the store'
+  }, [store?.name])
+
+  function applyDraft(draft: SellTradeDraft | null) {
+    setLines(draft?.lines ?? [])
+    setPayoutMethod(draft?.payoutMethod ?? 'credit')
+    setKioskCustomerName(draft?.kioskCustomerName ?? '')
+    if (draft?.gameFilter) setGameFilter(draft.gameFilter)
+  }
+
+  // Keep a live snapshot for unload / route leave flush.
+  useEffect(() => {
+    draftRef.current = { lines, payoutMethod, kioskCustomerName, gameFilter }
+  }, [lines, payoutMethod, kioskCustomerName, gameFilter])
+
+  // Paint local draft immediately, then quietly reconcile with the profile.
+  useEffect(() => {
+    let cancelled = false
+    skipNextServerSync.current = true
+
+    const local = loadSellTradeDraft(slug)
+    applyDraft(local)
+    setHydrated(true)
+
+    async function reconcile() {
+      if (!user) return
+      try {
+        const remote = await fetchSellTradeDraft(slug)
+        if (cancelled) return
+        if (remote && !isSellTradeDraftEmpty(remote)) {
+          const localNow = loadSellTradeDraft(slug)
+          const remoteCount = remote.lines.reduce((n, line) => n + line.quantity, 0)
+          const localCount = localNow?.lines.reduce((n, line) => n + line.quantity, 0) ?? 0
+          if (!localNow || isSellTradeDraftEmpty(localNow) || remoteCount >= localCount) {
+            skipNextServerSync.current = true
+            applyDraft(remote)
+            saveSellTradeDraft(slug, remote)
+          }
+        } else if (local && !isSellTradeDraftEmpty(local)) {
+          try {
+            await persistSellTradeDraft(slug, local)
+          } catch {
+            // Offline — local draft still drives the UI.
+          }
+        }
+      } catch {
+        // Keep whatever local already painted.
+      }
+    }
+
+    void reconcile()
+    return () => {
+      cancelled = true
+    }
+  }, [slug, user?.id, user])
+
+  // Flush + alert when leaving this page (SPA navigate or tab close).
+  useEffect(() => {
+    const mountId = ++leaveMountId.current
+    leavingNotified.current = false
+
+    function flushLeave() {
+      if (leavingNotified.current || kioskMode || !user) return
+      const draft = draftRef.current
+      if (isSellTradeDraftEmpty(draft)) return
+      leavingNotified.current = true
+      flushSellTradeDraftOnLeave(slug, draft, localStorage.getItem('token'))
+      try {
+        sessionStorage.setItem(
+          'lgs-sell-draft-toast',
+          JSON.stringify({
+            slug,
+            storeName: storeNameRef.current,
+            cardCount: draft.lines.reduce((n, line) => n + line.quantity, 0),
+          }),
+        )
+      } catch {
+        // ignore
+      }
+      void queryClient.invalidateQueries({ queryKey: ['my-sell-trade-drafts'] })
+      invalidateCustomerNotifications(queryClient)
+    }
+
+    window.addEventListener('pagehide', flushLeave)
+    return () => {
+      window.removeEventListener('pagehide', flushLeave)
+      if (serverSyncTimer.current) clearTimeout(serverSyncTimer.current)
+      // Defer so React Strict Mode remounts don't fire a false "left the page".
+      queueMicrotask(() => {
+        if (leaveMountId.current !== mountId) return
+        flushLeave()
+      })
+    }
+  }, [slug, user?.id, user, kioskMode, queryClient])
+
+  useEffect(() => {
+    if (!hydrated || !slug) return
+    const draft: SellTradeDraft = { lines, payoutMethod, kioskCustomerName, gameFilter }
+    saveSellTradeDraft(slug, draft)
+
+    if (!user || kioskMode) return
+    if (skipNextServerSync.current) {
+      skipNextServerSync.current = false
+      return
+    }
+    if (serverSyncTimer.current) clearTimeout(serverSyncTimer.current)
+    serverSyncTimer.current = setTimeout(() => {
+      void persistSellTradeDraft(slug, draft)
+        .then(() => {
+          void queryClient.invalidateQueries({ queryKey: ['my-sell-trade-drafts'] })
+        })
+        .catch(() => {
+          // Keep local draft; next edit retries.
+        })
+    }, 450)
+  }, [hydrated, slug, lines, payoutMethod, kioskCustomerName, gameFilter, user, kioskMode, queryClient])
+
+  // Refresh buy-list offers (or drop dead entries) after restore / buylist fetch.
+  useEffect(() => {
+    if (!hydrated || buylistLoading) return
+    setLines((current) => {
+      let changed = false
+      const next = current.map((line) => {
+        if (!line.entry) return line
+        const fresh = buylist.find((entry) => entry.id === line.entry!.id && entry.active)
+        if (!fresh) {
+          changed = true
+          return {
+            ...line,
+            entry: null,
+            key: lineKey(line.card, null, line.finish, line.condition),
+          }
+        }
+        if (fresh === line.entry) return line
+        changed = true
+        return {
+          ...line,
+          entry: fresh,
+          key: lineKey(line.card, fresh, line.finish, line.condition),
+        }
+      })
+      return changed ? next : current
+    })
+  }, [hydrated, buylist, buylistLoading])
 
   // Card search: text typeahead → pick name → printings (Singles Add style)
   const [searchTerm, setSearchTerm] = useState('')
@@ -365,8 +533,24 @@ export default function SellTradePage() {
     onSuccess: async () => {
       setLines([])
       setKioskCustomerName('')
+      setPayoutMethod('credit')
       setReviewOpen(false)
       clearSearch()
+      clearSellTradeDraft(slug)
+      try {
+        sessionStorage.removeItem('lgs-sell-draft-toast')
+      } catch {
+        // ignore
+      }
+      leavingNotified.current = true
+      if (user && !kioskMode) {
+        void deleteSellTradeDraft(slug)
+          .then(() => {
+            void queryClient.invalidateQueries({ queryKey: ['my-sell-trade-drafts'] })
+            invalidateCustomerNotifications(queryClient)
+          })
+          .catch(() => undefined)
+      }
       await queryClient.invalidateQueries({ queryKey: mySubmissionsKey(slug) })
       void queryClient.invalidateQueries({ queryKey: ['my-notifications'] })
       setAddNotice(
@@ -484,9 +668,9 @@ export default function SellTradePage() {
     pickingPrintings &&
     (printingsQuery.isPending || printingsQuery.isFetching || printings.length > 1)
 
-  // Full-screen branded loader only while the screen isn't completely
-  // loaded — cached revisits render instantly.
-  if (storeLoading || buylistLoading) {
+  // Full-screen branded loader only while the store shell isn't ready —
+  // buy list and draft hydrate in place so revisits feel instant.
+  if (storeLoading) {
     return <StorePageLoader label="Loading sell & trade…" />
   }
 
@@ -810,7 +994,16 @@ export default function SellTradePage() {
         {/* Desktop: sticky summary column */}
         <aside className="hidden lg:sticky lg:top-20 lg:block">
           <Card>
-            <CardHeader title="Your sell list" subtitle={lines.length === 0 ? 'Add cards to see your offer.' : undefined} />
+            <CardHeader
+              title="Your sell list"
+              subtitle={
+                lines.length === 0
+                  ? 'Add cards to see your offer.'
+                  : user && !kioskMode
+                    ? 'Saved as a draft — leave anytime and continue later.'
+                    : undefined
+              }
+            />
             <CardBody>{summaryPanel}</CardBody>
           </Card>
         </aside>
