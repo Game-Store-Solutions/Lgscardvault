@@ -18,6 +18,7 @@ class CustomerNotification
     public const TYPE_SELL_TRADE_ACCEPTED = 'sell_trade_accepted';
     public const TYPE_SELL_TRADE_DECLINED = 'sell_trade_declined';
     public const TYPE_SELL_TRADE_COMPLETED = 'sell_trade_completed';
+    public const TYPE_SELL_TRADE_DRAFT_SAVED = 'sell_trade_draft_saved';
 
     /** @var list<string> */
     public const TYPES = [
@@ -29,6 +30,7 @@ class CustomerNotification
         self::TYPE_SELL_TRADE_ACCEPTED,
         self::TYPE_SELL_TRADE_DECLINED,
         self::TYPE_SELL_TRADE_COMPLETED,
+        self::TYPE_SELL_TRADE_DRAFT_SAVED,
     ];
 
     #[ORM\Id]
@@ -148,6 +150,13 @@ class CustomerNotification
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function touchCreatedAt(): static
+    {
+        $this->createdAt = new \DateTimeImmutable();
+
+        return $this;
     }
 
     public function getReadAt(): ?\DateTimeImmutable

@@ -52,6 +52,14 @@ class StoreCustomer
     #[ORM\Column(length: 32, nullable: true)]
     private ?string $paymentMethodType = null;
 
+    /**
+     * In-progress sell/trade list for this store (ids + qty). Null when empty.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $sellTradeDraft = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -208,6 +216,21 @@ class StoreCustomer
     public function setPaymentMethodType(?string $paymentMethodType): static
     {
         $this->paymentMethodType = $paymentMethodType;
+        $this->touch();
+
+        return $this;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getSellTradeDraft(): ?array
+    {
+        return $this->sellTradeDraft;
+    }
+
+    /** @param array<string, mixed>|null $sellTradeDraft */
+    public function setSellTradeDraft(?array $sellTradeDraft): static
+    {
+        $this->sellTradeDraft = $sellTradeDraft;
         $this->touch();
 
         return $this;

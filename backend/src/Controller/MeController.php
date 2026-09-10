@@ -11,10 +11,12 @@ use App\Repository\CustomerWantListEntryRepository;
 use App\Repository\OrderRepository;
 use App\Repository\SellSubmissionRepository;
 use App\Repository\StoreCreditTransactionRepository;
+use App\Repository\StoreCustomerRepository;
 use App\Repository\StoreRepository;
 use App\Repository\StoreStaffRepository;
 use App\Service\Customer\ActivityListPagination;
 use App\Service\Customer\MarketplaceActivitySerializer;
+use App\Service\Customer\SellTradeDraftService;
 use App\Service\Credit\StoreCreditLedger;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
@@ -52,6 +54,8 @@ class MeController extends AbstractController
         private readonly CustomerFavoriteRepository $favoriteRepository,
         private readonly CustomerNotificationRepository $notificationRepository,
         private readonly SellSubmissionRepository $sellSubmissionRepository,
+        private readonly StoreCustomerRepository $storeCustomerRepository,
+        private readonly SellTradeDraftService $sellTradeDraftService,
         private readonly StoreCreditTransactionRepository $creditTransactions,
         private readonly StoreCreditLedger $creditLedger,
         private readonly MarketplaceActivitySerializer $activitySerializer,
@@ -289,6 +293,46 @@ class MeController extends AbstractController
             $this->sellSubmissionRepository->countForUser($user, $store),
             $pagination,
         ));
+    }
+
+    /** In-progress sell/trade drafts across stores (not yet submitted). */
+    #[Route('/me/sell-trade-drafts', name: 'api_me_sell_trade_drafts', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function mySellTradeDrafts(Request $request): JsonResponse
+    {
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        $user = $this->requireUser();
+        $items = [];
+        foreach ($this->storeCustomerRepository->findWithSellTradeDraftsForUser($user, $store) as $customer) {
+            $rowStore = $customer->getStore();
+            if (!$rowStore instanceof Store) {
+                continue;
+            }
+            $draft = $this->sellTradeDraftService->hydrate($customer->getSellTradeDraft(), $rowStore);
+            if (null === $draft || [] === ($draft['lines'] ?? [])) {
+                continue;
+            }
+            $cardCount = 0;
+            foreach ($draft['lines'] as $line) {
+                $cardCount += (int) ($line['quantity'] ?? 0);
+            }
+            $items[] = [
+                'storeSlug' => $rowStore->getSlug(),
+                'storeName' => $rowStore->getName(),
+                'payoutMethod' => $draft['payoutMethod'],
+                'gameFilter' => $draft['gameFilter'],
+                'cardCount' => $cardCount,
+                'lineCount' => \count($draft['lines']),
+                'updatedAt' => $customer->getUpdatedAt()->format(DATE_ATOM),
+                'lines' => $draft['lines'],
+            ];
+        }
+
+        return $this->json(['items' => $items]);
     }
 
     /**

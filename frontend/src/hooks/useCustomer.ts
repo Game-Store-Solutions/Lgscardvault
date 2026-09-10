@@ -8,6 +8,7 @@ import type {
   PaginatedList,
   PaginatedOrders,
   SellSubmission,
+  SellTradeDraftSummary,
   StoreCustomer,
 } from '../api/types'
 
@@ -30,6 +31,7 @@ export const customerKeys = {
   myFavorites: (page: number, store?: string) => ['my-favorites', page, store ?? 'all'] as const,
   myNotifications: (page: number, store?: string) => ['my-notifications', page, store ?? 'all'] as const,
   mySellSubmissions: (page: number, store?: string) => ['my-sell-submissions', page, store ?? 'all'] as const,
+  mySellTradeDrafts: (store?: string) => ['my-sell-trade-drafts', store ?? 'all'] as const,
   myCredit: (page: number, store?: string) => ['my-credit', page, store ?? 'all'] as const,
   notifications: (slug: string) => ['customer-notifications', slug] as const,
 }
@@ -239,6 +241,19 @@ export function useMySellSubmissions(page = 1, storeSlug?: string, enabled = tru
     },
     enabled,
     placeholderData: keepPreviousData,
+  })
+}
+
+export function useMySellTradeDrafts(storeSlug?: string, enabled = true) {
+  return useQuery({
+    queryKey: customerKeys.mySellTradeDrafts(storeSlug),
+    queryFn: async () => {
+      const { data } = await api.get<{ items: SellTradeDraftSummary[] }>('/me/sell-trade-drafts', {
+        params: storeSlug ? { store: storeSlug } : undefined,
+      })
+      return data.items ?? []
+    },
+    enabled,
   })
 }
 

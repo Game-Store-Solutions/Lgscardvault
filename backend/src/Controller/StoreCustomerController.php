@@ -35,6 +35,8 @@ use App\Service\Checkout\PickupFulfillment;
 use App\Service\Checkout\PickupOrderTaxSync;
 use App\Service\Checkout\PickupTaxNotReadyException;
 use App\Service\Checkout\PickupTaxPolicy;
+use App\Service\Customer\SellTradeDraftService;
+use App\Service\Notification\SellTradeDraftNotifier;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
 use App\Service\Payments\CheckoutGatewayInterface;
@@ -77,6 +79,8 @@ final class StoreCustomerController extends AbstractController
         private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly PickupOrderTaxSync $pickupOrderTaxSync,
         private readonly CustomerPaymentProfileSync $paymentProfileSync,
+        private readonly SellTradeDraftService $sellTradeDraftService,
+        private readonly SellTradeDraftNotifier $sellTradeDraftNotifier,
         private readonly EntityManagerInterface $entityManager,
         private readonly KernelInterface $kernel,
     ) {
@@ -463,6 +467,91 @@ final class StoreCustomerController extends AbstractController
                 $this->entityManager->remove($entry);
             }
             $this->entityManager->flush();
+        }
+
+        return $this->json(null, 204);
+    }
+
+    /**
+     * In-progress sell/trade list for the signed-in shopper at this store.
+     * Read-only: no customer row yet ⇒ empty draft.
+     */
+    #[Route('/sell-trade-draft', name: 'api_store_customer_sell_trade_draft_show', methods: ['GET'])]
+    public function sellTradeDraft(string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $customer = $this->findCustomer($store);
+        $draft = $customer instanceof StoreCustomer
+            ? $this->sellTradeDraftService->hydrate($customer->getSellTradeDraft(), $store)
+            : null;
+
+        return $this->json(['draft' => $draft]);
+    }
+
+    /** Upsert the sell/trade draft. Empty payload clears it. Pass notify=1 when leaving the page. */
+    #[Route('/sell-trade-draft', name: 'api_store_customer_sell_trade_draft_save', methods: ['PUT'])]
+    public function saveSellTradeDraft(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!\is_array($payload)) {
+            return $this->json(['detail' => 'Invalid JSON body.'], 400);
+        }
+
+        try {
+            $stored = $this->sellTradeDraftService->normalizeStored($store, $payload);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['detail' => $e->getMessage()], 422);
+        }
+
+        $customer = $this->getOrCreateCustomer($store);
+        $customer->setSellTradeDraft($stored);
+        $this->entityManager->flush();
+
+        $user = $this->getUser();
+        $notify = $request->query->getBoolean('notify') || !empty($payload['notify']);
+        if ($user instanceof User) {
+            $cardCount = 0;
+            foreach ($stored['lines'] ?? [] as $line) {
+                $cardCount += (int) ($line['quantity'] ?? 0);
+            }
+            if ($notify && $cardCount > 0) {
+                $this->sellTradeDraftNotifier->notifySaved($user, $store, $cardCount);
+            } elseif (null === $stored || 0 === $cardCount) {
+                $this->sellTradeDraftNotifier->clear($user, $store);
+            }
+        }
+
+        return $this->json([
+            'draft' => $this->sellTradeDraftService->hydrate($stored, $store),
+        ]);
+    }
+
+    #[Route('/sell-trade-draft', name: 'api_store_customer_sell_trade_draft_clear', methods: ['DELETE'])]
+    public function clearSellTradeDraft(string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $customer = $this->findCustomer($store);
+        if ($customer instanceof StoreCustomer && null !== $customer->getSellTradeDraft()) {
+            $customer->setSellTradeDraft(null);
+            $this->entityManager->flush();
+        }
+
+        $user = $this->getUser();
+        if ($user instanceof User) {
+            $this->sellTradeDraftNotifier->clear($user, $store);
         }
 
         return $this->json(null, 204);
