@@ -231,10 +231,15 @@ final class StoreBuylistControllerTest extends WebTestCase
 
         $this->authenticate($customer);
         $acceptedNotes = $this->jsonRequest('GET', '/api/me/notifications');
-        self::assertCount(1, $acceptedNotes['items'] ?? []);
-        self::assertSame('sell_trade_accepted', $acceptedNotes['items'][0]['type']);
-        self::assertSame(sprintf('Sell/trade #%d accepted', $submission['id']), $acceptedNotes['items'][0]['title']);
-        self::assertStringContainsString('accepted your sell/trade', $acceptedNotes['items'][0]['body']);
+        $acceptedTypes = array_column($acceptedNotes['items'] ?? [], 'type');
+        self::assertContains('sell_trade_submitted', $acceptedTypes);
+        self::assertContains('sell_trade_accepted', $acceptedTypes);
+        $acceptedNote = array_values(array_filter(
+            $acceptedNotes['items'] ?? [],
+            static fn (array $note): bool => 'sell_trade_accepted' === $note['type'],
+        ))[0];
+        self::assertSame(sprintf('Sell/trade #%d accepted', $submission['id']), $acceptedNote['title']);
+        self::assertStringContainsString('accepted your sell/trade', $acceptedNote['body']);
 
         // Completing the deal stocks the accepted copies with the payout as COGS.
         $this->authenticate($store->getOwner());
@@ -407,9 +412,14 @@ final class StoreBuylistControllerTest extends WebTestCase
 
         $this->authenticate($customer);
         $notes = $this->jsonRequest('GET', '/api/me/notifications');
-        self::assertCount(1, $notes['items'] ?? []);
-        self::assertSame('sell_trade_declined', $notes['items'][0]['type']);
-        self::assertSame(sprintf('Sell/trade #%d declined', $submission['id']), $notes['items'][0]['title']);
-        self::assertStringContainsString('declined your sell/trade', $notes['items'][0]['body']);
+        $types = array_column($notes['items'] ?? [], 'type');
+        self::assertContains('sell_trade_submitted', $types);
+        self::assertContains('sell_trade_declined', $types);
+        $declinedNote = array_values(array_filter(
+            $notes['items'] ?? [],
+            static fn (array $note): bool => 'sell_trade_declined' === $note['type'],
+        ))[0];
+        self::assertSame(sprintf('Sell/trade #%d declined', $submission['id']), $declinedNote['title']);
+        self::assertStringContainsString('declined your sell/trade', $declinedNote['body']);
     }
 }
