@@ -114,9 +114,9 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
     <div className={cx('rounded-card', storeFrameClass('hero'), className)}>
     <div
       className={cx(
-        // Fixed aspect ratio so object-fit:cover framing stays stable as the
-        // viewport width changes (min-height breakpoints used to re-crop).
-        'relative isolate flex aspect-[12/5] w-full items-end overflow-hidden rounded-[inherit]',
+        // Mobile needs real height — a 12/5 strip clips the heading + CTAs.
+        // From sm up, keep the fixed cinematic crop.
+        'relative isolate flex min-h-[22rem] w-full items-end overflow-hidden rounded-[inherit] sm:min-h-0 sm:aspect-[12/5]',
       )}
     >
       <div aria-hidden className="absolute inset-0 -z-[21] bg-bg" style={{ backgroundColor: primary }} />
@@ -132,26 +132,35 @@ export function CinematicHero({ props, tokens }: { props: StoreHeroProps; tokens
           style={photoStyle as CSSProperties}
         />
       ) : null}
+      {/* Scrim so baked-in banner typography doesn’t fight the CTAs */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 -z-[5] h-[70%] bg-gradient-to-t from-black/85 via-black/45 to-transparent"
+      />
       <div
         aria-hidden
         className="pointer-events-none absolute -right-16 -top-20 -z-10 size-72 rounded-full opacity-50 blur-3xl"
         style={{ backgroundColor: accent }}
       />
-      <div className="relative w-full p-5 text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.55)] sm:p-8 lg:p-10">
+      <div className="relative w-full p-4 pb-5 text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.45)] sm:p-8 sm:[text-shadow:0_2px_12px_rgba(0,0,0,0.55)] lg:p-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-2 sm:space-y-0">
             <div className="flex flex-wrap items-center gap-3">
-              <HeroLogo logoUrl={logoUrl} className="size-12 sm:size-14" glass />
+              <HeroLogo logoUrl={logoUrl} className="size-11 sm:size-14" glass />
               {tagline?.trim() ? <HeroTagline tagline={tagline.trim()} accent={accent} light /> : null}
             </div>
-            <h1 className="mt-3 max-w-2xl font-display text-3xl font-bold leading-[1.05] tracking-tight drop-shadow-sm sm:mt-5 sm:text-4xl lg:text-5xl">
+            <h1 className="max-w-2xl font-display text-2xl font-bold leading-tight tracking-tight sm:mt-5 sm:text-4xl sm:leading-[1.05] lg:text-5xl">
               {heading}
             </h1>
             {heroSubheading?.trim() ? (
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/85 sm:mt-3 sm:text-base lg:text-lg">{heroSubheading}</p>
+              <p className="max-w-xl text-sm leading-relaxed text-white/90 sm:mt-3 sm:text-base lg:text-lg">{heroSubheading}</p>
             ) : null}
           </div>
-          {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">{actions}</div> : null}
+          {actions ? (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3 [&_a]:w-full sm:[&_a]:w-auto">
+              {actions}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
