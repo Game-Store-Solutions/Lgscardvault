@@ -1033,15 +1033,15 @@ function SubmissionsTable({
   }
 }) {
   return (
-    <table className="w-full table-fixed text-left text-sm">
+    <table className="w-full min-w-[56rem] table-fixed text-left text-sm">
       <thead>
         <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
-          <th className="w-[26%] px-5 py-3 font-semibold">Cards</th>
-          <th className="w-[22%] px-5 py-3 font-semibold">Customer</th>
-          <th className="w-[14%] px-5 py-3 font-semibold">Submission</th>
+          <th className="w-[22%] px-5 py-3 font-semibold">Cards</th>
+          <th className="w-[18%] px-5 py-3 font-semibold">Customer</th>
+          <th className="w-[12%] px-5 py-3 font-semibold">Submission</th>
           <th className="w-[12%] px-5 py-3 font-semibold">Payout</th>
-          <th className="w-[12%] px-5 py-3 font-semibold">Offer</th>
-          <th className="w-[10%] px-5 py-3 font-semibold">Status</th>
+          <th className="w-[10%] px-5 py-3 font-semibold">Offer</th>
+          <th className="w-[12%] px-5 py-3 font-semibold">Status</th>
           <th className="w-[14%] px-3 py-3 text-right font-semibold">Action</th>
         </tr>
       </thead>

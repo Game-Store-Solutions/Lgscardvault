@@ -552,44 +552,45 @@ export default function StorePage() {
 
       {isStoreFeatureEnabled(store, 'sellTrade') && !kioskMode && <TradePromoBanner slug={slug} showSellLink />}
 
-      {/* Slim stat line */}
-      <p className="text-sm text-fg-muted">
-        <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings ·{' '}
-        <span className="font-bold text-fg">{shelf?.copies ?? 0}</span> cards ·{' '}
-        <span className="font-bold text-fg">{availableSets.length}</span> sets
-        {isStoreFeatureEnabled(store, 'events') && (
-          <>
-            {' · '}
-            <Link
-              to={`/s/${slug}/events`}
-              className="font-bold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
-            >
-              Event calendar
-            </Link>
-          </>
-        )}
+      {/* Slim inventory counts — Event calendar lives in hero CTAs / quick tiles */}
+      <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-sm text-fg-muted">
+        <span>
+          <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings
+        </span>
+        <span aria-hidden className="text-fg-muted/50">
+          ·
+        </span>
+        <span>
+          <span className="font-bold text-fg">{shelf?.copies ?? 0}</span> cards
+        </span>
+        <span aria-hidden className="text-fg-muted/50">
+          ·
+        </span>
+        <span>
+          <span className="font-bold text-fg">{availableSets.length}</span> sets
+        </span>
       </p>
 
       {/* Quick actions. Themed shortcut tiles over the spotlight */}
-      <section className="space-y-5">
-        <p className="mx-auto max-w-2xl text-center text-sm text-fg/75 sm:text-base">
+      <section className="space-y-4 sm:space-y-5">
+        <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed text-fg/75 sm:text-base">
           {kioskMode
             ? 'Browse in-stock singles, pick a card, add it to your cart, and place your order.'
             : 'Browse thousands of in-stock singles, build decks, sell or trade your collection.'}
         </p>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3 lg:grid-cols-6">
           {QUICK_ACTIONS.filter(({ feature, path }) => {
             if (kioskMode && path === 'sell') return false
             return !feature || isStoreFeatureEnabled(store, feature)
           }).map(({ label, icon: Icon, path, action }) => {
             const tileClass =
-              'group flex flex-col items-center justify-center gap-2 rounded-card px-2 py-3 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
+              'group flex flex-col items-center justify-center gap-2 rounded-card px-2 py-4 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
             const content = (
               <>
                 <span className="grid size-9 place-items-center rounded-xl border border-brand-500/25 bg-brand-500/12 text-brand-600 shadow-sm transition-all duration-300 group-hover:border-brand-500/40 group-hover:bg-brand-500/18 group-hover:shadow-[var(--shadow-glow)] sm:size-12 dark:text-brand-300">
                   <Icon aria-hidden className="size-4 sm:size-6" />
                 </span>
-                <span className="text-center text-[11px] font-bold leading-tight sm:text-sm">{label}</span>
+                <span className="px-0.5 text-center text-[11px] font-bold leading-snug sm:text-sm">{label}</span>
               </>
             )
             return path ? (
@@ -622,15 +623,17 @@ export default function StorePage() {
       {/* Spotlight. Holographic cards in a lively persistent rail */}
       {spotlightEnabled && (spotlightLoading || spotlightItems.length > 0) && (
         <section>
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
+          <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
+            <div className="min-w-0">
               <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">
-                <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
                   <Sparkles aria-hidden className="size-4" />
                 </span>
-                Spotlight{gameFilter ? ` · ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''}` : ''}
+                <span className="min-w-0 leading-snug">
+                  Spotlight{gameFilter ? ` · ${gameOptions.find((g) => g.code === gameFilter)?.name ?? ''}` : ''}
+                </span>
               </h2>
-              <p className="mt-1 text-sm text-fg-muted">
+              <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
                 {(store?.spotlightPinnedInventoryIds?.length ?? 0) > 0
                   ? `Featured picks plus singles at or above ${formatPrice(store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS)}`
                   : `Premium singles over ${formatPrice(store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS)} market`}
