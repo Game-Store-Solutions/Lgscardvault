@@ -71,6 +71,7 @@ All mutations require `STORE_MANAGE`; public reads back the storefront.
 | Color vocabulary (public) | `GET /cases/filter-suggestions` |
 | List sections (flat, public) | `GET /api/stores/{slug}/sections` |
 | Section CRUD (create requires `caseId`) | `POST /sections`, `PATCH /sections/{id}`, `DELETE /sections/{id}` |
+| Reorder sections in a case | `PUT /cases/{id}/sections/reorder` (`sectionIds` full permutation) |
 | Manual add (idempotent, optional pool `quantity`; capped by free stock) | `POST /sections/{id}/items` |
 | Edit pool size (clamped ≥ sold, ≤ free inventory) | `PATCH /sections/{id}/items/{cardId}` |
 | Remove card | `DELETE /sections/{id}/items/{cardId}` |
@@ -80,7 +81,7 @@ All mutations require `STORE_MANAGE`; public reads back the storefront.
 ## Frontend
 
 - **Storefront** (`CaseCardsPage`, `/s/{slug}/case-cards`): cases as headings, sections as labeled rails of holographic tiles; sold-out pool cards, empty sections, and empty cases are hidden.
-- **Admin** (`CaseCardsTab`): create/delete cases; per-case section creation; per-section filter row (color datalist, rarity, set, type, price range) with "Pull from inventory"; per-card pool editing ("In case" count capped by free inventory stock, sold/remaining badges); add-from-inventory quantity picker; pull-sheet modal with print.
+- **Admin** (`CaseCardsTab`): create/delete cases; per-case section creation; drag-handle reorder of sections within a case (updates storefront order and sale-pool priority); per-section filter row (color datalist, rarity, set, type, price range) with "Pull from inventory"; per-card pool editing ("In case" count capped by free inventory stock, sold/remaining badges); add-from-inventory quantity picker; pull-sheet modal with print.
 - **Orders** (`OrderLineList`, `printOrderSheet`): case badges on screen and on the printed sheet.
 
 ## Tests

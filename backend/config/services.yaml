@@ -110,6 +110,8 @@ services:
         arguments:
             $decorated: '@lexik_jwt_authentication.handler.authentication_success'
 
+    Lexik\Bundle\JWTAuthenticationBundle\Services\KeyLoader\KeyLoaderInterface: '@lexik_jwt_authentication.key_loader.raw'
+
     # Shared Scryfall throttle: the lock file lives in var/ (app-owned, shared
     # by web + messenger processes on the host) rather than the system temp
     # dir, where PrivateTmp systemd units would silently give each service its

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, Minus, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, GripVertical, Minus, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
 import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases, useStoreGames } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
@@ -19,7 +19,7 @@ import {
   dropdownItemClass,
   dropdownPanelClass,
 } from '../../components/ui'
-import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
+import { AnimatePresence, EASE_PREMIUM, motion, Reorder, useDragControls } from '../../components/motion'
 import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
 import { cx } from '../../lib/cx'
 
@@ -257,6 +257,25 @@ function CaseEditor({
   const invalidate = () => queryClient.invalidateQueries({ queryKey: storeCasesKey(slug) })
   const [title, setTitle] = useState('')
   const [mode, setMode] = useState<StoreSectionMode>('auto')
+  const [sectionOrder, setSectionOrder] = useState(() => storeCase.sections.map((section) => section.id))
+  const sectionOrderRef = useRef(sectionOrder)
+  const orderDirtyRef = useRef(false)
+
+  const sectionIdsKey = storeCase.sections.map((section) => section.id).join(',')
+  useEffect(() => {
+    if (orderDirtyRef.current) return
+    setSectionOrder(storeCase.sections.map((section) => section.id))
+  }, [sectionIdsKey, storeCase.sections])
+
+  useEffect(() => {
+    sectionOrderRef.current = sectionOrder
+  }, [sectionOrder])
+
+  const sectionsById = useMemo(() => {
+    const map = new Map<number, StoreSection>()
+    for (const section of storeCase.sections) map.set(section.id, section)
+    return map
+  }, [storeCase.sections])
 
   const deleteCase = useMutation({
     mutationFn: async () => {
@@ -274,6 +293,64 @@ function CaseEditor({
       await invalidate()
     },
   })
+
+  const reorderSections = useMutation({
+    mutationFn: async (sectionIds: number[]) => {
+      const { data } = await api.put<StoreCaseSummary>(
+        `/stores/${slug}/cases/${storeCase.id}/sections/reorder`,
+        { sectionIds },
+      )
+      return data
+    },
+    onMutate: async (sectionIds) => {
+      orderDirtyRef.current = false
+      const key = storeCasesKey(slug)
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData<StoreCaseSummary[]>(key)
+      queryClient.setQueryData<StoreCaseSummary[]>(key, (casesData) => {
+        if (!casesData) return casesData
+        return casesData.map((row) => {
+          if (row.id !== storeCase.id) return row
+          const byId = new Map(row.sections.map((section) => [section.id, section]))
+          const sections = sectionIds
+            .map((id, position) => {
+              const section = byId.get(id)
+              return section ? { ...section, position } : null
+            })
+            .filter((section): section is StoreSection => section != null)
+          return { ...row, sections }
+        })
+      })
+      return { previous }
+    },
+    onError: (_error, _ids, context) => {
+      orderDirtyRef.current = false
+      if (context?.previous) queryClient.setQueryData(storeCasesKey(slug), context.previous)
+    },
+    onSettled: () => {
+      orderDirtyRef.current = false
+      void queryClient.invalidateQueries({ queryKey: storeCasesKey(slug) })
+    },
+  })
+
+  function applySectionOrder(next: number[]) {
+    orderDirtyRef.current = true
+    setSectionOrder(next)
+    queryClient.setQueryData<StoreCaseSummary[]>(storeCasesKey(slug), (casesData) => {
+      if (!casesData) return casesData
+      return casesData.map((row) => {
+        if (row.id !== storeCase.id) return row
+        const byId = new Map(row.sections.map((section) => [section.id, section]))
+        const sections = next
+          .map((id, position) => {
+            const section = byId.get(id)
+            return section ? { ...section, position } : null
+          })
+          .filter((section): section is StoreSection => section != null)
+        return { ...row, sections }
+      })
+    })
+  }
 
   return (
     <section className="space-y-4">
@@ -323,17 +400,92 @@ function CaseEditor({
           {extractErrorMessage(createSection.error, 'Could not create the section.')}
         </p>
       )}
+      {reorderSections.isError && (
+        <p className="text-sm font-medium text-danger-700" role="alert">
+          {extractErrorMessage(reorderSections.error, 'Could not reorder sections.')}
+        </p>
+      )}
 
-      {storeCase.sections.length === 0 ? (
+      {sectionOrder.length === 0 ? (
         <p className="text-sm text-fg-muted">No sections yet. Add one above.</p>
       ) : (
-        <div className="space-y-6">
-          {storeCase.sections.map((section) => (
-            <SectionEditor key={section.id} slug={slug} section={section} cases={cases} onChanged={invalidate} />
-          ))}
+        <div className="space-y-2">
+          {sectionOrder.length > 1 ? (
+            <p className="text-xs text-fg-muted">Drag the grip handle to reorder sections on the Case Cards page.</p>
+          ) : null}
+          <Reorder.Group
+            axis="y"
+            values={sectionOrder}
+            onReorder={applySectionOrder}
+            className="flex list-none flex-col gap-6 p-0"
+            as="div"
+          >
+            {sectionOrder.map((sectionId) => {
+              const section = sectionsById.get(sectionId)
+              if (!section) return null
+              return (
+                <SortableSectionEditor
+                  key={section.id}
+                  slug={slug}
+                  section={section}
+                  cases={cases}
+                  onChanged={invalidate}
+                  onDragEnd={() => {
+                    if (!orderDirtyRef.current) return
+                    reorderSections.mutate(sectionOrderRef.current)
+                  }}
+                />
+              )
+            })}
+          </Reorder.Group>
         </div>
       )}
     </section>
+  )
+}
+
+function SortableSectionEditor({
+  slug,
+  section,
+  cases,
+  onChanged,
+  onDragEnd,
+}: {
+  slug: string
+  section: StoreSection
+  cases: StoreCaseSummary[]
+  onChanged: () => void
+  onDragEnd: () => void
+}) {
+  const controls = useDragControls()
+
+  return (
+    <Reorder.Item
+      value={section.id}
+      as="div"
+      dragListener={false}
+      dragControls={controls}
+      onDragEnd={onDragEnd}
+      className="relative"
+      style={{ position: 'relative' }}
+    >
+      <SectionEditor
+        slug={slug}
+        section={section}
+        cases={cases}
+        onChanged={onChanged}
+        dragHandle={
+          <button
+            type="button"
+            aria-label={`Drag to reorder ${section.title}`}
+            className="grid size-8 touch-none cursor-grab place-items-center rounded-lg text-fg-muted hover:bg-bg hover:text-fg active:cursor-grabbing"
+            onPointerDown={(event) => controls.start(event)}
+          >
+            <GripVertical className="size-4" aria-hidden />
+          </button>
+        }
+      />
+    </Reorder.Item>
   )
 }
 
@@ -342,11 +494,13 @@ function SectionEditor({
   section,
   cases,
   onChanged,
+  dragHandle,
 }: {
   slug: string
   section: StoreSection
   cases: StoreCaseSummary[]
   onChanged: () => void
+  dragHandle?: ReactNode
 }) {
   const queryClient = useQueryClient()
   const [collapsed, setCollapsed] = useState(false)
@@ -461,7 +615,12 @@ function SectionEditor({
   return (
     <Card>
       <CardHeader
-        title={section.title}
+        title={
+          <span className="flex items-center gap-2">
+            {dragHandle}
+            <span>{section.title}</span>
+          </span>
+        }
         subtitle={
           `${section.mode === 'auto' ? 'Auto-filled' : 'Hand-picked'} · ` +
           `${section.availableQuantity} card${section.availableQuantity === 1 ? '' : 's'} available in this section`

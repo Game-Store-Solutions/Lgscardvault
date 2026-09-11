@@ -6,6 +6,7 @@ use App\Entity\Store;
 use App\Entity\StoreCase;
 use App\Repository\StoreCaseRepository;
 use App\Repository\StoreRepository;
+use App\Repository\StoreSectionRepository;
 use App\Service\CaseCards\ColorIdentityParser;
 use App\Service\CaseCards\SectionSerializer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,6 +30,7 @@ final class StoreCaseController extends AbstractController
     public function __construct(
         private readonly StoreRepository $storeRepository,
         private readonly StoreCaseRepository $caseRepository,
+        private readonly StoreSectionRepository $sectionRepository,
         private readonly SectionSerializer $serializer,
         private readonly ColorIdentityParser $colorIdentityParser,
         private readonly EntityManagerInterface $entityManager,
@@ -81,6 +83,63 @@ final class StoreCaseController extends AbstractController
         $this->entityManager->flush();
 
         return $this->json($this->serializeCase($case), 201);
+    }
+
+    /**
+     * Reorder sections inside a case. Body: `{ "sectionIds": [3, 1, 2] }` —
+     * a complete permutation of that case's section ids. Positions are
+     * rewritten 0..n-1 so storefront order and sale-pool priority match.
+     */
+    #[Route('/{id}/sections/reorder', name: 'api_store_cases_sections_reorder', methods: ['PUT'])]
+    #[IsGranted('ROLE_USER')]
+    public function reorderSections(Request $request, string $slug, int $id): JsonResponse
+    {
+        $case = $this->findManagedCase($slug, $id);
+        if (!$case instanceof StoreCase) {
+            return $this->json(['detail' => 'Case not found.'], 404);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        $sectionIds = is_array($payload) ? ($payload['sectionIds'] ?? null) : null;
+        if (!is_array($sectionIds) || [] === $sectionIds) {
+            return $this->json(['detail' => 'sectionIds must be a non-empty array of section ids.'], 422);
+        }
+
+        $normalized = [];
+        foreach ($sectionIds as $sectionId) {
+            if (!is_int($sectionId) && !(is_string($sectionId) && ctype_digit($sectionId))) {
+                return $this->json(['detail' => 'Each sectionId must be an integer.'], 422);
+            }
+            $normalized[] = (int) $sectionId;
+        }
+
+        if (count($normalized) !== count(array_unique($normalized))) {
+            return $this->json(['detail' => 'sectionIds must not contain duplicates.'], 422);
+        }
+
+        $existing = $this->sectionRepository->findForCase($case);
+        $byId = [];
+        foreach ($existing as $section) {
+            $byId[(int) $section->getId()] = $section;
+        }
+
+        if (count($normalized) !== count($byId)) {
+            return $this->json(['detail' => 'sectionIds must include every section in this case exactly once.'], 422);
+        }
+
+        foreach ($normalized as $sectionId) {
+            if (!isset($byId[$sectionId])) {
+                return $this->json(['detail' => sprintf('Section %d is not in this case.', $sectionId)], 422);
+            }
+        }
+
+        foreach ($normalized as $position => $sectionId) {
+            $byId[$sectionId]->setPosition($position);
+        }
+
+        $this->entityManager->flush();
+
+        return $this->json($this->serializeCase($case));
     }
 
     #[Route('/{id}', name: 'api_store_cases_update', methods: ['PATCH'])]

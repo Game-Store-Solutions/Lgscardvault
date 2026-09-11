@@ -61,4 +61,31 @@ class StoreSectionRepository extends ServiceEntityRepository
 
         return null === $max ? 0 : ((int) $max) + 1;
     }
+
+    /** Next display index within a single case (0-based append). */
+    public function nextPositionForCase(\App\Entity\StoreCase $case): int
+    {
+        $max = $this->createQueryBuilder('s')
+            ->select('MAX(s.position)')
+            ->andWhere('s.storeCase = :case')
+            ->setParameter('case', $case)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return null === $max ? 0 : ((int) $max) + 1;
+    }
+
+    /**
+     * @return list<StoreSection>
+     */
+    public function findForCase(\App\Entity\StoreCase $case): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.storeCase = :case')
+            ->setParameter('case', $case)
+            ->orderBy('s.position', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

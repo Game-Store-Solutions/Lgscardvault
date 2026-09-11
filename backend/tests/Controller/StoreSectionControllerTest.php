@@ -112,6 +112,58 @@ final class StoreSectionControllerTest extends WebTestCase
         self::assertSame(0, $body['availableQuantity']);
     }
 
+    public function testReorderSectionsInCase(): void
+    {
+        $store = $this->fixtures->store();
+        $case = $this->fixtures->storeCase($store, 'Reorder Case');
+        $this->authenticate($store->getOwner());
+
+        $first = $this->createSection($store, $case, 'Alpha');
+        $second = $this->createSection($store, $case, 'Bravo');
+        $third = $this->createSection($store, $case, 'Charlie');
+
+        $reordered = $this->jsonRequest(
+            'PUT',
+            "/api/stores/{$store->getSlug()}/cases/{$case->getId()}/sections/reorder",
+            ['sectionIds' => [$third->getId(), $first->getId(), $second->getId()]],
+        );
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(
+            ['Charlie', 'Alpha', 'Bravo'],
+            array_column($reordered['sections'], 'title'),
+        );
+        self::assertSame([0, 1, 2], array_column($reordered['sections'], 'position'));
+
+        $this->anonymous();
+        $public = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/cases");
+        $matched = null;
+        foreach ($public as $row) {
+            if (($row['id'] ?? null) === $case->getId()) {
+                $matched = $row;
+                break;
+            }
+        }
+        self::assertNotNull($matched);
+        self::assertSame(['Charlie', 'Alpha', 'Bravo'], array_column($matched['sections'], 'title'));
+    }
+
+    public function testReorderSectionsRejectsIncompleteList(): void
+    {
+        $store = $this->fixtures->store();
+        $case = $this->fixtures->storeCase($store);
+        $this->authenticate($store->getOwner());
+        $first = $this->createSection($store, $case, 'Only');
+        $this->createSection($store, $case, 'Two');
+
+        $this->jsonRequest(
+            'PUT',
+            "/api/stores/{$store->getSlug()}/cases/{$case->getId()}/sections/reorder",
+            ['sectionIds' => [$first->getId()]],
+        );
+        self::assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testManualAddTracksPool(): void
     {
         $store = $this->fixtures->store();
