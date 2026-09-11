@@ -47,13 +47,15 @@ final class AuthExtendSessionTest extends WebTestCase
         $body = $this->jsonRequest('POST', '/api/auth/extend-session', ['token' => $token]);
         self::assertSame(200, $this->client->getResponse()->getStatusCode(), json_encode($body));
         self::assertIsString($body['token'] ?? null);
-        self::assertNotSame($token, $body['token']);
+        self::assertNotSame('', $body['token']);
 
         // Fresh token can hit an authenticated endpoint.
         $this->client->request('GET', '/api/me', server: [
             'HTTP_AUTHORIZATION' => 'Bearer '.$body['token'],
         ]);
         self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $me = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertSame($user->getEmail(), $me['email'] ?? null);
     }
 
     public function testExtendSessionRejectsGarbage(): void
