@@ -15,11 +15,11 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     if (jwtIsExpired(token)) {
-      localStorage.removeItem('token')
-      // Kiosk terminals stay on guest shopping — never interrupt with auth UI.
+      // Stash before remove so "Still here?" can renew without a password.
       if (!isKioskModeActive()) {
-        announceSessionExpired()
+        announceSessionExpired(token)
       }
+      localStorage.removeItem('token')
     } else {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -73,10 +73,12 @@ api.interceptors.response.use(
     const url = axiosRequestUrl(error)
     const isCredentialRequest = /\/login(?:\?|$)|\/register(?:\?|$)|\/auth\//.test(url)
     if (!isCredentialRequest && shouldPromptSessionExpiry(status, error)) {
-      localStorage.removeItem('token')
+      const expired =
+        localStorage.getItem('token') ?? authorizationBearer(error)
       if (!isKioskModeActive()) {
-        announceSessionExpired()
+        announceSessionExpired(expired)
       }
+      localStorage.removeItem('token')
     }
     return Promise.reject(error)
   },

@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { ComponentProps, ReactNode } from 'react'
-import { AnimatePresence, motion, MotionConfig } from 'framer-motion'
+import { motion, MotionConfig } from 'framer-motion'
 import { cx } from '../../lib/cx'
 
 /**
@@ -195,4 +195,4 @@ export function ConfettiBurst({
   )
 }
 
-export { AnimatePresence, motion }
+export { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion'

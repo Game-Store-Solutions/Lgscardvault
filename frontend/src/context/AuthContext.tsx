@@ -15,7 +15,7 @@ import type { UserProfile } from '../api/types'
 import { manageableStores } from '../lib/manageableStores'
 import { readJwtExpiryMs } from '../lib/jwtExpiry'
 import { isKioskModeActive } from '../lib/kioskMode'
-import { announceSessionExpired, onSessionExpired, resetSessionExpiry } from '../lib/sessionExpiry'
+import { announceSessionExpired, onSessionExpired, resetSessionExpiry, takeSessionResumeToken } from '../lib/sessionExpiry'
 
 interface AuthContextValue {
   user: UserProfile | null
@@ -34,6 +34,8 @@ interface AuthContextValue {
     dateOfBirth?: string,
   ) => Promise<void>
   logout: () => void
+  /** Mint a fresh JWT from the stashed expired token (Still here?). */
+  extendSession: () => Promise<boolean>
   refreshUser: () => Promise<UserProfile | null>
   isSuperAdmin: boolean
   isStoreOwner: boolean
@@ -133,8 +135,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // data fetched for another (the store-admin, inventory, orders and import
   // caches are all keyed by store slug and would otherwise leak across a
   // logout → login in the same tab).
-  const startFreshSession = useCallback((nextToken: string) => {
-    queryClient.clear()
+  const startFreshSession = useCallback((nextToken: string, options?: { clearCache?: boolean }) => {
+    if (options?.clearCache !== false) {
+      queryClient.clear()
+    }
     resetSessionExpiry()
     setSessionExpired(false)
     localStorage.setItem('token', nextToken)
@@ -151,6 +155,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithToken = useCallback(async (nextToken: string) => {
     startFreshSession(nextToken)
     return refreshUser()
+  }, [refreshUser, startFreshSession])
+
+  /** Resume after JWT expiry without a password — keeps React Query cache. */
+  const extendSession = useCallback(async (): Promise<boolean> => {
+    const resume = takeSessionResumeToken()
+    if (!resume) {
+      return false
+    }
+    try {
+      const { data } = await api.post<{ token: string }>('/auth/extend-session', { token: resume })
+      startFreshSession(data.token, { clearCache: false })
+      await refreshUser()
+      return true
+    } catch {
+      return false
+    }
   }, [refreshUser, startFreshSession])
 
   const register = useCallback(async (
@@ -183,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginWithToken,
       register,
       logout,
+      extendSession,
       refreshUser,
       // Kiosk terminals are always customer-facing — never report staff roles.
       isSuperAdmin: isKioskModeActive() ? false : (user?.roles.includes('ROLE_SUPER_ADMIN') ?? false),
@@ -190,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? false
         : (user?.roles.includes('ROLE_STORE_OWNER') ?? false) || manageableStores(user).length > 0,
     }),
-    [user, token, loading, sessionExpired, login, loginWithToken, register, logout, refreshUser],
+    [user, token, loading, sessionExpired, login, loginWithToken, register, logout, extendSession, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

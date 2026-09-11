@@ -8,6 +8,7 @@ use App\Security\ApiRateLimit;
 use App\Service\Auth\AgeAttestation;
 use App\Service\Auth\EmailVerificationService;
 use App\Service\Auth\PasswordResetService;
+use App\Service\Auth\SessionTokenExtender;
 use App\Service\Mail\TransactionalMailer;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -34,12 +35,15 @@ class AuthController extends AbstractController
         private readonly PasswordResetService $passwordReset,
         private readonly EmailVerificationService $emailVerification,
         private readonly JWTTokenManagerInterface $jwtManager,
+        private readonly SessionTokenExtender $sessionTokenExtender,
         #[Autowire(service: 'limiter.forgot_password')]
         private readonly RateLimiterFactoryInterface $forgotPasswordLimiter,
         #[Autowire(service: 'limiter.reset_password')]
         private readonly RateLimiterFactoryInterface $resetPasswordLimiter,
         #[Autowire(service: 'limiter.email_verification')]
         private readonly RateLimiterFactoryInterface $emailVerificationLimiter,
+        #[Autowire(service: 'limiter.extend_session')]
+        private readonly RateLimiterFactoryInterface $extendSessionLimiter,
     ) {
     }
 
@@ -305,6 +309,44 @@ class AuthController extends AbstractController
             'detail' => 'Email verified.',
             'token' => $this->jwtManager->create($result),
         ]);
+    }
+
+    /**
+     * Mint a fresh JWT from a recently expired access token (signature still
+     * valid, within a short grace window). Used by the "Are you still there?"
+     * modal so owners can keep working without re-entering a password.
+     */
+    #[Route('/auth/extend-session', name: 'api_extend_session', methods: ['POST'])]
+    public function extendSession(Request $request): JsonResponse
+    {
+        $blocked = ApiRateLimit::enforce(
+            $this->extendSessionLimiter,
+            'extend-ip:'.($request->getClientIp() ?? 'unknown'),
+            'Too many session refresh attempts. Please sign in again.',
+        );
+        if ($blocked instanceof JsonResponse) {
+            return $blocked;
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $token = isset($payload['token']) ? trim((string) $payload['token']) : '';
+        if ('' === $token) {
+            $auth = $request->headers->get('Authorization', '');
+            if (preg_match('/^Bearer\s+(\S+)/i', $auth, $matches)) {
+                $token = $matches[1];
+            }
+        }
+
+        $user = $this->sessionTokenExtender->userFromResumeToken($token);
+        if (!$user instanceof User) {
+            return $this->json(
+                ['error' => 'Session could not be renewed. Please sign in again.'],
+                Response::HTTP_UNAUTHORIZED,
+            );
+        }
+
+        return $this->json(['token' => $this->jwtManager->create($user)]);
     }
 
     private function isTruthy(mixed $value): bool

@@ -104,7 +104,7 @@ final class StoreSectionController extends AbstractController
         $section->setStore($store);
         $section->setStoreCase($case);
         $section->setTitle(mb_substr($title, 0, 120));
-        $section->setPosition($this->sectionRepository->nextPosition($store));
+        $section->setPosition($this->sectionRepository->nextPositionForCase($case));
 
         $error = $this->applySettings($section, $payload);
         if (null !== $error) {
