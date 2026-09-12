@@ -20,7 +20,23 @@ export function typeaheadNameTier(name: string, query: string): number {
 }
 
 export function catalogNamesMatch(name: string, query: string): boolean {
-  return foldSearchText(name) === foldSearchText(query)
+  return foldSearchText(catalogCardIdentity(name)) === foldSearchText(catalogCardIdentity(query))
+}
+
+/**
+ * TCGPlayer titles stash set/treatment in the name. "Shanks (OP04) (Manga)"
+ * and "Shanks - OP09-004 (Gold)" are the same card for typeahead + printings.
+ */
+export function catalogCardIdentity(name: string): string {
+  let base = name.trim()
+  if (!base) return ''
+  let previous = ''
+  while (previous !== base) {
+    previous = base
+    base = base.replace(/\s*[([{][^)\]}]+[)\]}]\s*$/u, '').trim()
+  }
+  base = base.replace(/\s+-\s+[A-Za-z]{1,8}\d{0,4}(?:-[A-Za-z0-9]+)?\s*$/u, '').trim()
+  return base || name.trim()
 }
 
 export function searchTextIncludes(haystack: string, needle: string): boolean {

@@ -57,10 +57,10 @@ final readonly class CartOrderBuilder
             ->setChannel($channel)
             ->setFulfillment($fulfillment);
 
-        // In-store kiosk: customer is already at the counter — land in Ready for
-        // pickup so staff pull from that queue instead of Pending → Accept.
+        // In-store kiosk: skip Pending and land in Processing (Accepted) so
+        // staff pull the order, then move it to Ready for pickup.
         if (Order::CHANNEL_KIOSK === $channel) {
-            $order->setStatus(OrderStatus::FULFILLED);
+            $order->setStatus(OrderStatus::RECEIVED);
         }
 
         $total = 0;

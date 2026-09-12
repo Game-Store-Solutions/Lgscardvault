@@ -38,6 +38,8 @@ flowchart LR
 
 **Local-first**: the local catalog (trigram-indexed `LIKE`) is searched first; the Scryfall live search + upsert only runs when the filtered local result set is thin (fewer than `REMOTE_FALLBACK_THRESHOLD = 15` cards). As bulk syncs and past imports fill the `cards` table, per-keystroke remote API calls and catalog writes disappear.
 
+Unique-card search (`?unique=cards`) collapses Magic by oracle id and TCGCSV games by **base name** — TCGPlayer titles like `Shanks (OP04) (Manga)` and `Shanks - OP09-004 (Gold)` become one **Shanks** typeahead hit. Printings then list every suffix of that name. Admin Singles add uses the same set-code typeahead as Search stock (`SetCodeTypeahead`, catalog sets + stocked sets).
+
 | Layer | Where |
 |-------|-------|
 | Frontend | `pages/store-admin/SearchTab.tsx`, `hooks/useDebouncedValue.ts` |

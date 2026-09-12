@@ -68,9 +68,9 @@ final readonly class StoreOrderProcessor implements ProcessorInterface
         $this->attributeKioskCustomer($data);
 
         // Staff/admin “New kiosk order” and terminal creates: skip Pending and
-        // land in Ready for pickup (customer is already in the store).
+        // land in Processing (Accepted) so staff pull, then mark Ready.
         if (Order::CHANNEL_KIOSK === $data->getChannel()) {
-            $data->setStatus(OrderStatus::FULFILLED);
+            $data->setStatus(OrderStatus::RECEIVED);
         }
 
         $total = 0;

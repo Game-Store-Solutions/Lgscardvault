@@ -4,6 +4,7 @@ namespace App\Tests\Service\Catalog;
 
 use App\Entity\Card;
 use App\Entity\Game;
+use App\Service\Catalog\CardNameIdentity;
 use App\Service\Catalog\CatalogSearchRanker;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
@@ -122,6 +123,20 @@ final class CatalogSearchRankerTest extends TestCase
             static fn (Card $card): string => $card->getName(),
             $unique,
         ));
+    }
+
+    public function testOnePieceVariantsCollapseToOneUniqueName(): void
+    {
+        $ranker = new CatalogSearchRanker();
+        $game = (new Game())->setCode('onepiece')->setName('One Piece');
+        $base = $this->pokemonCard(30, 'Shanks', '12.00', $game);
+        $manga = $this->pokemonCard(31, 'Shanks (OP04) (Manga)', '80.00', $game);
+        $gold = $this->pokemonCard(32, 'Shanks - OP09-004 (Gold)', '25.00', $game);
+
+        $unique = $ranker->uniqueCards($ranker->rank([$base, $manga, $gold], 'shanks'));
+
+        self::assertCount(1, $unique);
+        self::assertSame('Shanks', CardNameIdentity::baseName($unique[0]->getName()));
     }
 
     private function card(int $seed, string $name, int $edhrecRank, ?Uuid $oracleId = null): Card

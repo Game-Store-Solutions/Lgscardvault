@@ -10,7 +10,7 @@ use App\Service\Scryfall\ScryfallClient;
 /**
  * Other paper printings of a specific catalog card — the inventory edit
  * picker. Magic uses the oracle id (and Scryfall when the local catalog is
- * thin); every other game matches the exact name in that game.
+ * thin); every other game matches the TCGPlayer base name in that game.
  */
 final class CardPrintingsFinder
 {

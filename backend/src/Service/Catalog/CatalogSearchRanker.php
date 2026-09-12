@@ -39,7 +39,7 @@ final class CatalogSearchRanker
     }
 
     /**
-     * One row per oracle identity (Magic) or exact name (other games),
+     * One row per oracle identity (Magic) or TCGPlayer base name (other games),
      * keeping the first — callers must rank first so that row is the
      * best-matching printing of that card.
      *
@@ -210,6 +210,6 @@ final class CatalogSearchRanker
             }
         }
 
-        return 'name:'.$card->resolvedGameCode().':'.$this->foldPhrase($card->getName());
+        return 'name:'.$card->resolvedGameCode().':'.CardNameIdentity::fold(CardNameIdentity::baseName($card->getName()));
     }
 }

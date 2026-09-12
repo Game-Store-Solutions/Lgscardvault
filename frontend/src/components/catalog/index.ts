@@ -8,3 +8,6 @@ export { CatalogResultCard } from './CatalogResultCard'
 export type { CatalogResultCardProps } from './CatalogResultCard'
 
 export { PrintingGrid } from './PrintingGrid'
+
+export { SetCodeTypeahead } from './SetCodeTypeahead'
+export type { SetCodeTypeaheadProps } from './SetCodeTypeahead'
