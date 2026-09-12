@@ -3,11 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\CustomerNotification;
+use App\Entity\Game;
 use App\Entity\Store;
 use App\Entity\User;
 use App\Repository\CustomerFavoriteRepository;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\CustomerWantListEntryRepository;
+use App\Repository\GameRepository;
 use App\Repository\OrderRepository;
 use App\Repository\SellSubmissionRepository;
 use App\Repository\StoreCreditTransactionRepository;
@@ -17,6 +19,7 @@ use App\Repository\StoreStaffRepository;
 use App\Service\Customer\ActivityListPagination;
 use App\Service\Customer\MarketplaceActivitySerializer;
 use App\Service\Customer\SellTradeDraftService;
+use App\Service\Customer\SetAlertBook;
 use App\Service\Credit\StoreCreditLedger;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
@@ -60,6 +63,8 @@ class MeController extends AbstractController
         private readonly StoreCreditLedger $creditLedger,
         private readonly MarketplaceActivitySerializer $activitySerializer,
         private readonly StoreStaffRepository $staffRepository,
+        private readonly SetAlertBook $setAlertBook,
+        private readonly GameRepository $gameRepository,
     ) {
     }
 
@@ -270,6 +275,78 @@ class MeController extends AbstractController
         $this->entityManager->flush();
 
         return $this->json($this->activitySerializer->notification($notification));
+    }
+
+    /** Store + set restock watches for the signed-in shopper. */
+    #[Route('/me/set-alerts', name: 'api_me_set_alerts', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function mySetAlerts(Request $request): JsonResponse
+    {
+        $store = $this->optionalStore($request);
+        if ($store instanceof JsonResponse) {
+            return $store;
+        }
+
+        $pagination = ActivityListPagination::fromRequest($request);
+        $user = $this->requireUser();
+
+        return $this->json(ActivityListPagination::payload(
+            array_map(
+                $this->setAlertBook->serialize(...),
+                $this->setAlertBook->list($user, $store, $pagination['offset'], $pagination['itemsPerPage']),
+            ),
+            $this->setAlertBook->count($user, $store),
+            $pagination,
+        ));
+    }
+
+    #[Route('/me/set-alerts', name: 'api_me_set_alerts_create', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    public function createSetAlert(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true);
+        if (!\is_array($payload)) {
+            return $this->json(['detail' => 'Invalid payload.'], 422);
+        }
+
+        $store = $this->storeRepository->findOneBySlug(trim((string) ($payload['store'] ?? '')));
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $game = $this->gameRepository->findOneByCode((string) ($payload['game'] ?? ''));
+        if (!$game instanceof Game) {
+            return $this->json(['detail' => 'Unknown game.'], 422);
+        }
+
+        try {
+            $alert = $this->setAlertBook->subscribe(
+                $this->requireUser(),
+                $store,
+                $game,
+                (string) ($payload['setCode'] ?? ''),
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return $this->json(['detail' => $exception->getMessage()], 422);
+        }
+
+        $created = null === $alert->getId();
+        $this->entityManager->flush();
+
+        return $this->json($this->setAlertBook->serialize($alert), $created ? 201 : 200);
+    }
+
+    #[Route('/me/set-alerts/{id}', name: 'api_me_set_alerts_delete', methods: ['DELETE'], requirements: ['id' => '\\d+'])]
+    #[IsGranted('ROLE_USER')]
+    public function deleteSetAlert(int $id): JsonResponse
+    {
+        if (!$this->setAlertBook->unsubscribe($this->requireUser(), $id)) {
+            return $this->json(['detail' => 'Set alert not found.'], 404);
+        }
+
+        $this->entityManager->flush();
+
+        return $this->json(null, 204);
     }
 
     /** Sell/trade submissions across stores. */

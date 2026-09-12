@@ -20,6 +20,8 @@ export interface SetCodeTypeaheadProps {
   onEnter?: () => void
   className?: string
   emptyLabel?: string
+  /** Hide the empty “Any set” row — used when a set must be chosen. */
+  required?: boolean
 }
 
 function visibleSetWindow(count: number, scrollTop: number, headerHeight: number) {
@@ -41,6 +43,7 @@ export function SetCodeTypeahead({
   onEnter,
   className,
   emptyLabel = 'Any set',
+  required = false,
 }: SetCodeTypeaheadProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -48,12 +51,13 @@ export function SetCodeTypeahead({
   const [index, setIndex] = useState(-1)
   const [scrollTop, setScrollTop] = useState(0)
   const browsing = value.trim().length === 0
+  const allowEmpty = browsing && !required
   const options = useMemo(() => (open ? rankSetSearch(sets, value) : []), [open, sets, value])
   const show = open
   const windowed = options.length > WINDOW_AFTER
   const windowRange = useMemo(
-    () => visibleSetWindow(options.length, scrollTop, browsing ? ROW_HEIGHT : 0),
-    [browsing, options.length, scrollTop],
+    () => visibleSetWindow(options.length, scrollTop, allowEmpty ? ROW_HEIGHT : 0),
+    [allowEmpty, options.length, scrollTop],
   )
   const visible = windowed ? options.slice(windowRange.start, windowRange.end) : options
 
@@ -63,23 +67,23 @@ export function SetCodeTypeahead({
       setIndex(-1)
       return
     }
-    if (browsing) {
+    if (allowEmpty) {
       setIndex(-1)
       return
     }
     const selected = options.findIndex((set) => foldSearchText(set.code) === foldSearchText(value))
     setIndex(selected >= 0 ? selected : options.length > 0 ? 0 : -1)
-  }, [browsing, open, options, value])
+  }, [allowEmpty, browsing, open, options, value])
 
   useEffect(() => {
     const list = listRef.current
     if (!show || index < 0 || !list) return
-    const top = index * ROW_HEIGHT + (browsing ? ROW_HEIGHT : 0)
+    const top = index * ROW_HEIGHT + (allowEmpty ? ROW_HEIGHT : 0)
     if (top < list.scrollTop) list.scrollTop = top
     else if (top + ROW_HEIGHT > list.scrollTop + list.clientHeight) {
       list.scrollTop = top + ROW_HEIGHT - list.clientHeight
     }
-  }, [browsing, index, show])
+  }, [allowEmpty, browsing, index, show])
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
@@ -107,7 +111,7 @@ export function SetCodeTypeahead({
       return
     }
     setIndex((current) => {
-      const min = browsing ? -1 : 0
+      const min = allowEmpty ? -1 : 0
       const next = current + delta
       if (next < min) return options.length - 1
       if (next >= options.length) return min
@@ -135,20 +139,20 @@ export function SetCodeTypeahead({
         aria-autocomplete="list"
         aria-expanded={show}
         aria-controls={listboxId}
-        aria-activedescendant={show && index >= 0 ? `${listboxId}-${index}` : show && browsing ? `${listboxId}-any` : undefined}
+        aria-activedescendant={show && index >= 0 ? `${listboxId}-${index}` : show && allowEmpty ? `${listboxId}-any` : undefined}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
           onChange(e.target.value)
           setOpen(true)
         }}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowDown' && (options.length > 0 || browsing)) {
+          if (e.key === 'ArrowDown' && (options.length > 0 || allowEmpty)) {
             e.preventDefault()
             setOpen(true)
             moveHighlight(1)
             return
           }
-          if (e.key === 'ArrowUp' && (options.length > 0 || browsing)) {
+          if (e.key === 'ArrowUp' && (options.length > 0 || allowEmpty)) {
             e.preventDefault()
             setOpen(true)
             moveHighlight(-1)
@@ -194,7 +198,7 @@ export function SetCodeTypeahead({
           onScroll={windowed ? (event) => setScrollTop(event.currentTarget.scrollTop) : undefined}
           className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-72 w-full overflow-y-auto p-1')}
         >
-          {browsing ? (
+          {allowEmpty ? (
             <li id={`${listboxId}-any`} role="option" aria-selected={index < 0} className="sticky top-0 z-10 bg-surface">
               <button
                 type="button"

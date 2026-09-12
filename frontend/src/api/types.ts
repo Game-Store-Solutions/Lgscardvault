@@ -650,6 +650,16 @@ export interface CartItem {
   updatedAt: string
 }
 
+export interface CustomerSetAlert {
+  id: number
+  game: string
+  setCode: string
+  setName: string
+  storeSlug?: string | null
+  storeName?: string | null
+  createdAt: string
+}
+
 export interface CustomerWantListEntry {
   id: number
   card?: CardSummary | null

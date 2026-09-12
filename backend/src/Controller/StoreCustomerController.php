@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Card;
 use App\Entity\CartItem;
+use App\Entity\Game;
 use App\Entity\CustomerNotification;
 use App\Entity\CustomerFavorite;
 use App\Entity\CustomerWantListEntry;
@@ -15,6 +16,7 @@ use App\Service\Catalog\FinishVocabulary;
 use App\Entity\StoreCustomer;
 use App\Entity\User;
 use App\Repository\CardRepository;
+use App\Repository\GameRepository;
 use App\Repository\CartItemRepository;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\CustomerFavoriteRepository;
@@ -36,6 +38,8 @@ use App\Service\Checkout\PickupOrderTaxSync;
 use App\Service\Checkout\PickupTaxNotReadyException;
 use App\Service\Checkout\PickupTaxPolicy;
 use App\Service\Customer\SellTradeDraftService;
+use App\Service\Customer\WantListBulkAdder;
+use App\Service\Customer\WantListLimits;
 use App\Service\Notification\SellTradeDraftNotifier;
 use App\Service\Order\CustomerOrderPagination;
 use App\Service\Order\CustomerOrderSerializer;
@@ -66,6 +70,8 @@ final class StoreCustomerController extends AbstractController
         private readonly \App\Service\Catalog\GameCatalogSerializer $catalogSerializer,
         private readonly InventoryItemRepository $inventoryRepository,
         private readonly CardRepository $cardRepository,
+        private readonly GameRepository $gameRepository,
+        private readonly WantListBulkAdder $wantListBulkAdder,
         private readonly OrderRepository $orderRepository,
         private readonly CustomerOrderSerializer $customerOrderSerializer,
         private readonly \App\Service\Credit\StoreCreditLedger $creditLedger,
@@ -247,6 +253,12 @@ final class StoreCustomerController extends AbstractController
         }
 
         $customer = $this->getOrCreateCustomer($store);
+        $used = null === $customer->getId() ? 0 : $this->wantListRepository->countForCustomer($customer);
+        if ($used >= WantListLimits::MAX_ENTRIES) {
+            return $this->json([
+                'detail' => sprintf('Want list is full (%d cards).', WantListLimits::MAX_ENTRIES),
+            ], 422);
+        }
 
         $payload = $this->jsonPayload($request);
         $card = $this->findCard((string) ($payload['cardId'] ?? ''));
@@ -271,6 +283,32 @@ final class StoreCustomerController extends AbstractController
         $this->entityManager->flush();
 
         return $this->json($this->serializeWantListEntry($store, $entry), 201);
+    }
+
+    #[Route('/want-list/bulk', name: 'api_store_customer_want_list_bulk', methods: ['POST'])]
+    public function addWantListBulk(Request $request, string $slug): JsonResponse
+    {
+        $store = $this->resolveStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $payload = $this->jsonPayload($request);
+        $game = $this->gameRepository->findOneByCode((string) ($payload['game'] ?? ''));
+        if (!$game instanceof Game) {
+            return $this->json(['detail' => 'Unknown game.'], 422);
+        }
+
+        $lines = $payload['lines'] ?? [];
+        if (!\is_array($lines)) {
+            return $this->json(['detail' => 'lines must be an array of card names.'], 422);
+        }
+
+        $customer = $this->getOrCreateCustomer($store);
+        $result = $this->wantListBulkAdder->add($customer, $game, $lines);
+        $this->entityManager->flush();
+
+        return $this->json($result, 201);
     }
 
     #[Route('/want-list/{id}', name: 'api_store_customer_want_list_remove', methods: ['DELETE'])]

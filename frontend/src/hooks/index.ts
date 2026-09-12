@@ -22,6 +22,7 @@ export {
   useCustomerOrders,
   useMyOrders,
   useMyWantList,
+  useMySetAlerts,
   useMyFavorites,
   useMyNotifications,
   useMySellSubmissions,

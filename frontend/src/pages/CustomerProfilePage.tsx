@@ -5,6 +5,7 @@ const TAB_TO_SECTION: Record<string, string> = {
   orders: 'orders',
   favorites: 'favorites',
   wantlist: 'wantlist',
+  setalerts: 'setalerts',
   selltrade: 'selltrade',
   credit: 'credit',
   notifications: 'notifications',

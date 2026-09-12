@@ -22,6 +22,23 @@ class GameSetRepository extends ServiceEntityRepository
         return $this->findOneBy(['tcgcsvGroupId' => $groupId]);
     }
 
+    public function findOneByGameAndCode(Game $game, string $code): ?GameSet
+    {
+        $needle = mb_strtolower(trim($code));
+        if ('' === $needle) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.game = :game')
+            ->andWhere('LOWER(s.code) = :code')
+            ->setParameter('game', $game)
+            ->setParameter('code', $needle)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     /** @return list<GameSet> newest releases first */
     public function findForGame(Game $game): array
     {

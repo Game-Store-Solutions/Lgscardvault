@@ -130,6 +130,56 @@ class CustomerNotificationRepository extends ServiceEntityRepository
         ]);
     }
 
+    public function findLatestByTitle(User $user, Store $store, string $type, string $title): ?CustomerNotification
+    {
+        $found = $this->findLatestByTitleForUsers([$user], $store, $type, $title);
+
+        return $found[$user->getId() ?? 0] ?? null;
+    }
+
+    /**
+     * Latest matching notice per user. Newest row wins when a shopper has more than one.
+     *
+     * @param list<User> $users
+     *
+     * @return array<int, CustomerNotification>
+     */
+    public function findLatestByTitleForUsers(array $users, Store $store, string $type, string $title): array
+    {
+        $users = array_values(array_filter(
+            $users,
+            static fn (mixed $user): bool => $user instanceof User && null !== $user->getId(),
+        ));
+        if ([] === $users) {
+            return [];
+        }
+
+        /** @var list<CustomerNotification> $rows */
+        $rows = $this->createQueryBuilder('notification')
+            ->andWhere('notification.user IN (:users)')
+            ->andWhere('notification.store = :store')
+            ->andWhere('notification.type = :type')
+            ->andWhere('notification.title = :title')
+            ->setParameter('users', $users)
+            ->setParameter('store', $store)
+            ->setParameter('type', $type)
+            ->setParameter('title', $title)
+            ->orderBy('notification.createdAt', 'DESC')
+            ->addOrderBy('notification.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        $latest = [];
+        foreach ($rows as $row) {
+            $id = $row->getUser()?->getId();
+            if (null !== $id && !isset($latest[$id])) {
+                $latest[$id] = $row;
+            }
+        }
+
+        return $latest;
+    }
+
     /** Latest notification of a type for this shopper at a store (draft upserts). */
     public function findLatestOfType(User $user, Store $store, string $type): ?CustomerNotification
     {

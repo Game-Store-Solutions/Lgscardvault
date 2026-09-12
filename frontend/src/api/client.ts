@@ -150,8 +150,14 @@ export const CUSTOMER_ORDERS_PAGE_SIZE = 15
 /** Profile activity lists (want list, favorites, notifications, sell/trade, credit). */
 export const ACCOUNT_PAGE_SIZE = 20
 
+/** Distinct cards a shopper can watch at one store. */
+export const WANT_LIST_MAX = 100
+
 /** Compact activity feed on the profile overview. */
 export const PROFILE_ACTIVITY_PAGE_SIZE = 8
+
+/** Account → Alerts list. Smaller than other profile tables so the pager shows. */
+export const NOTIFICATIONS_PAGE_SIZE = 8
 
 export function unwrapCollection<T>(data: T[] | { member?: T[]; 'hydra:member'?: T[] }): T[] {
   if (Array.isArray(data)) {

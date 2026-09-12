@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Card;
 use App\Entity\CustomerWantListEntry;
 use App\Entity\Store;
 use App\Entity\StoreCustomer;
@@ -36,6 +37,11 @@ class CustomerWantListEntryRepository extends ServiceEntityRepository
             ->setParameter('name', $cardName)
             ->getQuery()
             ->getResult();
+    }
+
+    public function findOneForCustomerAndCard(StoreCustomer $customer, Card $card): ?CustomerWantListEntry
+    {
+        return $this->findOneBy(['customer' => $customer, 'card' => $card]);
     }
 
     public function findForCustomer(StoreCustomer $customer): array
@@ -77,6 +83,16 @@ class CustomerWantListEntryRepository extends ServiceEntityRepository
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    public function countForCustomer(StoreCustomer $customer): int
+    {
+        return (int) $this->createQueryBuilder('entry')
+            ->select('COUNT(entry.id)')
+            ->andWhere('entry.customer = :customer')
+            ->setParameter('customer', $customer)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     public function countForUser(User $user, ?Store $store = null): int

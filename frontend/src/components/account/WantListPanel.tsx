@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ImageOff, List, Plus, Search, Trash2, X } from 'lucide-react'
-import api, { ACCOUNT_PAGE_SIZE, cardImage, extractErrorMessage } from '../../api/client'
+import { ClipboardList, ImageOff, List, Plus, Search, Trash2, X } from 'lucide-react'
+import api, { ACCOUNT_PAGE_SIZE, WANT_LIST_MAX, cardImage, extractErrorMessage } from '../../api/client'
 import type { CardSummary, CustomerWantListEntry } from '../../api/types'
 import { customerKeys, useCatalogGames, useCardPrintings, useDebouncedValue, useMyWantList } from '../../hooks'
 import { CatalogResultCard, PrintingGrid } from '../catalog'
@@ -10,6 +10,8 @@ import { Badge, Button, EmptyState, ErrorState, Input, LoadingPanel, Pagination,
 import { CardImage } from '../cards'
 import { ProfileSection } from '../profile'
 import { finishChoices } from '../../lib/finishes'
+import { cx } from '../../lib/cx'
+import { WantListBulkForm } from './WantListBulkForm'
 
 type StoreOption = { slug: string; name: string }
 
@@ -22,6 +24,7 @@ export function WantListPanel({
 }) {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
+  const [addMode, setAddMode] = useState<'search' | 'paste'>('search')
   const query = useMyWantList(page, storeSlug)
 
   useEffect(() => {
@@ -45,7 +48,39 @@ export function WantListPanel({
 
   return (
     <ProfileSection title="Want list">
-      <WantListAddForm stores={stores} defaultStoreSlug={storeSlug} />
+      <div className="mb-5 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setAddMode('search')}
+          className={cx(
+            'inline-flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold ring-1 transition-colors',
+            addMode === 'search'
+              ? 'bg-brand-500 text-white ring-brand-500'
+              : 'bg-surface text-fg ring-border hover:bg-bg',
+          )}
+        >
+          <Search aria-hidden className="size-4" />
+          Search catalog
+        </button>
+        <button
+          type="button"
+          onClick={() => setAddMode('paste')}
+          className={cx(
+            'inline-flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold ring-1 transition-colors',
+            addMode === 'paste'
+              ? 'bg-brand-500 text-white ring-brand-500'
+              : 'bg-surface text-fg ring-border hover:bg-bg',
+          )}
+        >
+          <ClipboardList aria-hidden className="size-4" />
+          Paste a list
+        </button>
+      </div>
+      {addMode === 'search' ? (
+        <WantListAddForm stores={stores} defaultStoreSlug={storeSlug} />
+      ) : (
+        <WantListBulkForm stores={stores} defaultStoreSlug={storeSlug} />
+      )}
 
       {query.isLoading ? (
         <LoadingPanel bare label="Loading want list…" />
@@ -172,6 +207,9 @@ function WantListAddForm({
 
   const needsStorePicker = stores.length > 1 && !defaultStoreSlug
   const resolvedSlug = defaultStoreSlug || (stores.length === 1 ? stores[0].slug : targetSlug)
+  const usage = useMyWantList(1, resolvedSlug || undefined, Boolean(resolvedSlug))
+  const used = usage.data?.total ?? 0
+  const remaining = Math.max(0, WANT_LIST_MAX - used)
 
   useEffect(() => {
     if (defaultStoreSlug) {
@@ -303,7 +341,7 @@ function WantListAddForm({
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          if (selected && resolvedSlug) addMutation.mutate()
+          if (selected && resolvedSlug && remaining > 0) addMutation.mutate()
         }}
         className="space-y-3"
       >
@@ -374,7 +412,7 @@ function WantListAddForm({
               <Button
                 type="submit"
                 loading={addMutation.isPending}
-                disabled={!resolvedSlug}
+                disabled={!resolvedSlug || remaining === 0}
                 className="ml-auto"
               >
                 <Plus aria-hidden className="size-4" />
@@ -541,6 +579,13 @@ function WantListAddForm({
               </div>
             )}
           </div>
+        ) : null}
+
+        {resolvedSlug ? (
+          <p className="text-sm text-fg-muted">
+            {used} / {WANT_LIST_MAX} cards at this store
+            {remaining === 0 ? ' — list is full.' : '.'}
+          </p>
         ) : null}
 
         {addMutation.isError ? (

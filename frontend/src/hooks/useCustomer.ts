@@ -4,6 +4,7 @@ import type {
   CartItem,
   CustomerFavorite,
   CustomerNotification,
+  CustomerSetAlert,
   CustomerWantListEntry,
   PaginatedList,
   PaginatedOrders,
@@ -28,8 +29,10 @@ export const customerKeys = {
   myOrders: (page: number, store?: string, itemsPerPage?: number) =>
     ['my-orders', page, store ?? 'all', itemsPerPage ?? CUSTOMER_ORDERS_PAGE_SIZE] as const,
   myWantList: (page: number, store?: string) => ['my-want-list', page, store ?? 'all'] as const,
+  mySetAlerts: (page: number, store?: string) => ['my-set-alerts', page, store ?? 'all'] as const,
   myFavorites: (page: number, store?: string) => ['my-favorites', page, store ?? 'all'] as const,
-  myNotifications: (page: number, store?: string) => ['my-notifications', page, store ?? 'all'] as const,
+  myNotifications: (page: number, store?: string, itemsPerPage?: number) =>
+    ['my-notifications', page, store ?? 'all', itemsPerPage ?? ACCOUNT_PAGE_SIZE] as const,
   mySellSubmissions: (page: number, store?: string) => ['my-sell-submissions', page, store ?? 'all'] as const,
   mySellTradeDrafts: (store?: string) => ['my-sell-trade-drafts', store ?? 'all'] as const,
   myCredit: (page: number, store?: string) => ['my-credit', page, store ?? 'all'] as const,
@@ -161,6 +164,20 @@ export function useMyOrders(
   })
 }
 
+export function useMySetAlerts(page = 1, storeSlug?: string, enabled = true) {
+  return useQuery({
+    queryKey: customerKeys.mySetAlerts(page, storeSlug),
+    queryFn: async () => {
+      const { data } = await api.get<PaginatedList<CustomerSetAlert>>('/me/set-alerts', {
+        params: { page, itemsPerPage: ACCOUNT_PAGE_SIZE, ...(storeSlug ? { store: storeSlug } : {}) },
+      })
+      return data
+    },
+    enabled,
+    placeholderData: keepPreviousData,
+  })
+}
+
 export function useMyWantList(page = 1, storeSlug?: string, enabled = true) {
   return useQuery({
     queryKey: customerKeys.myWantList(page, storeSlug),
@@ -193,13 +210,14 @@ export function useMyNotifications(
   page = 1,
   storeSlug?: string,
   enabled = true,
-  options?: { poll?: boolean },
+  options?: { poll?: boolean; itemsPerPage?: number },
 ) {
+  const itemsPerPage = options?.itemsPerPage ?? ACCOUNT_PAGE_SIZE
   return useQuery({
-    queryKey: customerKeys.myNotifications(page, storeSlug),
+    queryKey: customerKeys.myNotifications(page, storeSlug, itemsPerPage),
     queryFn: async () => {
       const { data } = await api.get<PaginatedList<CustomerNotification>>('/me/notifications', {
-        params: { page, itemsPerPage: ACCOUNT_PAGE_SIZE, ...(storeSlug ? { store: storeSlug } : {}) },
+        params: { page, itemsPerPage, ...(storeSlug ? { store: storeSlug } : {}) },
       })
       return data
     },

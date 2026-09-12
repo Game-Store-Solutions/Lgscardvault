@@ -1,6 +1,6 @@
 # Customers & orders
 
-Covers per-store customer profiles, favorites, want lists, customer carts, local test orders, owner order management, customer order history, notifications, and sales reports.
+Covers per-store customer profiles, favorites, want lists, set restock alerts, customer carts, local test orders, owner order management, customer order history, notifications, and sales reports.
 
 A `StoreCustomer` links a global `User` to a specific `Store` with a unique `user_id + store_id` pair. Favorites and want-list entries hang off that customer row.
 
@@ -55,26 +55,33 @@ flowchart LR
 
 Favorites point at concrete `InventoryItem` rows, so the favorited item must belong to the requested store. Want-list entries may point at a shared catalog `Card`, but `card_id` is optional so customers can request cards that are not in the local catalog yet.
 
+Bulk want-list add (`POST /api/stores/{slug}/customer/want-list/bulk`) lives in `WantListBulkAdder`: pasted decklist lines are ranked against the catalog (`CatalogSearchRanker`) and written to the selected store. Controllers flush. The same `parseDecklist` helper is shared with Mass Search and Sell/Trade. A store want list is capped at 100 cards (`WantListLimits::MAX_ENTRIES`).
+
+Set restock watches (`customer_set_alerts`) are account-scoped: one unique row per `(user, store, game, set_code)`. CRUD is `/api/me/set-alerts`. `SetAlertBook` owns subscribe/list/drop; `SetAlertNotifier` fires from `StoreInventoryWriter` on any stock-in (CSV, singles, Complete & stock). One unread wave per store+set; later cards bump the count. A new notice and email start only after the last wave was read.
+
 ```mermaid
 flowchart LR
-    subgraph FE["Frontend: CustomerProfilePage.tsx / CardDetailsPage"]
+    subgraph FE["Frontend: AccountPage"]
         fav["favorites GET/PUT/DELETE"]
-        want["want-list GET/POST/DELETE"]
+        want["want-list GET/POST/DELETE + bulk"]
+        sets["set-alerts GET/POST/DELETE"]
     end
     fav --> ctl["StoreCustomerController"]
     want --> ctl
-    ctl --> customer["StoreCustomerRepository"]
-    ctl --> inv["InventoryItemRepository"]
-    ctl --> card["CardRepository"]
+    sets --> me["MeController"]
+    ctl --> adder["WantListBulkAdder"]
+    me --> book["SetAlertBook"]
     ctl --> db["store_customers, customer_favorites, customer_want_list_entries"]
+    me --> alerts["customer_set_alerts"]
 ```
 
 | Layer | Where |
 |-------|-------|
-| Frontend | `pages/CustomerProfilePage.tsx`, `hooks/useCustomer.ts`, `components/cards/*` |
-| Controller | `Controller/StoreCustomerController.php` |
-| Repos | `StoreCustomerRepository`, `CustomerFavoriteRepository`, `CustomerWantListEntryRepository`, `InventoryItemRepository`, `CardRepository` |
-| DB | `store_customers`, `customer_favorites`, `customer_want_list_entries` |
+| Frontend | `pages/AccountPage.tsx`, `components/account/WantListPanel.tsx`, `WantListBulkForm.tsx`, `SetAlertsPanel.tsx`, `hooks/useCustomer.ts` |
+| Controller | `Controller/StoreCustomerController.php`, `Controller/MeController.php` |
+| Services | `WantListBulkAdder`, `SetAlertBook`, `SetAlertNotifier` |
+| Repos | `StoreCustomerRepository`, `CustomerFavoriteRepository`, `CustomerWantListEntryRepository`, `CustomerSetAlertRepository`, `CardRepository` |
+| DB | `store_customers`, `customer_favorites`, `customer_want_list_entries`, `customer_set_alerts` |
 
 ---
 
@@ -214,6 +221,7 @@ sequenceDiagram
 ```
 
 - A notification is created when an order first transitions to `fulfilled` or legacy `completed`.
+- `set_restock` notices are written by `SetAlertNotifier` when watched-set cards are stocked. Unread waves reuse one row and bump the card count; a new email is sent only after the shopper reads the last notice.
 - When staff add cards to a captured PayPal order, an `order_balance_due` notification and email ask the shopper to approve the extra. One row per order; the body updates if the amount changes. The bell stays until they pay (opening Orders does not auto-clear it). After they capture the extra, the notice is marked read.
 - The processor looks up the `User` by `orders.customer_email`. If no matching user exists, no customer notification is created.
 - Duplicate fulfilled notifications are prevented by checking `(user, order, type)`.
