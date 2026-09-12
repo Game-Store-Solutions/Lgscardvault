@@ -4,6 +4,7 @@ Player-first marketplace for trading-card games. Discover, play, and trade cards
 
 **Site:** https://lgscardvault.com/
 **Stores:** https://lgscardvault.com/stores
+**For stores:** https://lgscardvault.com/for-stores
 **Open a store:** https://lgscardvault.com/register/owner
 
 ## What it is

@@ -13,6 +13,7 @@ import { EASE_PREMIUM, Reveal, Stagger, StaggerItem } from './motion'
 import { ContactForm } from './ContactForm'
 import { NewsletterSignup } from './NewsletterSignup'
 import { usePageMeta, useJsonLd } from '../hooks/usePageMeta'
+import { usePreservedHref } from '../hooks/usePreservedHref'
 import { GameShowcaseReel, warmupShowcaseCards } from './GameShowcaseReel'
 import { GameTile } from './GameTile'
 import { buttonVariants } from './ui'
@@ -40,6 +41,7 @@ export default function MarketplaceLanding() {
   const { isSuperAdmin } = useAuth()
   const onboardingDraft = useOnboardingDraft()
   const continueApplication = isOnboardingDraftInProgress(onboardingDraft)
+  const ownerHref = usePreservedHref(continueApplication ? '/register/owner' : '/for-stores')
   const { data: games = [], isLoading: gamesLoading } = useGameShowcase()
   // Each game's signature cards behind the hero, resolved from our catalog.
   // 12 per game fills the 60 layout slots when all five games are stocked.
@@ -151,12 +153,12 @@ export default function MarketplaceLanding() {
                 Platform admin
               </Link>
             ) : continueApplication ? (
-              <Link to="/register/owner" className={secondaryCta}>
+              <Link to={ownerHref} className={secondaryCta}>
                 <Store aria-hidden className="size-4" />
                 Continue application
               </Link>
             ) : (
-              <Link to="/register/owner" className={secondaryCta}>
+              <Link to={ownerHref} className={secondaryCta}>
                 <Store aria-hidden className="size-4" />
                 Open a store
               </Link>

@@ -30,8 +30,10 @@ const LANDING_SECTIONS = [
 
 const LANDING_ROUTES = [
   // { to: '/tools/deck-builder', label: 'Deck Builder' },
-  { to: '/pricing', label: 'Pricing' },
+  { to: '/for-stores', label: 'For stores' },
 ] as const
+
+const MARKETING_NAV_PATHS = new Set(['/', '/for-stores'])
 
 export default function AppLayout() {
   const { user, logout, isSuperAdmin, isStoreOwner } = useAuth()
@@ -69,6 +71,7 @@ export default function AppLayout() {
   // Section links only make sense on the guest landing page, where those
   // sections actually exist. Everywhere else the header stays logo + actions.
   const onLandingPage = location.pathname === '/' && !user
+  const onMarketingNav = !user && MARKETING_NAV_PATHS.has(location.pathname)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [storeMenuOpen, setStoreMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -137,28 +140,29 @@ export default function AppLayout() {
   const mobileLinkClass = 'block rounded-btn px-3 py-2.5 text-base font-medium text-fg hover:bg-bg'
   const closeMobile = () => setMobileOpen(false)
 
-  const landingLinks = (
-    <>
-      {LANDING_ROUTES.map(({ to, label }) => (
-        <Link
-          key={to}
-          to={to}
-          className="rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg"
-        >
-          {label}
-        </Link>
-      ))}
-      {LANDING_SECTIONS.map(({ id, label }) => (
-        <a
-          key={id}
-          href={`#${id}`}
-          className="rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg"
-        >
-          {label}
-        </a>
-      ))}
-    </>
-  )
+  const marketingRouteLinks = LANDING_ROUTES.map(({ to, label }) => (
+    <NavLink
+      key={to}
+      to={to}
+      className={({ isActive }) =>
+        isActive
+          ? 'rounded-full bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700'
+          : 'rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg'
+      }
+    >
+      {label}
+    </NavLink>
+  ))
+
+  const landingSectionLinks = LANDING_SECTIONS.map(({ id, label }) => (
+    <a
+      key={id}
+      href={`#${id}`}
+      className="rounded-full px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-bg hover:text-fg"
+    >
+      {label}
+    </a>
+  ))
 
   const themeToggle = (
     <button
@@ -255,7 +259,12 @@ export default function AppLayout() {
           <div className="flex items-center gap-3">
           {/* Desktop navigation */}
           <nav className="hidden items-center gap-3 md:flex">
-            {onLandingPage && <div className="flex items-center gap-1">{landingLinks}</div>}
+            {onMarketingNav && (
+              <div className="flex items-center gap-1">
+                {marketingRouteLinks}
+                {onLandingPage ? landingSectionLinks : null}
+              </div>
+            )}
 
             {user && (
               <NavLink to="/" className={navLinkClass} end>
@@ -476,18 +485,19 @@ export default function AppLayout() {
                 </div>
               )}
 
-              {onLandingPage && (
+              {onMarketingNav && (
                 <>
                   {LANDING_ROUTES.map(({ to, label }) => (
                     <Link key={to} to={to} onClick={closeMobile} className={mobileLinkClass}>
                       {label}
                     </Link>
                   ))}
-                  {LANDING_SECTIONS.map(({ id, label }) => (
-                    <a key={id} href={`#${id}`} onClick={closeMobile} className={mobileLinkClass}>
-                      {label}
-                    </a>
-                  ))}
+                  {onLandingPage &&
+                    LANDING_SECTIONS.map(({ id, label }) => (
+                      <a key={id} href={`#${id}`} onClick={closeMobile} className={mobileLinkClass}>
+                        {label}
+                      </a>
+                    ))}
                 </>
               )}
 
@@ -604,7 +614,7 @@ function MarketplaceLegalFooter() {
   )
 }
 
-function useStoreApplicationCta(): { to: '/register/owner'; label: string } | null {
+function useStoreApplicationCta(): { to: '/register/owner' | '/for-stores'; label: string } | null {
   const { user, isSuperAdmin } = useAuth()
   const draft = useOnboardingDraft()
   if (isOnboardingDraftInProgress(draft)) {
@@ -613,7 +623,7 @@ function useStoreApplicationCta(): { to: '/register/owner'; label: string } | nu
   if (!user) return null
   const ownsAStore = (user.ownedStores?.length ?? 0) > 0
   if (!ownsAStore && !isSuperAdmin) {
-    return { to: '/register/owner', label: 'Open a store' }
+    return { to: '/for-stores', label: 'Open a store' }
   }
   return null
 }
