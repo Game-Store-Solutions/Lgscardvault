@@ -35,7 +35,7 @@ Two backend styles coexist:
 | **Case cards** | Owner-curated storefront sections filled manually or auto-pulled by price/rarity from inventory | [case-cards.md](case-cards.md) |
 | **Commander deck builder** | Reference-deck harvesting, strategy classification, card relationships, contextual scoring, and 100-card construction | [commander-deck-builder.md](commander-deck-builder.md) |
 | **CSV import** | Async bulk import lifecycle, failed-row recovery, card resolution, inventory writes, and live polling | [csv-import.md](csv-import.md) |
-| **Customers & orders** | Per-store customer profiles, favorites, want lists, cart, test checkout, order workflow, notifications, and reports | [customers-and-orders.md](customers-and-orders.md) |
+| **Customers & orders** | Per-store customer profiles, favorites, want lists, set alerts, cart, test checkout, order workflow, notifications, and reports | [customers-and-orders.md](customers-and-orders.md) |
 | **Launch compliance** | US pickup-only launch: SaaS copy, licenses, DOB, cookies, CCPA queue, $0-tax card block, disputes — and what is still lawyer/operator work | [compliance.md](compliance.md) |
 
 ## Ops & developer guides

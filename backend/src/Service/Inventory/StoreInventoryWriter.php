@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Enum\CardCondition;
 use App\Repository\InventoryItemRepository;
 use App\Service\Catalog\FinishVocabulary;
+use App\Service\Notification\SetAlertNotifier;
 use App\Service\Notification\WantListNotifier;
 use App\Service\Scryfall\ScryfallClient;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,6 +23,7 @@ final readonly class StoreInventoryWriter
         private ScryfallClient $scryfallClient,
         private LoggerInterface $logger,
         private WantListNotifier $wantListNotifier,
+        private SetAlertNotifier $setAlertNotifier,
     ) {
     }
 
@@ -148,6 +150,7 @@ final readonly class StoreInventoryWriter
         // work, so flush the persisted notifications explicitly.
         if ($item->getQuantity() > 0) {
             $this->wantListNotifier->notifyAvailability($store, $card, $exceptWantListUser);
+            $this->setAlertNotifier->notifyStocked($store, $card, $exceptWantListUser);
             $this->entityManager->flush();
         }
 
@@ -205,6 +208,7 @@ final readonly class StoreInventoryWriter
         // with the batch (the CSV handler owns the transaction boundary).
         if ($item->getQuantity() > 0) {
             $this->wantListNotifier->notifyAvailability($store, $card, $exceptWantListUser);
+            $this->setAlertNotifier->notifyStocked($store, $card, $exceptWantListUser);
         }
 
         return $item;

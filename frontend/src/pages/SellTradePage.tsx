@@ -17,6 +17,7 @@ import type { BuylistEntry, CardSummary, SellPayoutMethod, SellSubmission, Trade
 import { useAuth } from '../context/AuthContext'
 import { useCardPrintings, useCatalogGames, useDebouncedValue, useKioskMode, useStore, useStoreTheme } from '../hooks'
 import { GameSelector, PrintingGrid } from '../components/catalog'
+import { parseDecklistQuantities } from '../lib/parseDecklist'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../components/motion'
 import {
   BackButton,
@@ -98,21 +99,6 @@ function lineOfferCents(line: SellLine, rates: TradeRates, method: SellPayoutMet
       ? rates.creditPercent
       : rates.cashPercent
   return Math.floor((market * percent) / 100)
-}
-
-/** Parse a pasted decklist: `4 Lightning Bolt`, `4x ...`, or bare names. */
-function parseDecklist(text: string): Map<string, number> {
-  const byName = new Map<string, number>()
-  for (const rawLine of text.split('\n')) {
-    const raw = rawLine.trim()
-    if (!raw || raw.startsWith('#') || raw.startsWith('//')) continue
-    const counted = /^(\d+)\s*[xX]?\s+(.+)$/.exec(raw)
-    const quantity = counted ? Math.max(1, Number(counted[1])) : 1
-    const name = (counted ? counted[2] : raw).replace(/\s*\([A-Za-z0-9]{2,6}\)\s*[\w-]*\s*$/, '').trim().toLowerCase()
-    if (!name) continue
-    byName.set(name, (byName.get(name) ?? 0) + quantity)
-  }
-  return byName
 }
 
 function matchesName(card: CardSummary, wanted: string): boolean {
@@ -597,7 +583,7 @@ export default function SellTradePage() {
 
   /** Resolve pasted names against the catalog, cheapest priced printing first. */
   async function importBulk() {
-    const wanted = parseDecklist(bulkText)
+    const wanted = parseDecklistQuantities(bulkText)
     if (wanted.size === 0) return
     setBulkBusy(true)
     const misses: string[] = []

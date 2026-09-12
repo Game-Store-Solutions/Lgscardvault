@@ -7,6 +7,7 @@ import type { Store as StoreType, UserProfile } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import { useActiveStores, useMarkAllNotificationsRead, useMyFavorites, useMyNotifications, useMyOrders, useMyWantList } from '../hooks'
 import { AccountSettingsPanel } from '../components/account/AccountSettingsPanel'
+import { SetAlertsPanel } from '../components/account/SetAlertsPanel'
 import { WantListPanel } from '../components/account/WantListPanel'
 import {
   FavoritesPanel,
@@ -44,6 +45,7 @@ type AccountSection =
   | 'orders'
   | 'favorites'
   | 'wantlist'
+  | 'setalerts'
   | 'selltrade'
   | 'credit'
   | 'notifications'
@@ -55,6 +57,7 @@ const SECTIONS: AccountSection[] = [
   'orders',
   'favorites',
   'wantlist',
+  'setalerts',
   'selltrade',
   'credit',
   'notifications',
@@ -67,6 +70,7 @@ const SECTION_ALERT_TYPES: Partial<Record<AccountSection, string[]>> = {
   orders: ['order_fulfilled', 'order_cancelled', 'order_balance_due'],
   selltrade: ['sell_trade_submitted', 'sell_trade_accepted', 'sell_trade_declined', 'sell_trade_completed', 'sell_trade_draft_saved'],
   wantlist: ['want_list_match'],
+  setalerts: ['set_restock'],
 }
 
 /**
@@ -143,7 +147,7 @@ export default function AccountPage() {
   useEffect(() => {
     if (!user || !sectionAlertTypes) return
     markSectionAlertsRead.mutate()
-    // Opening Orders / Sell-Trade / Want list clears those unread alerts.
+    // Opening Orders / Sell-Trade / Want list / Set alerts clears those unread alerts.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per section + store
   }, [section, storeSlug, user])
 
@@ -159,6 +163,7 @@ export default function AccountPage() {
     { id: 'orders', label: 'Orders' },
     { id: 'favorites', label: 'Favorites' },
     { id: 'wantlist', label: 'Want list' },
+    { id: 'setalerts', label: 'Set alerts' },
     { id: 'selltrade', label: 'Sell / Trade' },
     { id: 'credit', label: 'Store credit' },
     {
@@ -374,6 +379,8 @@ export default function AccountPage() {
       )}
 
       {section === 'wantlist' && <WantListPanel stores={pickerStores} storeSlug={storeSlug} />}
+
+      {section === 'setalerts' && <SetAlertsPanel stores={pickerStores} storeSlug={storeSlug} />}
 
       {section === 'selltrade' && (
         <ProfileSection title="Sell / Trade">

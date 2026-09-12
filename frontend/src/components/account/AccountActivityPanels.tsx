@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Heart, ImageOff, Trash2, Wallet, WalletCards } from 'lucide-react'
-import api, { ACCOUNT_PAGE_SIZE, cardImage, formatPrice, formatScryfallPrice } from '../../api/client'
+import { AccountAccordion } from './AccountAccordion'
+import api, { ACCOUNT_PAGE_SIZE, NOTIFICATIONS_PAGE_SIZE, cardImage, formatPrice, formatScryfallPrice } from '../../api/client'
 import type { CustomerFavorite, CustomerNotification, PaginatedList, SellSubmission, SellTradeDraftSummary, StoreCreditBalance, StoreCreditSummary, StoreCreditTransaction } from '../../api/types'
 import { customerKeys, useMarkAllNotificationsRead, useMarkNotificationRead, useMyFavorites, useMyNotifications, useMySellSubmissions, useMySellTradeDrafts } from '../../hooks'
 import { NotificationList } from '../notifications/NotificationList'
@@ -191,33 +192,29 @@ export function SellTradeHistoryPanel({
       ) : null}
 
       {drafts.length > 0 ? (
-        <ul className="divide-y divide-border rounded-btn border border-dashed border-brand-300/60 bg-brand-50/40 dark:bg-brand-950/20">
-          {drafts.map((draft) => (
-            <SellTradeDraftRow key={draft.storeSlug} draft={draft} />
+        <ul className="divide-y divide-border rounded-btn border border-dashed border-brand-300/60 bg-brand-50/40 px-3 dark:bg-brand-950/20 sm:px-4">
+          {drafts.map((draft, index) => (
+            <SellTradeDraftRow key={draft.storeSlug} draft={draft} defaultOpen={index === 0} />
           ))}
         </ul>
       ) : null}
 
       {submissions.length > 0 ? (
         <ul className="divide-y divide-border">
-          {submissions.map((submission) => (
-            <li key={`${submission.storeSlug ?? 'store'}-${submission.id}`} className="py-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-bold text-fg">
-                    {submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)} cards · store pays{' '}
-                    {formatPrice(submission.totalOfferCents)} in {submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}
-                  </p>
-                  <p className="mt-0.5 text-sm text-fg-muted">
-                    {submission.storeName ? `${submission.storeName} · ` : ''}
-                    {new Date(submission.createdAt).toLocaleString()}
-                  </p>
-                </div>
+          {submissions.map((submission, index) => (
+            <AccountAccordion
+              key={`${submission.storeSlug ?? 'store'}-${submission.id}`}
+              id={`sell-trade-${submission.id}`}
+              defaultOpen={index === 0 && drafts.length === 0}
+              title={`${submission.items.reduce((n, item) => n + (item.acceptedQuantity ?? item.quantity), 0)} cards · store pays ${formatPrice(submission.totalOfferCents)} in ${submission.payoutMethod === 'credit' ? 'store credit' : 'cash'}`}
+              subtitle={`${submission.storeName ? `${submission.storeName} · ` : ''}${new Date(submission.createdAt).toLocaleString()}`}
+              badge={
                 <Badge tone={SELL_STATUS_TONE[submission.status]} className="uppercase">
                   {submission.status}
                 </Badge>
-              </div>
-              <ul className="mt-3 space-y-1 text-sm">
+              }
+            >
+              <ul className="space-y-1 text-sm">
                 {submission.items.map((item) => (
                   <li key={item.id} className="flex items-center justify-between gap-3">
                     <span className="min-w-0 truncate text-fg">
@@ -233,7 +230,7 @@ export function SellTradeHistoryPanel({
                   Open this store’s buy list →
                 </Link>
               ) : null}
-            </li>
+            </AccountAccordion>
           ))}
         </ul>
       ) : null}
@@ -250,39 +247,31 @@ export function SellTradeHistoryPanel({
   )
 }
 
-function SellTradeDraftRow({ draft }: { draft: SellTradeDraftSummary }) {
-  const preview = draft.lines.slice(0, 4)
-  const remaining = Math.max(0, draft.lineCount - preview.length)
-
+function SellTradeDraftRow({ draft, defaultOpen }: { draft: SellTradeDraftSummary; defaultOpen?: boolean }) {
   return (
-    <li className="px-3 py-4 sm:px-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-bold text-fg">
-            {draft.cardCount} card{draft.cardCount === 1 ? '' : 's'} · unfinished list
-            {draft.payoutMethod === 'cash' ? ' · cash payout' : ' · store credit'}
-          </p>
-          <p className="mt-0.5 text-sm text-fg-muted">
-            {draft.storeName} · saved {new Date(draft.updatedAt).toLocaleString()}
-          </p>
-        </div>
+    <AccountAccordion
+      id={`sell-trade-draft-${draft.storeSlug}`}
+      defaultOpen={defaultOpen}
+      title={`${draft.cardCount} card${draft.cardCount === 1 ? '' : 's'} · unfinished list${draft.payoutMethod === 'cash' ? ' · cash payout' : ' · store credit'}`}
+      subtitle={`${draft.storeName} · saved ${new Date(draft.updatedAt).toLocaleString()}`}
+      badge={
         <Badge tone="warning" className="uppercase">
           Draft
         </Badge>
-      </div>
-      <ul className="mt-3 space-y-1 text-sm">
-        {preview.map((line) => (
+      }
+    >
+      <ul className="space-y-1 text-sm">
+        {draft.lines.map((line) => (
           <li key={line.key} className="truncate text-fg">
             {line.quantity}× {line.card.name}
             {line.finish && line.finish !== 'Nonfoil' ? ` (${line.finish})` : ''}
           </li>
         ))}
-        {remaining > 0 ? <li className="text-fg-muted">+{remaining} more</li> : null}
       </ul>
       <Link to={`/s/${draft.storeSlug}/sell`} className="mt-3 inline-block text-sm font-bold text-brand-600 hover:underline">
         Continue this list →
       </Link>
-    </li>
+    </AccountAccordion>
   )
 }
 
@@ -456,7 +445,7 @@ export function StoreCreditPanel({
 
 export function NotificationsPanel({ storeSlug }: { storeSlug?: string }) {
   const [page, setPage] = useState(1)
-  const query = useMyNotifications(page, storeSlug)
+  const query = useMyNotifications(page, storeSlug, true, { itemsPerPage: NOTIFICATIONS_PAGE_SIZE })
   const markRead = useMarkNotificationRead()
   const markAllRead = useMarkAllNotificationsRead(storeSlug)
   const all = query.data?.items ?? []
@@ -512,7 +501,7 @@ export function NotificationsPanel({ storeSlug }: { storeSlug?: string }) {
       )}
       <Pagination
         page={page}
-        pageCount={pageCount(query.data?.total ?? 0)}
+        pageCount={pageCount(query.data?.total ?? 0, query.data?.itemsPerPage ?? NOTIFICATIONS_PAGE_SIZE)}
         onPageChange={setPage}
         totalItems={query.data?.total}
       />

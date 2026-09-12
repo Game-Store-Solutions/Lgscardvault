@@ -659,6 +659,44 @@ final class TransactionalMailer
         );
     }
 
+    /** Store-branded — a watched set just had cards stocked. */
+    public function sendSetRestock(User $user, Store $store, string $setCode, string $setName): void
+    {
+        $email = $user->getEmail();
+        if (null === $email || '' === $email) {
+            return;
+        }
+
+        $storeName = $store->getName() ?? 'Store';
+        $slug = (string) ($store->getSlug() ?? '');
+        $setUrl = $this->frontendUrl().'/s/'.rawurlencode($slug);
+        $customerName = $user->getDisplayName() ?: 'there';
+        $label = '' !== trim($setName) ? $setName : $setCode;
+
+        $this->sendHtml(
+            to: $email,
+            subject: sprintf('%s just arrived at %s', $setCode, $storeName),
+            htmlTemplate: 'emails/store/set_restock.html.twig',
+            context: [
+                'preheader' => sprintf('%s cards are now in stock at %s.', $setCode, $storeName),
+                'customerName' => $customerName,
+                'storeName' => $storeName,
+                'setCode' => $setCode,
+                'setName' => $label,
+                'setUrl' => $setUrl,
+                'footerNote' => sprintf('Set alerts from %s.', $storeName),
+            ],
+            textBody: sprintf(
+                "%s (%s) just arrived at %s.\n\nView: %s\n",
+                $setCode,
+                $label,
+                $storeName,
+                $setUrl,
+            ),
+            store: $store,
+        );
+    }
+
     /** Store-branded — staff accepted the shopper's sell/trade offer. */
     public function sendSellTradeAccepted(SellSubmission $submission, User $user, Store $store): void
     {

@@ -19,6 +19,7 @@ class CustomerNotification
     public const TYPE_SELL_TRADE_DECLINED = 'sell_trade_declined';
     public const TYPE_SELL_TRADE_COMPLETED = 'sell_trade_completed';
     public const TYPE_SELL_TRADE_DRAFT_SAVED = 'sell_trade_draft_saved';
+    public const TYPE_SET_RESTOCK = 'set_restock';
 
     /** @var list<string> */
     public const TYPES = [
@@ -31,6 +32,7 @@ class CustomerNotification
         self::TYPE_SELL_TRADE_DECLINED,
         self::TYPE_SELL_TRADE_COMPLETED,
         self::TYPE_SELL_TRADE_DRAFT_SAVED,
+        self::TYPE_SET_RESTOCK,
     ];
 
     #[ORM\Id]

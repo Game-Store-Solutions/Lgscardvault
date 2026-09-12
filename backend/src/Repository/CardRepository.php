@@ -903,6 +903,69 @@ class CardRepository extends ServiceEntityRepository
         return $cards;
     }
 
+    /**
+     * One (or a few chunked) lookups for a pasted decklist: exact name,
+     * DFC front face, and a prefix match for names at least 3 characters.
+     *
+     * @param list<string> $names
+     *
+     * @return list<Card>
+     */
+    public function findCandidatesByNames(Game $game, array $names): array
+    {
+        $needles = [];
+        foreach ($names as $name) {
+            $needle = mb_strtolower(trim($name));
+            if ('' !== $needle) {
+                $needles[$needle] = $needle;
+            }
+        }
+        if ([] === $needles) {
+            return [];
+        }
+
+        $merged = [];
+        $seen = [];
+        foreach (array_chunk(array_values($needles), 80) as $chunk) {
+            foreach ($this->findCandidateChunk($game, $chunk) as $card) {
+                $id = (string) $card->getId();
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $merged[] = $card;
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param list<string> $needles lowercase trimmed names
+     *
+     * @return list<Card>
+     */
+    private function findCandidateChunk(Game $game, array $needles): array
+    {
+        $qb = $this->scopedToGame($game);
+        $or = $qb->expr()->orX('LOWER(c.name) IN (:names)');
+        foreach ($needles as $i => $name) {
+            $or->add('LOWER(c.name) LIKE :front'.$i);
+            $qb->setParameter('front'.$i, $name.' //%');
+            if (mb_strlen($name) >= 3) {
+                $or->add('LOWER(c.name) LIKE :prefix'.$i);
+                $qb->setParameter('prefix'.$i, $name.'%');
+            }
+        }
+
+        return $qb
+            ->andWhere($or)
+            ->setParameter('names', $needles)
+            ->setMaxResults(min(400, max(40, \count($needles) * 8)))
+            ->getQuery()
+            ->getResult();
+    }
+
     /** Base query for one game, including legacy NULL-game rows for Magic. */
     private function scopedToGame(Game $game): QueryBuilder
     {

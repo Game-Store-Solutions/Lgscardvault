@@ -10,13 +10,10 @@ import { useAuth } from '../context/AuthContext'
 import { Badge, BackButton, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Skeleton, Textarea } from '../components/ui'
 import { CardImage } from '../components/cards'
 import { finishName } from '../lib/finishes'
+import { parseDecklist, type DecklistLine } from '../lib/parseDecklist'
 
 /** One parsed request line: how many copies of which card name. */
-interface RequestLine {
-  raw: string
-  name: string
-  quantity: number
-}
+type RequestLine = DecklistLine
 
 type LineStatus = 'found' | 'partial' | 'missing'
 
@@ -28,28 +25,6 @@ interface LineResult extends RequestLine {
   fillable: number
   /** Cheapest-first cost of the fillable copies, in cents; null when unpriced. */
   fillCents: number | null
-}
-
-/**
- * Parse a pasted decklist. Accepts `4 Lightning Bolt`, `4x Lightning Bolt`, or
- * a bare card name (quantity 1); blank lines and `#`/`//` comments are skipped,
- * and a trailing `(SET) 123` printing hint is ignored. Duplicate names merge.
- */
-function parseDecklist(text: string): RequestLine[] {
-  const byName = new Map<string, RequestLine>()
-  for (const rawLine of text.split('\n')) {
-    const raw = rawLine.trim()
-    if (!raw || raw.startsWith('#') || raw.startsWith('//')) continue
-    const counted = /^(\d+)\s*[xX]?\s+(.+)$/.exec(raw)
-    const quantity = counted ? Math.max(1, Number(counted[1])) : 1
-    const name = (counted ? counted[2] : raw).replace(/\s*\([A-Za-z0-9]{2,6}\)\s*[\w-]*\s*$/, '').trim()
-    if (!name) continue
-    const key = name.toLowerCase()
-    const existing = byName.get(key)
-    if (existing) existing.quantity += quantity
-    else byName.set(key, { raw, name, quantity })
-  }
-  return [...byName.values()]
 }
 
 function itemMarketCents(item: InventoryItem): number | null {

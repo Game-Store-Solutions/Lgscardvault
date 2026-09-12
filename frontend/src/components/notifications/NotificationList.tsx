@@ -1,4 +1,4 @@
-import { Bell, Check, Coins, CreditCard, ShoppingBag } from 'lucide-react'
+import { Bell, BellRing, Check, Coins, CreditCard, ShoppingBag } from 'lucide-react'
 import { Link } from 'react-router'
 import type { CustomerNotification } from '../../api/types'
 import { Button } from '../ui'
@@ -22,6 +22,9 @@ function notificationHref(notification: CustomerNotification): string {
   }
   if (notification.type === 'want_list_match') {
     return `/account?section=wantlist${store}`
+  }
+  if (notification.type === 'set_restock') {
+    return `/account?section=setalerts${store}`
   }
   return `/account?section=orders${store}${order}`
 }
@@ -53,7 +56,9 @@ export function NotificationList({
           ? Coins
           : notification.type === 'want_list_match'
             ? ShoppingBag
-            : notification.type === 'order_balance_due' || notification.type === 'order_cancelled'
+            : notification.type === 'set_restock'
+              ? BellRing
+              : notification.type === 'order_balance_due' || notification.type === 'order_cancelled'
               ? CreditCard
               : Bell
         return (
