@@ -26,7 +26,7 @@ import { type Condition } from '../../components/inventory'
 import { defaultFinishFor, finishChoices, finishOptions, isFoilFinish } from '../../lib/finishes'
 import { listingMarketSummary } from '../../lib/marketFinishes'
 import { rankInventorySearch } from '../../lib/rankInventorySearch'
-import { foldSearchText, catalogCardIdentity, catalogNamesMatch, typeaheadNameTier } from '../../lib/searchText'
+import { foldSearchText, catalogCardIdentity, catalogNamesMatch, mergeSetSearchOptions, typeaheadNameTier } from '../../lib/searchText'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -401,21 +401,10 @@ export default function SearchTab({ slug }: { slug: string }) {
   const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, gameFilter)
   const inventorySets = gameStats?.sets ?? []
   const { data: catalogGameSets = [] } = useGameSets(gameFilter)
-  const catalogSetOptions = useMemo(() => {
-    const byCode = new Map<string, { code: string; name: string }>()
-    for (const set of catalogGameSets) {
-      const code = set.code?.trim()
-      if (!code) continue
-      byCode.set(code.toLowerCase(), { code, name: set.name })
-    }
-    for (const set of inventorySets) {
-      const code = set.code?.trim()
-      if (!code) continue
-      const key = code.toLowerCase()
-      if (!byCode.has(key)) byCode.set(key, { code, name: set.name })
-    }
-    return [...byCode.values()]
-  }, [catalogGameSets, inventorySets])
+  const catalogSetOptions = useMemo(
+    () => mergeSetSearchOptions(catalogGameSets, inventorySets),
+    [catalogGameSets, inventorySets],
+  )
 
   const activeGameName = gameOptions.find((game) => game.code === gameFilter)?.name ?? 'this game'
   // The finish filter is worded in the managed game's own terms, so a Pokemon
@@ -579,7 +568,7 @@ export default function SearchTab({ slug }: { slug: string }) {
                   sets={catalogSetOptions}
                   listboxId="catalog-set-typeahead"
                   ariaLabel="Matching catalog sets"
-                  placeholder="Set code or name"
+                  placeholder="Type or browse sets"
                   onEnter={() => void startCatalogSearch()}
                 />
               )}
