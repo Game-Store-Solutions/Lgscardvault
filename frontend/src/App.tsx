@@ -44,6 +44,7 @@ import PlatformStoreImportsPage from './pages/PlatformStoreImportsPage'
 import LegalPage from './pages/LegalPage'
 import GuestOrderBalancePage from './pages/GuestOrderBalancePage'
 import PricingPage from './pages/PricingPage'
+import ForStoresPage from './pages/ForStoresPage'
 // import PublicDeckBuilderPage from './pages/PublicDeckBuilderPage'
 import NewsletterAdminPage from './pages/platform-admin/NewsletterAdminPage'
 import NewsletterUnsubscribePage from './pages/NewsletterUnsubscribePage'
@@ -104,6 +105,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route index element={<HomePage />} />
               <Route path="pricing" element={<PricingPage />} />
+              <Route path="for-stores" element={<ForStoresPage />} />
               <Route path="newsletter/unsubscribe" element={<NewsletterUnsubscribePage />} />
               {/* <Route path="tools/deck-builder" element={<PublicDeckBuilderPage />} /> */}
               <Route path="stores" element={<StoreDirectoryPage />} />

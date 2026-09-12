@@ -8,7 +8,8 @@ LGS Card Vault (https://lgscardvault.com) lets players browse real store invento
 
 - Homepage: https://lgscardvault.com/
 - Store directory: https://lgscardvault.com/stores
-- Open a store: https://lgscardvault.com/register/owner
+- For stores (owners, including pricing): https://lgscardvault.com/for-stores
+- Open a store (application): https://lgscardvault.com/register/owner
 - Player account: https://lgscardvault.com/register/customer
 - Privacy: https://lgscardvault.com/privacy
 - Privacy request: https://lgscardvault.com/privacy-request

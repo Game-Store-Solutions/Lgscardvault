@@ -30,10 +30,10 @@ const routes = [
       'Browse verified Magic, Pokémon, One Piece, and Flesh & Blood storefronts on LGS Card Vault. Shop real in-store inventory online.',
   },
   {
-    path: '/pricing',
-    title: 'Store Pricing',
+    path: '/for-stores',
+    title: 'For Local Game Stores',
     description:
-      'Open your verified storefront on LGS Card Vault for $450 flat or 10% of daily online sales until $450. Full platform access with no monthly fees after the cap.',
+      'Put your cases online and keep the sale at your counter. Branded storefront, live inventory, pickup checkout, buylist, want lists, and set alerts. $450 a month.',
   },
 ]
 

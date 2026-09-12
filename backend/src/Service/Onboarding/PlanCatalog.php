@@ -5,7 +5,7 @@ namespace App\Service\Onboarding;
 /**
  * Platform pricing for new stores. $450 / calendar month (Pacific):
  * pay the month in full up front, or accrue 10% of each business day's
- * shopper sales until $450 — remaining balance auto-charges at month end.
+ * shopper sales until $450. Remaining balance auto-charges at month end.
  * Legacy monthly tiers remain readable for stores already on them.
  */
 final class PlanCatalog
@@ -33,7 +33,7 @@ final class PlanCatalog
             'capCents' => self::PLATFORM_CAP_CENTS,
             'feePercentBps' => 0,
             'requiresVault' => false,
-            'tagline' => 'One $450 payment each month — every feature, no sales fees that month.',
+            'tagline' => 'One $450 payment each month. Every feature, no sales fees that month.',
             'popular' => true,
             'features' => self::FEATURES,
         ],
@@ -45,7 +45,7 @@ final class PlanCatalog
             'capCents' => self::PLATFORM_CAP_CENTS,
             'feePercentBps' => self::USAGE_FEE_BPS,
             'requiresVault' => true,
-            'tagline' => '10% of each day\'s sales toward this month\'s $450 — remaining auto-charged at month end.',
+            'tagline' => '10% of each day\'s sales toward this month\'s $450. Remaining auto-charged at month end.',
             'features' => self::FEATURES,
         ],
     ];
