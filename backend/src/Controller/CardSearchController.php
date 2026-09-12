@@ -252,9 +252,9 @@ class CardSearchController extends AbstractController
     }
 
     /**
-     * Every paper printing of this exact card (oracle id for Magic, exact
-     * name for other games). Inventory edit uses this instead of name search
-     * so "Abrade" does not collapse to a single unique-card hit.
+     * Every paper printing of this exact card (oracle id for Magic, TCGPlayer
+     * base name for other games). Inventory edit uses this instead of name
+     * search so "Abrade" does not collapse to a single unique-card hit.
      */
     #[Route('/cards/{id}/printings', name: 'api_catalog_card_printings', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]

@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Card;
 use App\Entity\Game;
 use App\Service\Catalog\ArtistCredits;
+use App\Service\Catalog\CardNameIdentity;
 use App\Service\Catalog\SearchTextNormalizer;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -567,22 +568,32 @@ class CardRepository extends ServiceEntityRepository
     }
 
     /**
-     * Every catalog printing with this exact name in a non-Magic game.
-     * Name search is too lossy here: LIKE + a limit can fill up with
-     * "Pikachu V" cousins and drop later Pikachu printings.
+     * Every catalog printing of this card in a non-Magic game. Exact name
+     * plus TCGPlayer suffixes ("Shanks (OP04) (Manga)", "Shanks - OP09-004")
+     * so One Piece treatments land in one printing picker. LIKE + a bare
+     * prefix would also pull "Pikachu V" into Pikachu.
      *
      * @return list<Card>
      */
     public function findPrintingsByExactNameForGame(Game $game, string $name, int $limit = 200): array
     {
-        $needle = mb_strtolower(trim($name));
+        $identity = CardNameIdentity::baseName($name);
+        $needle = mb_strtolower(trim($identity));
         if ('' === $needle) {
             return [];
         }
 
         return $this->scopedToGame($game)
-            ->andWhere('LOWER(c.name) = :name')
+            ->andWhere(
+                'LOWER(c.name) = :name
+                OR LOWER(c.name) LIKE :paren
+                OR LOWER(c.name) LIKE :bracket
+                OR LOWER(c.name) LIKE :dash',
+            )
             ->setParameter('name', $needle)
+            ->setParameter('paren', $needle.' (%')
+            ->setParameter('bracket', $needle.' [%')
+            ->setParameter('dash', $needle.' - %')
             ->orderBy('c.releasedAt', 'DESC')
             ->addOrderBy('c.setCode', 'ASC')
             ->addOrderBy('c.collectorNumber', 'ASC')

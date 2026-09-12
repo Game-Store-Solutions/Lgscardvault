@@ -10,8 +10,8 @@ use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * In-store kiosk orders land in Ready for pickup (fulfilled) so staff pull
- * from that queue — the customer is already at the counter.
+ * In-store kiosk orders land in Processing / Accepted (received) so staff
+ * pull the order, then mark Ready for pickup.
  */
 final class KioskOrderStatusTest extends WebTestCase
 {
@@ -48,7 +48,7 @@ final class KioskOrderStatusTest extends WebTestCase
         return '' === $raw ? [] : (json_decode($raw, true) ?? []);
     }
 
-    public function testTerminalKioskOrderStartsReadyForPickup(): void
+    public function testTerminalKioskOrderStartsAccepted(): void
     {
         $store = $this->fixtures->store('kiosk-ready-terminal');
         $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(9201), 2, priceCents: 1500);
@@ -71,11 +71,11 @@ final class KioskOrderStatusTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(201);
         $order = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame('fulfilled', $order['status']);
+        self::assertSame('received', $order['status']);
         self::assertSame('kiosk', $order['channel']);
     }
 
-    public function testAdminKioskCreateStartsReadyForPickup(): void
+    public function testAdminKioskCreateStartsAccepted(): void
     {
         $store = $this->fixtures->store('kiosk-ready-admin');
         $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(9202), 2, priceCents: 2000);
@@ -88,7 +88,7 @@ final class KioskOrderStatusTest extends WebTestCase
         ]);
 
         self::assertResponseIsSuccessful();
-        self::assertSame('fulfilled', $order['status']);
+        self::assertSame('received', $order['status']);
         self::assertSame('kiosk', $order['channel']);
     }
 

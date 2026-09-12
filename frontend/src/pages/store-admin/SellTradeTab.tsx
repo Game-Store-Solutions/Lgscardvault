@@ -11,13 +11,13 @@ import type {
   TradeRateSettings,
   TradeRates,
 } from '../../api/types'
-import { useCatalogGames, useDebouncedValue, useCardPrintings, useSellSubmissionsList, sellSubmissionsKey, useStore } from '../../hooks'
+import { useCatalogGames, useDebouncedValue, useCardPrintings, useGameSets, useSellSubmissionsList, sellSubmissionsKey, useStore } from '../../hooks'
 import { formatDate } from '../../lib/format'
-import { GameSelector, PrintingGrid } from '../../components/catalog'
-import { Avatar, Badge, Button, Card, EmptyState, Input, LoadingPanel, Modal, Select, Spinner, dropdownItemClass, dropdownPanelClass } from '../../components/ui'
+import { GameSelector, PrintingGrid, SetCodeTypeahead } from '../../components/catalog'
+import { Avatar, Badge, Button, Card, EmptyState, Field, Input, LoadingPanel, Modal, Select, Spinner, dropdownItemClass, dropdownPanelClass } from '../../components/ui'
 import { cx } from '../../lib/cx'
 import { finishChoices, isFoilFinish } from '../../lib/finishes'
-import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
+import { catalogCardIdentity, catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
 
 function AccordionPanel({
   id,
@@ -105,16 +105,9 @@ function sellStatusPresentation(status: SellSubmissionStatus): { label: string; 
   }
 }
 
-/** Queue row CTA — opens the same modal; label matches the next staff action. */
+/** Queue row only opens the review modal — accept / complete / archive live there. */
 function submissionQueueActionLabel(status: SellSubmissionStatus): string {
-  switch (status) {
-    case 'pending':
-      return 'Review'
-    case 'accepted':
-      return 'Complete & stock'
-    default:
-      return 'View'
-  }
+  return status === 'pending' || status === 'accepted' ? 'Review' : 'View'
 }
 
 /**
@@ -210,11 +203,6 @@ export default function SellTradeTab({ slug }: { slug: string }) {
 
   const rowActions = (submission: SellSubmission, inArchive: boolean) => ({
     onReview: () => setReviewing(submission),
-    onArchive:
-      submission.status === 'accepted' && !inArchive
-        ? () => archiveSubmission.mutate({ id: submission.id, archived: true })
-        : undefined,
-    archivePending: archiveSubmission.isPending && archiveSubmission.variables?.id === submission.id,
     onRestore:
       inArchive && submission.status === 'accepted'
         ? () => archiveSubmission.mutate({ id: submission.id, archived: false })
@@ -228,7 +216,7 @@ export default function SellTradeTab({ slug }: { slug: string }) {
         id="sell-submissions"
         defaultOpen
         title="Sell submissions"
-        subtitle="Review new offers, then pay out and complete accepted deals (completed submissions stock inventory automatically)."
+        subtitle="Open a submission to review lines. Accept first, then pay out and complete — that stocks inventory."
       >
         <div className="space-y-0">
           {submissionsLoading ? (
@@ -523,6 +511,14 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
     [catalogGames],
   )
   const [gameFilter, setGameFilter] = useState('')
+  const { data: catalogGameSets = [] } = useGameSets(gameFilter)
+  const catalogSetOptions = useMemo(
+    () =>
+      catalogGameSets
+        .filter((set) => Boolean(set.code?.trim()))
+        .map((set) => ({ code: set.code!.trim(), name: set.name })),
+    [catalogGameSets],
+  )
 
   useEffect(() => {
     if (!gameFilter && gameOptions.length > 0) {
@@ -563,8 +559,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
     debounced.length >= 2 &&
     Boolean(gameFilter) &&
     !nameHit &&
-    !selected &&
-    !scopedToSet
+    !selected
   const gameFinishes = finishChoices(null, gameFilter || undefined)
 
   const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
@@ -605,10 +600,18 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
 
   const printingsQuery = useCardPrintings(nameHit?.id, Boolean(nameHit) && !selected)
   const printings = useMemo(() => {
-    const items = printingsQuery.data ?? []
+    let items = printingsQuery.data ?? []
+    const setNeedle = catalogSetFilter.trim().toLowerCase()
+    if (setNeedle) {
+      items = items.filter((card) => {
+        const code = (card.setCode ?? '').toLowerCase()
+        const setName = (card.setName ?? '').toLowerCase()
+        return code === setNeedle || code.startsWith(setNeedle) || setName.includes(setNeedle)
+      })
+    }
     if (!scopedToFinish) return items
     return items.filter((card) => printingHasFinish(card, catalogFinishFilter))
-  }, [printingsQuery.data, scopedToFinish, catalogFinishFilter])
+  }, [printingsQuery.data, scopedToFinish, catalogFinishFilter, catalogSetFilter])
 
   const setScopedPrintings = useMemo(() => {
     if (!scopedToSet) return []
@@ -628,12 +631,16 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
     const seen = new Set<string>()
     return [...typeaheadResults]
       .filter((card) => {
-        const key = foldSearchText(card.name)
+        const key = foldSearchText(catalogCardIdentity(card.name))
         if (seen.has(key)) return false
         seen.add(key)
         return true
       })
-      .sort((left, right) => typeaheadNameTier(left.name, debounced) - typeaheadNameTier(right.name, debounced))
+      .sort(
+        (left, right) =>
+          typeaheadNameTier(catalogCardIdentity(left.name), debounced) -
+          typeaheadNameTier(catalogCardIdentity(right.name), debounced),
+      )
   }, [typeaheadResults, debounced])
 
   const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
@@ -653,7 +660,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
   }, [])
 
   function autofillCatalogName(card: CardSummary) {
-    setQuery(card.name)
+    setQuery(catalogCardIdentity(card.name))
     setTypeaheadOpen(false)
     setTypeaheadIndex(-1)
   }
@@ -673,7 +680,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
       typeaheadResults.length > 0 &&
       foldSearchText(debounced) === foldSearchText(typed)
     const rows = canReuseTypeahead ? typeaheadResults : ((await runCatalogSearch()).data ?? [])
-    if (scopedToSet || rows.length === 0) return
+    if (rows.length === 0) return
     const exact = rows.find((card) => catalogNamesMatch(card.name, typed))
     if (exact) {
       setNameHit(exact)
@@ -747,7 +754,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
             label="Game for buy list search"
           />
         ) : null}
-        <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_8rem_10rem_auto] lg:items-end">
+        <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_minmax(14rem,20rem)_10rem_auto] lg:items-end">
           <div ref={typeaheadRef} className="relative min-w-0">
             <Input
               label="Add a card"
@@ -832,21 +839,27 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
                       onMouseEnter={() => setTypeaheadIndex(index)}
                       className={dropdownItemClass({ active: index === typeaheadIndex })}
                     >
-                      <span className="truncate">{card.name}</span>
+                      <span className="truncate">{catalogCardIdentity(card.name)}</span>
                     </button>
                   </li>
                 ))}
               </ul>
             ) : null}
           </div>
-          <Input
-            label="Set"
-            value={catalogSetFilter}
-            onChange={(e) => setCatalogSetFilter(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void startCatalogSearch()}
-            placeholder="Set code"
-            className="uppercase"
-          />
+          <Field label="Set">
+            {({ id }) => (
+              <SetCodeTypeahead
+                id={id}
+                value={catalogSetFilter}
+                onChange={setCatalogSetFilter}
+                sets={catalogSetOptions}
+                listboxId="buylist-set-typeahead"
+                ariaLabel="Matching catalog sets"
+                placeholder="Set code or name"
+                onEnter={() => void startCatalogSearch()}
+              />
+            )}
+          </Field>
           <Select
             label="Finish"
             value={catalogFinishFilter}
@@ -866,10 +879,10 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-semibold text-fg">{nameHit.name}</p>
+                <p className="truncate font-semibold text-fg">{catalogCardIdentity(nameHit.name)}</p>
                 <p className="text-xs text-fg-muted">
                   {printings.length > 0
-                    ? `${printings.length} ${printings.length === 1 ? 'printing' : 'printings'} of ${nameHit.name}`
+                    ? `${printings.length} ${printings.length === 1 ? 'printing' : 'printings'} of ${catalogCardIdentity(nameHit.name)}`
                     : 'Pick a printing'}
                 </p>
               </div>
@@ -1026,8 +1039,6 @@ function SubmissionsTable({
   rows: SellSubmission[]
   getRowActions: (submission: SellSubmission) => {
     onReview: () => void
-    onArchive?: () => void
-    archivePending?: boolean
     onRestore?: () => void
     restorePending?: boolean
   }
@@ -1042,7 +1053,7 @@ function SubmissionsTable({
           <th className="w-[12%] px-5 py-3 font-semibold">Payout</th>
           <th className="w-[10%] px-5 py-3 font-semibold">Offer</th>
           <th className="w-[12%] px-5 py-3 font-semibold">Status</th>
-          <th className="w-[14%] px-3 py-3 text-right font-semibold">Action</th>
+          <th className="w-[12%] px-3 py-3 text-right font-semibold">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -1057,15 +1068,11 @@ function SubmissionsTable({
 function SubmissionTableRow({
   submission,
   onReview,
-  onArchive,
-  archivePending = false,
   onRestore,
   restorePending = false,
 }: {
   submission: SellSubmission
   onReview: () => void
-  onArchive?: () => void
-  archivePending?: boolean
   onRestore?: () => void
   restorePending?: boolean
 }) {
@@ -1122,11 +1129,6 @@ function SubmissionTableRow({
           {onRestore ? (
             <Button size="sm" variant="ghost" loading={restorePending} onClick={onRestore}>
               Restore
-            </Button>
-          ) : null}
-          {onArchive ? (
-            <Button size="sm" variant="ghost" loading={archivePending} onClick={onArchive}>
-              Archive
             </Button>
           ) : null}
           <Button size="sm" variant="secondary" onClick={onReview}>
@@ -1381,6 +1383,9 @@ function ReviewSubmissionModal({
           )}
           {submission.status === 'accepted' && (
             <>
+              <p className="mr-auto max-w-sm text-left text-xs text-fg-muted">
+                Pay the customer, then complete — accepted copies stock automatically.
+              </p>
               <Button variant="ghost" loading={archivePending} onClick={() => void onArchive?.()}>
                 <Archive className="size-4" aria-hidden />
                 Archive
@@ -1390,7 +1395,7 @@ function ReviewSubmissionModal({
               </Button>
               <Button loading={decide.isPending} onClick={() => decide.mutate({ status: 'completed' })}>
                 <Check className="size-4" aria-hidden />
-                Complete &amp; stock inventory
+                Complete &amp; stock
               </Button>
             </>
           )}

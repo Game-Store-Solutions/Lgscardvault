@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LayoutGrid, List, Search, X } from 'lucide-react'
 import api, { extractErrorMessage, parsePriceInput } from '../../api/client'
 import type { CardSummary, InventoryItem } from '../../api/types'
-import { inventoryKey, inventoryPageKey, useCardPrintings, useCatalogGames, useDebouncedValue, useInventoryPage, useStoreGameStats } from '../../hooks'
-import { GameWorkspaceHeader, PrintingGrid } from '../../components/catalog'
+import { inventoryKey, inventoryPageKey, useCardPrintings, useCatalogGames, useDebouncedValue, useGameSets, useInventoryPage, useStoreGameStats } from '../../hooks'
+import { GameWorkspaceHeader, PrintingGrid, SetCodeTypeahead } from '../../components/catalog'
 import { AnimatePresence, EASE_PREMIUM, motion, Stagger, StaggerItem } from '../../components/motion'
 import {
   Card,
@@ -26,7 +26,7 @@ import { type Condition } from '../../components/inventory'
 import { defaultFinishFor, finishChoices, finishOptions, isFoilFinish } from '../../lib/finishes'
 import { listingMarketSummary } from '../../lib/marketFinishes'
 import { rankInventorySearch } from '../../lib/rankInventorySearch'
-import { foldSearchText, catalogNamesMatch, typeaheadNameTier, rankSetSearch } from '../../lib/searchText'
+import { foldSearchText, catalogCardIdentity, catalogNamesMatch, typeaheadNameTier } from '../../lib/searchText'
 import {
   CatalogResultCard,
   EditInventoryModal,
@@ -104,9 +104,6 @@ export default function SearchTab({ slug }: { slug: string }) {
   const [invTypeaheadIndex, setInvTypeaheadIndex] = useState(0)
   const [invTypeaheadOpen, setInvTypeaheadOpen] = useState(false)
   const invTypeaheadRef = useRef<HTMLDivElement>(null)
-  const [invSetTypeaheadIndex, setInvSetTypeaheadIndex] = useState(0)
-  const [invSetTypeaheadOpen, setInvSetTypeaheadOpen] = useState(false)
-  const invSetTypeaheadRef = useRef<HTMLDivElement>(null)
   const debouncedFilter = useDebouncedValue(filter.trim(), 300)
   const debouncedInventorySet = useDebouncedValue(inventorySetFilter.trim(), 300)
   const debouncedCatalogSearch = useDebouncedValue(catalogSearch.trim(), 150)
@@ -144,10 +141,11 @@ export default function SearchTab({ slug }: { slug: string }) {
     const seen = new Set<string>()
     const names: string[] = []
     for (const item of rankInventorySearch(invTypeaheadPage?.items ?? [], query)) {
-      const key = foldSearchText(item.card.name)
+      const label = catalogCardIdentity(item.card.name)
+      const key = foldSearchText(label)
       if (seen.has(key)) continue
       seen.add(key)
-      names.push(item.card.name)
+      names.push(label)
       if (names.length >= 12) break
     }
     return names
@@ -160,8 +158,7 @@ export default function SearchTab({ slug }: { slug: string }) {
     debouncedCatalogSearch.length >= 2 &&
     Boolean(gameFilter) &&
     !nameHit &&
-    !selectedCard &&
-    !scopedToSet
+    !selectedCard
 
   const { data: typeaheadResults = [], isFetching: typeaheadFetching } = useQuery({
     queryKey: ['card-search', 'typeahead', 'prefix-rank', debouncedCatalogSearch, catalogFinishFilter, gameFilter],
@@ -205,10 +202,18 @@ export default function SearchTab({ slug }: { slug: string }) {
 
   const printingsQuery = useCardPrintings(nameHit?.id, Boolean(nameHit))
   const printings = useMemo(() => {
-    const items = printingsQuery.data ?? []
+    let items = printingsQuery.data ?? []
+    const setNeedle = catalogSetFilter.trim().toLowerCase()
+    if (setNeedle) {
+      items = items.filter((card) => {
+        const code = (card.setCode ?? '').toLowerCase()
+        const setName = (card.setName ?? '').toLowerCase()
+        return code === setNeedle || code.startsWith(setNeedle) || setName.includes(setNeedle)
+      })
+    }
     if (!scopedToFinish) return items
     return items.filter((card) => printingHasFinish(card, catalogFinishFilter))
-  }, [printingsQuery.data, scopedToFinish, catalogFinishFilter])
+  }, [printingsQuery.data, scopedToFinish, catalogFinishFilter, catalogSetFilter])
 
   useEffect(() => {
     if (!nameHit || selectedCard) return
@@ -223,12 +228,16 @@ export default function SearchTab({ slug }: { slug: string }) {
     const seen = new Set<string>()
     return [...typeaheadResults]
       .filter((card) => {
-        const key = foldSearchText(card.name)
+        const key = foldSearchText(catalogCardIdentity(card.name))
         if (seen.has(key)) return false
         seen.add(key)
         return true
       })
-      .sort((left, right) => typeaheadNameTier(left.name, query) - typeaheadNameTier(right.name, query))
+      .sort(
+        (left, right) =>
+          typeaheadNameTier(catalogCardIdentity(left.name), query) -
+          typeaheadNameTier(catalogCardIdentity(right.name), query),
+      )
   }, [typeaheadResults, debouncedCatalogSearch])
 
   const showTypeahead = typeaheadOpen && typeaheadReady && typeaheadNames.length > 0
@@ -249,16 +258,13 @@ export default function SearchTab({ slug }: { slug: string }) {
       if (invTypeaheadRef.current && !invTypeaheadRef.current.contains(event.target as Node)) {
         setInvTypeaheadOpen(false)
       }
-      if (invSetTypeaheadRef.current && !invSetTypeaheadRef.current.contains(event.target as Node)) {
-        setInvSetTypeaheadOpen(false)
-      }
     }
     document.addEventListener('mousedown', onPointerDown)
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [])
 
   function autofillCatalogName(card: CardSummary) {
-    setCatalogSearch(card.name)
+    setCatalogSearch(catalogCardIdentity(card.name))
     setTypeaheadOpen(false)
     setTypeaheadIndex(-1)
   }
@@ -267,12 +273,6 @@ export default function SearchTab({ slug }: { slug: string }) {
     setFilter(name)
     setInvTypeaheadOpen(false)
     setInvTypeaheadIndex(-1)
-  }
-
-  function autofillInventorySet(code: string) {
-    setInventorySetFilter(code.toUpperCase())
-    setInvSetTypeaheadOpen(false)
-    setInvSetTypeaheadIndex(-1)
   }
 
   async function startCatalogSearch() {
@@ -284,9 +284,7 @@ export default function SearchTab({ slug }: { slug: string }) {
       typeaheadResults.length > 0 &&
       foldSearchText(debouncedCatalogSearch) === foldSearchText(typed)
     const rows = canReuseTypeahead ? typeaheadResults : ((await runCatalogSearch()).data ?? [])
-    // A set filter already lists those printings. Name-only (or finish-only)
-    // should open every printing of an exact match instead of one unique hit.
-    if (scopedToSet || rows.length === 0) return
+    if (rows.length === 0) return
     const exact = rows.find((card) => catalogNamesMatch(card.name, typed))
     if (exact) {
       setNameHit(exact)
@@ -402,16 +400,22 @@ export default function SearchTab({ slug }: { slug: string }) {
   )
   const { data: gameStats, isLoading: statsLoading } = useStoreGameStats(slug, gameFilter)
   const inventorySets = gameStats?.sets ?? []
-  const invSetTypeaheadReady = inventorySetFilter.trim().length >= 1 && Boolean(gameFilter)
-  const invSetTypeaheadOptions = useMemo(() => {
-    if (!invSetTypeaheadReady) return []
-    return rankSetSearch(inventorySets, inventorySetFilter).slice(0, 12)
-  }, [inventorySets, inventorySetFilter, invSetTypeaheadReady])
-  const showInvSetTypeahead = invSetTypeaheadOpen && invSetTypeaheadReady && invSetTypeaheadOptions.length > 0
-
-  useEffect(() => {
-    setInvSetTypeaheadIndex(invSetTypeaheadOptions.length > 0 ? 0 : -1)
-  }, [inventorySetFilter, invSetTypeaheadOptions])
+  const { data: catalogGameSets = [] } = useGameSets(gameFilter)
+  const catalogSetOptions = useMemo(() => {
+    const byCode = new Map<string, { code: string; name: string }>()
+    for (const set of catalogGameSets) {
+      const code = set.code?.trim()
+      if (!code) continue
+      byCode.set(code.toLowerCase(), { code, name: set.name })
+    }
+    for (const set of inventorySets) {
+      const code = set.code?.trim()
+      if (!code) continue
+      const key = code.toLowerCase()
+      if (!byCode.has(key)) byCode.set(key, { code, name: set.name })
+    }
+    return [...byCode.values()]
+  }, [catalogGameSets, inventorySets])
 
   const activeGameName = gameOptions.find((game) => game.code === gameFilter)?.name ?? 'this game'
   // The finish filter is worded in the managed game's own terms, so a Pokemon
@@ -434,7 +438,6 @@ export default function SearchTab({ slug }: { slug: string }) {
     setInventorySetFilter('')
     setInventoryFinishFilter('all')
     setInvTypeaheadOpen(false)
-    setInvSetTypeaheadOpen(false)
   }
 
   useEffect(() => {
@@ -469,7 +472,7 @@ export default function SearchTab({ slug }: { slug: string }) {
             </p>
           )}
 
-          <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_8rem_10rem_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_minmax(14rem,20rem)_10rem_auto] lg:items-end">
             <Field label="Card name">
               {({ id }) => (
                 <div ref={typeaheadRef} className="relative">
@@ -558,7 +561,7 @@ export default function SearchTab({ slug }: { slug: string }) {
                             onMouseEnter={() => setTypeaheadIndex(index)}
                             className={dropdownItemClass({ active: index === typeaheadIndex })}
                           >
-                            <span className="truncate">{card.name}</span>
+                            <span className="truncate">{catalogCardIdentity(card.name)}</span>
                           </button>
                         </li>
                       ))}
@@ -569,13 +572,15 @@ export default function SearchTab({ slug }: { slug: string }) {
             </Field>
             <Field label="Set">
               {({ id }) => (
-                <Input
+                <SetCodeTypeahead
                   id={id}
                   value={catalogSetFilter}
-                  onChange={(e) => setCatalogSetFilter(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void startCatalogSearch()}
-                  placeholder="Set code"
-                  className="uppercase"
+                  onChange={setCatalogSetFilter}
+                  sets={catalogSetOptions}
+                  listboxId="catalog-set-typeahead"
+                  ariaLabel="Matching catalog sets"
+                  placeholder="Set code or name"
+                  onEnter={() => void startCatalogSearch()}
                 />
               )}
             </Field>
@@ -615,10 +620,10 @@ export default function SearchTab({ slug }: { slug: string }) {
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-fg">{nameHit.name}</p>
+                  <p className="truncate font-semibold text-fg">{catalogCardIdentity(nameHit.name)}</p>
                   <p className="text-xs text-fg-muted">
                     {printings.length > 0
-                      ? `${printings.length} ${printings.length === 1 ? 'printing' : 'printings'} of ${nameHit.name}`
+                      ? `${printings.length} ${printings.length === 1 ? 'printing' : 'printings'} of ${catalogCardIdentity(nameHit.name)}`
                       : 'Pick a printing'}
                   </p>
                 </div>
@@ -697,7 +702,7 @@ export default function SearchTab({ slug }: { slug: string }) {
           }
         />
         <CardBody className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_minmax(12rem,16rem)_10rem_auto_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_minmax(14rem,20rem)_10rem_auto_auto] lg:items-end">
             <Field label="Search stock">
               {({ id }) => (
                 <div ref={invTypeaheadRef} className="relative">
@@ -797,95 +802,15 @@ export default function SearchTab({ slug }: { slug: string }) {
             </Field>
             <Field label="Set">
               {({ id }) => (
-                <div ref={invSetTypeaheadRef} className="relative">
-                  <Input
-                    id={id}
-                    value={inventorySetFilter}
-                    autoComplete="off"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-expanded={showInvSetTypeahead}
-                    aria-controls="inventory-set-typeahead"
-                    aria-activedescendant={
-                      showInvSetTypeahead && invSetTypeaheadIndex >= 0
-                        ? `inventory-set-typeahead-${invSetTypeaheadIndex}`
-                        : undefined
-                    }
-                    onFocus={() => {
-                      if (invSetTypeaheadOptions.length > 0) setInvSetTypeaheadOpen(true)
-                    }}
-                    onChange={(e) => {
-                      setInventorySetFilter(e.target.value)
-                      setInvSetTypeaheadOpen(true)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'ArrowDown' && invSetTypeaheadOptions.length > 0) {
-                        e.preventDefault()
-                        setInvSetTypeaheadOpen(true)
-                        setInvSetTypeaheadIndex((index) => (index + 1) % invSetTypeaheadOptions.length)
-                        return
-                      }
-                      if (e.key === 'ArrowUp' && invSetTypeaheadOptions.length > 0) {
-                        e.preventDefault()
-                        setInvSetTypeaheadOpen(true)
-                        setInvSetTypeaheadIndex((index) =>
-                          index <= 0 ? invSetTypeaheadOptions.length - 1 : index - 1,
-                        )
-                        return
-                      }
-                      if (e.key === 'Escape') {
-                        setInvSetTypeaheadOpen(false)
-                        return
-                      }
-                      if (e.key === 'Tab' && showInvSetTypeahead) {
-                        const set = invSetTypeaheadOptions[invSetTypeaheadIndex] ?? invSetTypeaheadOptions[0]
-                        if (set) autofillInventorySet(set.code)
-                        return
-                      }
-                      if (e.key === 'Enter' && showInvSetTypeahead) {
-                        const set = invSetTypeaheadOptions[invSetTypeaheadIndex] ?? invSetTypeaheadOptions[0]
-                        if (set && !catalogNamesMatch(set.code, inventorySetFilter)) {
-                          e.preventDefault()
-                          autofillInventorySet(set.code)
-                        } else {
-                          setInvSetTypeaheadOpen(false)
-                        }
-                      }
-                    }}
-                    placeholder="Set code or name"
-                    className="uppercase min-h-11"
-                  />
-                  {showInvSetTypeahead ? (
-                    <ul
-                      id="inventory-set-typeahead"
-                      role="listbox"
-                      aria-label="Matching inventory sets"
-                      className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
-                    >
-                      {invSetTypeaheadOptions.map((set, index) => (
-                        <li
-                          key={set.code}
-                          id={`inventory-set-typeahead-${index}`}
-                          role="option"
-                          aria-selected={index === invSetTypeaheadIndex}
-                        >
-                          <button
-                            type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => autofillInventorySet(set.code)}
-                            onMouseEnter={() => setInvSetTypeaheadIndex(index)}
-                            className={dropdownItemClass({ active: index === invSetTypeaheadIndex })}
-                          >
-                            <span className="min-w-0 truncate">
-                              <span className="font-semibold uppercase">{set.code}</span>
-                              {set.name ? <span className="text-fg-muted"> · {set.name}</span> : null}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
+                <SetCodeTypeahead
+                  id={id}
+                  value={inventorySetFilter}
+                  onChange={setInventorySetFilter}
+                  sets={inventorySets}
+                  listboxId="inventory-set-typeahead"
+                  ariaLabel="Matching inventory sets"
+                  placeholder="Set code or name"
+                />
               )}
             </Field>
             <Field label="Finish">
