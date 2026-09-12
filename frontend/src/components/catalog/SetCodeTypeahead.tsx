@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Input, dropdownItemClass, dropdownPanelClass } from '../ui'
 import { cx } from '../../lib/cx'
-import { catalogNamesMatch, rankSetSearch, type SetSearchOption } from '../../lib/searchText'
+import { catalogNamesMatch, foldSearchText, rankSetSearch, type SetSearchOption } from '../../lib/searchText'
+
+const ROW_HEIGHT = 36
+const VIEWPORT = 288
+const OVERSCAN = 8
+const WINDOW_AFTER = 40
 
 export interface SetCodeTypeaheadProps {
   id?: string
@@ -13,33 +19,67 @@ export interface SetCodeTypeaheadProps {
   ariaLabel?: string
   onEnter?: () => void
   className?: string
+  emptyLabel?: string
 }
 
-/** Shared set-code combobox used by Singles add and Search stock. */
+function visibleSetWindow(count: number, scrollTop: number, headerHeight: number) {
+  if (count <= WINDOW_AFTER) return { start: 0, end: count }
+  const start = Math.max(0, Math.floor(Math.max(0, scrollTop - headerHeight) / ROW_HEIGHT) - OVERSCAN)
+  const end = Math.min(count, start + Math.ceil(VIEWPORT / ROW_HEIGHT) + OVERSCAN * 2)
+  return { start, end }
+}
+
+/** Searchable set combobox: type to filter, or open the full list. */
 export function SetCodeTypeahead({
   id,
   value,
   onChange,
   sets,
-  placeholder = 'Set code or name',
+  placeholder = 'Type or browse sets',
   listboxId,
-  ariaLabel = 'Matching sets',
+  ariaLabel = 'Sets',
   onEnter,
   className,
+  emptyLabel = 'Any set',
 }: SetCodeTypeaheadProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const [open, setOpen] = useState(false)
-  const [index, setIndex] = useState(0)
-  const ready = value.trim().length >= 1
-  const options = useMemo(() => {
-    if (!ready) return []
-    return rankSetSearch(sets, value).slice(0, 12)
-  }, [ready, sets, value])
-  const show = open && ready && options.length > 0
+  const [index, setIndex] = useState(-1)
+  const [scrollTop, setScrollTop] = useState(0)
+  const browsing = value.trim().length === 0
+  const options = useMemo(() => (open ? rankSetSearch(sets, value) : []), [open, sets, value])
+  const show = open
+  const windowed = options.length > WINDOW_AFTER
+  const windowRange = useMemo(
+    () => visibleSetWindow(options.length, scrollTop, browsing ? ROW_HEIGHT : 0),
+    [browsing, options.length, scrollTop],
+  )
+  const visible = windowed ? options.slice(windowRange.start, windowRange.end) : options
 
   useEffect(() => {
-    setIndex(options.length > 0 ? 0 : -1)
-  }, [value, options.length])
+    if (!open) {
+      setScrollTop(0)
+      setIndex(-1)
+      return
+    }
+    if (browsing) {
+      setIndex(-1)
+      return
+    }
+    const selected = options.findIndex((set) => foldSearchText(set.code) === foldSearchText(value))
+    setIndex(selected >= 0 ? selected : options.length > 0 ? 0 : -1)
+  }, [browsing, open, options, value])
+
+  useEffect(() => {
+    const list = listRef.current
+    if (!show || index < 0 || !list) return
+    const top = index * ROW_HEIGHT + (browsing ? ROW_HEIGHT : 0)
+    if (top < list.scrollTop) list.scrollTop = top
+    else if (top + ROW_HEIGHT > list.scrollTop + list.clientHeight) {
+      list.scrollTop = top + ROW_HEIGHT - list.clientHeight
+    }
+  }, [browsing, index, show])
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
@@ -52,9 +92,37 @@ export function SetCodeTypeahead({
   }, [])
 
   function pick(code: string) {
-    onChange(code.toUpperCase())
+    onChange(code ? code.toUpperCase() : '')
     setOpen(false)
     setIndex(-1)
+  }
+
+  function highlightedSet() {
+    return index >= 0 ? (options[index] ?? null) : null
+  }
+
+  function moveHighlight(delta: number) {
+    if (options.length === 0) {
+      setIndex(-1)
+      return
+    }
+    setIndex((current) => {
+      const min = browsing ? -1 : 0
+      const next = current + delta
+      if (next < min) return options.length - 1
+      if (next >= options.length) return min
+      return next
+    })
+  }
+
+  function commitKeyboard(kind: 'enter' | 'tab') {
+    const set = highlightedSet()
+    if (set && (kind === 'tab' || !catalogNamesMatch(set.code, value))) {
+      pick(set.code)
+      return
+    }
+    setOpen(false)
+    if (kind === 'enter') onEnter?.()
   }
 
   return (
@@ -67,25 +135,23 @@ export function SetCodeTypeahead({
         aria-autocomplete="list"
         aria-expanded={show}
         aria-controls={listboxId}
-        aria-activedescendant={show && index >= 0 ? `${listboxId}-${index}` : undefined}
-        onFocus={() => {
-          if (options.length > 0) setOpen(true)
-        }}
+        aria-activedescendant={show && index >= 0 ? `${listboxId}-${index}` : show && browsing ? `${listboxId}-any` : undefined}
+        onFocus={() => setOpen(true)}
         onChange={(e) => {
           onChange(e.target.value)
           setOpen(true)
         }}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowDown' && options.length > 0) {
+          if (e.key === 'ArrowDown' && (options.length > 0 || browsing)) {
             e.preventDefault()
             setOpen(true)
-            setIndex((current) => (current + 1) % options.length)
+            moveHighlight(1)
             return
           }
-          if (e.key === 'ArrowUp' && options.length > 0) {
+          if (e.key === 'ArrowUp' && (options.length > 0 || browsing)) {
             e.preventDefault()
             setOpen(true)
-            setIndex((current) => (current <= 0 ? options.length - 1 : current - 1))
+            moveHighlight(-1)
             return
           }
           if (e.key === 'Escape') {
@@ -93,54 +159,89 @@ export function SetCodeTypeahead({
             return
           }
           if (e.key === 'Tab' && show) {
-            const set = options[index] ?? options[0]
-            if (set) pick(set.code)
+            commitKeyboard('tab')
             return
           }
           if (e.key === 'Enter') {
-            if (show) {
-              const set = options[index] ?? options[0]
-              if (set && !catalogNamesMatch(set.code, value)) {
-                e.preventDefault()
-                pick(set.code)
-                return
-              }
-              setOpen(false)
-            }
-            onEnter?.()
+            e.preventDefault()
+            if (show) commitKeyboard('enter')
+            else onEnter?.()
           }
         }}
         placeholder={placeholder}
-        className={cx('uppercase min-h-11', className)}
+        className={cx('uppercase min-h-11 pr-10', className)}
       />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Browse sets"
+        aria-expanded={show}
+        aria-controls={listboxId}
+        onMouseDown={(event) => {
+          event.preventDefault()
+          setOpen((current) => !current)
+        }}
+        className="absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-btn text-fg-muted transition-colors hover:text-fg"
+      >
+        <ChevronDown aria-hidden className={cx('size-4 transition-transform', show && 'rotate-180')} />
+      </button>
       {show ? (
         <ul
+          ref={listRef}
           id={listboxId}
           role="listbox"
           aria-label={ariaLabel}
-          className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto p-1')}
+          onScroll={windowed ? (event) => setScrollTop(event.currentTarget.scrollTop) : undefined}
+          className={cx(dropdownPanelClass, 'absolute z-30 mt-1.5 max-h-72 w-full overflow-y-auto p-1')}
         >
-          {options.map((set, optionIndex) => (
-            <li
-              key={set.code}
-              id={`${listboxId}-${optionIndex}`}
-              role="option"
-              aria-selected={optionIndex === index}
-            >
+          {browsing ? (
+            <li id={`${listboxId}-any`} role="option" aria-selected={index < 0} className="sticky top-0 z-10 bg-surface">
               <button
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => pick(set.code)}
-                onMouseEnter={() => setIndex(optionIndex)}
-                className={dropdownItemClass({ active: optionIndex === index })}
+                onClick={() => pick('')}
+                className={dropdownItemClass({ active: index < 0, selected: !value.trim() })}
               >
-                <span className="min-w-0 truncate">
-                  <span className="font-semibold uppercase">{set.code}</span>
-                  {set.name ? <span className="text-fg-muted"> · {set.name}</span> : null}
-                </span>
+                <span className="text-fg-muted">{emptyLabel}</span>
               </button>
             </li>
-          ))}
+          ) : null}
+          {options.length === 0 ? (
+            browsing ? null : <li className="px-2.5 py-2 text-sm text-fg-muted">No matching sets</li>
+          ) : (
+            <>
+              {windowed ? <li aria-hidden className="pointer-events-none" style={{ height: windowRange.start * ROW_HEIGHT }} /> : null}
+              {visible.map((set, offset) => {
+                const optionIndex = windowed ? windowRange.start + offset : offset
+                const selected = foldSearchText(set.code) === foldSearchText(value)
+                return (
+                  <li
+                    key={set.code}
+                    id={`${listboxId}-${optionIndex}`}
+                    role="option"
+                    aria-selected={optionIndex === index}
+                    style={{ height: ROW_HEIGHT }}
+                  >
+                    <button
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => pick(set.code)}
+                      onMouseEnter={() => setIndex(optionIndex)}
+                      className={dropdownItemClass({ active: optionIndex === index, selected })}
+                    >
+                      <span className="min-w-0 truncate">
+                        <span className="font-semibold uppercase">{set.code}</span>
+                        {set.name ? <span className="text-fg-muted"> · {set.name}</span> : null}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+              {windowed ? (
+                <li aria-hidden className="pointer-events-none" style={{ height: (options.length - windowRange.end) * ROW_HEIGHT }} />
+              ) : null}
+            </>
+          )}
         </ul>
       ) : null}
     </div>

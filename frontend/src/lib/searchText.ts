@@ -45,12 +45,30 @@ export function searchTextIncludes(haystack: string, needle: string): boolean {
   return foldSearchText(haystack).includes(n)
 }
 
-export type SetSearchOption = { code: string; name: string }
+export type SetSearchOption = { code: string; name: string; releaseDate?: string | null }
+
+type SetOptionSource = { code?: string | null; name?: string | null; releaseDate?: string | null }
+
+/** Dedupes catalog + inventory sets by code; earlier groups win (keep release dates). */
+export function mergeSetSearchOptions(...groups: Array<Iterable<SetOptionSource>>): SetSearchOption[] {
+  const byCode = new Map<string, SetSearchOption>()
+  for (const group of groups) {
+    for (const set of group) {
+      const code = set.code?.trim()
+      if (!code) continue
+      const key = foldSearchText(code)
+      if (byCode.has(key)) continue
+      byCode.set(key, { code, name: (set.name ?? '').trim(), releaseDate: set.releaseDate })
+    }
+  }
+  return [...byCode.values()]
+}
 
 /** Rank store/catalog sets like name typeahead (exact/prefix first). */
 export function rankSetSearch(sets: SetSearchOption[], rawQuery: string): SetSearchOption[] {
   const needle = foldSearchText(rawQuery)
-  if (!needle) return []
+  // Catalog payload is already newest-first — don't copy/sort just to browse.
+  if (!needle) return sets
 
   const scored: Array<{ set: SetSearchOption; score: number; code: string }> = []
   for (const set of sets) {

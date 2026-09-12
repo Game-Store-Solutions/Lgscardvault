@@ -17,7 +17,7 @@ import { GameSelector, PrintingGrid, SetCodeTypeahead } from '../../components/c
 import { Avatar, Badge, Button, Card, EmptyState, Field, Input, LoadingPanel, Modal, Select, Spinner, dropdownItemClass, dropdownPanelClass } from '../../components/ui'
 import { cx } from '../../lib/cx'
 import { finishChoices, isFoilFinish } from '../../lib/finishes'
-import { catalogCardIdentity, catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
+import { catalogCardIdentity, catalogNamesMatch, foldSearchText, mergeSetSearchOptions, typeaheadNameTier } from '../../lib/searchText'
 
 function AccordionPanel({
   id,
@@ -512,13 +512,7 @@ function BuylistCard({ slug, rates }: { slug: string; rates: TradeRates | undefi
   )
   const [gameFilter, setGameFilter] = useState('')
   const { data: catalogGameSets = [] } = useGameSets(gameFilter)
-  const catalogSetOptions = useMemo(
-    () =>
-      catalogGameSets
-        .filter((set) => Boolean(set.code?.trim()))
-        .map((set) => ({ code: set.code!.trim(), name: set.name })),
-    [catalogGameSets],
-  )
+  const catalogSetOptions = useMemo(() => mergeSetSearchOptions(catalogGameSets), [catalogGameSets])
 
   useEffect(() => {
     if (!gameFilter && gameOptions.length > 0) {
