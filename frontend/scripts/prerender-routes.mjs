@@ -19,9 +19,9 @@ const defaultImage = `${site}/brand/android-chrome-512.png`
 const routes = [
   {
     path: '/',
-    title: 'Shop Local Game Stores Online',
+    title: 'LGS Card Vault',
     description:
-      'Browse real inventory from verified local game stores. Online checkout and sell/trade your collection.',
+      'LGS Card Vault is the marketplace for Magic, Pokémon, One Piece, and Flesh & Blood from verified local game stores. Shop real in-store inventory online for pickup.',
   },
   {
     path: '/stores',
@@ -46,7 +46,7 @@ function escapeHtml(value) {
 }
 
 function applyMeta(html, route) {
-  const fullTitle = `${route.title} | ${siteName}`
+  const fullTitle = route.title.includes(siteName) ? route.title : `${route.title} | ${siteName}`
   const url = route.path === '/' ? `${site}/` : `${site}${route.path}`
   const description = escapeHtml(route.description)
   const title = escapeHtml(fullTitle)
