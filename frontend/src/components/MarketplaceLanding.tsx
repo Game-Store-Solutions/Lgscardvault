@@ -52,9 +52,9 @@ export default function MarketplaceLanding() {
   useAppShellFlush(true)
 
   usePageMeta({
-    title: 'Shop Local Game Stores Online',
+    title: 'LGS Card Vault',
     description:
-      'Browse real inventory from verified local game stores. Online checkout and sell/trade your collection.',
+      'LGS Card Vault is the marketplace for Magic, Pokémon, One Piece, and Flesh & Blood from verified local game stores. Shop real in-store inventory online for pickup.',
     path: '/',
   })
 
@@ -62,14 +62,28 @@ export default function MarketplaceLanding() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'LGS Card Vault',
+    alternateName: ['lgscardvault', 'LGSCardVault'],
     url: 'https://lgscardvault.com/',
     description:
       'Marketplace for Magic, Pokémon, One Piece, and Flesh & Blood from trusted local game stores.',
+    publisher: { '@id': 'https://lgscardvault.com/#organization' },
     potentialAction: {
       '@type': 'SearchAction',
       target: 'https://lgscardvault.com/stores?q={search_term_string}',
       'query-input': 'required name=search_term_string',
     },
+  })
+
+  useJsonLd('organization', {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': 'https://lgscardvault.com/#organization',
+    name: 'LGS Card Vault',
+    alternateName: ['lgscardvault', 'LGSCardVault'],
+    url: 'https://lgscardvault.com/',
+    logo: 'https://lgscardvault.com/brand/android-chrome-512.png',
+    description:
+      'Storefront and marketplace software for US local game stores. Pickup-only checkout. The store is merchant of record.',
   })
 
   useEffect(() => {
