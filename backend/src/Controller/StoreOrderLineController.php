@@ -10,6 +10,7 @@ use App\Repository\StoreRepository;
 use App\Service\Order\OrderBalanceDueNotifier;
 use App\Service\Order\OrderCreditReconciler;
 use App\Service\Order\OrderLineEditor;
+use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Checkout\PickupOrderTaxSync;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +30,7 @@ final class StoreOrderLineController extends AbstractController
         private readonly OrderCreditReconciler $creditReconciler,
         private readonly OrderBalanceDueNotifier $notifier,
         private readonly PickupOrderTaxSync $pickupOrderTaxSync,
+        private readonly PayInStoreFinalizer $payInStoreFinalizer,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -107,6 +109,7 @@ final class StoreOrderLineController extends AbstractController
         }
 
         $this->pickupOrderTaxSync->sync($store, $order);
+        $this->payInStoreFinalizer->refresh($store, $order);
         $this->entityManager->flush();
         $this->notifier->sync($order);
         $this->entityManager->flush();

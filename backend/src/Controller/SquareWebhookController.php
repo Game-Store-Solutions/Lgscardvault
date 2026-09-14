@@ -114,6 +114,10 @@ final class SquareWebhookController extends AbstractController
             'refund.created', 'refund.updated' => $this->handleRefund($data),
             'dispute.created' => $this->handleDispute($data),
             'payment.updated', 'payment.created' => $this->handlePayment($data),
+            'invoice.created', 'invoice.published', 'invoice.updated', 'invoice.canceled',
+            'invoice.deleted', 'invoice.scheduled_charge_failed' => [SquareWebhookEvent::STATUS_IGNORED, 'Invoice lifecycle only; payment is handled separately.'],
+            'invoice.payment_made' => $this->handleInvoicePayment($data),
+            'invoice.refunded' => $this->handleInvoiceRefund($data),
             default => [SquareWebhookEvent::STATUS_IGNORED, 'No handler for this type.'],
         };
     }
@@ -144,24 +148,23 @@ final class SquareWebhookController extends AbstractController
             $order->setSquareOrderId($squareOrderId);
         }
 
-        if ('COMPLETED' === $status && $order->getPaidCents() < 1) {
-            $amount = (int) ($payment['amount_money']['amount'] ?? 0);
-            if ($amount > 0) {
-                $order->setPaidCents($amount)->setPaymentReference($paymentId)->recordPaymentCapture($paymentId, $amount);
-                if (Order::NOTE_PAY_IN_STORE === $order->getNotes()) {
-                    $order->setNotes(null);
-                }
+        if ('COMPLETED' !== $status) {
+            return [SquareWebhookEvent::STATUS_PROCESSED, sprintf(
+                'Payment %s (%s) for order %s',
+                $paymentId,
+                $status,
+                $order->getReference(),
+            )];
+        }
 
-                $store = $order->getStore();
-                if ($store instanceof Store) {
-                    $appFee = (int) ($payment['app_fee_money']['amount'] ?? $payment['application_fee_money']['amount'] ?? 0);
-                    if ($appFee > 0) {
-                        $this->platformFees->recordCollectedFee($store, $appFee);
-                    } else {
-                        $this->dailySales->accrueCapture($store, $amount);
-                    }
-                }
-            }
+        $amount = (int) ($payment['amount_money']['amount'] ?? 0);
+        $applied = $this->ledgerAmount($order, $amount);
+        if ($applied > 0 && $order->getPaidCents() < 1) {
+            $this->markPayInStoreCollected($order, $applied, $payment);
+        }
+        if ($applied > 0) {
+            $order->setPaymentProvider(StorePaymentAccount::PROVIDER_SQUARE);
+            $order->recordPaymentCapture($paymentId, $applied);
         }
 
         return [SquareWebhookEvent::STATUS_PROCESSED, sprintf(
@@ -170,6 +173,149 @@ final class SquareWebhookController extends AbstractController
             $status,
             $order->getReference(),
         )];
+    }
+
+    /**
+     * Staff collected an unpaid pay-in-store invoice on Square POS / Dashboard.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function handleInvoicePayment(array $data): array
+    {
+        $invoice = is_array($data['object']['invoice'] ?? null) ? $data['object']['invoice'] : [];
+        $order = $this->findOrderForInvoice($invoice);
+        if (!$order instanceof Order) {
+            $invoiceId = $this->nullableString($invoice['id'] ?? $data['id'] ?? null);
+
+            return [SquareWebhookEvent::STATUS_IGNORED, 'No LGS order for invoice '.($invoiceId ?? '?')];
+        }
+
+        $amount = $this->ledgerAmount($order, $this->invoiceCollectedCents($invoice));
+        if ($amount > 0 && $order->getPaidCents() < 1) {
+            $this->markPayInStoreCollected($order, $amount, []);
+        }
+
+        return [SquareWebhookEvent::STATUS_PROCESSED, sprintf(
+            'Invoice %s paid for order %s',
+            (string) ($invoice['id'] ?? '?'),
+            $order->getReference(),
+        )];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private function handleInvoiceRefund(array $data): array
+    {
+        $invoice = is_array($data['object']['invoice'] ?? null) ? $data['object']['invoice'] : [];
+        $order = $this->findOrderForInvoice($invoice);
+        if (!$order instanceof Order) {
+            return [SquareWebhookEvent::STATUS_IGNORED, 'No LGS order for refunded invoice.'];
+        }
+        if (!$order->getStatus()->canTransitionTo(OrderStatus::REFUNDED)) {
+            return [SquareWebhookEvent::STATUS_IGNORED, 'Order '.$order->getReference().' is already '.$order->getStatus()->value];
+        }
+
+        $order->setStatus(OrderStatus::REFUNDED);
+        $this->stockReleaser->release($order);
+
+        return [SquareWebhookEvent::STATUS_PROCESSED, 'Refunded invoice order '.$order->getReference()];
+    }
+
+    /**
+     * @param array<string, mixed> $invoice
+     */
+    private function findOrderForInvoice(array $invoice): ?Order
+    {
+        $invoiceId = $this->nullableString($invoice['id'] ?? null);
+        if (null !== $invoiceId) {
+            $order = $this->orders->findOneBy(['squareInvoiceId' => $invoiceId]);
+            if ($order instanceof Order) {
+                return $order;
+            }
+        }
+
+        $squareOrderId = $this->nullableString($invoice['order_id'] ?? null);
+        if (null !== $squareOrderId) {
+            $order = $this->orders->findOneBy(['squareOrderId' => $squareOrderId]);
+            if ($order instanceof Order) {
+                return $order;
+            }
+        }
+
+        $reference = $this->nullableString($invoice['invoice_number'] ?? null);
+        if (null !== $reference) {
+            $order = $this->orders->findOneBy(['reference' => $reference]);
+            if ($order instanceof Order) {
+                return $order;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $invoice
+     */
+    private function invoiceCollectedCents(array $invoice): int
+    {
+        $total = 0;
+        foreach ($invoice['payment_requests'] ?? [] as $request) {
+            if (!is_array($request)) {
+                continue;
+            }
+            $total += (int) ($request['total_completed_amount_money']['amount'] ?? 0);
+        }
+
+        return max(0, $total);
+    }
+
+    /**
+     * Square may collect the $1 pad; LGS paidCents and the capture ledger stay
+     * on the real hold. Staff delete the pad on the Invoices tab before charging.
+     */
+    private function ledgerAmount(Order $order, int $squareAmount): int
+    {
+        if ($squareAmount < 1) {
+            return 0;
+        }
+
+        $due = $order->amountDueCents();
+        $invoiceCollect = Order::NOTE_PAY_IN_STORE === $order->getNotes()
+            || null !== $order->getSquareInvoiceId();
+        if ($invoiceCollect && $due > 0 && $squareAmount > $due) {
+            return $due;
+        }
+
+        return $squareAmount;
+    }
+
+    /**
+     * @param array<string, mixed> $payment
+     */
+    private function markPayInStoreCollected(Order $order, int $amount, array $payment): void
+    {
+        $order->setPaidCents($amount);
+        if (Order::NOTE_PAY_IN_STORE === $order->getNotes()) {
+            $order->setNotes(null);
+        }
+        $order->setPaymentProvider(StorePaymentAccount::PROVIDER_SQUARE);
+
+        $store = $order->getStore();
+        if (!$store instanceof Store) {
+            return;
+        }
+
+        $appFee = (int) ($payment['app_fee_money']['amount'] ?? $payment['application_fee_money']['amount'] ?? 0);
+        if ($appFee > 0) {
+            $this->platformFees->recordCollectedFee($store, $appFee);
+        } else {
+            $this->dailySales->accrueCapture($store, $amount);
+        }
     }
 
     /**

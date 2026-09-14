@@ -4,6 +4,7 @@ namespace App\Tests\Support;
 
 use App\Entity\Store;
 use App\Service\Payments\CheckoutGatewayInterface;
+use App\Service\Payments\SquareInvoiceMinimum;
 
 /**
  * Stands in for Square during tests: records what would have been charged and
@@ -26,6 +27,12 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
     /** @var list<array{amount: int, idempotencyKey: string, referenceId: string}> */
     public array $paymentLinks = [];
 
+    /** @var list<array{idempotencyKey: string, referenceId: string, email: ?string, lineItems?: list<array{name: string, quantity: int, priceCents: int}>}> */
+    public array $invoices = [];
+
+    /** @var list<string> */
+    public array $cancelledInvoices = [];
+
     /** Message thrown instead of refunding; null means the refund succeeds. */
     public ?string $refundDeclineWith = null;
 
@@ -34,6 +41,12 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
 
     /** When true, charge() throws as if Square CreateOrder failed. */
     public bool $failCreateOrder = false;
+
+    /** When true, createPayInStoreInvoice() throws so pay-in-store can fall back to a payment link. */
+    public bool $failInvoice = false;
+
+    /** When true, cancelInvoice() throws so line-edit refresh keeps the current invoice. */
+    public bool $failCancelInvoice = false;
 
     /** @var list<array{lineItems: array, creditCents: int}> */
     public array $quotes = [];
@@ -195,6 +208,62 @@ final class FakeCheckoutGateway implements CheckoutGatewayInterface
             'url' => 'https://square.link/u/test-'.$referenceId,
             'squareOrderId' => 'sqord_link_'.$n,
         ];
+    }
+
+    public function createPayInStoreInvoice(
+        Store $store,
+        string $idempotencyKey,
+        string $referenceId,
+        array $lineItems,
+        int $creditCents = 0,
+        ?string $buyerEmail = null,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
+    ): array {
+        if (null !== $this->declineWith) {
+            throw new \RuntimeException($this->declineWith);
+        }
+        if ($this->failInvoice) {
+            throw new \RuntimeException('Square invoices are not available for this store.');
+        }
+        $email = trim((string) $buyerEmail);
+        if ('' === $email) {
+            throw new \RuntimeException('A customer email is required to create a Square invoice.');
+        }
+
+        $due = 0;
+        foreach ($lineItems as $item) {
+            $due += max(0, (int) ($item['priceCents'] ?? 0)) * max(1, (int) ($item['quantity'] ?? 1));
+        }
+        $due = max(0, $due - max(0, $creditCents)) + max(0, $this->addedTaxCents);
+        $padded = SquareInvoiceMinimum::invoiceLineItems($lineItems, $this->addedTaxCents, $due);
+
+        $this->invoices[] = [
+            'idempotencyKey' => $idempotencyKey,
+            'referenceId' => $referenceId,
+            'email' => $email,
+            'lineItems' => $padded,
+        ];
+
+        $token = bin2hex(random_bytes(4));
+
+        return [
+            'url' => 'https://squareup.com/pay-invoice/test-'.$referenceId,
+            'squareOrderId' => 'sqord_inv_'.$token,
+            'squareInvoiceId' => 'sqinv_'.$token,
+        ];
+    }
+
+    public function cancelInvoice(Store $store, string $invoiceId): void
+    {
+        $id = trim($invoiceId);
+        if ('' === $id) {
+            return;
+        }
+        if ($this->failCancelInvoice) {
+            throw new \RuntimeException('Square invoice could not be canceled.');
+        }
+        $this->cancelledInvoices[] = $id;
     }
 
     public function vaultPaymentMethod(
