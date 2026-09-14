@@ -575,6 +575,8 @@ export interface PullSheetRow {
   setCode: string | null
   collectorNumber: string | null
   quantity: number
+  caseName: string | null
+  sectionTitle: string | null
   orderReference: string | null
   orderStatus: string | null
   customerName: string | null
@@ -583,6 +585,7 @@ export interface PullSheetRow {
 }
 
 export interface PullSheet {
+  scope: 'section' | 'store'
   caseName: string | null
   sectionTitle: string
   generatedAt: string
@@ -596,6 +599,7 @@ export interface StockingSheetRow {
   cardName: string
   setCode: string | null
   collectorNumber: string | null
+  rarity: string | null
   condition: string | null
   /** Treatment in the game's own words: Nonfoil, Holofoil, Rainbow Foil. */
   finish: string
@@ -981,6 +985,8 @@ export interface Order {
   /** Square hosted checkout URL returned once when a pay-in-store QR is minted. */
   paymentUrl?: string | null
   createdAt: string
+  /** When staff last changed status (accept, decline, ready, delivered). */
+  statusChangedAt?: string | null
   lines?: OrderLine[]
 }
 

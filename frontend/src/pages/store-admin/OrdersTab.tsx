@@ -43,7 +43,7 @@ import {
   percentChange,
   type OrderListTab,
 } from '../../lib/orderManagementUi'
-import { formatOrderDate, formatOrderShortDate, orderItemCount, orderLineImage } from '../../lib/orders'
+import { formatOrderDate, formatOrderDateTime, orderItemCount, orderLineImage, orderLines, orderStatusTimestamp } from '../../lib/orders'
 import { printOrderSheet } from '../../lib/printOrderSheet'
 import { rankInventorySearch } from '../../lib/rankInventorySearch'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
@@ -356,6 +356,7 @@ function PendingAcceptQueue({
                   <span className="block truncate text-sm text-fg-muted">
                     {order.customerName ?? 'Guest'} · {order.reference}
                   </span>
+                  <span className="block text-xs text-fg-muted">{formatOrderDateTime(order.createdAt)}</span>
                   <span className="block text-sm font-semibold tabular-nums text-fg">{formatPrice(order.totalCents)}</span>
                 </span>
               </button>
@@ -470,7 +471,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
           order.reference,
           order.customerName,
           order.customerEmail,
-          ...(order.lines ?? []).map((l) => l.cardName),
+          ...orderLines(order).map((l) => l.cardName),
         ]
           .filter(Boolean)
           .join(' ')
@@ -951,7 +952,7 @@ function OrderCard({
               {order.customerName ?? 'Guest'} · {order.reference}
             </span>
             <span className="mt-0.5 block text-xs text-fg-muted">
-              {formatOrderShortDate(order.createdAt)} · {itemCount} item{itemCount === 1 ? '' : 's'}
+              {orderStatusTimestamp(order)} · {itemCount} item{itemCount === 1 ? '' : 's'}
             </span>
             <span className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-sm font-bold tabular-nums text-fg">{formatPrice(order.totalCents)}</span>
@@ -1044,7 +1045,7 @@ function OrderRow({
       </td>
       <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
         <p className="truncate font-semibold text-fg">{order.reference}</p>
-        <p className="truncate text-xs text-fg-muted">{formatOrderShortDate(order.createdAt)}</p>
+        <p className="truncate text-xs text-fg-muted">{orderStatusTimestamp(order)}</p>
       </td>
       <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
         <p className="truncate font-bold text-fg">{formatPrice(order.totalCents)}</p>
@@ -1360,6 +1361,15 @@ function OrderDetailModal({
                 Channel: <span className="font-semibold text-fg">{order.channel === 'kiosk' ? 'Kiosk' : 'Online'}</span>
               </p>
             )}
+            <p className="mt-3 text-xs text-fg-muted">
+              Placed <span className="font-semibold text-fg">{formatOrderDateTime(order.createdAt)}</span>
+            </p>
+            {order.statusChangedAt && (order.status === 'received' || order.status === 'paid' || order.status === 'cancelled') ? (
+              <p className="mt-1 text-xs text-fg-muted">
+                {order.status === 'cancelled' ? 'Declined' : 'Accepted'}{' '}
+                <span className="font-semibold text-fg">{formatOrderDateTime(order.statusChangedAt)}</span>
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-col justify-center rounded-xl border border-border bg-bg p-4 sm:p-5">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-muted">Order total</p>
@@ -1410,10 +1420,10 @@ function OrderDetailModal({
                 Store credit applied: {formatPrice(order.creditAppliedCents ?? 0)}
               </p>
             )}
-            {order.paymentCaptures && order.paymentCaptures.length > 0 ? (
+            {Array.isArray(order.paymentCaptures) && order.paymentCaptures.length > 0 ? (
               <div className="mt-3 space-y-1 rounded-lg bg-bg px-3 py-2 text-xs text-fg-muted">
                 <p className="font-bold uppercase tracking-wide">Payment captures</p>
-                {order.paymentCaptures.map((capture) => (
+                {order.paymentCaptures.filter(Boolean).map((capture) => (
                   <p key={capture.id} className="font-mono break-all">
                     {capture.id}
                     <span className="text-fg">
@@ -1465,7 +1475,7 @@ function OrderDetailModal({
         <div>
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fg-muted">Line items</p>
           <OrderLineList
-            lines={order.lines ?? []}
+            lines={orderLines(order)}
             editing={canEdit}
             busyLineId={busyLineId}
             onQuantityChange={canEdit ? (line, quantity) => patchLine.mutate({ line, quantity }) : undefined}
@@ -1619,9 +1629,9 @@ function AddInventoryResultRow({
           <img src={cardImage(item.card)} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
         ) : null}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold text-fg">{item.card.name}</span>
+          <span className="block truncate text-sm font-bold text-fg">{item.card?.name ?? 'Unknown card'}</span>
           <span className="block text-xs text-fg-muted">
-            {item.card.setCode?.toUpperCase()} · {item.condition}
+            {item.card?.setCode?.toUpperCase()} · {item.condition}
             {item.isFoil ? ` · ${item.finish}` : ''} · {item.quantity} in stock
           </span>
         </span>
@@ -1631,7 +1641,7 @@ function AddInventoryResultRow({
         <div className="flex items-center gap-1 rounded-lg border border-border bg-bg p-0.5">
           <motion.button
             type="button"
-            aria-label={`Decrease quantity for ${item.card.name}`}
+            aria-label={`Decrease quantity for ${item.card?.name ?? 'card'}`}
             disabled={busy || qty <= 1}
             whileTap={busy || qty <= 1 ? undefined : { scale: 0.9 }}
             onClick={() => setQty((current) => Math.max(1, current - 1))}
@@ -1655,7 +1665,7 @@ function AddInventoryResultRow({
           </span>
           <motion.button
             type="button"
-            aria-label={`Increase quantity for ${item.card.name}`}
+            aria-label={`Increase quantity for ${item.card?.name ?? 'card'}`}
             disabled={busy || qty >= maxQty}
             whileTap={busy || qty >= maxQty ? undefined : { scale: 0.9 }}
             onClick={() => setQty((current) => Math.min(maxQty, current + 1))}

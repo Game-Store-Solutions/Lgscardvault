@@ -253,7 +253,7 @@ final class StoreSectionControllerTest extends WebTestCase
     {
         $store = $this->fixtures->store();
         $case = $this->fixtures->storeCase($store);
-        $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(301), 5);
+        $item = $this->fixtures->inventoryItem($store, $this->fixtures->card(301, ['rarity' => 'rare']), 5);
         $this->authenticate($store->getOwner());
         $section = $this->createSection($store, $case, 'Restock me');
         $base = "/api/stores/{$store->getSlug()}/sections/{$section->getId()}";
@@ -266,6 +266,7 @@ final class StoreSectionControllerTest extends WebTestCase
         $sheet = $this->jsonRequest('GET', "$base/stocking-sheet");
         self::assertCount(1, $sheet['rows']);
         self::assertSame(2, $sheet['rows'][0]['copies']);
+        self::assertSame('rare', $sheet['rows'][0]['rarity']);
         self::assertSame(2, $sheet['totalCards']);
 
         // Marking stocked clears the sheet and stamps the card.
@@ -332,6 +333,26 @@ final class StoreSectionControllerTest extends WebTestCase
         ]);
         self::assertSame(422, $this->client->getResponse()->getStatusCode());
         self::assertStringContainsString('limited to 1', $body['detail']);
+
+        // Sold-out frozen rows keep pull-sheet history but do not consume a
+        // physical slot — a second distinct card must still fit the limit.
+        $this->em->clear();
+        $section = $this->em->getRepository(StoreSection::class)->find($manual->getId());
+        self::assertNotNull($section);
+        $placed = $section->getCards()->first();
+        self::assertNotFalse($placed);
+        $placed->setSoldQuantity($placed->getQuantity());
+        $this->em->flush();
+
+        $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}/items", [
+            'inventoryItemId' => $items[1]->getId(),
+        ]);
+        self::assertResponseIsSuccessful();
+        $occupied = array_values(array_filter(
+            $body['cards'] ?? [],
+            static fn (array $card): bool => ($card['remaining'] ?? 0) > 0,
+        ));
+        self::assertCount(1, $occupied);
 
         // Out-of-range limits are rejected; clearing works.
         $this->jsonRequest('PATCH', "/api/stores/{$store->getSlug()}/sections/{$manual->getId()}", ['cardLimit' => 0]);

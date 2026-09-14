@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Archive, ChevronDown, ClipboardList, GalleryHorizontalEnd, GripVertical, Minus, PackagePlus, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
-import { storeCasesKey, useInventoryPage, usePullSheet, useStockingSheet, useStoreCases, useStoreGames } from '../../hooks'
+import { storeCasesKey, useInventoryPage, usePullSheet, useStorePullSheet, useStockingSheet, useStoreCases, useStoreGames } from '../../hooks'
 import { useDebouncedValue } from '../../hooks'
 import type { CardSummary, PullSheet, StockingSheet, StoreCaseSummary, StoreSection, StoreSectionMode } from '../../api/types'
 import {
@@ -21,6 +21,7 @@ import {
 } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion, Reorder, useDragControls } from '../../components/motion'
 import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
+import { rarityLabel } from '../../lib/mtg'
 import { cx } from '../../lib/cx'
 
 /** Rarities the auto-fill filter accepts — must mirror the backend allow-list. */
@@ -71,6 +72,18 @@ function caseCopiesClaimedElsewhere(
     }
   }
   return claimed
+}
+
+/** Must match StoreSection::occupiedSlotCount() — sold-out frozen rows are not slots. */
+function occupiedSlotCount(section: StoreSection): number {
+  return section.cards.filter((entry) => entry.remaining > 0).length
+}
+
+function addListingLabel(added: boolean, atLimit: boolean, free: number): string {
+  if (added) return 'In case'
+  if (atLimit) return 'Section full'
+  if (free < 1) return 'No free copies'
+  return 'Add to case'
 }
 
 /** How many on-hand copies can still be put in this section's pool. */
@@ -179,6 +192,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
   const { data: cases, isLoading } = useStoreCases(slug)
   const queryClient = useQueryClient()
   const [caseName, setCaseName] = useState('')
+  const [storePullOpen, setStorePullOpen] = useState(false)
 
   const createCase = useMutation({
     mutationFn: async () => {
@@ -196,6 +210,14 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
         <CardHeader
           title="Display cases"
           subtitle="A case is a physical display in your store. Divide each one into sections. Every section tracks its own cards, quantities, and pull sheet."
+          actions={
+            (cases ?? []).length > 0 ? (
+              <Button variant="secondary" size="sm" onClick={() => setStorePullOpen(true)}>
+                <ClipboardList className="size-4" aria-hidden />
+                Pull sheet (all cases)
+              </Button>
+            ) : null
+          }
         />
         <CardBody>
           <form
@@ -240,6 +262,7 @@ export default function CaseCardsTab({ slug }: { slug: string }) {
           ))}
         </div>
       )}
+      {storePullOpen && <StorePullSheetModal slug={slug} onClose={() => setStorePullOpen(false)} />}
     </div>
   )
 }
@@ -510,7 +533,10 @@ function SectionEditor({
   const toStockCount = section.cards.filter(
     (entry) => entry.needsStocking && (entry.inventoryItem.quantity ?? 0) > 0,
   ).length
-  const visibleCards = section.cards.filter((entry) => (entry.inventoryItem.quantity ?? 0) > 0)
+  const occupiedCount = occupiedSlotCount(section)
+  const visibleCards = section.cards.filter(
+    (entry) => entry.remaining > 0 || (entry.inventoryItem.quantity ?? 0) > 0,
+  )
   const [min, setMin] = useState(section.autoMinPriceCents != null ? (section.autoMinPriceCents / 100).toFixed(2) : '')
   const [max, setMax] = useState(section.autoMaxPriceCents != null ? (section.autoMaxPriceCents / 100).toFixed(2) : '')
   const [rarity, setRarity] = useState(section.autoRarity ?? '')
@@ -739,7 +765,7 @@ function SectionEditor({
               />
             </div>
             <span className="pb-2 text-xs text-fg-muted">
-              {visibleCards.length} in section
+              {occupiedCount} in section
               {section.cardLimit != null ? ` · limit ${section.cardLimit}` : ''}
             </span>
           </div>
@@ -839,14 +865,58 @@ function SectionEditor({
   )
 }
 
+function pullSheetLocation(row: PullSheet['rows'][number]): string {
+  return [row.caseName, row.sectionTitle].filter(Boolean).join(' / ')
+}
+
 function PullSheetModal({ slug, section, onClose }: { slug: string; section: StoreSection; onClose: () => void }) {
   const { data: sheet, isLoading } = usePullSheet(slug, section.id)
+
+  return (
+    <PullSheetDialog
+      title={`Pull sheet: ${sheet?.caseName ?? ''} / ${section.title}`}
+      sheet={sheet}
+      isLoading={isLoading}
+      emptyDescription="No open orders include cards from this section."
+      onClose={onClose}
+    />
+  )
+}
+
+function StorePullSheetModal({ slug, onClose }: { slug: string; onClose: () => void }) {
+  const { data: sheet, isLoading } = useStorePullSheet(slug)
+
+  return (
+    <PullSheetDialog
+      title="Pull sheet: all cases"
+      sheet={sheet}
+      isLoading={isLoading}
+      emptyDescription="No open orders include cards from any display case."
+      onClose={onClose}
+    />
+  )
+}
+
+function PullSheetDialog({
+  title,
+  sheet,
+  isLoading,
+  emptyDescription,
+  onClose,
+}: {
+  title: string
+  sheet: PullSheet | undefined
+  isLoading: boolean
+  emptyDescription: string
+  onClose: () => void
+}) {
+  const showLocation = sheet?.scope === 'store'
 
   return (
     <Modal
       open
       onClose={onClose}
-      title={`Pull sheet: ${sheet?.caseName ?? ''} / ${section.title}`}
+      title={title}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -862,11 +932,7 @@ function PullSheetModal({ slug, section, onClose }: { slug: string; section: Sto
       {isLoading || !sheet ? (
         <LoadingPanel />
       ) : sheet.rows.length === 0 ? (
-        <EmptyState
-          icon={GalleryHorizontalEnd}
-          title="Nothing to pull"
-          description="No open orders include cards from this section."
-        />
+        <EmptyState icon={GalleryHorizontalEnd} title="Nothing to pull" description={emptyDescription} />
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-fg-muted">
@@ -877,6 +943,7 @@ function PullSheetModal({ slug, section, onClose }: { slug: string; section: Sto
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-fg-muted">
+                  {showLocation ? <th className="py-2 pr-3">Location</th> : null}
                   <th className="py-2 pr-3">Card</th>
                   <th className="py-2 pr-3">Set</th>
                   <th className="py-2 pr-3 text-right">Qty</th>
@@ -887,6 +954,9 @@ function PullSheetModal({ slug, section, onClose }: { slug: string; section: Sto
               <tbody>
                 {sheet.rows.map((row) => (
                   <tr key={row.lineId} className="border-b border-border/60">
+                    {showLocation ? (
+                      <td className="py-2 pr-3 text-fg-muted">{pullSheetLocation(row) || '—'}</td>
+                    ) : null}
                     <td className="py-2 pr-3 font-bold text-fg">{row.cardName}</td>
                     <td className="py-2 pr-3 text-fg-muted">
                       {row.setCode?.toUpperCase() ?? '—'}
@@ -906,12 +976,6 @@ function PullSheetModal({ slug, section, onClose }: { slug: string; section: Sto
   )
 }
 
-/**
- * Stocking sheet: the restock counterpart of the pull sheet. Lists every card
- * added or topped up by auto-fill/manual adds that staff have not yet placed
- * in the physical case, printable, with a one-click "mark all stocked" once
- * the copies are in the display.
- */
 function StockingSheetModal({
   slug,
   section,
@@ -990,6 +1054,7 @@ function StockingSheetModal({
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-fg-muted">
                   <th className="py-2 pr-3">Card</th>
                   <th className="py-2 pr-3">Set</th>
+                  <th className="py-2 pr-3">Rarity</th>
                   <th className="py-2 pr-3">Finish / Cond.</th>
                   <th className="py-2 pr-3 text-right">Copies</th>
                   <th className="py-2 text-right">Price</th>
@@ -1003,6 +1068,7 @@ function StockingSheetModal({
                       {row.setCode?.toUpperCase() ?? '—'}
                       {row.collectorNumber ? ` #${row.collectorNumber}` : ''}
                     </td>
+                    <td className="py-2 pr-3 text-fg-muted">{rarityLabel(row.rarity) || '—'}</td>
                     <td className="py-2 pr-3 text-fg-muted">
                       {row.finish}
                       {row.condition ? ` · ${row.condition}` : ''}
@@ -1022,10 +1088,9 @@ function StockingSheetModal({
   )
 }
 
-/** Print the stocking sheet through a transient iframe (same pattern as the pull sheet). */
-function printStockingSheet(sheet: StockingSheet) {
+function printHtml(title: string, html: string) {
   const iframe = document.createElement('iframe')
-  iframe.setAttribute('title', `Print stocking sheet ${sheet.sectionTitle}`)
+  iframe.setAttribute('title', title)
   iframe.style.position = 'fixed'
   iframe.style.right = '0'
   iframe.style.bottom = '0'
@@ -1041,26 +1106,23 @@ function printStockingSheet(sheet: StockingSheet) {
     return
   }
   frameWindow.addEventListener('afterprint', () => iframe.remove(), { once: true })
-
-  const rows = sheet.rows
-    .map(
-      (row) => `
-        <tr>
-          <td>${escapeHtml(row.cardName)}</td>
-          <td>${escapeHtml(row.setCode?.toUpperCase() ?? '-')}${row.collectorNumber ? ' #' + escapeHtml(row.collectorNumber) : ''}</td>
-          <td>${escapeHtml(row.finish)}${row.condition ? ' · ' + escapeHtml(row.condition) : ''}</td>
-          <td>${row.copies}</td>
-          <td>[&nbsp;&nbsp;]</td>
-        </tr>`,
-    )
-    .join('')
-
   frameDocument.open()
-  frameDocument.write(`
-    <!doctype html>
+  frameDocument.write(html)
+  frameDocument.close()
+  window.setTimeout(() => {
+    frameWindow.focus()
+    frameWindow.print()
+    window.setTimeout(() => iframe.remove(), 1000)
+  }, 100)
+}
+
+function printSheetPage(title: string, heading: string, muted: string, thead: string, rows: string, qtyColumn: number) {
+  printHtml(
+    title,
+    `<!doctype html>
     <html>
       <head>
-        <title>Stocking sheet: ${escapeHtml(sheet.caseName ?? '')} / ${escapeHtml(sheet.sectionTitle)}</title>
+        <title>${heading}</title>
         <style>
           body { color: #111827; font-family: Arial, sans-serif; margin: 32px; }
           header { border-bottom: 2px solid #111827; margin-bottom: 20px; padding-bottom: 12px; }
@@ -1069,57 +1131,59 @@ function printStockingSheet(sheet: StockingSheet) {
           table { border-collapse: collapse; width: 100%; margin-top: 16px; }
           th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 6px; text-align: left; }
           th { color: #4b5563; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
-          td:nth-child(4), th:nth-child(4) { text-align: right; }
+          td:nth-child(${qtyColumn}), th:nth-child(${qtyColumn}) { text-align: right; }
           @media print { body { margin: 14mm; } }
         </style>
       </head>
       <body>
         <header>
-          <h1>Stocking Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
-          <div class="muted">${sheet.totalCards} cop${sheet.totalCards === 1 ? 'y' : 'ies'} to place in the case · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
+          <h1>${heading}</h1>
+          <div class="muted">${muted}</div>
         </header>
         <table>
-          <thead>
-            <tr><th>Card</th><th>Set</th><th>Finish / Cond.</th><th>Copies</th><th>Placed</th></tr>
-          </thead>
+          <thead><tr>${thead}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </body>
-    </html>
-  `)
-  frameDocument.close()
-
-  window.setTimeout(() => {
-    frameWindow.focus()
-    frameWindow.print()
-    window.setTimeout(() => iframe.remove(), 1000)
-  }, 100)
+    </html>`,
+  )
 }
 
-/** Print the pull sheet through a transient iframe (same pattern as the order sheet). */
-function printPullSheet(sheet: PullSheet) {
-  const iframe = document.createElement('iframe')
-  iframe.setAttribute('title', `Print pull sheet ${sheet.sectionTitle}`)
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
-  iframe.style.border = '0'
-  document.body.appendChild(iframe)
-
-  const frameWindow = iframe.contentWindow
-  const frameDocument = frameWindow?.document
-  if (!frameWindow || !frameDocument) {
-    iframe.remove()
-    return
-  }
-  frameWindow.addEventListener('afterprint', () => iframe.remove(), { once: true })
-
+function printStockingSheet(sheet: StockingSheet) {
   const rows = sheet.rows
     .map(
       (row) => `
         <tr>
+          <td>${escapeHtml(row.cardName)}</td>
+          <td>${escapeHtml(row.setCode?.toUpperCase() ?? '-')}${row.collectorNumber ? ' #' + escapeHtml(row.collectorNumber) : ''}</td>
+          <td>${escapeHtml(rarityLabel(row.rarity) || '-')}</td>
+          <td>${escapeHtml(row.finish)}${row.condition ? ' · ' + escapeHtml(row.condition) : ''}</td>
+          <td>${row.copies}</td>
+          <td>[&nbsp;&nbsp;]</td>
+        </tr>`,
+    )
+    .join('')
+
+  printSheetPage(
+    `Print stocking sheet ${sheet.sectionTitle}`,
+    `Stocking Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}`,
+    `${sheet.totalCards} cop${sheet.totalCards === 1 ? 'y' : 'ies'} to place in the case · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}`,
+    '<th>Card</th><th>Set</th><th>Rarity</th><th>Finish / Cond.</th><th>Copies</th><th>Placed</th>',
+    rows,
+    5,
+  )
+}
+
+function printPullSheet(sheet: PullSheet) {
+  const storeWide = sheet.scope === 'store'
+  const heading = storeWide
+    ? 'Pull Sheet: All cases'
+    : `Pull Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}`
+  const rows = sheet.rows
+    .map(
+      (row) => `
+        <tr>
+          ${storeWide ? `<td>${escapeHtml(pullSheetLocation(row) || '-')}</td>` : ''}
           <td>${escapeHtml(row.cardName)}</td>
           <td>${escapeHtml(row.setCode?.toUpperCase() ?? '-')}${row.collectorNumber ? ' #' + escapeHtml(row.collectorNumber) : ''}</td>
           <td>${row.quantity}</td>
@@ -1129,45 +1193,14 @@ function printPullSheet(sheet: PullSheet) {
     )
     .join('')
 
-  frameDocument.open()
-  frameDocument.write(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>Pull sheet: ${escapeHtml(sheet.caseName ?? '')} / ${escapeHtml(sheet.sectionTitle)}</title>
-        <style>
-          body { color: #111827; font-family: Arial, sans-serif; margin: 32px; }
-          header { border-bottom: 2px solid #111827; margin-bottom: 20px; padding-bottom: 12px; }
-          h1 { font-size: 24px; margin: 0 0 4px; }
-          .muted { color: #4b5563; font-size: 13px; }
-          table { border-collapse: collapse; width: 100%; margin-top: 16px; }
-          th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 6px; text-align: left; }
-          th { color: #4b5563; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
-          td:nth-child(3), th:nth-child(3) { text-align: right; }
-          @media print { body { margin: 14mm; } }
-        </style>
-      </head>
-      <body>
-        <header>
-          <h1>Pull Sheet: ${escapeHtml(sheet.caseName ?? 'Case')} / ${escapeHtml(sheet.sectionTitle)}</h1>
-          <div class="muted">${sheet.totalCards} card${sheet.totalCards === 1 ? '' : 's'} to pull · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}</div>
-        </header>
-        <table>
-          <thead>
-            <tr><th>Card</th><th>Set</th><th>Qty</th><th>Order</th><th>Customer</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </body>
-    </html>
-  `)
-  frameDocument.close()
-
-  window.setTimeout(() => {
-    frameWindow.focus()
-    frameWindow.print()
-    window.setTimeout(() => iframe.remove(), 1000)
-  }, 100)
+  printSheetPage(
+    `Print pull sheet ${sheet.sectionTitle}`,
+    heading,
+    `${sheet.totalCards} card${sheet.totalCards === 1 ? '' : 's'} to pull · generated ${escapeHtml(new Date(sheet.generatedAt).toLocaleString())}`,
+    `${storeWide ? '<th>Location</th>' : ''}<th>Card</th><th>Set</th><th>Qty</th><th>Order</th><th>Customer</th>`,
+    rows,
+    storeWide ? 4 : 3,
+  )
 }
 
 function escapeHtml(value: string): string {
@@ -1222,6 +1255,7 @@ function InventoryPicker({
     () => new Set(section.cards.map((c) => c.inventoryItem.id)),
     [section.cards],
   )
+  const atCardLimit = section.cardLimit != null && occupiedSlotCount(section) >= section.cardLimit
 
   // Same ranked catalog typeahead as Singles → Add (prefix / exact / word tiers).
   const typeaheadReady = debounced.length >= 2 && Boolean(game) && !pickedCard
@@ -1264,7 +1298,7 @@ function InventoryPicker({
   })
 
   const results = useMemo(() => {
-    const items = searchPage?.items ?? []
+    const items = (searchPage?.items ?? []).filter((item) => item.card)
     const q = inventoryQuery
     const ranked = [...items].sort(
       (a, b) =>
@@ -1431,7 +1465,7 @@ function InventoryPicker({
                 )}
               </div>
               <div className="flex shrink-0 flex-col items-stretch gap-2 self-center sm:items-end">
-                {primaryListing && !primaryAdded && primaryFree > 0 ? (
+                {primaryListing && !primaryAdded && primaryFree > 0 && !atCardLimit ? (
                   <label className="flex items-center justify-end gap-2 text-sm text-fg-muted">
                     Copies
                     <input
@@ -1448,13 +1482,13 @@ function InventoryPicker({
                   <Button
                     type="button"
                     variant={primaryAdded ? 'ghost' : 'primary'}
-                    disabled={primaryAdded || primaryFree < 1}
+                    disabled={primaryAdded || atCardLimit || primaryFree < 1}
                     loading={addMutation.isPending && addMutation.variables?.inventoryItemId === primaryListing.id}
                     onClick={() =>
                       addMutation.mutate({ inventoryItemId: primaryListing.id, quantity: primaryQty })
                     }
                   >
-                    {primaryAdded ? 'In case' : primaryFree < 1 ? 'No free copies' : 'Add to case'}
+                    {addListingLabel(primaryAdded, atCardLimit, primaryFree)}
                   </Button>
                 )}
                 <Button type="button" variant="ghost" size="sm" onClick={clearPickedCard}>
@@ -1514,7 +1548,7 @@ function InventoryPicker({
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-                        {!added && free > 0 ? (
+                        {!added && free > 0 && !atCardLimit ? (
                           <label className="flex items-center gap-1 text-xs text-fg-muted">
                             Copies
                             <input
@@ -1530,11 +1564,11 @@ function InventoryPicker({
                         <Button
                           size="sm"
                           variant={added ? 'ghost' : 'primary'}
-                          disabled={added || free < 1}
+                          disabled={added || atCardLimit || free < 1}
                           loading={addMutation.isPending && addMutation.variables?.inventoryItemId === item.id}
                           onClick={() => addMutation.mutate({ inventoryItemId: item.id, quantity: qty })}
                         >
-                          {added ? 'In case' : free < 1 ? 'No free copies' : 'Add to case'}
+                          {addListingLabel(added, atCardLimit, free)}
                         </Button>
                       </div>
                     </li>

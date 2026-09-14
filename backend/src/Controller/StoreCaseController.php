@@ -4,10 +4,12 @@ namespace App\Controller;
 
 use App\Entity\Store;
 use App\Entity\StoreCase;
+use App\Repository\OrderLineRepository;
 use App\Repository\StoreCaseRepository;
 use App\Repository\StoreRepository;
 use App\Repository\StoreSectionRepository;
 use App\Service\CaseCards\ColorIdentityParser;
+use App\Service\CaseCards\PullSheetSerializer;
 use App\Service\CaseCards\SectionSerializer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -31,7 +33,9 @@ final class StoreCaseController extends AbstractController
         private readonly StoreRepository $storeRepository,
         private readonly StoreCaseRepository $caseRepository,
         private readonly StoreSectionRepository $sectionRepository,
+        private readonly OrderLineRepository $orderLineRepository,
         private readonly SectionSerializer $serializer,
+        private readonly PullSheetSerializer $pullSheetSerializer,
         private readonly ColorIdentityParser $colorIdentityParser,
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -57,6 +61,20 @@ final class StoreCaseController extends AbstractController
     public function filterSuggestions(): JsonResponse
     {
         return $this->json(['colorIdentities' => $this->colorIdentityParser->suggestions()]);
+    }
+
+    #[Route('/pull-sheet', name: 'api_store_cases_pull_sheet', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function pullSheet(string $slug): JsonResponse
+    {
+        $store = $this->findManagedStore($slug);
+        if (!$store instanceof Store) {
+            return $this->json(['detail' => 'Store not found.'], 404);
+        }
+
+        $lines = $this->orderLineRepository->findOpenPullLinesForStore($store);
+
+        return $this->json($this->pullSheetSerializer->forStore($lines));
     }
 
     #[Route('', name: 'api_store_cases_create', methods: ['POST'])]

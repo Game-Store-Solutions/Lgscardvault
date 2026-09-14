@@ -131,6 +131,7 @@ final class CasePurchaseFlowTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSame('Front Counter', $sheet['caseName']);
         self::assertSame('Black', $sheet['sectionTitle']);
+        self::assertSame('section', $sheet['scope']);
         self::assertSame(1, $sheet['totalCards']);
         self::assertCount(1, $sheet['rows']);
         self::assertSame($order['reference'], $sheet['rows'][0]['orderReference']);
@@ -138,13 +139,14 @@ final class CasePurchaseFlowTest extends WebTestCase
         self::assertSame('case-buyer@test.local', $sheet['rows'][0]['customerEmail']);
 
         // Fulfilling the order pulls it off the sheet (card has been pulled).
-        $this->jsonRequest(
+        $accepted = $this->jsonRequest(
             'PATCH',
             "/api/stores/{$store->getSlug()}/orders/{$order['id']}",
             ['status' => 'received'],
             'application/merge-patch+json',
         );
         self::assertResponseIsSuccessful();
+        self::assertNotEmpty($accepted['statusChangedAt'] ?? null, 'accepting an order stamps the decision time');
         $this->jsonRequest(
             'PATCH',
             "/api/stores/{$store->getSlug()}/orders/{$order['id']}",
@@ -156,6 +158,47 @@ final class CasePurchaseFlowTest extends WebTestCase
         $sheet = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/sections/{$section->getId()}/pull-sheet");
         self::assertSame(0, $sheet['totalCards']);
         self::assertCount(0, $sheet['rows']);
+    }
+
+    public function testStoreWidePullSheetIncludesEveryCase(): void
+    {
+        [$store, $section, $item] = $this->storeWithCasedListing(stock: 5, pool: 2);
+        $secondCase = $this->fixtures->storeCase($store, 'Wall Case');
+        $otherItem = $this->fixtures->inventoryItem($store, $this->fixtures->card(802), 3, priceCents: 1800);
+        $otherSection = new StoreSection();
+        $otherSection->setStore($store);
+        $otherSection->setStoreCase($secondCase);
+        $otherSection->setTitle('Rares');
+        $this->em->persist($otherSection);
+        $otherCard = new StoreSectionCard();
+        $otherCard->setInventoryItem($otherItem);
+        $otherCard->setQuantity(1);
+        $otherSection->addCard($otherCard);
+        $this->em->flush();
+
+        $first = $this->placeOrder($store, $this->fixtures->user(['ROLE_USER'], 'all-pull-a@test.local'), $item->getId(), 1);
+        $second = $this->placeOrder($store, $this->fixtures->user(['ROLE_USER'], 'all-pull-b@test.local'), $otherItem->getId(), 1);
+
+        $this->authenticate($store->getOwner());
+        $sheet = $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/cases/pull-sheet");
+        self::assertResponseIsSuccessful();
+        self::assertSame('All cases', $sheet['sectionTitle']);
+        self::assertSame('store', $sheet['scope']);
+        self::assertSame(2, $sheet['totalCards']);
+        self::assertCount(2, $sheet['rows']);
+        $refs = array_column($sheet['rows'], 'orderReference');
+        self::assertContains($first['reference'], $refs);
+        self::assertContains($second['reference'], $refs);
+        $locations = array_map(
+            static fn (array $row): string => ($row['caseName'] ?? '').' / '.($row['sectionTitle'] ?? ''),
+            $sheet['rows'],
+        );
+        self::assertContains('Front Counter / Black', $locations);
+        self::assertContains('Wall Case / Rares', $locations);
+
+        $this->bearer = null;
+        $this->jsonRequest('GET', "/api/stores/{$store->getSlug()}/cases/pull-sheet");
+        self::assertSame(401, $this->client->getResponse()->getStatusCode());
     }
 
     /**

@@ -39,7 +39,10 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
             throw new \InvalidArgumentException('Expected Order.');
         }
 
-        $originalStatus = $this->entityManager->getUnitOfWork()->getOriginalEntityData($data)['status'] ?? null;
+        $originalStatus = $this->previousStatus(
+            $this->entityManager->getUnitOfWork()->getOriginalEntityData($data)['status'] ?? null,
+        );
+        $data->setStatusChangedAt(new \DateTimeImmutable());
         $this->assertCanFulfill($data, $originalStatus);
         $this->createFulfilledNotificationIfNeeded($data, $originalStatus);
         $this->notifyOrderCancelledIfNeeded($data, $originalStatus);
@@ -53,6 +56,18 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         $this->entityManager->flush();
 
         return $data;
+    }
+
+    private function previousStatus(mixed $originalStatus): ?OrderStatus
+    {
+        if ($originalStatus instanceof OrderStatus) {
+            return $originalStatus;
+        }
+        if (is_string($originalStatus)) {
+            return OrderStatus::tryFrom($originalStatus);
+        }
+
+        return null;
     }
 
     /**

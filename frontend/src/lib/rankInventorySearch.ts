@@ -12,6 +12,7 @@ export function rankInventorySearch(items: InventoryItem[], rawQuery: string): I
   const scored: Array<{ item: InventoryItem; score: number; name: string }> = []
 
   for (const item of items) {
+    if (!item.card) continue
     const name = item.card.name
     const foldedName = foldSearchText(name)
     const setCode = foldSearchText(item.card.setCode ?? '')

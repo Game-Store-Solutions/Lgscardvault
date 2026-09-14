@@ -4,11 +4,9 @@ namespace App\Controller;
 
 use App\Entity\InventoryItem;
 use App\Entity\Store;
-use App\Service\Catalog\FinishVocabulary;
 use App\Entity\StoreCase;
 use App\Entity\StoreSection;
 use App\Entity\StoreSectionCard;
-use App\Enum\OrderStatus;
 use App\Repository\InventoryItemRepository;
 use App\Repository\OrderLineRepository;
 use App\Repository\StoreCaseRepository;
@@ -16,8 +14,10 @@ use App\Repository\StoreRepository;
 use App\Repository\StoreSectionCardRepository;
 use App\Repository\StoreSectionRepository;
 use App\Service\CaseCards\ColorIdentityParser;
+use App\Service\CaseCards\PullSheetSerializer;
 use App\Service\CaseCards\SectionAutoFiller;
 use App\Service\CaseCards\SectionSerializer;
+use App\Service\Catalog\FinishVocabulary;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -44,9 +44,6 @@ final class StoreSectionController extends AbstractController
     /** Rarities the auto-fill filter accepts (matched case-insensitively). */
     private const ALLOWED_RARITIES = ['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus'];
 
-    /** Order statuses whose case cards still need to be pulled from the case. */
-    private const PULL_OPEN_STATUSES = [OrderStatus::PENDING, OrderStatus::RECEIVED, OrderStatus::PAID];
-
     public function __construct(
         private readonly StoreRepository $storeRepository,
         private readonly StoreCaseRepository $caseRepository,
@@ -56,6 +53,7 @@ final class StoreSectionController extends AbstractController
         private readonly OrderLineRepository $orderLineRepository,
         private readonly SectionAutoFiller $autoFiller,
         private readonly SectionSerializer $serializer,
+        private readonly PullSheetSerializer $pullSheetSerializer,
         private readonly ColorIdentityParser $colorIdentityParser,
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -205,15 +203,16 @@ final class StoreSectionController extends AbstractController
 
         $existing = $this->existingInventoryItemIds($section);
         $position = $this->sectionCardRepository->nextPosition($section);
-        $limit = $section->getCardLimit();
         $added = 0;
 
         foreach ($ids as $itemId) {
             if (isset($existing[$itemId])) {
                 continue;
             }
-            if (null !== $limit && count($existing) >= $limit) {
-                return $this->json(['detail' => sprintf('This section is limited to %d cards. Remove a card or raise the limit first.', $limit)], 422);
+            if ($section->isAtCardLimit()) {
+                return $this->json([
+                    'detail' => sprintf('This section is limited to %d cards. Remove a card or raise the limit first.', (int) $section->getCardLimit()),
+                ], 422);
             }
 
             $item = $this->inventoryItemRepository->findOneByStoreAndId($store, $itemId);
@@ -353,9 +352,7 @@ final class StoreSectionController extends AbstractController
             return $this->json(['detail' => 'Minimum price cannot exceed maximum price.'], 422);
         }
 
-        // The section's own capacity wins over the platform ceiling, so a
-        // 12-slot case area pulls exactly 12 cards.
-        $picked = $this->autoFiller->pickListings($section, min($section->getCardLimit() ?? self::AUTO_FILL_MAX, self::AUTO_FILL_MAX));
+        $picked = $this->autoFiller->pickListings($section, $section->getCardLimit() ?? self::AUTO_FILL_MAX);
 
         /** @var array<int, StoreSectionCard> $existingByItem */
         $existingByItem = [];
@@ -397,12 +394,6 @@ final class StoreSectionController extends AbstractController
         return $this->json($this->serializer->serializeSection($section));
     }
 
-    /**
-     * Pull sheet: every case card in open orders (placed but not yet
-     * fulfilled/shipped/cancelled) that staff must pull from this section.
-     * Reflects the live order lifecycle — fulfilling, cancelling, or
-     * refunding an order drops its lines off the sheet.
-     */
     #[Route('/{id}/pull-sheet', name: 'api_store_sections_pull_sheet', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
     public function pullSheet(string $slug, int $id): JsonResponse
@@ -412,44 +403,11 @@ final class StoreSectionController extends AbstractController
             return $this->json(['detail' => 'Section not found.'], 404);
         }
 
-        $lines = $this->orderLineRepository->findOpenPullLinesForSection($section, self::PULL_OPEN_STATUSES);
+        $lines = $this->orderLineRepository->findOpenPullLinesForSection($section);
 
-        $rows = [];
-        $totalCards = 0;
-        foreach ($lines as $line) {
-            $order = $line->getParentOrder();
-            $card = $line->getCard();
-            $totalCards += $line->getCaseQuantity();
-            $rows[] = [
-                'lineId' => $line->getId(),
-                'cardName' => $line->getCardName(),
-                'setCode' => $card?->getSetCode(),
-                'collectorNumber' => $card?->getCollectorNumber(),
-                'quantity' => $line->getCaseQuantity(),
-                'orderReference' => $order?->getReference(),
-                'orderStatus' => $order?->getStatus()->value,
-                'customerName' => $order?->getCustomerName(),
-                'customerEmail' => $order?->getCustomerEmail(),
-                'orderedAt' => $order?->getCreatedAt()->format(DATE_ATOM),
-            ];
-        }
-
-        return $this->json([
-            'caseName' => $section->getStoreCase()?->getName(),
-            'sectionTitle' => $section->getTitle(),
-            'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
-            'totalCards' => $totalCards,
-            'rows' => $rows,
-        ]);
+        return $this->json($this->pullSheetSerializer->forSection($section, $lines));
     }
 
-    /**
-     * Stocking sheet: every card added (or topped up) to this section's pool
-     * that staff have not yet physically placed in the display case. This is
-     * the restock counterpart of the pull sheet — pull answers "what leaves
-     * the case for orders", stocking answers "what goes INTO the case after
-     * a backfill".
-     */
     #[Route('/{id}/stocking-sheet', name: 'api_store_sections_stocking_sheet', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
     public function stockingSheet(string $slug, int $id): JsonResponse
@@ -475,6 +433,7 @@ final class StoreSectionController extends AbstractController
                 'cardName' => $card?->getName() ?? 'Unknown card',
                 'setCode' => $card?->getSetCode(),
                 'collectorNumber' => $card?->getCollectorNumber(),
+                'rarity' => $card?->getRarity(),
                 'condition' => $item?->getCondition()->value,
                 'finish' => $item?->getFinish() ?? FinishVocabulary::DEFAULT_PLAIN,
                 'isFoil' => $item?->isFoil() ?? false,

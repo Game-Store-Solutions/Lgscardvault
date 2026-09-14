@@ -11,6 +11,7 @@ use App\Service\Order\OrderBalanceDueNotifier;
 use App\Service\Order\OrderCreditReconciler;
 use App\Service\Order\OrderLineEditor;
 use App\Service\Checkout\PickupOrderTaxSync;
+use App\Service\Order\StoreOrderReadSerializer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -29,6 +30,7 @@ final class StoreOrderLineController extends AbstractController
         private readonly OrderCreditReconciler $creditReconciler,
         private readonly OrderBalanceDueNotifier $notifier,
         private readonly PickupOrderTaxSync $pickupOrderTaxSync,
+        private readonly StoreOrderReadSerializer $orderReadSerializer,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -111,7 +113,7 @@ final class StoreOrderLineController extends AbstractController
         $this->notifier->sync($order);
         $this->entityManager->flush();
 
-        return $this->json($order, 200, [], ['groups' => ['order:read']]);
+        return $this->json($this->orderReadSerializer->serialize($order));
     }
 
     /** @return array{0: Store, 1: Order} */
