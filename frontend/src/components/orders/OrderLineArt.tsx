@@ -153,9 +153,6 @@ export function OrderLineArt({
 
   const body = (
     <>
-      {image || twoSided ? (
-        <span aria-hidden className="pointer-events-none absolute inset-0 skeleton-shimmer" />
-      ) : null}
       {art}
       {caption}
       {badge}
