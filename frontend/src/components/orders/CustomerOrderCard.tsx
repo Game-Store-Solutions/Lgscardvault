@@ -9,14 +9,12 @@ import {
   orderItemCount,
   orderLineImage,
 } from '../../lib/orders'
-import { CardImage } from '../cards/CardImage'
 import { OrderLineArt } from './OrderLineArt'
 import { OrderLineList } from './OrderLineList'
 import { OrderBalanceDuePaypal } from './OrderBalanceDuePaypal'
 import { OrderStatusBadge } from './OrderStatusBadge'
+import { OrderThumbStack } from './OrderThumbStack'
 import { OrderWorkflow } from './OrderWorkflow'
-
-const CARD_THUMB = 'h-[5.75rem] w-[4.1rem] shrink-0 rounded-xl sm:h-36 sm:w-[6.5rem]'
 
 export function CustomerOrderCard({
   order,
@@ -38,8 +36,6 @@ export function CustomerOrderCard({
   const previewLines = (order.lines ?? []).slice(0, 3)
   const storeHref = order.storeSlug ? `/s/${order.storeSlug}` : undefined
   const lines = order.lines ?? []
-  const thumbs = lines.map((line) => orderLineImage(line)).filter(Boolean).slice(0, 2) as string[]
-  const extra = Math.max(0, lines.length - thumbs.length)
   const closed = isClosedOrderStatus(order.status)
   const primary = lines[0]
   const title =
@@ -63,7 +59,7 @@ export function CustomerOrderCard({
           className="flex w-full items-start gap-3 rounded-xl px-1 py-3 text-left transition-colors hover:bg-fg/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 sm:items-center sm:gap-5 sm:px-4 sm:py-3.5"
           aria-expanded={expanded}
         >
-          <ThumbStack thumbs={thumbs} extra={extra} />
+          <OrderThumbStack order={order} size="account" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="truncate text-sm font-semibold text-fg sm:text-base">{title}</span>
@@ -222,10 +218,10 @@ function SingleLineReceipt({ line }: { line: OrderLine }) {
 function CompactReceiptLines({ lines }: { lines: OrderLine[] }) {
   return (
     <ul className="divide-y divide-border">
-      {lines.map((line) => {
+      {lines.map((line, index) => {
         return (
           <li key={line.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-            <OrderLineArt line={line} />
+            <OrderLineArt line={line} priority={index < 8} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-fg">{line.cardName}</p>
               <p className="mt-0.5 text-xs text-fg-muted">
@@ -240,36 +236,6 @@ function CompactReceiptLines({ lines }: { lines: OrderLine[] }) {
         )
       })}
     </ul>
-  )
-}
-
-function ThumbStack({ thumbs, extra }: { thumbs: string[]; extra: number }) {
-  if (thumbs.length === 0) {
-    return (
-      <span
-        className={cx(CARD_THUMB, 'shrink-0 bg-black/[0.04] ring-1 ring-border dark:bg-white/[0.06]')}
-      />
-    )
-  }
-
-  return (
-    <span className="flex shrink-0 -space-x-4">
-      {thumbs.map((src) => (
-        <span key={src} className={cx(CARD_THUMB, 'overflow-hidden shadow-sm ring-2 ring-bg')}>
-          <CardImage src={src} alt="" showLabel={false} className="size-full" />
-        </span>
-      ))}
-      {extra > 0 ? (
-        <span
-          className={cx(
-            CARD_THUMB,
-            'grid place-items-center bg-black/[0.04] text-sm font-bold text-fg-muted ring-2 ring-bg dark:bg-white/[0.06]',
-          )}
-        >
-          +{extra}
-        </span>
-      ) : null}
-    </span>
   )
 }
 

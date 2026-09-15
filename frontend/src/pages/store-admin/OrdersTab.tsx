@@ -28,6 +28,7 @@ import type { InventoryItem, Order, OrderChannel, OrderLine, OrderStatus } from 
 import { inventoryKey, openStoreOrdersCountKey, ordersKey, resolveOrdersListTotal, useDebouncedValue, useInventoryPage, useOrders, useStoreOrderQueueCounts } from '../../hooks'
 import { Avatar, Button, EmptyState, ErrorState, Input, LoadingPanel, Modal, Select, Skeleton, dropdownPanelClass } from '../../components/ui'
 import { OrderLineList } from '../../components/orders/OrderLineList'
+import { OrderThumbStack } from '../../components/orders/OrderThumbStack'
 import { OrderWorkflow } from '../../components/orders/OrderWorkflow'
 import { cx } from '../../lib/cx'
 import {
@@ -43,7 +44,7 @@ import {
   percentChange,
   type OrderListTab,
 } from '../../lib/orderManagementUi'
-import { formatOrderDate, formatOrderDateTime, orderItemCount, orderLineImage, orderLines, orderStatusTimestamp } from '../../lib/orders'
+import { formatOrderDate, formatOrderDateTime, orderLines, orderStatusTimestamp } from '../../lib/orders'
 import { printOrderSheet } from '../../lib/printOrderSheet'
 import { rankInventorySearch } from '../../lib/rankInventorySearch'
 import { AnimatePresence, EASE_PREMIUM, motion } from '../../components/motion'
@@ -321,8 +322,6 @@ function PendingAcceptQueue({
       </div>
       <ul className="divide-y divide-border">
         {orders.map((order) => {
-          const firstLine = order.lines?.[0]
-          const thumb = firstLine ? orderLineImage(firstLine) : undefined
           const busy = busyOrderId === order.id
           const rowLocked = busyOrderId != null && !busy
           return (
@@ -339,17 +338,14 @@ function PendingAcceptQueue({
                 className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
               >
                 <motion.span
-                  className="grid size-11 shrink-0 overflow-hidden rounded-xl bg-bg"
+                  className="shrink-0"
                   whileHover={{ scale: 1.04 }}
                   transition={{ duration: 0.2, ease: EASE_PREMIUM }}
                 >
-                  {thumb ? (
-                    <img src={thumb} alt="" className="size-full object-cover" />
-                  ) : (
-                    <span className="grid size-full place-items-center text-fg-muted">
-                      <Package aria-hidden className="size-5" />
-                    </span>
-                  )}
+                  <OrderThumbStack
+                    order={order}
+                    fallback={<Package aria-hidden className="size-4 text-fg-muted" />}
+                  />
                 </motion.span>
                 <span className="min-w-0 flex-1 space-y-0.5">
                   <span className="block truncate font-semibold text-fg">{orderPrimaryProductName(order)}</span>
@@ -793,7 +789,8 @@ function OrdersCardSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
     <div className="divide-y divide-border lg:hidden" aria-busy="true" aria-label="Loading orders">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex gap-3 px-4 py-4">
-          <Skeleton className="size-12 shrink-0 rounded-xl" />
+          <Skeleton className="h-12 w-8 shrink-0 rounded-lg" />
+          <Skeleton className="-ml-1 h-12 w-8 shrink-0 rounded-lg" />
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
@@ -819,10 +816,12 @@ function OrdersTableSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
               <tr key={i} className={cx('border-b border-border/60', ORDER_TABLE_ROW_H)}>
                 <td className="px-5 py-4 align-middle">
                   <div className="flex items-center gap-3">
-                    <Skeleton className="size-11 shrink-0 rounded-xl" />
-                    <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex shrink-0">
+                      <Skeleton className="h-11 w-8 rounded-lg" />
+                      <Skeleton className="-ml-1 h-11 w-8 rounded-lg" />
+                    </div>
+                    <div className="min-w-0 flex-1">
                       <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/4" />
                     </div>
                   </div>
                 </td>
@@ -928,31 +927,23 @@ function OrderCard({
   updatePending,
 }: OrderListItemProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const firstLine = order.lines?.[0]
-  const thumb = firstLine ? orderLineImage(firstLine) : undefined
   const actions = orderStatusChoices(order)
-  const itemCount = orderItemCount(order)
 
   return (
     <article className="px-4 py-4">
       <div className="flex items-start gap-3">
         <button type="button" onClick={onOpenDetail} className="flex min-w-0 flex-1 items-start gap-3 text-left">
-          <span className="grid size-12 shrink-0 overflow-hidden rounded-xl bg-bg">
-            {thumb ? (
-              <img src={thumb} alt="" className="size-full object-cover" />
-            ) : (
-              <span className="grid size-full place-items-center text-fg-muted">
-                <Package aria-hidden className="size-5" />
-              </span>
-            )}
-          </span>
+          <OrderThumbStack
+            order={order}
+            fallback={<Package aria-hidden className="size-4 text-fg-muted" />}
+          />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-fg">{orderPrimaryProductName(order)}</span>
             <span className="mt-0.5 block truncate text-sm text-fg-muted">
               {order.customerName ?? 'Guest'} · {order.reference}
             </span>
             <span className="mt-0.5 block text-xs text-fg-muted">
-              {orderStatusTimestamp(order)} · {itemCount} item{itemCount === 1 ? '' : 's'}
+              {orderStatusTimestamp(order)}
             </span>
             <span className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-sm font-bold tabular-nums text-fg">{formatPrice(order.totalCents)}</span>
@@ -1006,10 +997,7 @@ function OrderRow({
   updatePending,
 }: OrderListItemProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const firstLine = order.lines?.[0]
-  const thumb = firstLine ? orderLineImage(firstLine) : undefined
   const actions = orderStatusChoices(order)
-  const itemCount = orderItemCount(order)
 
   return (
     <tr className={cx('border-b border-border/60 transition-colors hover:bg-bg/80', ORDER_TABLE_ROW_H)}>
@@ -1019,18 +1007,12 @@ function OrderRow({
           onClick={onOpenDetail}
           className="flex w-full min-w-0 max-w-full items-center gap-3 text-left"
         >
-          <span className="grid size-11 shrink-0 overflow-hidden rounded-xl bg-bg">
-            {thumb ? (
-              <img src={thumb} alt="" className="size-full object-cover" />
-            ) : (
-              <span className="grid size-full place-items-center text-fg-muted">
-                <Package aria-hidden className="size-5" />
-              </span>
-            )}
-          </span>
+          <OrderThumbStack
+            order={order}
+            fallback={<Package aria-hidden className="size-4 text-fg-muted" />}
+          />
           <span className="min-w-0 flex-1 overflow-hidden">
             <span className="block truncate font-semibold text-fg">{orderPrimaryProductName(order)}</span>
-            <span className="block truncate text-xs text-fg-muted">Items {itemCount}</span>
           </span>
         </button>
       </td>

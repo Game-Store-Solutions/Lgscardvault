@@ -89,6 +89,19 @@ export function orderLineImage(line: OrderLine, opts?: { quality?: 'display' | '
   )
 }
 
+/** First `max` line-art URLs plus how many more unique lines remain. */
+export function orderThumbStack(order: Pick<Order, 'lines'>, max = 2): { thumbs: string[]; extra: number } {
+  const lines = orderLines(order)
+  const thumbs: string[] = []
+  for (const line of lines) {
+    const image = orderLineImage(line)
+    if (!image) continue
+    thumbs.push(image)
+    if (thumbs.length >= max) break
+  }
+  return { thumbs, extra: Math.max(0, lines.length - thumbs.length) }
+}
+
 const ROTATE_LAYOUTS: Record<string, number> = { flip: 180, split: 90, aftermath: 90 }
 
 export type OrderLineFaceArt = { name?: string; image: string }
