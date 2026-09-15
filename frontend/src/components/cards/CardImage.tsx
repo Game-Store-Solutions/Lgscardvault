@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ImageOff } from 'lucide-react'
 import { cardArtDelivery } from '../../api/client'
 import { cx } from '../../lib/cx'
@@ -16,6 +16,8 @@ export interface CardImageProps {
   label?: string
   /** Override lazy loading (e.g. above-the-fold hero). */
   loading?: 'lazy' | 'eager'
+  /** `full` keeps the large Scryfall face (inspect overlays). */
+  quality?: 'display' | 'full'
 }
 
 /**
@@ -39,9 +41,14 @@ export function CardImage({
   showLabel = true,
   label = 'No image',
   loading = 'lazy',
+  quality = 'display',
 }: CardImageProps) {
   const [failed, setFailed] = useState(false)
-  const delivery = useMemo(() => (src ? cardArtDelivery(src) : null), [src])
+  const delivery = useMemo(() => (src ? cardArtDelivery(src, quality) : null), [src, quality])
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src, quality])
 
   if (delivery && !failed) {
     return (

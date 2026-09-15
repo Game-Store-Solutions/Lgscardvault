@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { ChevronDown, GalleryHorizontalEnd } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cardImage, formatPrice } from '../api/client'
 import { useStore, useStoreCases, useStoreTheme, useTilt } from '../hooks'
 import { BackButton, Card, CardBody, EmptyState } from '../components/ui'
 import type { StoreSectionCard } from '../api/types'
-import { CardImage } from '../components/cards'
+import { CardArtLightbox, CardImage } from '../components/cards'
 import { FoilOverlays } from '../components/cards/FoilOverlays'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { finishName } from '../lib/finishes'
+import { previewFromCaseCard } from '../lib/cardPreview'
 import { cx } from '../lib/cx'
 import { CASE_CARDS_LABEL } from './utils/actionsUtil'
 
@@ -107,6 +108,8 @@ function CaseSection({
   section: { id: number; title: string; cards: RenderableCard[] }
 }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [inspectIndex, setInspectIndex] = useState<number | null>(null)
+  const inspectCards = section.cards.map((entry) => previewFromCaseCard(entry.inventoryItem, slug))
 
   return (
     <section>
@@ -127,10 +130,19 @@ function CaseSection({
       </button>
       {!collapsed && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-6">
-          {section.cards.map((entry) => (
-            <CaseCardTile key={entry.id} slug={slug} entry={entry} />
+          {section.cards.map((entry, index) => (
+            <CaseCardTile key={entry.id} entry={entry} onInspect={() => setInspectIndex(index)} />
           ))}
         </div>
+      )}
+      {inspectIndex != null && inspectCards[inspectIndex] && (
+        <CardArtLightbox
+          inspect
+          cards={inspectCards}
+          index={inspectIndex}
+          onClose={() => setInspectIndex(null)}
+          onIndexChange={setInspectIndex}
+        />
       )}
     </section>
   )
@@ -148,7 +160,13 @@ function caseCardCount(sections: { cards: RenderableCard[] }[]): number {
  * One case card: large JPEG art (a step below lossless PNG for faster first
  * paint), holographic foil overlay on foils, and a subtle hover lift.
  */
-function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) {
+function CaseCardTile({
+  entry,
+  onInspect,
+}: {
+  entry: RenderableCard
+  onInspect: () => void
+}) {
   const { inventoryItem } = entry
   const card = inventoryItem.card
   const image = cardImage(card)
@@ -158,10 +176,11 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
   })
 
   return (
-    <Link
-      to={`/s/${slug}/cards/${inventoryItem.id}`}
-      state={{ from: 'case-cards' }}
-      className="group relative rounded-card transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    <button
+      type="button"
+      onClick={onInspect}
+      aria-label={`View larger ${card.name}`}
+      className="group relative w-full rounded-card text-left transition-transform duration-150 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
       {lastOne && (
         <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-accent-500 px-2 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-white shadow">
@@ -176,7 +195,7 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
           )}
           style={tiltStyle}
         >
-          <CardImage src={image} alt={card.name} className="h-full w-full" label={card.name} />
+          <CardImage src={image} alt="" className="h-full w-full" label={card.name} />
           {image && <FoilOverlays foil={inventoryItem.isFoil} />}
         </motion.div>
       </div>
@@ -190,6 +209,6 @@ function CaseCardTile({ slug, entry }: { slug: string; entry: RenderableCard }) 
           <span className="text-sm font-bold text-fg">{formatPrice(inventoryItem.priceCents)}</span>
         </div>
       </div>
-    </Link>
+    </button>
   )
 }
