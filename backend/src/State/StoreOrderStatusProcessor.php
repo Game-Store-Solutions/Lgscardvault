@@ -44,6 +44,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         $originalStatus = $this->previousStatus(
             $this->entityManager->getUnitOfWork()->getOriginalEntityData($data)['status'] ?? null,
         );
+        $data->setStatusChangedAt(new \DateTimeImmutable());
         $this->assertCanFulfill($data, $originalStatus);
         $this->createFulfilledNotificationIfNeeded($data, $originalStatus);
         $this->notifyOrderCancelledIfNeeded($data, $originalStatus);

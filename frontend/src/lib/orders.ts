@@ -37,8 +37,12 @@ export function isClosedOrderStatus(status: OrderStatus): boolean {
   return status === 'cancelled' || status === 'refunded'
 }
 
+export function orderLines(order: Pick<Order, 'lines'>): OrderLine[] {
+  return Array.isArray(order.lines) ? order.lines : []
+}
+
 export function orderItemCount(order: Pick<Order, 'lines'>): number {
-  return (order.lines ?? []).reduce((sum, line) => sum + line.quantity, 0)
+  return orderLines(order).reduce((sum, line) => sum + line.quantity, 0)
 }
 
 export function formatOrderDate(value?: string): string {
@@ -47,6 +51,31 @@ export function formatOrderDate(value?: string): string {
 
 export function formatOrderShortDate(value?: string): string {
   return value ? new Date(value).toLocaleDateString() : '-'
+}
+
+/** Compact date + time for accept/decline queues and order lists. */
+export function formatOrderDateTime(value?: string | null): string {
+  if (!value) return '-'
+  return new Date(value).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+/** Staff-facing stamp: when the order was placed, or when it was accepted/declined. */
+export function orderStatusTimestamp(order: Pick<Order, 'status' | 'createdAt' | 'statusChangedAt'>): string {
+  const placed = formatOrderDateTime(order.createdAt)
+  if (order.status === 'pending') return `Placed ${placed}`
+
+  const decided = formatOrderDateTime(order.statusChangedAt ?? order.createdAt)
+  if (order.status === 'received' || order.status === 'paid') return `Accepted ${decided}`
+  if (order.status === 'cancelled') return `Declined ${decided}`
+  if (order.status === 'refunded') return `Refunded ${decided}`
+
+  return placed
 }
 
 export function orderLineImage(line: OrderLine): string | undefined {

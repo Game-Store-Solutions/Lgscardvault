@@ -24,7 +24,6 @@ class OrderLine
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    #[Groups(['order:read'])]
     private ?Card $card = null;
 
     /**

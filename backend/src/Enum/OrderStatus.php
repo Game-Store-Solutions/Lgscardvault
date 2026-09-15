@@ -64,4 +64,10 @@ enum OrderStatus: string
             && self::CANCELLED !== $this
             && self::REFUNDED !== $this;
     }
+
+    /** @return list<self> placed orders whose case cards are still in the display */
+    public static function pullSheetStatuses(): array
+    {
+        return [self::PENDING, self::RECEIVED, self::PAID];
+    }
 }

@@ -3,9 +3,11 @@
 namespace App\Repository;
 
 use App\Entity\OrderLine;
+use App\Entity\Store;
 use App\Entity\StoreSection;
 use App\Enum\OrderStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -19,28 +21,50 @@ class OrderLineRepository extends ServiceEntityRepository
     }
 
     /**
-     * The section's pull sheet: case-card lines of orders still in an "open"
-     * status (sold, not yet pulled/handed over), oldest order first. Order and
-     * card are eagerly joined for display.
-     *
-     * @param list<OrderStatus> $openStatuses
+     * Case-card lines still waiting to be pulled from one section.
      *
      * @return list<OrderLine>
      */
-    public function findOpenPullLinesForSection(StoreSection $section, array $openStatuses): array
+    public function findOpenPullLinesForSection(StoreSection $section): array
+    {
+        return $this->openCaseLineQuery()
+            ->andWhere('sc.section = :section')
+            ->setParameter('section', $section)
+            ->orderBy('o.createdAt', 'ASC')
+            ->addOrderBy('l.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Case-card lines still waiting to be pulled anywhere in the store.
+     *
+     * @return list<OrderLine>
+     */
+    public function findOpenPullLinesForStore(Store $store): array
+    {
+        return $this->openCaseLineQuery()
+            ->addSelect('sc')
+            ->join('sc.section', 's')->addSelect('s')
+            ->leftJoin('s.storeCase', 'cs')->addSelect('cs')
+            ->andWhere('s.store = :store')
+            ->setParameter('store', $store)
+            ->orderBy('cs.position', 'ASC')
+            ->addOrderBy('s.position', 'ASC')
+            ->addOrderBy('o.createdAt', 'ASC')
+            ->addOrderBy('l.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    private function openCaseLineQuery(): QueryBuilder
     {
         return $this->createQueryBuilder('l')
             ->join('l.sectionCard', 'sc')
             ->join('l.parentOrder', 'o')->addSelect('o')
             ->leftJoin('l.card', 'c')->addSelect('c')
-            ->andWhere('sc.section = :section')
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('l.caseQuantity > 0')
-            ->setParameter('section', $section)
-            ->setParameter('statuses', $openStatuses)
-            ->orderBy('o.createdAt', 'ASC')
-            ->addOrderBy('l.id', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->setParameter('statuses', OrderStatus::pullSheetStatuses());
     }
 }

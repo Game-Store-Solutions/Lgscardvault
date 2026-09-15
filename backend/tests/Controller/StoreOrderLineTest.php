@@ -85,6 +85,9 @@ final class StoreOrderLineTest extends WebTestCase
             'quantity' => 2,
         ]);
         self::assertSame(200, $this->responseCode(), (string) ($updated['detail'] ?? ''));
+        self::assertSame('received', $updated['status'] ?? null);
+        self::assertIsList($updated['lines'] ?? null);
+        self::assertArrayNotHasKey('card', $updated['lines'][0] ?? []);
         self::assertCount(2, $updated['lines'] ?? []);
         self::assertSame(6000, $updated['totalCents']);
 
@@ -170,6 +173,8 @@ final class StoreOrderLineTest extends WebTestCase
         $order = $this->placeKioskOrder($store, $first, 1);
         $this->jsonRequest('PATCH', "/api/stores/{$store->getSlug()}/orders/{$order['id']}", ['status' => 'cancelled']);
         self::assertSame(200, $this->responseCode());
+        $cancelled = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertNotEmpty($cancelled['statusChangedAt'] ?? null, 'declining an order stamps the decision time');
 
         $body = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders/{$order['id']}/lines", [
             'inventoryItemId' => $second->getId(),

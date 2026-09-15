@@ -165,4 +165,23 @@ class StoreSection
     {
         $this->cards->clear();
     }
+
+    /** Listings with unsold copies — the physical slots that count toward cardLimit. */
+    public function occupiedSlotCount(): int
+    {
+        $occupied = 0;
+        foreach ($this->cards as $card) {
+            if ($card->remaining() > 0) {
+                ++$occupied;
+            }
+        }
+
+        return $occupied;
+    }
+
+    /** True when adding another distinct listing would exceed cardLimit. */
+    public function isAtCardLimit(): bool
+    {
+        return null !== $this->cardLimit && $this->occupiedSlotCount() >= $this->cardLimit;
+    }
 }

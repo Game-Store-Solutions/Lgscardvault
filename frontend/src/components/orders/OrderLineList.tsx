@@ -28,6 +28,7 @@ export function OrderLineList({
       {lines.map((line) => {
         const image = orderLineImage(line)
         const busy = busyLineId === line.id
+        const setCode = typeof line.setCode === 'string' ? line.setCode : ''
         return (
           <div
             key={line.id}
@@ -52,7 +53,7 @@ export function OrderLineList({
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-fg">{line.cardName}</p>
                 <p className="text-xs text-fg-muted">
-                  {line.setCode ? `${line.setCode.toUpperCase()} · ` : ''}
+                  {setCode ? `${setCode.toUpperCase()} · ` : ''}
                   {editing ? null : `Qty ${line.quantity} x `}
                   {formatPrice(line.priceCents)}
                 </p>

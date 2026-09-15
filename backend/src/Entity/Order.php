@@ -213,6 +213,11 @@ class Order
     #[Groups(['order:read'])]
     private ?\DateTimeImmutable $disputedAt = null;
 
+    /** When staff last changed status (accept, decline, ready, delivered, …). */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['order:read'])]
+    private ?\DateTimeImmutable $statusChangedAt = null;
+
     #[ORM\Column]
     #[Groups(['order:read'])]
     private \DateTimeImmutable $createdAt;
@@ -668,6 +673,18 @@ class Order
         $this->disputeStatus = 'open';
         $this->disputeReason = mb_substr(trim($reason), 0, 255) ?: null;
         $this->disputedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getStatusChangedAt(): ?\DateTimeImmutable
+    {
+        return $this->statusChangedAt;
+    }
+
+    public function setStatusChangedAt(?\DateTimeImmutable $statusChangedAt): static
+    {
+        $this->statusChangedAt = $statusChangedAt;
 
         return $this;
     }
