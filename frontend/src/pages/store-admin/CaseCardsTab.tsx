@@ -20,9 +20,11 @@ import {
   dropdownPanelClass,
 } from '../../components/ui'
 import { AnimatePresence, EASE_PREMIUM, motion, Reorder, useDragControls } from '../../components/motion'
+import { CardArtLightbox } from '../../components/cards'
 import { catalogNamesMatch, foldSearchText, typeaheadNameTier } from '../../lib/searchText'
 import { rarityLabel } from '../../lib/mtg'
 import { cx } from '../../lib/cx'
+import { previewFromCaseCard } from '../../lib/cardPreview'
 
 /** Rarities the auto-fill filter accepts — must mirror the backend allow-list. */
 const RARITIES = ['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus'] as const
@@ -544,6 +546,11 @@ function SectionEditor({
   const [setCode, setSetCode] = useState(section.autoSetCode ?? '')
   const [cardType, setCardType] = useState(section.autoCardType ?? '')
   const [cardLimit, setCardLimit] = useState(section.cardLimit != null ? String(section.cardLimit) : '')
+  const [inspectIndex, setInspectIndex] = useState<number | null>(null)
+  const inspectCards = visibleCards.flatMap((entry) => {
+    const card = entry.inventoryItem.card
+    return card ? [previewFromCaseCard({ ...entry.inventoryItem, card }, slug)] : []
+  })
 
   useEffect(() => {
     setColor(colorFilterSelectValue(section))
@@ -796,20 +803,33 @@ function SectionEditor({
               const onHand = entry.inventoryItem.quantity ?? 0
               const free = freeCaseCopies(cases, entry.inventoryItem.id, onHand, section.id)
               const maxInCase = entry.soldQuantity + free
+              const inspectAt = inspectCards.findIndex((preview) => preview.catalogCardId === card?.id && preview.inventoryOptions?.[0]?.id === entry.inventoryItem.id)
               return (
                 <li
                   key={entry.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={card ? `View larger ${card.name}` : 'View larger card'}
                   className={`relative flex gap-3 rounded-card border border-border bg-surface p-2 ${entry.remaining === 0 ? 'opacity-75' : ''}`}
+                  onClick={() => inspectAt >= 0 && setInspectIndex(inspectAt)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    if (inspectAt >= 0) setInspectIndex(inspectAt)
+                  }}
                 >
                   {card && cardImage(card) && (
-                    <img src={cardImage(card)} alt={card.name} className="h-16 w-12 flex-shrink-0 rounded object-cover" />
+                    <img src={cardImage(card)} alt="" className="h-16 w-12 flex-shrink-0 rounded object-cover" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-fg">{card?.name ?? 'Unknown card'}</p>
                     <p className="text-xs text-fg-muted">
                       {card?.setCode?.toUpperCase()} · {formatPrice(entry.inventoryItem.priceCents)}
                     </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    <div
+                      className="mt-1 flex flex-wrap items-center gap-2 text-xs"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <CasePoolQuantityInput
                         quantity={entry.quantity}
                         min={entry.soldQuantity}
@@ -828,7 +848,10 @@ function SectionEditor({
                   <button
                     type="button"
                     aria-label="Remove card"
-                    onClick={() => removeItem.mutate(entry.id)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      removeItem.mutate(entry.id)
+                    }}
                     className="absolute right-1 top-1 rounded-full p-1 text-fg-muted hover:bg-bg hover:text-danger-700"
                   >
                     <X className="size-4" aria-hidden />
@@ -859,6 +882,15 @@ function SectionEditor({
           section={section}
           onClose={() => setStockingSheetOpen(false)}
           onChanged={onChanged}
+        />
+      )}
+      {inspectIndex != null && inspectCards[inspectIndex] && (
+        <CardArtLightbox
+          inspect
+          cards={inspectCards}
+          index={inspectIndex}
+          onClose={() => setInspectIndex(null)}
+          onIndexChange={setInspectIndex}
         />
       )}
     </Card>

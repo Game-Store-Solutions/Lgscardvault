@@ -107,6 +107,7 @@ type PreviewSource = {
 export type BuildCardArtPreviewOptions = {
   storeSlug?: string
   printingSelection?: CardPrintingSelection | null
+  imageQuality?: 'display' | 'full'
 }
 
 export function buildCardArtPreview(
@@ -122,7 +123,7 @@ export function buildCardArtPreview(
     catalogCardId: row.card.id,
     name: row.inventoryItem?.card.name ?? row.card.name,
     typeLine: row.inventoryItem?.card.typeLine ?? row.card.typeLine,
-    imageUrl: cardImageUrl(catalog),
+    imageUrl: cardImageUrl(catalog, opts?.imageQuality === 'full' ? { quality: 'full' } : undefined),
     priceCents,
     priceLabel: priceLabelForCard(row.priceCents ?? row.inventoryItem?.priceCents, options),
     inventoryOptions: options,
@@ -130,6 +131,35 @@ export function buildCardArtPreview(
   }
 
   return applyPrintingSelection(base, opts?.printingSelection)
+}
+
+/** Case-card listings: one inventory copy with high-res art for inspect. */
+export function previewFromCaseCard(
+  item: {
+    id: number
+    priceCents: number
+    quantity: number
+    condition: InventoryItem['condition']
+    finish: string
+    isFoil: boolean
+    card: CardSummary
+  },
+  storeSlug?: string,
+): CardArtPreview {
+  return buildCardArtPreview(
+    {
+      card: {
+        id: item.card.id,
+        oracleId: item.card.oracleId ?? item.card.id,
+        name: item.card.name,
+        typeLine: item.card.typeLine,
+        imageUrl: item.card.imageUrl,
+      },
+      inventoryItem: item,
+      priceCents: item.priceCents,
+    },
+    { storeSlug, imageQuality: 'full' },
+  )
 }
 
 type CommanderPreviewSource = {
