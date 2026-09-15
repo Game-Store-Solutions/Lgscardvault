@@ -102,19 +102,22 @@ function orderSheetHtml(order: Order): string {
   const { taxCents, subtotalCents, totalCents } = moneyTotals(order)
   const showLocation = lines.some((line) => (line.caseQuantity ?? 0) > 0)
 
+  const cell = (className: string, value: string): string =>
+    `<td class="${className}"><div class="cell">${value}</div></td>`
+
   const rows = lines
     .map((line) => {
-      const locationCell = showLocation ? `<td class="location">${escapeHtml(lineLocation(line))}</td>` : ''
       const rarity = line.isSealed ? 'Sealed' : printRarity(line.rarity)
       const collector = line.isSealed ? '' : (line.collectorNumber ?? '')
+      const location = showLocation ? cell('location', escapeHtml(lineLocation(line))) : ''
       return `
         <tr>
-          <td class="qty">${line.quantity}</td>
-          <td class="description">${escapeHtml(lineDescription(line))}</td>
-          <td class="rarity">${escapeHtml(rarity)}</td>
-          <td class="num">${escapeHtml(collector)}</td>
-          <td class="price">${formatPrice(line.priceCents)}</td>
-          ${locationCell}
+          ${cell('qty', String(line.quantity))}
+          ${cell('description', escapeHtml(lineDescription(line)))}
+          ${cell('rarity', escapeHtml(rarity))}
+          ${cell('num', escapeHtml(collector))}
+          ${cell('price', formatPrice(line.priceCents))}
+          ${location}
         </tr>
       `
     })
@@ -128,35 +131,50 @@ function orderSheetHtml(order: Order): string {
         <style>
           * { box-sizing: border-box; }
           html, body { background: #fff; color: #111; }
-          body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; margin: 28px; }
-          h1 { font-size: 22px; font-weight: 700; margin: 0 0 20px; text-align: center; }
-          .meta { margin: 0 0 22px; }
-          .meta-row { line-height: 1.55; }
+          body { font-family: Arial, Helvetica, sans-serif; font-size: 12.5px; line-height: 1.35; margin: 16mm; }
+          h1 { font-size: 22px; font-weight: 700; margin: 0 0 16px; text-align: center; }
+          .meta { margin: 0 0 18px; }
+          .meta-row { line-height: 1.5; }
           .meta-row .k { font-weight: 700; }
-          h2 { font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+          h2 { font-size: 13px; font-weight: 700; margin: 0 0 8px; }
           table { border-collapse: collapse; table-layout: fixed; width: 100%; }
-          th, td { padding: 8px 6px; text-align: left; vertical-align: top; }
-          th { border-bottom: 1px solid #111; font-size: 12px; font-weight: 700; padding-bottom: 10px; }
-          td { border-bottom: 1px solid #d4d4d4; padding: 18px 6px; height: 3.4rem; }
-          col.qty { width: 5%; }
-          col.description { width: 58%; }
-          col.rarity { width: 12%; }
-          col.num { width: 8%; }
-          col.price { width: 17%; }
-          table.has-location col.description { width: 46%; }
-          table.has-location col.rarity { width: 10%; }
-          table.has-location col.price { width: 12%; }
-          table.has-location col.location { width: 19%; }
-          .qty, .rarity, .num, .price { white-space: nowrap; }
-          .price { text-align: right; }
+          col.qty { width: 48px; }
+          col.description { width: auto; }
+          col.rarity { width: 88px; }
+          col.num { width: 72px; }
+          col.price { width: 80px; }
+          col.location { width: 110px; }
+          thead { display: table-header-group; }
+          tr { page-break-inside: avoid; break-inside: avoid; }
+          th, td {
+            padding: 9px 12px;
+            text-align: left;
+            vertical-align: top;
+            overflow: hidden;
+          }
+          th { border-bottom: 1px solid #111; font-size: 11px; font-weight: 700; padding-bottom: 8px; }
+          td { border-bottom: 1px solid #d4d4d4; }
+          .cell { max-width: 100%; min-width: 0; overflow: hidden; }
+          .qty .cell, .rarity .cell, .num .cell, .price .cell {
+            white-space: nowrap;
+            text-overflow: ellipsis;
+          }
+          .description .cell, .location .cell {
+            white-space: normal;
+            overflow-wrap: break-word;
+            word-break: normal;
+            hyphens: none;
+          }
+          .qty { padding-left: 0; }
+          .price { padding-right: 0; text-align: right; }
           th.price { text-align: right; }
-          .description { padding-right: 10px; overflow-wrap: normal; word-break: normal; }
-          .location { overflow-wrap: break-word; word-break: normal; }
-          .totals { margin-left: auto; margin-top: 18px; width: 240px; page-break-inside: avoid; }
-          .total-row { display: flex; justify-content: space-between; padding: 4px 0; }
+          .total-row { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }
           .total-row.final { font-weight: 700; margin-top: 4px; }
-          .money-summary { margin: 0 0 18px; padding: 10px 0; border-top: 1px solid #111; border-bottom: 1px solid #111; width: 240px; }
-          @media print { body { margin: 14mm; } button { display: none; } }
+          .money-summary { margin: 0 0 16px; padding: 8px 0; border-top: 1px solid #111; border-bottom: 1px solid #111; width: 220px; }
+          @media print {
+            body { margin: 12mm; }
+            button { display: none; }
+          }
         </style>
       </head>
       <body>
@@ -197,11 +215,6 @@ function orderSheetHtml(order: Order): string {
           </thead>
           <tbody>${rows}</tbody>
         </table>
-        <div class="totals">
-          <div class="total-row"><span>Subtotal:</span><span>${formatPrice(subtotalCents)}</span></div>
-          <div class="total-row"><span>Tax:</span><span>${formatPrice(taxCents)}</span></div>
-          <div class="total-row final"><span>Total:</span><span>${formatPrice(totalCents)}</span></div>
-        </div>
       </body>
     </html>
   `

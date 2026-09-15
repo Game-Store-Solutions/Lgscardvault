@@ -738,7 +738,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
             ) : (
               <div className="relative min-w-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[44rem] table-fixed text-left text-sm">
+                  <table className="w-full min-w-[60rem] table-fixed text-left text-sm">
                     <OrdersTableHead />
                     <tbody
                       className={cx('min-h-0 transition-opacity duration-150', listFetching && 'opacity-60')}
@@ -777,11 +777,11 @@ function OrdersTableHead() {
   return (
     <thead>
       <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-muted">
-        <th className="w-[28%] min-w-0 px-5 py-3 font-semibold">Product Name</th>
-        <th className="w-[20%] min-w-0 px-5 py-3 font-semibold">Customer Name</th>
-        <th className="w-[14%] min-w-0 px-5 py-3 font-semibold">Order Id</th>
+        <th className="w-[22%] min-w-0 px-5 py-3 font-semibold">Product Name</th>
+        <th className="w-[16%] min-w-0 px-5 py-3 font-semibold">Customer Name</th>
+        <th className="w-[26%] px-5 py-3 font-semibold">Order Id</th>
         <th className="w-[12%] min-w-0 px-5 py-3 font-semibold">Amount</th>
-        <th className="w-[12%] min-w-0 px-5 py-3 font-semibold">Status</th>
+        <th className="w-[14%] min-w-0 px-5 py-3 font-semibold">Status</th>
         <th className="w-16 px-3 py-3 font-semibold text-right">Action</th>
       </tr>
     </thead>
@@ -812,7 +812,7 @@ function OrdersTableSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
   return (
     <div className="relative hidden min-w-0 lg:block" aria-busy="true" aria-label="Loading orders">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[44rem] table-fixed text-left text-sm">
+        <table className="w-full min-w-[60rem] table-fixed text-left text-sm">
           <OrdersTableHead />
           <tbody>
             {Array.from({ length: rows }, (_, i) => (
@@ -1043,9 +1043,9 @@ function OrderRow({
           </div>
         </div>
       </td>
-      <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
-        <p className="truncate font-semibold text-fg">{order.reference}</p>
-        <p className="truncate text-xs text-fg-muted">{orderStatusTimestamp(order)}</p>
+      <td className="px-5 py-4 align-middle">
+        <p className="font-semibold text-fg">{order.reference}</p>
+        <p className="whitespace-nowrap text-xs text-fg-muted">{orderStatusTimestamp(order)}</p>
       </td>
       <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
         <p className="truncate font-bold text-fg">{formatPrice(order.totalCents)}</p>

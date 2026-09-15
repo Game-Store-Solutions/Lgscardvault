@@ -1,8 +1,8 @@
-import { ImageOff, Minus, Plus, X } from 'lucide-react'
+import { Minus, Plus, X } from 'lucide-react'
 import { formatPrice } from '../../api/client'
 import type { OrderLine } from '../../api/types'
-import { orderLineImage } from '../../lib/orders'
 import { cx } from '../../lib/cx'
+import { OrderLineArt } from './OrderLineArt'
 
 export function OrderLineList({
   lines = [],
@@ -26,7 +26,6 @@ export function OrderLineList({
   return (
     <div className={cx('grid', compact ? 'divide-y divide-border' : 'gap-2')}>
       {lines.map((line) => {
-        const image = orderLineImage(line)
         const busy = busyLineId === line.id
         const setCode = typeof line.setCode === 'string' ? line.setCode : ''
         return (
@@ -38,18 +37,7 @@ export function OrderLineList({
             )}
           >
             <div className="flex min-w-0 items-center gap-3">
-              <span
-                className={cx(
-                  'grid shrink-0 place-items-center overflow-hidden rounded-btn border border-border bg-bg',
-                  compact ? 'h-12 w-9' : 'h-14 w-10 sm:h-16 sm:w-12',
-                )}
-              >
-                {image ? (
-                  <img src={image} alt={line.cardName} className="size-full object-cover" />
-                ) : (
-                  <ImageOff aria-hidden className="size-4 text-fg-muted" />
-                )}
-              </span>
+              <OrderLineArt line={line} compact={compact} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-fg">{line.cardName}</p>
                 <p className="text-xs text-fg-muted">
@@ -65,7 +53,7 @@ export function OrderLineList({
                 )}
               </div>
             </div>
-            <div className="flex shrink-0 items-center justify-between gap-2 pl-[3.25rem] sm:justify-end sm:pl-0">
+            <div className="flex shrink-0 items-center justify-between gap-2 pl-[6.5rem] sm:justify-end sm:pl-0">
               {editing && onQuantityChange ? (
                 <div className="flex items-center gap-1 rounded-lg border border-border bg-bg p-0.5">
                   <button

@@ -928,6 +928,9 @@ export interface OrderLine {
     large?: string
     png?: string
   } | null
+  /** Per-face art for transform / modal DFCs so the order UI can flip the thumb. */
+  cardFaces?: CardFace[] | null
+  layout?: string | null
   setCode?: string | null
   setName?: string | null
   collectorNumber?: string | null

@@ -154,6 +154,48 @@ final class StoreOrderLineTest extends WebTestCase
         self::assertSame(3000, $updated['totalCents']);
     }
 
+    public function testDoubleFacedCardLinesExposeFrontFaceArt(): void
+    {
+        $store = $this->fixtures->store();
+        $dfc = $this->fixtures->card(4301, [
+            'name' => 'Jugan Defends the Temple // Remnant of the Rising Star',
+            'layout' => 'transform',
+            'card_faces' => [
+                [
+                    'name' => 'Jugan Defends the Temple',
+                    'image_uris' => [
+                        'small' => 'https://cards.scryfall.io/small/front/j/u/jugan.jpg',
+                        'normal' => 'https://cards.scryfall.io/normal/front/j/u/jugan.jpg',
+                    ],
+                ],
+                [
+                    'name' => 'Remnant of the Rising Star',
+                    'image_uris' => [
+                        'normal' => 'https://cards.scryfall.io/normal/back/j/u/jugan.jpg',
+                    ],
+                ],
+            ],
+        ]);
+        $item = $this->fixtures->inventoryItem($store, $dfc, 2, priceCents: 110);
+        $owner = $store->getOwner();
+        self::assertInstanceOf(User::class, $owner);
+        $this->authenticate($owner);
+
+        $order = $this->placeKioskOrder($store, $item, 1);
+        $uris = $order['lines'][0]['imageUris'] ?? null;
+        self::assertIsArray($uris);
+        self::assertSame('https://cards.scryfall.io/normal/front/j/u/jugan.jpg', $uris['normal'] ?? null);
+        self::assertSame('https://cards.scryfall.io/normal/front/j/u/jugan.jpg', $order['lines'][0]['imageUrl'] ?? null);
+        $faces = $order['lines'][0]['cardFaces'] ?? null;
+        self::assertIsArray($faces);
+        self::assertCount(2, $faces);
+        self::assertSame('Jugan Defends the Temple', $faces[0]['name'] ?? null);
+        self::assertSame('https://cards.scryfall.io/normal/front/j/u/jugan.jpg', $faces[0]['imageUris']['normal'] ?? null);
+        self::assertSame('Remnant of the Rising Star', $faces[1]['name'] ?? null);
+        self::assertSame('https://cards.scryfall.io/normal/back/j/u/jugan.jpg', $faces[1]['imageUris']['normal'] ?? null);
+        self::assertSame('transform', $order['lines'][0]['layout'] ?? null);
+    }
+
     public function testCannotRemoveTheLastLine(): void
     {
         [$store, $first, , $owner] = $this->storeWithTwoListings();
