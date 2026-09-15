@@ -10,7 +10,7 @@ import { FloatingCardsBackdrop } from '../components/FloatingCardsBackdrop'
 import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../lib/heroImageOpacity'
 import { useActiveStores, useDebouncedValue, useIsDarkTheme } from '../hooks'
 import { useAuth } from '../context/AuthContext'
-import { usePageMeta } from '../hooks/usePageMeta'
+import { useJsonLd, usePageMeta } from '../hooks/usePageMeta'
 
 type SortKey = 'featured' | 'newest' | 'name'
 
@@ -66,6 +66,30 @@ export default function StoreDirectoryPage() {
     path: '/stores',
   })
 
+  useJsonLd('stores-directory', {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Find local game stores',
+    url: 'https://lgscardvault.com/stores',
+    description:
+      'Browse verified Magic, Pokémon, One Piece, and Flesh & Blood storefronts on LGS Card Vault. Shop real in-store inventory online for pickup.',
+    isPartOf: { '@type': 'WebSite', name: 'LGS Card Vault', url: 'https://lgscardvault.com/' },
+    ...(stores.length > 0
+      ? {
+          mainEntity: {
+            '@type': 'ItemList',
+            numberOfItems: stores.length,
+            itemListElement: stores.map((store, index) => ({
+              '@type': 'ListItem',
+              position: index + 1,
+              name: store.name,
+              url: `https://lgscardvault.com/s/${store.slug}`,
+            })),
+          },
+        }
+      : {}),
+  })
+
   const featured = useMemo(() => stores.find((s) => s.featured), [stores])
 
   const results = useMemo(() => {
@@ -75,34 +99,6 @@ export default function StoreDirectoryPage() {
       : [...stores]
     return sortStores(list, sort)
   }, [stores, debouncedQuery, sort])
-
-  if (isLoading) {
-    return <StoreDirectorySkeleton />
-  }
-
-  if (error) {
-    return (
-      <ErrorState
-        title="Failed to load stores"
-        description="We couldn't reach the marketplace. Please try again."
-        onRetry={() => void refetch()}
-      />
-    )
-  }
-
-  if (stores.length === 0) {
-    return (
-      <div className="space-y-6">
-        <ContinueApplicationBanner />
-        {!user && <BackButton to="/">Home</BackButton>}
-        <EmptyState
-          icon={Store}
-          title="No active stores yet"
-          description="Once a store opens on the marketplace, it will show up here."
-        />
-      </div>
-    )
-  }
 
   return (
     <div>
@@ -130,6 +126,7 @@ export default function StoreDirectoryPage() {
           </h1>
           <p className="mt-3 max-w-xl text-base text-fg-muted">
             Magic, Pokémon, One Piece, Flesh &amp; Blood. Browse verified storefronts and shop with confidence.
+            Pay online or in store, then pick up at the counter. Listings are cards shops actually have on the shelf.
           </p>
 
           <div className="relative mt-7 max-w-xl">
@@ -145,13 +142,43 @@ export default function StoreDirectoryPage() {
           </div>
 
           <p className="mt-4 text-sm text-fg-muted">
-            <span className="font-bold text-fg">{stores.length}</span>{' '}
-            {stores.length === 1 ? 'store' : 'stores'} open now
+            {isLoading ? (
+              'Loading verified storefronts…'
+            ) : (
+              <>
+                <span className="font-bold text-fg">{stores.length}</span>{' '}
+                {stores.length === 1 ? 'store' : 'stores'} open now
+              </>
+            )}
           </p>
         </div>
       </section>
 
-      {!searching && featured && (
+      {error ? (
+        <ErrorState
+          title="Failed to load stores"
+          description="We couldn't reach the marketplace. Please try again."
+          onRetry={() => void refetch()}
+        />
+      ) : null}
+
+      {isLoading ? (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <StoreCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : null}
+
+      {!isLoading && !error && stores.length === 0 ? (
+        <EmptyState
+          icon={Store}
+          title="New storefronts appear here after approval"
+          description="Verified local game stores list live singles and sealed on LGS Card Vault. Apply to open a shop, or check back as more storefronts go live."
+        />
+      ) : null}
+
+      {!isLoading && !error && stores.length > 0 && !searching && featured && (
         <section>
           <PageHeader title="Featured store" subtitle="Hand-picked by the LGS Card Vault team." className="mb-4" />
           <StoreHero
@@ -196,6 +223,7 @@ export default function StoreDirectoryPage() {
         </section>
       )}
 
+      {!isLoading && !error && stores.length > 0 ? (
       <section>
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <PageHeader
@@ -234,6 +262,7 @@ export default function StoreDirectoryPage() {
           </div>
         )}
       </section>
+      ) : null}
       </div>
     </div>
   )

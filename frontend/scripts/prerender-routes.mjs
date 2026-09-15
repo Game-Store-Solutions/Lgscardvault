@@ -42,6 +42,14 @@ const routes = [
   <p>Pay online or in store, then pick up at the counter. Want lists, restock alerts, and sell or trade lists stay with your local shop.</p>
   <p><a href="/">Home</a> · <a href="/for-stores">For local game stores</a></p>
 </main>`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Find local game stores',
+      url: `${site}/stores`,
+      description:
+        'Browse verified Magic, Pokémon, One Piece, and Flesh & Blood storefronts on LGS Card Vault. Shop real in-store inventory online for pickup.',
+    },
   },
   {
     path: '/for-stores',
@@ -94,6 +102,11 @@ function applyMeta(html, route) {
     next = next.replace(/<link rel="canonical" href="[^"]*"\s*\/?>/, canonical)
   } else {
     next = next.replace('</head>', `    ${canonical}\n  </head>`)
+  }
+
+  if (route.jsonLd) {
+    const script = `<script type="application/ld+json">${JSON.stringify(route.jsonLd)}</script>`
+    next = next.replace('</head>', `    ${script}\n  </head>`)
   }
 
   if (!next.includes('<div id="root"></div>')) {
