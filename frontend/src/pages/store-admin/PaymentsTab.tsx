@@ -17,6 +17,8 @@ const subscriptionKey = (slug: string) => ['store-subscription', slug] as const
 
 type ChargeSource = 'vault' | 'square' | 'paypal'
 
+const SQUARE_SANDBOX_TEST_ACCOUNTS = 'https://developer.squareup.com/console/en/sandbox-test-accounts'
+
 const STORE_SALES_CHECKOUT_COPY = 'Customer checkout through these accounts.'
 const SALES_CHECKOUT_METHODS_TIP =
   'Store sales checkout only supports Square and PayPal. The nightly debit card cannot be used for customer checkout.'
@@ -120,6 +122,10 @@ export default function PaymentsTab({ slug }: { slug: string }) {
     },
     onSuccess: (result) => {
       setSquareConnect(result)
+      if (result.environment === 'sandbox') {
+        window.open(SQUARE_SANDBOX_TEST_ACCOUNTS, 'lgs-square-console')
+        return
+      }
       window.open(result.authorizationUrl, '_blank', 'noopener,noreferrer')
     },
   })
@@ -410,7 +416,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
           connected={connected}
           environment={square?.environment}
           error={squareError}
-          pendingUrl={!connected ? squareConnect?.authorizationUrl : undefined}
+          pendingUrl={squareConnect?.authorizationUrl}
           connecting={connectMutation.isPending}
           refreshing={isFetching}
           onConnect={() => connectMutation.mutate()}
@@ -510,6 +516,7 @@ export default function PaymentsTab({ slug }: { slug: string }) {
         account={square}
         connecting={connectMutation.isPending}
         disconnecting={disconnectMutation.isPending}
+        pendingUrl={squareConnect?.authorizationUrl}
         onClose={() => setManaging(null)}
         onReconnect={() => connectMutation.mutate()}
         onDisconnect={() => {
@@ -980,18 +987,7 @@ function ProcessorCard({
           <span className="sr-only">{connecting ? `Connecting ${name}` : `Add ${name}`}</span>
         </button>
         {pendingUrl ? (
-          <p className="text-sm leading-6 text-fg-muted">
-            Finish authorization in the {name} tab. If it did not open,{' '}
-            <a
-              href={pendingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
-            >
-              continue to {name}
-            </a>
-            , then return here.
-          </p>
+          <SquareAuthorizeHint name={name} pendingUrl={pendingUrl} environment={environment} />
         ) : null}
         {error ? (
           <p role="alert" className="text-sm font-medium text-danger-700">
@@ -1653,12 +1649,53 @@ function formatFeePercent(value: number): string {
   return `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}%`
 }
 
+function SquareAuthorizeHint({
+  name,
+  pendingUrl,
+  environment,
+}: {
+  name: string
+  pendingUrl: string
+  environment?: string
+}) {
+  const sandbox = (environment === 'sandbox' || isDevBuild) && name === 'Square'
+  return (
+    <p className="text-sm leading-6 text-fg-muted">
+      {sandbox ? (
+        <>
+          Square will error unless you first click Square Dashboard on{' '}
+          <a
+            href={SQUARE_SANDBOX_TEST_ACCOUNTS}
+            target="lgs-square-console"
+            className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+          >
+            Sandbox test accounts
+          </a>
+          . Wait until Home loads, keep that tab open, then{' '}
+        </>
+      ) : (
+        <>Finish authorization in the {name} tab. If it did not open, </>
+      )}
+      <a
+        href={pendingUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+      >
+        {sandbox ? 'open Allow' : `continue to ${name}`}
+      </a>
+      {sandbox ? '.' : ', then return here.'}
+    </p>
+  )
+}
+
 function ManageProcessorModal({
   open,
   name,
   account,
   connecting,
   disconnecting,
+  pendingUrl,
   onClose,
   onReconnect,
   onDisconnect,
@@ -1668,10 +1705,12 @@ function ManageProcessorModal({
   account: StorePaymentAccount | null | undefined
   connecting: boolean
   disconnecting: boolean
+  pendingUrl?: string
   onClose: () => void
   onReconnect: () => void
   onDisconnect: () => void
 }) {
+  const sandboxSquare = name === 'Square' && (account?.environment === 'sandbox' || isDevBuild)
   return (
     <Modal
       open={open}
@@ -1697,6 +1736,19 @@ function ManageProcessorModal({
         <PaymentFact label="Token expires" value={formatDate(account?.tokenExpiresAt)} />
         <PaymentFact label="Scopes" value={account?.scopes?.join(', ') || '-'} wide />
       </dl>
+      {name === 'Square' && account?.status === 'connected' && account.invoicesEnabled === false ? (
+        <p role="status" className="mt-4 rounded-lg bg-warning-50 px-3 py-2 text-sm text-warning-800">
+          Reconnect Square so pay-in-store orders can appear under Invoices on the register.
+          {sandboxSquare
+            ? ' Click Square Dashboard on the Developer Console list and wait for Home. Then use open Allow — not Reconnect again.'
+            : null}
+        </p>
+      ) : null}
+      {pendingUrl ? (
+        <div className="mt-4">
+          <SquareAuthorizeHint name={name} pendingUrl={pendingUrl} environment={account?.environment} />
+        </div>
+      ) : null}
       {account?.lastError ? (
         <p role="alert" className="mt-4 text-sm font-medium text-danger-700">
           {account.lastError}

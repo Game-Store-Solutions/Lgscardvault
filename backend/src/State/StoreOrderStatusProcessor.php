@@ -12,6 +12,7 @@ use App\Enum\OrderStatus;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\UserRepository;
 use App\Service\Checkout\OrderStockReleaser;
+use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Mail\TransactionalMailer;
 use App\Service\Order\OrderBalanceDueNotifier;
 use App\Service\Order\OrderPaymentAdjuster;
@@ -27,6 +28,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         private UserRepository $userRepository,
         private CustomerNotificationRepository $notificationRepository,
         private OrderStockReleaser $stockReleaser,
+        private PayInStoreFinalizer $payInStoreFinalizer,
         private TransactionalMailer $mail,
         private OrderPaymentAdjuster $paymentAdjuster,
         private OrderBalanceDueNotifier $balanceDueNotifier,
@@ -39,12 +41,15 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
             throw new \InvalidArgumentException('Expected Order.');
         }
 
-        $originalStatus = $this->entityManager->getUnitOfWork()->getOriginalEntityData($data)['status'] ?? null;
+        $originalStatus = $this->previousStatus(
+            $this->entityManager->getUnitOfWork()->getOriginalEntityData($data)['status'] ?? null,
+        );
         $this->assertCanFulfill($data, $originalStatus);
         $this->createFulfilledNotificationIfNeeded($data, $originalStatus);
         $this->notifyOrderCancelledIfNeeded($data, $originalStatus);
 
         // Square refund first — if it fails, leave the order and stock alone.
+        $this->cancelPayInStoreInvoiceIfNeeded($data, $originalStatus);
         $this->refundSquarePaymentIfNeeded($data, $originalStatus);
         $this->releaseCasePoolsIfNeeded($data, $originalStatus);
         $this->clearBalanceDueAlertsIfNeeded($data, $originalStatus);
@@ -53,6 +58,35 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         $this->entityManager->flush();
 
         return $data;
+    }
+
+    private function previousStatus(mixed $originalStatus): ?OrderStatus
+    {
+        if ($originalStatus instanceof OrderStatus) {
+            return $originalStatus;
+        }
+        if (is_string($originalStatus)) {
+            return OrderStatus::tryFrom($originalStatus);
+        }
+
+        return null;
+    }
+
+    private function cancelPayInStoreInvoiceIfNeeded(Order $order, mixed $originalStatus): void
+    {
+        if (!$order->getStatus()->returnsStock()) {
+            return;
+        }
+        if ($originalStatus instanceof OrderStatus && $originalStatus->returnsStock()) {
+            return;
+        }
+
+        $store = $order->getStore();
+        if (!$store instanceof Store) {
+            return;
+        }
+
+        $this->payInStoreFinalizer->cancelRemote($store, $order);
     }
 
     /**

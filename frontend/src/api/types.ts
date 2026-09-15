@@ -221,6 +221,7 @@ export interface StorePaymentAccount {
   connectedAt?: string | null
   disconnectedAt?: string | null
   lastError?: string | null
+  invoicesEnabled?: boolean
 }
 
 export interface StorePaymentStatus {
@@ -978,6 +979,10 @@ export interface Order {
   disputeStatus?: string | null
   disputeReason?: string | null
   disputedAt?: string | null
+  /** Hosted Square invoice URL for unpaid pay-in-store (staff + checkout). */
+  squareInvoiceUrl?: string | null
+  /** Square Invoices API id when this unpaid pickup is on the register. */
+  squareInvoiceId?: string | null
   /** Square hosted checkout URL returned once when a pay-in-store QR is minted. */
   paymentUrl?: string | null
   createdAt: string

@@ -9,6 +9,7 @@ use App\Entity\StoreCreditTransaction;
 use App\Entity\User;
 use App\Service\Payments\CheckoutGatewayInterface;
 use App\Service\Payments\PaypalCheckoutGatewayInterface;
+use App\Service\Payments\SquareInvoiceMinimum;
 use App\Tests\Support\CatalogFixtures;
 use App\Tests\Support\FakeCheckoutGateway;
 use App\Tests\Support\FakePaypalCheckoutGateway;
@@ -47,9 +48,14 @@ final class SquareCheckoutTest extends WebTestCase
         // controller receives.
         $this->gateway = $container->get(CheckoutGatewayInterface::class);
         $this->gateway->failCreateOrder = false;
+        $this->gateway->failInvoice = false;
+        $this->gateway->failCancelInvoice = false;
         $this->gateway->addedTaxCents = 0;
         $this->gateway->declineWith = null;
         $this->gateway->charges = [];
+        $this->gateway->paymentLinks = [];
+        $this->gateway->invoices = [];
+        $this->gateway->cancelledInvoices = [];
 
         $paypal = $container->get(PaypalCheckoutGatewayInterface::class);
         if ($paypal instanceof FakePaypalCheckoutGateway) {
@@ -292,13 +298,56 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertSame(0, $order['paidCents']);
         self::assertSame(1800, $order['totalCents']);
         self::assertNotEmpty($order['paymentUrl']);
-        self::assertCount(1, $this->gateway->paymentLinks);
-        self::assertSame($order['reference'].'-link', $this->gateway->paymentLinks[0]['idempotencyKey']);
+        self::assertNotEmpty($order['squareInvoiceId'] ?? null);
+        self::assertCount(1, $this->gateway->invoices);
+        self::assertSame($order['reference'], $this->gateway->invoices[0]['referenceId']);
+        self::assertSame([], $this->gateway->paymentLinks);
         self::assertSame([], $this->gateway->charges, 'pay in store must not capture a card');
 
         $this->em->clear();
         $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
         self::assertSame(3, $fresh->getQuantity(), 'pay in store still reserves stock');
+    }
+
+    public function testPayInStoreUnderOneDollarPadsSquareInvoice(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 2, priceCents: 15);
+        $this->fillCart($store, $customer, $item, 1);
+        $this->gateway->ready = true;
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'pickup',
+        ]);
+
+        self::assertSame(201, $this->responseCode());
+        self::assertSame('Paying in store', $order['notes']);
+        self::assertSame(15, $order['totalCents'], 'LGS total stays the real hold');
+        self::assertNotEmpty($order['squareInvoiceId'] ?? null);
+        self::assertCount(1, $this->gateway->invoices);
+        $lines = $this->gateway->invoices[0]['lineItems'] ?? [];
+        self::assertCount(2, $lines);
+        self::assertSame(SquareInvoiceMinimum::PAD_LINE_NAME, $lines[1]['name']);
+        self::assertSame(85, $lines[1]['priceCents']);
+    }
+
+    public function testPayInStoreUnderOneDollarDoesNotPercentageTaxThePad(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 2, priceCents: 15);
+        $this->fillCart($store, $customer, $item, 1);
+        $this->gateway->ready = true;
+        $this->gateway->addedTaxCents = 2;
+
+        $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'pickup',
+        ]);
+
+        self::assertSame(201, $this->responseCode());
+        $lines = $this->gateway->invoices[0]['lineItems'] ?? [];
+        self::assertCount(3, $lines);
+        self::assertSame(SquareInvoiceMinimum::TAX_LINE_NAME, $lines[1]['name']);
+        self::assertSame(2, $lines[1]['priceCents']);
+        self::assertSame(SquareInvoiceMinimum::PAD_LINE_NAME, $lines[2]['name']);
+        self::assertSame(83, $lines[2]['priceCents']);
     }
 
     public function testPayInStoreIsRejectedForShipping(): void
@@ -313,11 +362,110 @@ final class SquareCheckoutTest extends WebTestCase
         self::assertSame(422, $this->responseCode());
         self::assertStringContainsString('pickup', strtolower((string) ($body['detail'] ?? '')));
         self::assertSame([], $this->gateway->paymentLinks);
+        self::assertSame([], $this->gateway->invoices);
         self::assertSame([], $this->gateway->charges);
 
         $this->em->clear();
         $fresh = $this->em->getRepository(InventoryItem::class)->find($item->getId());
         self::assertSame(3, $fresh->getQuantity(), 'a rejected pay-in-store checkout never touches stock');
+    }
+
+    public function testPayInStoreFallsBackToPaymentLinkWhenInvoiceFails(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 2, priceCents: 700);
+        $this->fillCart($store, $customer, $item, 1);
+        $this->gateway->ready = true;
+        $this->gateway->failInvoice = true;
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'pickup',
+        ]);
+
+        self::assertSame(201, $this->responseCode());
+        self::assertSame([], $this->gateway->invoices);
+        self::assertCount(1, $this->gateway->paymentLinks);
+        self::assertNotEmpty($order['paymentUrl']);
+        self::assertArrayNotHasKey('squareInvoiceId', $order);
+    }
+
+    public function testPayInStoreInvoiceIsRecreatedWhenStaffEditLines(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 1000);
+        $second = $this->fixtures->inventoryItem($store, $this->fixtures->card(911), 3, priceCents: 400);
+        $this->fillCart($store, $customer, $item, 1);
+        $this->gateway->ready = true;
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'pickup',
+        ]);
+        self::assertSame(201, $this->responseCode());
+        $firstInvoice = $this->gateway->invoices[0]['referenceId'] ?? null;
+        self::assertNotEmpty($order['squareInvoiceId']);
+
+        $this->authenticate($store->getOwner());
+        $updated = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders/{$order['id']}/lines", [
+            'inventoryItemId' => $second->getId(),
+            'quantity' => 1,
+        ]);
+
+        self::assertSame(200, $this->responseCode(), (string) ($updated['detail'] ?? ''));
+        self::assertCount(1, $this->gateway->cancelledInvoices);
+        self::assertCount(2, $this->gateway->invoices);
+        self::assertSame($firstInvoice, $this->gateway->invoices[1]['referenceId']);
+        self::assertNotSame($order['squareInvoiceId'], $updated['squareInvoiceId']);
+        self::assertSame('Paying in store', $updated['notes']);
+    }
+
+    public function testPayInStoreKeepsInvoiceWhenSquareCancelFailsOnLineEdit(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 5, priceCents: 1000);
+        $second = $this->fixtures->inventoryItem($store, $this->fixtures->card(912), 3, priceCents: 400);
+        $this->fillCart($store, $customer, $item, 1);
+        $this->gateway->ready = true;
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'pickup',
+        ]);
+        self::assertSame(201, $this->responseCode());
+        $invoiceId = $order['squareInvoiceId'];
+        self::assertNotEmpty($invoiceId);
+
+        $this->gateway->failCancelInvoice = true;
+        $this->authenticate($store->getOwner());
+        $updated = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/orders/{$order['id']}/lines", [
+            'inventoryItemId' => $second->getId(),
+            'quantity' => 1,
+        ]);
+
+        self::assertSame(200, $this->responseCode(), (string) ($updated['detail'] ?? ''));
+        self::assertSame([], $this->gateway->cancelledInvoices);
+        self::assertCount(1, $this->gateway->invoices, 'must not mint a second invoice when cancel fails');
+        self::assertSame($invoiceId, $updated['squareInvoiceId']);
+    }
+
+    public function testCancellingPayInStoreDropsTheSquareInvoice(): void
+    {
+        [$store, $item, $customer] = $this->storeWithStockedListing(stock: 2, priceCents: 900);
+        $this->fillCart($store, $customer, $item, 1);
+        $this->gateway->ready = true;
+
+        $order = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/customer/checkout/pay-in-store", [
+            'fulfillment' => 'pickup',
+        ]);
+        self::assertSame(201, $this->responseCode());
+        $invoiceId = $order['squareInvoiceId'];
+        self::assertNotEmpty($invoiceId);
+
+        $this->authenticate($store->getOwner());
+        $this->jsonRequest(
+            'PATCH',
+            "/api/stores/{$store->getSlug()}/orders/{$order['id']}",
+            ['status' => 'cancelled'],
+            'application/merge-patch+json',
+        );
+
+        self::assertSame(200, $this->responseCode());
+        self::assertSame([$invoiceId], $this->gateway->cancelledInvoices);
     }
 
     public function testCheckoutIsRejectedWhenTheStoreHasNotConnectedSquare(): void
