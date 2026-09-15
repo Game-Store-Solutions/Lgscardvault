@@ -1341,8 +1341,8 @@ function OrderDetailModal({
       open
       onClose={onClose}
       title={<span className="font-mono text-lg tracking-tight sm:text-xl">{order.reference}</span>}
-      className="max-h-[min(52rem,calc(100dvh-1.5rem))] max-w-3xl"
-      bodyClassName="ui-overlay-scroll"
+      className="max-h-[calc(100dvh-1.25rem)] max-w-[75vw]"
+      bodyClassName="ui-overlay-scroll overflow-x-hidden"
       footer={
         <div className="flex w-full flex-col gap-2">
           {actions.length > 0 ? (
@@ -1546,6 +1546,7 @@ function OrderDetailModal({
             lines={orderLines(order)}
             editing={canEdit}
             busyLineId={busyLineId}
+            className="lg:grid-cols-2"
             onQuantityChange={canEdit ? (line, quantity) => patchLine.mutate({ line, quantity }) : undefined}
             onRemove={canEdit ? (line) => patchLine.mutate({ line, quantity: 0 }) : undefined}
           />

@@ -101,7 +101,7 @@ export function Modal({ open, onClose, title, children, footer, className, bodyC
               {/* Body scrolls; header/footer stay pinned. min-h-0 lets it shrink in the flex column. */}
               <div
                 className={cx(
-                  'min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-8 sm:py-6',
+                  'min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-8 sm:py-6',
                   bodyClassName,
                 )}
               >
