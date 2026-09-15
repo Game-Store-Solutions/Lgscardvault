@@ -11,6 +11,7 @@ export function OrderLineList({
   busyLineId = null,
   onQuantityChange,
   onRemove,
+  className,
 }: {
   lines?: OrderLine[]
   compact?: boolean
@@ -18,13 +19,14 @@ export function OrderLineList({
   busyLineId?: number | null
   onQuantityChange?: (line: OrderLine, quantity: number) => void
   onRemove?: (line: OrderLine) => void
+  className?: string
 }) {
   if (lines.length === 0) {
     return <p className="rounded-btn border border-border bg-bg px-3 py-3 text-sm text-fg-muted">No line items.</p>
   }
 
   return (
-    <div className={cx('grid', compact ? 'divide-y divide-border' : 'gap-2')}>
+    <div className={cx('grid min-w-0', compact ? 'divide-y divide-border' : 'gap-2', className)}>
       {lines.map((line) => {
         const busy = busyLineId === line.id
         const setCode = typeof line.setCode === 'string' ? line.setCode : ''
@@ -32,7 +34,7 @@ export function OrderLineList({
           <div
             key={line.id}
             className={cx(
-              'flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3',
+              'flex min-w-0 items-center justify-between gap-3',
               compact ? 'px-0 py-2.5' : 'rounded-btn border border-border bg-surface px-3 py-2',
             )}
           >
@@ -53,7 +55,7 @@ export function OrderLineList({
                 )}
               </div>
             </div>
-            <div className="flex shrink-0 items-center justify-between gap-2 pl-[6.5rem] sm:justify-end sm:pl-0">
+            <div className="flex shrink-0 items-center justify-end gap-2">
               {editing && onQuantityChange ? (
                 <div className="flex items-center gap-1 rounded-lg border border-border bg-bg p-0.5">
                   <button
