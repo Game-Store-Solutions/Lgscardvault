@@ -34,63 +34,64 @@ export function OrderLineList({
           <div
             key={line.id}
             className={cx(
-              'flex min-w-0 items-center justify-between gap-3',
+              'flex min-w-0 gap-3',
               compact ? 'px-0 py-2.5' : 'rounded-btn border border-border bg-surface px-3 py-2',
             )}
           >
-            <div className="flex min-w-0 items-center gap-3">
-              <OrderLineArt line={line} compact={compact} />
+            <OrderLineArt line={line} compact={compact} />
+            <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-fg">{line.cardName}</p>
-                <p className="text-xs text-fg-muted">
+                <p className="text-sm font-bold leading-snug text-fg [overflow-wrap:anywhere]">{line.cardName}</p>
+                <p className="mt-0.5 text-xs leading-snug text-fg-muted [overflow-wrap:anywhere]">
                   {setCode ? `${setCode.toUpperCase()} · ` : ''}
-                  {editing ? null : `Qty ${line.quantity} x `}
                   {formatPrice(line.priceCents)}
                 </p>
                 {(line.caseQuantity ?? 0) > 0 && (
-                  <p className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-brand-50 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-brand-700">
+                  <p className="mt-1 inline-flex max-w-full flex-wrap items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-brand-700">
                     Case card · {line.caseName ?? 'Case'} / {line.sectionTitle ?? 'Section'}
                     {(line.caseQuantity ?? 0) < line.quantity ? ` (${line.caseQuantity} of ${line.quantity})` : ''}
                   </p>
                 )}
               </div>
-            </div>
-            <div className="flex shrink-0 items-center justify-end gap-2">
-              {editing && onQuantityChange ? (
-                <div className="flex items-center gap-1 rounded-lg border border-border bg-bg p-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                {editing && onQuantityChange ? (
+                  <div className="flex items-center gap-1 rounded-lg border border-border bg-bg p-0.5">
+                    <button
+                      type="button"
+                      aria-label={`Decrease ${line.cardName}`}
+                      disabled={busy || (line.quantity <= 1 && lines.length <= 1)}
+                      onClick={() => onQuantityChange(line, line.quantity - 1)}
+                      className="grid size-8 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
+                    >
+                      <Minus className="size-3.5" aria-hidden />
+                    </button>
+                    <span className="min-w-6 text-center text-sm font-bold tabular-nums text-fg">{line.quantity}</span>
+                    <button
+                      type="button"
+                      aria-label={`Increase ${line.cardName}`}
+                      disabled={busy}
+                      onClick={() => onQuantityChange(line, line.quantity + 1)}
+                      className="grid size-8 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
+                    >
+                      <Plus className="size-3.5" aria-hidden />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs font-bold tabular-nums text-fg">Qty {line.quantity}</p>
+                )}
+                <p className="ml-auto text-sm font-bold tabular-nums text-fg">{formatPrice(line.quantity * line.priceCents)}</p>
+                {editing && onRemove && lines.length > 1 ? (
                   <button
                     type="button"
-                    aria-label={`Decrease ${line.cardName}`}
-                    disabled={busy || (line.quantity <= 1 && lines.length <= 1)}
-                    onClick={() => onQuantityChange(line, line.quantity - 1)}
-                    className="grid size-8 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
-                  >
-                    <Minus className="size-3.5" aria-hidden />
-                  </button>
-                  <span className="min-w-6 text-center text-sm font-bold tabular-nums text-fg">{line.quantity}</span>
-                  <button
-                    type="button"
-                    aria-label={`Increase ${line.cardName}`}
+                    aria-label={`Remove ${line.cardName}`}
                     disabled={busy}
-                    onClick={() => onQuantityChange(line, line.quantity + 1)}
-                    className="grid size-8 place-items-center rounded-md text-fg-muted hover:bg-surface hover:text-fg disabled:opacity-40"
+                    onClick={() => onRemove(line)}
+                    className="grid size-8 place-items-center rounded-full text-fg-muted hover:bg-danger-50 hover:text-danger-700 disabled:opacity-40"
                   >
-                    <Plus className="size-3.5" aria-hidden />
+                    <X className="size-4" aria-hidden />
                   </button>
-                </div>
-              ) : null}
-              <p className="w-[4.5rem] text-right text-sm font-bold text-fg">{formatPrice(line.quantity * line.priceCents)}</p>
-              {editing && onRemove && lines.length > 1 ? (
-                <button
-                  type="button"
-                  aria-label={`Remove ${line.cardName}`}
-                  disabled={busy}
-                  onClick={() => onRemove(line)}
-                  className="grid size-8 place-items-center rounded-full text-fg-muted hover:bg-danger-50 hover:text-danger-700 disabled:opacity-40"
-                >
-                  <X className="size-4" aria-hidden />
-                </button>
-              ) : null}
+                ) : null}
+              </div>
             </div>
           </div>
         )
