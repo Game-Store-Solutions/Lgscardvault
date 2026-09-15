@@ -75,8 +75,8 @@ export function paymentSubtitle(order: Order): string {
     return order.paymentProvider === 'paypal' ? 'Paid with PayPal + store credit' : 'Paid online + store credit'
   }
   if (paid > 0) return order.paymentProvider === 'paypal' ? 'Paid with PayPal' : 'Paid online'
-    if (order.notes === 'Paying in store' || (order.status === 'pending' && paid === 0)) {
-    return 'Pay in store'
+  if (order.notes === 'Paying in store' || (order.status === 'pending' && paid === 0)) {
+    return order.squareInvoiceId ? 'On Square Invoices' : 'Pay in store'
   }
 
   if (order.status === 'pending') return 'Awaiting payment'

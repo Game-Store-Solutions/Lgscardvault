@@ -8,8 +8,12 @@ final readonly class SquareOAuthClient
 {
     private const DEFAULT_SCOPES = [
         'MERCHANT_PROFILE_READ',
+        'CUSTOMERS_READ',
+        'CUSTOMERS_WRITE',
         'ORDERS_READ',
         'ORDERS_WRITE',
+        'INVOICES_READ',
+        'INVOICES_WRITE',
         'PAYMENTS_READ',
         'PAYMENTS_WRITE',
     ];

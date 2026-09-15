@@ -77,7 +77,7 @@ class OrderRepository extends ServiceEntityRepository
         $q = trim((string) ($filters['q'] ?? ''));
         if ('' !== $q) {
             $qb->andWhere(
-                'LOWER(o.reference) LIKE :q OR LOWER(COALESCE(o.customerEmail, \'\')) LIKE :q OR LOWER(COALESCE(o.paymentReference, \'\')) LIKE :q OR LOWER(COALESCE(o.squareOrderId, \'\')) LIKE :q',
+                'LOWER(o.reference) LIKE :q OR LOWER(COALESCE(o.customerEmail, \'\')) LIKE :q OR LOWER(COALESCE(o.paymentReference, \'\')) LIKE :q OR LOWER(COALESCE(o.squareOrderId, \'\')) LIKE :q OR LOWER(COALESCE(o.squareInvoiceId, \'\')) LIKE :q',
             )->setParameter('q', '%'.mb_strtolower($q).'%');
         }
 

@@ -28,9 +28,14 @@ final class GuestCheckoutTest extends WebTestCase
         $this->fixtures = new CatalogFixtures($this->em);
         $this->gateway = $container->get(CheckoutGatewayInterface::class);
         $this->gateway->failCreateOrder = false;
+        $this->gateway->failInvoice = false;
+        $this->gateway->failCancelInvoice = false;
         $this->gateway->addedTaxCents = 0;
         $this->gateway->declineWith = null;
         $this->gateway->charges = [];
+        $this->gateway->paymentLinks = [];
+        $this->gateway->invoices = [];
+        $this->gateway->cancelledInvoices = [];
         $this->gateway->ready = true;
     }
 
@@ -204,7 +209,27 @@ final class GuestCheckoutTest extends WebTestCase
         self::assertNotSame('paid', $response['status'] ?? null);
         self::assertSame(0, $response['paidCents'] ?? null);
         self::assertNotEmpty($response['paymentUrl'] ?? null);
+        self::assertSame([], $this->gateway->invoices, 'guests without email keep the payment-link fallback');
         self::assertCount(1, $this->gateway->paymentLinks);
+    }
+
+    public function testGuestPayInStoreWithEmailCreatesASquareInvoice(): void
+    {
+        [$store, $item] = $this->storeWithStockedListing(stock: 2, priceCents: 500);
+        $this->gateway->ready = true;
+
+        $response = $this->jsonRequest('POST', "/api/stores/{$store->getSlug()}/guest/checkout/pay-in-store", [
+            'customerName' => 'Guest Shopper',
+            'customerEmail' => 'guest@example.com',
+            'fulfillment' => Order::FULFILLMENT_PICKUP,
+            'lines' => [['inventoryItemId' => $item->getId(), 'quantity' => 1]],
+        ]);
+
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        self::assertCount(1, $this->gateway->invoices);
+        self::assertSame([], $this->gateway->paymentLinks);
+        self::assertNotEmpty($response['squareInvoiceId'] ?? null);
+        self::assertNotEmpty($response['paymentUrl'] ?? null);
     }
 
     /** @return array{Store, InventoryItem} */

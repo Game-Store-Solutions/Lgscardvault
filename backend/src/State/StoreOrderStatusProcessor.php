@@ -12,6 +12,7 @@ use App\Enum\OrderStatus;
 use App\Repository\CustomerNotificationRepository;
 use App\Repository\UserRepository;
 use App\Service\Checkout\OrderStockReleaser;
+use App\Service\Checkout\PayInStoreFinalizer;
 use App\Service\Mail\TransactionalMailer;
 use App\Service\Order\OrderBalanceDueNotifier;
 use App\Service\Order\OrderPaymentAdjuster;
@@ -27,6 +28,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         private UserRepository $userRepository,
         private CustomerNotificationRepository $notificationRepository,
         private OrderStockReleaser $stockReleaser,
+        private PayInStoreFinalizer $payInStoreFinalizer,
         private TransactionalMailer $mail,
         private OrderPaymentAdjuster $paymentAdjuster,
         private OrderBalanceDueNotifier $balanceDueNotifier,
@@ -48,6 +50,7 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         $this->notifyOrderCancelledIfNeeded($data, $originalStatus);
 
         // Square refund first — if it fails, leave the order and stock alone.
+        $this->cancelPayInStoreInvoiceIfNeeded($data, $originalStatus);
         $this->refundSquarePaymentIfNeeded($data, $originalStatus);
         $this->releaseCasePoolsIfNeeded($data, $originalStatus);
         $this->clearBalanceDueAlertsIfNeeded($data, $originalStatus);
@@ -68,6 +71,23 @@ final readonly class StoreOrderStatusProcessor implements ProcessorInterface
         }
 
         return null;
+    }
+
+    private function cancelPayInStoreInvoiceIfNeeded(Order $order, mixed $originalStatus): void
+    {
+        if (!$order->getStatus()->returnsStock()) {
+            return;
+        }
+        if ($originalStatus instanceof OrderStatus && $originalStatus->returnsStock()) {
+            return;
+        }
+
+        $store = $order->getStore();
+        if (!$store instanceof Store) {
+            return;
+        }
+
+        $this->payInStoreFinalizer->cancelRemote($store, $order);
     }
 
     /**

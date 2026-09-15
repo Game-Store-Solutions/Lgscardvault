@@ -183,6 +183,16 @@ class Order
     #[Groups(['order:read'])]
     private ?string $squareOrderId = null;
 
+    /** Square Invoices API id for unpaid pay-in-store collect-at-register. */
+    #[ORM\Column(length: 191, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $squareInvoiceId = null;
+
+    /** Hosted Square invoice URL (POS Invoices + optional shopper pay page). */
+    #[ORM\Column(length: 1024, nullable: true)]
+    #[Groups(['order:read'])]
+    private ?string $squareInvoiceUrl = null;
+
     /**
      * Staff-facing checkout note, e.g. "Paying in store" for reserved pickup
      * orders that have not captured a Square payment yet.
@@ -473,6 +483,12 @@ class Order
             return $this;
         }
 
+        foreach ($this->normalizedPaymentCaptures() as $row) {
+            if ($row['id'] === $id) {
+                return $this;
+            }
+        }
+
         $this->paymentCaptures[] = [
             'id' => $id,
             'amountCents' => $amountCents,
@@ -582,6 +598,38 @@ class Order
         $this->squareOrderId = $squareOrderId;
 
         return $this;
+    }
+
+    public function getSquareInvoiceId(): ?string
+    {
+        return $this->squareInvoiceId;
+    }
+
+    public function setSquareInvoiceId(?string $squareInvoiceId): static
+    {
+        $trimmed = null !== $squareInvoiceId ? trim($squareInvoiceId) : '';
+        $this->squareInvoiceId = '' === $trimmed ? null : mb_substr($trimmed, 0, 191);
+
+        return $this;
+    }
+
+    public function getSquareInvoiceUrl(): ?string
+    {
+        return $this->squareInvoiceUrl;
+    }
+
+    public function setSquareInvoiceUrl(?string $squareInvoiceUrl): static
+    {
+        $trimmed = null !== $squareInvoiceUrl ? trim($squareInvoiceUrl) : '';
+        $this->squareInvoiceUrl = '' === $trimmed ? null : mb_substr($trimmed, 0, 1024);
+
+        return $this;
+    }
+
+    /** Reserved pickup that still needs to be collected at the counter. */
+    public function isUnpaidPayInStore(): bool
+    {
+        return self::NOTE_PAY_IN_STORE === $this->notes && $this->paidCents < 1;
     }
 
     public function getNotes(): ?string

@@ -11,7 +11,7 @@ final class CustomerOrderSerializer
     /** @return array<string, mixed> */
     public function serialize(Order $order): array
     {
-        return [
+        $payload = [
             'id' => $order->getId(),
             'reference' => $order->getReference(),
             'status' => $order->getStatus()->value,
@@ -33,6 +33,13 @@ final class CustomerOrderSerializer
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'lines' => array_map($this->serializeLine(...), $order->getLines()->toArray()),
         ];
+
+        $invoiceUrl = $order->isUnpaidPayInStore() ? $order->getSquareInvoiceUrl() : null;
+        if (null !== $invoiceUrl && '' !== $invoiceUrl) {
+            $payload['paymentUrl'] = $invoiceUrl;
+        }
+
+        return $payload;
     }
 
     /** @return array<string, mixed> */

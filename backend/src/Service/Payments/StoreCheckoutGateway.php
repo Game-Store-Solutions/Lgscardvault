@@ -408,19 +408,25 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         ];
 
         if ([] !== $lineItems) {
+            $taxCents = max(0, $amountCents - $this->merchandiseDue($lineItems, $creditCents));
+            $padded = SquareInvoiceMinimum::needsPad($amountCents);
             $payload['order'] = $this->squareOrderPayload(
                 $locationId,
-                $lineItems,
+                SquareInvoiceMinimum::invoiceLineItems($lineItems, $taxCents, $amountCents),
                 $creditCents,
                 $referenceId,
                 $buyerEmail,
                 $buyerName,
                 $fulfillment,
+                autoApplyTaxes: !$padded,
             );
         } else {
             $payload['quick_pay'] = [
                 'name' => mb_substr('Order '.$referenceId, 0, 255),
-                'price_money' => ['amount' => $amountCents, 'currency' => $this->credentials->currency()],
+                'price_money' => [
+                    'amount' => max($amountCents, SquareInvoiceMinimum::MIN_CENTS),
+                    'currency' => $this->credentials->currency(),
+                ],
                 'location_id' => $locationId,
             ];
         }
@@ -444,8 +450,187 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         ];
     }
 
+    public function createPayInStoreInvoice(
+        Store $store,
+        string $idempotencyKey,
+        string $referenceId,
+        array $lineItems,
+        int $creditCents = 0,
+        ?string $buyerEmail = null,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
+    ): array {
+        $email = trim((string) $buyerEmail);
+        if ('' === $email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('A customer email is required to create a Square invoice.');
+        }
+        if ([] === $lineItems) {
+            throw new \RuntimeException('There is nothing to invoice.');
+        }
+
+        $account = $this->connectedAccount($store);
+        if (null === $account) {
+            throw new \RuntimeException('This store is not accepting online payments right now.');
+        }
+
+        $locationId = (string) $account->getProviderLocationId();
+        if ('' === $locationId) {
+            throw new \RuntimeException('This store has not finished its payment setup.');
+        }
+
+        $customerId = $this->findOrCreateInvoiceCustomer($account, $email, $buyerName, $referenceId);
+
+        $calculated = $this->request($account, 'POST', '/v2/orders/calculate', [
+            'order' => $this->squareOrderPayload(
+                $locationId,
+                $lineItems,
+                $creditCents,
+                $referenceId,
+                $email,
+                $buyerName,
+                $fulfillment,
+            ),
+        ], flagCredentialError: false);
+
+        $explicitTaxes = $this->invoiceTaxesFromCalculatedOrder(
+            is_array($calculated['order'] ?? null) ? $calculated['order'] : [],
+        );
+
+        $totals = $this->totalsFromSquareOrder(
+            is_array($calculated['order'] ?? null) ? $calculated['order'] : null,
+            $this->merchandiseDue($lineItems, $creditCents),
+        );
+        $due = $totals['dueCents'];
+        $taxCents = $totals['taxCents'];
+        $padded = SquareInvoiceMinimum::needsPad($due);
+        $invoiceLines = SquareInvoiceMinimum::invoiceLineItems($lineItems, $taxCents, $due);
+        if ($padded) {
+            $this->logger->info('Padded Square invoice to $1.00 minimum', [
+                'store' => $store->getSlug(),
+                'reference' => $referenceId,
+                'amountDue' => $due,
+            ]);
+        }
+
+        $created = $this->createSquareOrder(
+            $account,
+            $idempotencyKey.'-order',
+            $this->squareOrderPayload(
+                $locationId,
+                $invoiceLines,
+                $creditCents,
+                $referenceId,
+                $email,
+                $buyerName,
+                // Invoices cannot be attached to Orders API fulfillments (pickup).
+                'invoice',
+                autoApplyTaxes: false,
+                // Padded invoices carry tax as a line so the $1 buffer is not taxed.
+                explicitTaxes: $padded ? [] : $explicitTaxes,
+                squareCustomerId: $customerId,
+            ),
+            flagCredentialError: false,
+        );
+
+        $today = (new \DateTimeImmutable('now', new \DateTimeZone('America/Los_Angeles')))->format('Y-m-d');
+        $draft = $this->request($account, 'POST', '/v2/invoices', [
+            'idempotency_key' => $idempotencyKey.'-invoice',
+            'invoice' => [
+                'location_id' => $locationId,
+                'order_id' => $created['id'],
+                'primary_recipient' => ['customer_id' => $customerId],
+                'delivery_method' => 'SHARE_MANUALLY',
+                'invoice_number' => $this->invoiceNumber($referenceId, $idempotencyKey),
+                'title' => mb_substr('Pickup '.$referenceId, 0, 255),
+                'description' => 'Pay in store at pickup — '.$referenceId,
+                'sale_or_service_date' => $today,
+                'payment_requests' => [[
+                    'request_type' => 'BALANCE',
+                    'due_date' => $today,
+                    'tipping_enabled' => false,
+                ]],
+                'accepted_payment_methods' => [
+                    'card' => true,
+                    'square_gift_card' => true,
+                    'cash_app_pay' => true,
+                    'bank_account' => false,
+                    'buy_now_pay_later' => false,
+                ],
+            ],
+        ], flagCredentialError: false);
+
+        $invoice = is_array($draft['invoice'] ?? null) ? $draft['invoice'] : [];
+        $invoiceId = trim((string) ($invoice['id'] ?? ''));
+        $version = (int) ($invoice['version'] ?? 0);
+        if ('' === $invoiceId) {
+            throw new \RuntimeException('Square did not return an invoice id.');
+        }
+
+        $published = $this->request($account, 'POST', '/v2/invoices/'.rawurlencode($invoiceId).'/publish', [
+            'version' => $version,
+            'idempotency_key' => $idempotencyKey.'-publish',
+        ], flagCredentialError: false);
+
+        $publishedInvoice = is_array($published['invoice'] ?? null) ? $published['invoice'] : $invoice;
+        $url = trim((string) ($publishedInvoice['public_url'] ?? $invoice['public_url'] ?? ''));
+
+        return [
+            'url' => '' !== $url ? $url : null,
+            'squareOrderId' => $created['id'],
+            'squareInvoiceId' => $invoiceId,
+        ];
+    }
+
+    public function cancelInvoice(Store $store, string $invoiceId): void
+    {
+        $invoiceId = trim($invoiceId);
+        if ('' === $invoiceId) {
+            return;
+        }
+
+        $account = $this->connectedAccount($store);
+        if (null === $account) {
+            return;
+        }
+
+        try {
+            $response = $this->request(
+                $account,
+                'GET',
+                '/v2/invoices/'.rawurlencode($invoiceId),
+                flagCredentialError: false,
+            );
+        } catch (\RuntimeException) {
+            return;
+        }
+
+        $invoice = is_array($response['invoice'] ?? null) ? $response['invoice'] : [];
+        $status = strtoupper((string) ($invoice['status'] ?? ''));
+        if ('PAID' === $status) {
+            throw new \RuntimeException('Square invoice is already paid.');
+        }
+        if (in_array($status, ['CANCELED', 'FAILED'], true)) {
+            return;
+        }
+
+        $version = (int) ($invoice['version'] ?? 0);
+        $this->request($account, 'POST', '/v2/invoices/'.rawurlencode($invoiceId).'/cancel', [
+            'version' => $version,
+        ], flagCredentialError: false);
+    }
+
+    /** Square invoice_number max 20 chars; derive from the idempotency key so retries stay stable. */
+    private function invoiceNumber(string $referenceId, string $idempotencyKey): string
+    {
+        $ref = preg_replace('/[^A-Za-z0-9-]/', '', $referenceId) ?: $referenceId;
+        $suffix = strtoupper(substr(hash('sha256', $idempotencyKey), 0, 4));
+
+        return mb_substr($ref.'-'.$suffix, 0, 20);
+    }
+
     /**
      * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     * @param list<array<string, mixed>>                                $explicitTaxes
      *
      * @return array<string, mixed>
      */
@@ -457,6 +642,9 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         ?string $buyerEmail,
         ?string $buyerName,
         string $fulfillment,
+        bool $autoApplyTaxes = true,
+        array $explicitTaxes = [],
+        ?string $squareCustomerId = null,
     ): array {
         $currency = $this->credentials->currency();
         $squareLines = [];
@@ -480,10 +668,16 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         $orderPayload = [
             'location_id' => $locationId,
             'line_items' => $squareLines,
-            'pricing_options' => [
-                'auto_apply_taxes' => true,
-            ],
         ];
+        if ($autoApplyTaxes) {
+            $orderPayload['pricing_options'] = ['auto_apply_taxes' => true];
+        }
+        if ([] !== $explicitTaxes) {
+            $orderPayload['taxes'] = $explicitTaxes;
+        }
+        if (null !== $squareCustomerId && '' !== $squareCustomerId) {
+            $orderPayload['customer_id'] = $squareCustomerId;
+        }
         if (null !== $referenceId && '' !== $referenceId) {
             $orderPayload['reference_id'] = substr($referenceId, 0, 40);
         }
@@ -518,6 +712,91 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
     }
 
     /**
+     * @param array<string, mixed> $order
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function invoiceTaxesFromCalculatedOrder(array $order): array
+    {
+        $taxes = [];
+        foreach ($order['taxes'] ?? [] as $i => $tax) {
+            if (!is_array($tax)) {
+                continue;
+            }
+            $entry = array_filter([
+                'uid' => isset($tax['uid']) ? (string) $tax['uid'] : 'tax-'.$i,
+                'name' => isset($tax['name']) ? mb_substr((string) $tax['name'], 0, 255) : 'Sales tax',
+                'type' => isset($tax['type']) ? (string) $tax['type'] : 'ADDITIVE',
+                'percentage' => isset($tax['percentage']) ? (string) $tax['percentage'] : null,
+                'catalog_object_id' => isset($tax['catalog_object_id']) ? (string) $tax['catalog_object_id'] : null,
+                'scope' => isset($tax['scope']) ? (string) $tax['scope'] : 'ORDER',
+            ], static fn (mixed $v): bool => null !== $v && '' !== $v);
+            if (isset($entry['percentage']) || isset($entry['catalog_object_id'])) {
+                $taxes[] = $entry;
+            }
+        }
+
+        if ([] !== $taxes) {
+            return $taxes;
+        }
+
+        $taxCents = isset($order['total_tax_money']['amount']) ? (int) $order['total_tax_money']['amount'] : 0;
+        $totalCents = isset($order['total_money']['amount']) ? (int) $order['total_money']['amount'] : 0;
+        $subtotal = max(0, $totalCents - $taxCents);
+        if ($taxCents < 1 || $subtotal < 1) {
+            return [];
+        }
+
+        return [[
+            'uid' => 'pickup-tax',
+            'name' => 'Sales tax',
+            'type' => 'ADDITIVE',
+            'percentage' => number_format(($taxCents / $subtotal) * 100, 4, '.', ''),
+            'scope' => 'ORDER',
+        ]];
+    }
+
+    private function findOrCreateInvoiceCustomer(
+        StorePaymentAccount $account,
+        string $email,
+        ?string $buyerName,
+        string $referenceId,
+    ): string {
+        try {
+            $found = $this->request($account, 'POST', '/v2/customers/search', [
+                'limit' => 1,
+                'query' => [
+                    'filter' => [
+                        'email_address' => ['exact' => $email],
+                    ],
+                ],
+            ], flagCredentialError: false);
+            $id = $found['customers'][0]['id'] ?? null;
+            if (is_string($id) && '' !== $id) {
+                return $id;
+            }
+        } catch (\RuntimeException) {
+            // Create below — a search miss or missing CUSTOMERS_READ must not kill pay-in-store.
+        }
+
+        $name = trim((string) $buyerName);
+        $payload = array_filter([
+            'idempotency_key' => bin2hex(random_bytes(16)),
+            'email_address' => $email,
+            'given_name' => '' !== $name ? mb_substr($name, 0, 255) : null,
+            'reference_id' => mb_substr($referenceId, 0, 40),
+        ], static fn (?string $value): bool => null !== $value && '' !== $value);
+
+        $response = $this->request($account, 'POST', '/v2/customers', $payload, flagCredentialError: false);
+        $id = $response['customer']['id'] ?? null;
+        if (!is_string($id) || '' === $id) {
+            throw new \RuntimeException('Could not create a Square customer for this invoice.');
+        }
+
+        return $id;
+    }
+
+    /**
      * @param array<string, mixed> $orderPayload
      *
      * @return array{id: string, taxCents: int, totalCents: int}
@@ -526,11 +805,12 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         StorePaymentAccount $account,
         string $idempotencyKey,
         array $orderPayload,
+        bool $flagCredentialError = true,
     ): array {
         $response = $this->request($account, 'POST', '/v2/orders', [
             'idempotency_key' => $idempotencyKey,
             'order' => $orderPayload,
-        ]);
+        ], flagCredentialError: $flagCredentialError);
 
         $order = $response['order'] ?? null;
         $orderId = is_array($order) ? ($order['id'] ?? null) : null;
@@ -805,8 +1085,13 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      *
      * @return array<string, mixed>
      */
-    private function request(StorePaymentAccount $account, string $method, string $path, array $body = []): array
-    {
+    private function request(
+        StorePaymentAccount $account,
+        string $method,
+        string $path,
+        array $body = [],
+        bool $flagCredentialError = true,
+    ): array {
         $accessToken = $this->accessToken($account);
 
         try {
@@ -832,7 +1117,7 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
         $payload = is_array($decoded) ? $decoded : [];
 
         if ($status >= 400) {
-            throw new \RuntimeException($this->errorMessage($account, $payload));
+            throw new \RuntimeException($this->errorMessage($account, $payload, $flagCredentialError));
         }
 
         return $payload;
@@ -845,24 +1130,37 @@ final class StoreCheckoutGateway implements CheckoutGatewayInterface
      *
      * @param array<string, mixed> $payload
      */
-    private function errorMessage(StorePaymentAccount $account, array $payload): string
+    private function errorMessage(StorePaymentAccount $account, array $payload, bool $flagCredentialError = true): string
     {
         $error = is_array($payload['errors'][0] ?? null) ? $payload['errors'][0] : [];
         $category = (string) ($error['category'] ?? '');
         $detail = trim((string) ($error['detail'] ?? ''));
 
         if (in_array($category, ['AUTHENTICATION_ERROR', 'AUTHORIZATION_ERROR'], true)) {
-            $account->setLastError($detail ?: 'Square rejected the store credentials.');
-            $this->entityManager->flush();
+            if ($flagCredentialError) {
+                $account->setLastError($detail ?: 'Square rejected the store credentials.');
+                $this->entityManager->flush();
+            }
 
-            return 'This store is not accepting online payments right now.';
+            return $flagCredentialError
+                ? 'This store is not accepting online payments right now.'
+                : ($detail !== '' ? $detail : 'Square rejected this request.');
         }
 
         if ('PAYMENT_METHOD_ERROR' === $category && '' !== $detail) {
             return $detail;
         }
 
-        $this->logger->error('Square declined a checkout payment', ['category' => $category, 'detail' => $detail]);
+        $code = trim((string) ($error['code'] ?? ''));
+        $label = '' !== $detail ? $detail : $code;
+        $this->logger->error(
+            'Square declined a checkout payment: '.('' !== $label ? $label : $category),
+            ['category' => $category, 'code' => $code, 'detail' => $detail],
+        );
+
+        if (!$flagCredentialError && '' !== $label) {
+            return $label;
+        }
 
         return 'Your payment could not be completed. Please try another card.';
     }

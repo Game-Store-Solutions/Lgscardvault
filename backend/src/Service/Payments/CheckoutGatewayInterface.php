@@ -79,6 +79,33 @@ interface CheckoutGatewayInterface
     public function refund(Store $store, string $paymentId, int $amountCents, string $idempotencyKey, ?string $reason = null): array;
 
     /**
+     * Unpaid pickup invoice that appears under Square POS → Invoices so staff
+     * can collect on the register. The order must not use auto-applied taxes.
+     *
+     * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems
+     *
+     * @return array{url: string|null, squareOrderId: string, squareInvoiceId: string}
+     *
+     * @throws \RuntimeException when Square is not ready, the buyer has no email, or Square declines
+     */
+    public function createPayInStoreInvoice(
+        Store $store,
+        string $idempotencyKey,
+        string $referenceId,
+        array $lineItems,
+        int $creditCents = 0,
+        ?string $buyerEmail = null,
+        ?string $buyerName = null,
+        string $fulfillment = 'pickup',
+    ): array;
+
+    /**
+     * Drop an unpaid invoice (and its Square order) so it leaves the register list.
+     * Paid or missing invoices are a no-op.
+     */
+    public function cancelInvoice(Store $store, string $invoiceId): void;
+
+    /**
      * Square-hosted checkout page (and QR) for an unpaid pickup order.
      *
      * @param list<array{name: string, quantity: int, priceCents: int}> $lineItems

@@ -352,12 +352,20 @@ final class StorePaymentController extends AbstractController
             'environment' => $account->getEnvironment(),
             'merchantId' => $account->getProviderMerchantId(),
             'locationId' => $account->getProviderLocationId(),
+            'invoicesEnabled' => $this->accountHasInvoiceScope($account),
             'scopes' => $account->getScopes(),
             'tokenExpiresAt' => $account->getTokenExpiresAt()?->format(DATE_ATOM),
             'connectedAt' => $account->getConnectedAt()?->format(DATE_ATOM),
             'disconnectedAt' => $account->getDisconnectedAt()?->format(DATE_ATOM),
             'lastError' => $account->getLastError(),
         ];
+    }
+
+    private function accountHasInvoiceScope(StorePaymentAccount $account): bool
+    {
+        $scopes = array_map('strtoupper', $account->getScopes());
+
+        return in_array('INVOICES_WRITE', $scopes, true);
     }
 
     private function redirectToAdminPayments(string $storeSlug, string $status, string $provider = 'square'): RedirectResponse

@@ -32,6 +32,8 @@ final class StoreOrderReadSerializer
             'disputeReason' => $order->getDisputeReason(),
             'disputedAt' => $order->getDisputedAt()?->format(DATE_ATOM),
             'squareOrderId' => $order->getSquareOrderId(),
+            'squareInvoiceId' => $order->getSquareInvoiceId(),
+            'squareInvoiceUrl' => $order->getSquareInvoiceUrl(),
             'createdAt' => $order->getCreatedAt()->format(DATE_ATOM),
             'statusChangedAt' => $order->getStatusChangedAt()?->format(DATE_ATOM),
             'lines' => array_values(array_map(

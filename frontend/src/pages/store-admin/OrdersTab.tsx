@@ -1446,6 +1446,38 @@ function OrderDetailModal({
                 Note: <span className="font-semibold text-fg">{order.notes}</span>
               </p>
             ) : null}
+            {order.notes === 'Paying in store' && (order.paidCents ?? 0) < 1 ? (
+              order.squareInvoiceId ? (
+              <div className="mt-3 space-y-1 rounded-lg bg-brand-500/10 px-3 py-2 text-sm text-fg">
+                <p className="font-semibold">On the Square register</p>
+                <p className="text-fg-muted">
+                  Open <span className="font-semibold text-fg">More → Invoices</span> on Square POS, find{' '}
+                  <span className="font-mono font-semibold text-fg">{order.reference}</span>, then Add payment.
+                </p>
+                {(order.totalCents ?? 0) + (order.taxCents ?? 0) - (order.creditAppliedCents ?? 0) < 100 ? (
+                  <p className="text-warning-800">
+                    Square invoice includes a line named{' '}
+                    <span className="font-semibold">DELETE THIS — Square $1 minimum (do not charge)</span>.
+                    Remove that line on the Invoices tab before collecting, or the register will charge $1.00.
+                  </p>
+                ) : null}
+                {order.squareInvoiceUrl ? (
+                  <a
+                    href={order.squareInvoiceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex text-sm font-semibold text-brand-600 hover:underline"
+                  >
+                    Open Square invoice
+                  </a>
+                ) : null}
+              </div>
+              ) : (
+              <p className="mt-3 rounded-lg bg-warning-50 px-3 py-2 text-sm text-warning-800">
+                Square did not create an invoice for this hold. Collect at the counter.
+              </p>
+              )
+            ) : null}
             {order.disputeStatus ? (
               <div className="mt-3 space-y-2 rounded-xl border border-danger-500/30 bg-danger-50 p-3 text-sm text-danger-800">
                 <p className="font-bold">
