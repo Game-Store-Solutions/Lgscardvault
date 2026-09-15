@@ -1341,7 +1341,43 @@ function OrderDetailModal({
       open
       onClose={onClose}
       title={<span className="font-mono text-lg tracking-tight sm:text-xl">{order.reference}</span>}
-      className="max-w-3xl"
+      className="max-h-[min(52rem,calc(100dvh-1.5rem))] max-w-3xl"
+      bodyClassName="ui-overlay-scroll"
+      footer={
+        <div className="flex w-full flex-col gap-2">
+          {actions.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {actions.map(({ status, label, icon: Icon }) => (
+                <Button
+                  key={status}
+                  variant={status === 'cancelled' || status === 'refunded' ? 'secondary' : 'primary'}
+                  onClick={() => onUpdateStatus(status)}
+                  loading={pendingStatus === status}
+                  className={actions.length === 1 ? 'sm:col-span-2' : undefined}
+                >
+                  <Icon aria-hidden className="size-4" />
+                  {label}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-bg px-4 py-3 text-sm text-fg-muted">This order is in a terminal status.</p>
+          )}
+          <Button
+            variant="secondary"
+            className="w-full"
+            size="lg"
+            onClick={() => {
+              void printOrderSheet(order, slug).then((updated) => {
+                if ((updated.taxCents ?? 0) !== (order.taxCents ?? 0)) persistOrder(updated)
+              })
+            }}
+          >
+            <Printer aria-hidden className="size-4" />
+            Print order sheet
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-5 sm:space-y-6">
         <OrderStatusSelect
@@ -1594,37 +1630,6 @@ function OrderDetailModal({
             </p>
           )}
         </div>
-        {actions.length > 0 ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {actions.map(({ status, label, icon: Icon }) => (
-              <Button
-                key={status}
-                variant={status === 'cancelled' || status === 'refunded' ? 'secondary' : 'primary'}
-                onClick={() => onUpdateStatus(status)}
-                loading={pendingStatus === status}
-                className={actions.length === 1 ? 'sm:col-span-2' : undefined}
-              >
-                <Icon aria-hidden className="size-4" />
-                {label}
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-xl bg-bg px-4 py-3 text-sm text-fg-muted">This order is in a terminal status.</p>
-        )}
-        <Button
-          variant="secondary"
-          className="w-full"
-          size="lg"
-          onClick={() => {
-            void printOrderSheet(order, slug).then((updated) => {
-              if ((updated.taxCents ?? 0) !== (order.taxCents ?? 0)) persistOrder(updated)
-            })
-          }}
-        >
-          <Printer aria-hidden className="size-4" />
-          Print order sheet
-        </Button>
         {Boolean(error) && (
           <p role="alert" className="rounded-xl bg-danger-50 px-4 py-3 text-sm text-danger-700">
             Could not update this order. Please try again.

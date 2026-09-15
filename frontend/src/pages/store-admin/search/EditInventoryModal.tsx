@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
-import { AlertTriangle, Search, TrendingUp } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, RefreshCw, RotateCw, Search, TrendingUp } from 'lucide-react'
 import { cardImage, formatPrice, parsePriceInput } from '../../../api/client'
-import type { CardSummary, InventoryItem } from '../../../api/types'
+import type { CardFace, CardSummary, InventoryItem } from '../../../api/types'
 import { Button, Field, Input, Modal, Skeleton } from '../../../components/ui'
-import { InteractiveCard } from '../../../components/cards'
+import { FlipCard, InteractiveCard } from '../../../components/cards'
 import { Stagger, StaggerItem } from '../../../components/motion'
 import { CONDITION_LABELS, ConditionSegmented, FinishPicker, QuantityStepper, type Condition } from '../../../components/inventory'
 import { rarityAccent } from '../../../lib/mtg'
@@ -11,6 +11,12 @@ import { defaultFinishFor, finishOptions, isFoilFinish } from '../../../lib/fini
 import { listingMarketSummary } from '../../../lib/marketFinishes'
 import { useCardPrintings } from '../../../hooks'
 import { PrintingGrid } from '../recovery/PrintingGrid'
+
+const ROTATE_LAYOUTS: Record<string, number> = { flip: 180, split: 90, aftermath: 90 }
+
+function faceImage(face: CardFace): string | undefined {
+  return cardImage(face)
+}
 
 /** Payload emitted when saving an inventory edit (shared with the update mutation). */
 export interface InventoryEditPayload {
@@ -55,10 +61,23 @@ function EditInventoryModalBody({
   const [editCondition, setEditCondition] = useState<Condition>(item.condition)
   const [editFinish, setEditFinish] = useState(item.finish || defaultFinishFor(item.card))
   const [variantQuery, setVariantQuery] = useState('')
+  const [faceIndex, setFaceIndex] = useState(0)
 
   const printingsQuery = useCardPrintings(item.card.id)
   const printings = printingsQuery.data ?? []
   const otherPrintings = printings.filter((card) => card.id !== item.card.id)
+
+  useEffect(() => {
+    const full = printings.find((card) => card.id === editSelectedCard.id)
+    if (!full) return
+    const richerFaces = (full.cardFaces?.length ?? 0) > (editSelectedCard.cardFaces?.length ?? 0)
+    const richerLayout = Boolean(full.layout) && !editSelectedCard.layout
+    if (richerFaces || richerLayout) setEditSelectedCard(full)
+  }, [printings, editSelectedCard.id, editSelectedCard.cardFaces?.length, editSelectedCard.layout])
+
+  useEffect(() => {
+    setFaceIndex(0)
+  }, [editSelectedCard.id])
 
   const visiblePrintings = useMemo(() => {
     const needle = variantQuery.trim().toLowerCase()
@@ -106,6 +125,14 @@ function EditInventoryModalBody({
     if (marketCents !== null) setEditPriceText(formatPrice(marketCents))
   }
 
+  const faces = editSelectedCard.cardFaces ?? []
+  const twoSided = faces.filter((face) => faceImage(face)).length >= 2
+  const rotateDeg = editSelectedCard.layout ? ROTATE_LAYOUTS[editSelectedCard.layout] : undefined
+  const rotatable = !twoSided && rotateDeg !== undefined && faces.length >= 2
+  const multiFace = twoSided || rotatable
+  const flipped = multiFace && faceIndex % 2 === 1
+  const nextFace = faces.length >= 2 ? faces[(faceIndex + 1) % faces.length] : undefined
+
   return (
     <Modal
       open
@@ -140,13 +167,37 @@ function EditInventoryModalBody({
       <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
           <div className="rounded-3xl bg-bg/70 p-4 ring-1 ring-black/[0.04] dark:ring-white/10 sm:p-5">
-            <InteractiveCard
-              image={cardImage(editSelectedCard)}
-              alt={editSelectedCard.name}
-              foil={editIsFoil}
-              accent={rarityAccent(editSelectedCard.rarity)}
-              maxTilt={12}
-            />
+            {multiFace ? (
+              <FlipCard
+                frontImage={faceImage(faces[0]) ?? cardImage(editSelectedCard)}
+                backImage={twoSided ? faceImage(faces[1]) : undefined}
+                rotateDeg={rotateDeg}
+                flipped={flipped}
+                onToggle={() => setFaceIndex((index) => index + 1)}
+                alt={editSelectedCard.name}
+                foil={editIsFoil}
+                accent={rarityAccent(editSelectedCard.rarity)}
+              />
+            ) : (
+              <InteractiveCard
+                image={cardImage(editSelectedCard)}
+                alt={editSelectedCard.name}
+                foil={editIsFoil}
+                accent={rarityAccent(editSelectedCard.rarity)}
+                maxTilt={12}
+              />
+            )}
+            {multiFace ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3 w-full"
+                onClick={() => setFaceIndex((index) => index + 1)}
+              >
+                {twoSided ? <RefreshCw aria-hidden className="size-4" /> : <RotateCw aria-hidden className="size-4" />}
+                {twoSided ? `Flip to ${nextFace?.name ?? 'back'}` : 'Rotate face'}
+              </Button>
+            ) : null}
             <div className="mt-4 space-y-1">
               <p className="font-display text-lg font-bold leading-snug tracking-tight text-fg">
                 {editSelectedCard.name}
