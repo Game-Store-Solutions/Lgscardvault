@@ -77,7 +77,7 @@ export function ProfileActivityFeed({
 
 function OrderRow({ order, onOpenOrders }: { order: Order; onOpenOrders: (orderId?: number) => void }) {
   const count = orderItemCount(order)
-  const thumbs = (order.lines ?? []).map(orderLineImage).filter(Boolean).slice(0, 2) as string[]
+  const thumbs = (order.lines ?? []).map((line) => orderLineImage(line)).filter(Boolean).slice(0, 2) as string[]
   const extra = Math.max(0, (order.lines?.length ?? 0) - thumbs.length)
 
   return (

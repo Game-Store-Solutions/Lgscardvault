@@ -350,6 +350,28 @@ class Card
         return $this->imageUris;
     }
 
+    /**
+     * Image URIs the UI can actually render. Transform / modal DFCs have no
+     * top-level Scryfall image_uris — the art lives on each face.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolvedImageUris(): ?array
+    {
+        if (is_array($this->imageUris) && [] !== $this->imageUris) {
+            return $this->imageUris;
+        }
+
+        foreach ($this->getCardFaces() as $face) {
+            $uris = $face['imageUris'] ?? null;
+            if (is_array($uris) && [] !== $uris) {
+                return $uris;
+            }
+        }
+
+        return null;
+    }
+
     /** @param array<string, mixed>|null $imageUris */
     public function setImageUris(?array $imageUris): static
     {
@@ -632,16 +654,16 @@ class Card
     #[Groups(['card:read', 'inventory:read'])]
     public function getImageUrl(): ?string
     {
-        $topLevel = $this->imageUris['large'] ?? $this->imageUris['normal'] ?? $this->imageUris['small'] ?? null;
-        if (null !== $topLevel) {
-            return $topLevel;
+        $uris = $this->resolvedImageUris();
+        $fromUris = is_array($uris)
+            ? ($uris['large'] ?? $uris['normal'] ?? $uris['small'] ?? null)
+            : null;
+        if (is_string($fromUris) && '' !== $fromUris) {
+            return $fromUris;
         }
 
-        // Double-faced cards (transform, modal_dfc, flip, …) carry no top-level
-        // image_uris; the art lives on each face. Fall back to the front face so
-        // these cards still render a thumbnail everywhere.
         foreach ($this->getCardFaces() as $face) {
-            if (isset($face['imageUrl']) && '' !== $face['imageUrl']) {
+            if (isset($face['imageUrl']) && is_string($face['imageUrl']) && '' !== $face['imageUrl']) {
                 return $face['imageUrl'];
             }
         }

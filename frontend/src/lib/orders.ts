@@ -78,9 +78,37 @@ export function orderStatusTimestamp(order: Pick<Order, 'status' | 'createdAt' |
   return placed
 }
 
-export function orderLineImage(line: OrderLine): string | undefined {
-  return cardImage({
-    imageUrl: line.imageUrl ?? undefined,
-    imageUris: line.imageUris ?? undefined,
-  })
+export function orderLineImage(line: OrderLine, opts?: { quality?: 'display' | 'full' }): string | undefined {
+  return cardImage(
+    {
+      imageUrl: line.imageUrl ?? undefined,
+      imageUris: line.imageUris ?? undefined,
+      cardFaces: line.cardFaces ?? undefined,
+    },
+    opts,
+  )
+}
+
+const ROTATE_LAYOUTS: Record<string, number> = { flip: 180, split: 90, aftermath: 90 }
+
+export type OrderLineFaceArt = { name?: string; image: string }
+
+/** Faces that have their own art — transform / modal DFCs. */
+export function orderLineFaceArt(line: OrderLine): OrderLineFaceArt[] {
+  const faces: OrderLineFaceArt[] = []
+  for (const face of line.cardFaces ?? []) {
+    const image = cardImage({
+      imageUrl: face.imageUrl,
+      imageUris: face.imageUris,
+    })
+    if (!image) continue
+    faces.push({ name: face.name, image })
+  }
+  return faces
+}
+
+export function orderLineRotateDeg(line: OrderLine): number | undefined {
+  const layout = line.layout?.trim()
+  if (!layout) return undefined
+  return ROTATE_LAYOUTS[layout]
 }

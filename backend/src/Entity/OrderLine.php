@@ -273,11 +273,66 @@ class OrderLine
     public function getImageUris(): ?array
     {
         $sealedImage = $this->sealedProduct?->getImageUrl();
-        if (null !== $sealedImage) {
+        if (null !== $sealedImage && '' !== $sealedImage) {
             return ['small' => $sealedImage, 'normal' => $sealedImage];
         }
 
-        return $this->card?->getImageUris();
+        return $this->card?->resolvedImageUris();
+    }
+
+    #[Groups(['order:read'])]
+    public function getImageUrl(): ?string
+    {
+        $sealedImage = $this->sealedProduct?->getImageUrl();
+        if (null !== $sealedImage && '' !== $sealedImage) {
+            return $sealedImage;
+        }
+
+        return $this->card?->getImageUrl();
+    }
+
+    /**
+     * Front/back art so the order UI can flip transform / modal DFCs.
+     *
+     * @return list<array{name: ?string, imageUrl: ?string, imageUris: ?array<string, mixed>}>
+     */
+    #[Groups(['order:read'])]
+    public function getCardFaces(): array
+    {
+        $faces = [];
+        foreach ($this->card?->getCardFaces() ?? [] as $face) {
+            $imageUris = isset($face['imageUris']) && is_array($face['imageUris']) ? $face['imageUris'] : null;
+            $imageUrl = isset($face['imageUrl']) && is_string($face['imageUrl']) && '' !== $face['imageUrl']
+                ? $face['imageUrl']
+                : null;
+            $name = isset($face['name']) && is_string($face['name']) && '' !== $face['name']
+                ? $face['name']
+                : null;
+            if (null === $imageUris && null === $imageUrl && null === $name) {
+                continue;
+            }
+
+            $faces[] = [
+                'name' => $name,
+                'imageUrl' => $imageUrl,
+                'imageUris' => $imageUris,
+            ];
+        }
+
+        return $faces;
+    }
+
+    #[Groups(['order:read'])]
+    public function getLayout(): ?string
+    {
+        $layout = $this->card?->getLayout();
+        if (is_string($layout) && '' !== $layout) {
+            return $layout;
+        }
+
+        $fromPayload = $this->card?->getScryfallData()['layout'] ?? null;
+
+        return is_string($fromPayload) && '' !== $fromPayload ? $fromPayload : null;
     }
 
     #[Groups(['order:read'])]

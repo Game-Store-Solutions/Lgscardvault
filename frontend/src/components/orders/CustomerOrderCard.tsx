@@ -10,6 +10,7 @@ import {
   orderLineImage,
 } from '../../lib/orders'
 import { CardImage } from '../cards/CardImage'
+import { OrderLineArt } from './OrderLineArt'
 import { OrderLineList } from './OrderLineList'
 import { OrderBalanceDuePaypal } from './OrderBalanceDuePaypal'
 import { OrderStatusBadge } from './OrderStatusBadge'
@@ -37,7 +38,7 @@ export function CustomerOrderCard({
   const previewLines = (order.lines ?? []).slice(0, 3)
   const storeHref = order.storeSlug ? `/s/${order.storeSlug}` : undefined
   const lines = order.lines ?? []
-  const thumbs = lines.map(orderLineImage).filter(Boolean).slice(0, 2) as string[]
+  const thumbs = lines.map((line) => orderLineImage(line)).filter(Boolean).slice(0, 2) as string[]
   const extra = Math.max(0, lines.length - thumbs.length)
   const closed = isClosedOrderStatus(order.status)
   const primary = lines[0]
@@ -222,15 +223,9 @@ function CompactReceiptLines({ lines }: { lines: OrderLine[] }) {
   return (
     <ul className="divide-y divide-border">
       {lines.map((line) => {
-        const image = orderLineImage(line)
         return (
           <li key={line.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-            <CardImage
-              src={image}
-              alt={line.cardName}
-              showLabel={false}
-              className="h-24 w-[4.25rem] shrink-0 rounded-lg sm:h-28 sm:w-20"
-            />
+            <OrderLineArt line={line} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-fg">{line.cardName}</p>
               <p className="mt-0.5 text-xs text-fg-muted">
@@ -279,7 +274,7 @@ function ThumbStack({ thumbs, extra }: { thumbs: string[]; extra: number }) {
 }
 
 function CardThumb({ line }: { line: OrderLine }) {
-  const image = line.imageUris?.small ?? line.imageUris?.normal ?? line.imageUrl ?? undefined
+  const image = orderLineImage(line)
   return (
     <span className="grid h-14 w-10 place-items-center overflow-hidden rounded-btn border border-border bg-bg ring-2 ring-surface">
       {image ? <img src={image} alt="" className="size-full object-cover" /> : <span className="text-xs font-bold text-fg-muted">?</span>}
