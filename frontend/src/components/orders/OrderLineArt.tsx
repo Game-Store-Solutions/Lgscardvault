@@ -1,15 +1,75 @@
-import { useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ImageOff, RefreshCw, RotateCw } from 'lucide-react'
+import { cardArtDelivery } from '../../api/client'
 import type { OrderLine } from '../../api/types'
 import { cx } from '../../lib/cx'
 import { orderLineFaceArt, orderLineImage, orderLineRotateDeg } from '../../lib/orders'
 
+function ThumbImg({
+  src,
+  alt,
+  className,
+  style,
+  priority,
+}: {
+  src: string
+  alt: string
+  className?: string
+  style?: CSSProperties
+  priority?: boolean
+}) {
+  const delivery = useMemo(() => cardArtDelivery(src, 'thumb'), [src])
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
+
+  useLayoutEffect(() => {
+    setStatus('loading')
+    const img = imgRef.current
+    if (!img?.complete) return
+    setStatus(img.naturalWidth > 0 ? 'ready' : 'failed')
+  }, [delivery.src])
+
+  if (status === 'failed') {
+    return (
+      <span className={cx('grid place-items-center', className)} style={style}>
+        <ImageOff aria-hidden className="size-4 text-fg-muted" />
+      </span>
+    )
+  }
+
+  return (
+    <img
+      ref={imgRef}
+      src={delivery.src}
+      srcSet={delivery.srcSet}
+      sizes="(min-width: 640px) 104px, 80px"
+      alt={alt}
+      width={146}
+      height={204}
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : 'auto'}
+      decoding="async"
+      onLoad={() => setStatus('ready')}
+      onError={() => setStatus('failed')}
+      className={cx(
+        'object-cover transition-opacity duration-200',
+        status === 'ready' ? 'opacity-100' : 'opacity-0',
+        className,
+      )}
+      style={style}
+    />
+  )
+}
+
 export function OrderLineArt({
   line,
   compact = false,
+  priority = false,
 }: {
   line: OrderLine
   compact?: boolean
+  /** Above-the-fold thumbs should start immediately, not wait for lazy. */
+  priority?: boolean
 }) {
   const [faceIndex, setFaceIndex] = useState(0)
   const faces = orderLineFaceArt(line)
@@ -41,25 +101,28 @@ export function OrderLineArt({
           transform: `rotateY(${flipped ? 180 : 0}deg)`,
         }}
       >
-        <img
+        <ThumbImg
           src={faces[0].image}
-          alt={faces[0].name ?? line.cardName}
-          className="absolute inset-0 size-full object-cover"
+          alt=""
+          priority={priority}
+          className="absolute inset-0 size-full"
           style={{ backfaceVisibility: 'hidden' }}
         />
-        <img
+        <ThumbImg
           src={faces[1].image}
-          alt={faces[1].name ?? line.cardName}
-          className="absolute inset-0 size-full object-cover"
+          alt=""
+          priority={priority}
+          className="absolute inset-0 size-full"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         />
       </span>
     </span>
   ) : image ? (
-    <img
+    <ThumbImg
       src={image}
-      alt={line.cardName}
-      className="size-full object-cover transition-transform duration-500 ease-out"
+      alt=""
+      priority={priority}
+      className="size-full transition-transform duration-500 ease-out"
       style={rotatable ? { transform: `rotate(${flipped ? rotateDeg : 0}deg)` } : undefined}
     />
   ) : (
@@ -69,7 +132,7 @@ export function OrderLineArt({
   const badge = canFlip ? (
     <span
       className={cx(
-        'pointer-events-none absolute right-1 grid place-items-center rounded-full bg-black/75 text-white shadow-sm',
+        'pointer-events-none absolute right-1 z-[1] grid place-items-center rounded-full bg-black/75 text-white shadow-sm',
         compact ? 'top-0.5 size-5' : 'top-1 size-6',
       )}
     >
@@ -83,15 +146,26 @@ export function OrderLineArt({
 
   const caption =
     !compact && twoSided && current?.name ? (
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[0.6rem] font-semibold leading-tight text-white">
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-black/65 px-1 py-0.5 text-center text-[0.6rem] font-semibold leading-tight text-white">
         {current.name}
       </span>
     ) : null
 
+  const body = (
+    <>
+      {image || twoSided ? (
+        <span aria-hidden className="pointer-events-none absolute inset-0 skeleton-shimmer" />
+      ) : null}
+      {art}
+      {caption}
+      {badge}
+    </>
+  )
+
   if (!canFlip) {
     return (
-      <span className={frame}>
-        {art}
+      <span className={frame} aria-hidden>
+        {body}
       </span>
     )
   }
@@ -108,9 +182,7 @@ export function OrderLineArt({
       }
       className={cx(frame, 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500')}
     >
-      {art}
-      {caption}
-      {badge}
+      {body}
     </button>
   )
 }

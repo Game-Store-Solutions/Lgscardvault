@@ -27,7 +27,7 @@ export function OrderLineList({
 
   return (
     <div className={cx('grid min-w-0', compact ? 'divide-y divide-border' : 'gap-2', className)}>
-      {lines.map((line) => {
+      {lines.map((line, index) => {
         const busy = busyLineId === line.id
         const setCode = typeof line.setCode === 'string' ? line.setCode : ''
         return (
@@ -38,7 +38,7 @@ export function OrderLineList({
               compact ? 'px-0 py-2.5' : 'rounded-btn border border-border bg-surface px-3 py-2',
             )}
           >
-            <OrderLineArt line={line} compact={compact} />
+            <OrderLineArt line={line} compact={compact} priority={index < 8} />
             <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm font-bold leading-snug text-fg [overflow-wrap:anywhere]">{line.cardName}</p>

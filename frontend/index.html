@@ -30,9 +30,43 @@
           var saved = localStorage.getItem('theme')
           var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
           document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.backgroundColor = dark ? '#0a0a0b' : '#f3f4f6'
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
         } catch (e) {}
       })()
     </script>
+    <style>
+      /*
+        Crawler HTML is injected into #root on prerendered routes. Hide it until
+        React replaces the node so a refresh never paints unstyled marketing copy
+        over admin / app screens. Production nginx falls back to spa.html (empty
+        root) for those URLs; this CSS covers /stores, /for-stores, and local preview.
+      */
+      #root[data-prerender] > * {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+    </style>
+    <noscript>
+      <style>
+        #root[data-prerender] > * {
+          position: static !important;
+          width: auto !important;
+          height: auto !important;
+          margin: 0 !important;
+          overflow: visible !important;
+          clip: auto !important;
+          white-space: normal !important;
+        }
+      </style>
+    </noscript>
   </head>
   <body>
     <style>

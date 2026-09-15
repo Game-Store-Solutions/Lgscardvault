@@ -16,8 +16,8 @@ export interface CardImageProps {
   label?: string
   /** Override lazy loading (e.g. above-the-fold hero). */
   loading?: 'lazy' | 'eager'
-  /** `full` keeps the large Scryfall face (inspect overlays). */
-  quality?: 'display' | 'full'
+  /** `thumb` uses Scryfall small; `full` keeps the large face. */
+  quality?: 'thumb' | 'display' | 'full'
 }
 
 /**

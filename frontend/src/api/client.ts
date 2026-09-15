@@ -208,15 +208,18 @@ export function cardImageUrl(
   return cardImage(card, opts) ?? ''
 }
 
+export type CardArtQuality = 'thumb' | 'display' | 'full'
+
 /**
- * Fast first paint + sharp display: use `normal` as `src` (1x), and offer
- * `large` as the 2x candidate so retina tiles look sharp without forcing PNG
- * or a large download on every 1x thumbnail. `full` skips the 1x downgrade
- * so inspect overlays can show the large face.
+ * Fast first paint + sharp display.
+ *
+ * - `thumb` — Scryfall `small` (1x) / `normal` (2x) for list tiles (~80–104px)
+ * - `display` — `normal` (1x) / `large` (2x) for marketplace cards
+ * - `full` — `large` only, for inspect overlays
  */
 export function cardArtDelivery(
   imageUrl: string,
-  quality: 'display' | 'full' = 'display',
+  quality: CardArtQuality = 'display',
 ): { src: string; srcSet?: string } {
   const base = imageUrl.split('#')[0] ?? imageUrl
   if (!base.includes('cards.scryfall.io')) {
@@ -227,6 +230,16 @@ export function cardArtDelivery(
     return { src: large }
   }
   const normal = scryfallSize(base, 'normal')
+  if (quality === 'thumb') {
+    const small = scryfallSize(base, 'small')
+    if (small === normal) {
+      return { src: small }
+    }
+    return {
+      src: small,
+      srcSet: `${small} 1x, ${normal} 2x`,
+    }
+  }
   if (normal === large) {
     return { src: normal }
   }

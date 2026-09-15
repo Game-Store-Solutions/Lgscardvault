@@ -114,8 +114,17 @@ function applyMeta(html, route) {
     process.exit(1)
   }
 
-  return next.replace('<div id="root"></div>', `<div id="root">${route.body.trim()}</div>`)
+  return next.replace(
+    '<div id="root"></div>',
+    `<div id="root" data-prerender>${route.body.trim()}</div>`,
+  )
 }
+
+// Empty-root shell for client-side routes. nginx falls back here instead of
+// the prerendered homepage, so a refresh on /s/:slug/admin does not paint
+// "Build your vault."
+fs.writeFileSync(path.join(distDir, 'spa.html'), baseHtml)
+console.log('prerender-routes: wrote /spa.html (SPA fallback shell)')
 
 for (const route of routes) {
   const outDir = route.path === '/' ? distDir : path.join(distDir, route.path.slice(1))
