@@ -12,14 +12,17 @@ export interface ModalProps {
   children: ReactNode
   footer?: ReactNode
   className?: string
+  /** Applied to the scrolling body (e.g. overlay scrollbars on tall dialogs). */
+  bodyClassName?: string
   /** Applied to the full-screen overlay (e.g. raise above cookie banners). */
   overlayClassName?: string
 }
 
-export function Modal({ open, onClose, title, children, footer, className, overlayClassName }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, className, bodyClassName, overlayClassName }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const hasMaxWidth = className != null && /\bmax-w-/.test(className)
+  const hasMaxHeight = className != null && /\bmax-h-/.test(className)
 
   useEffect(() => {
     if (!open) return
@@ -72,7 +75,8 @@ export function Modal({ open, onClose, title, children, footer, className, overl
               exit={{ opacity: 0, y: 10, scale: 0.985 }}
               transition={{ duration: 0.24, ease: EASE_PREMIUM }}
               className={cx(
-                'relative z-10 flex max-h-[min(40rem,calc(100dvh-2.5rem))] w-full flex-col overflow-hidden',
+                'relative z-10 flex w-full flex-col overflow-hidden',
+                !hasMaxHeight && 'max-h-[min(40rem,calc(100dvh-2.5rem))]',
                 'bg-surface border border-border rounded-card shadow-card',
                 'focus-visible:outline-none',
                 !hasMaxWidth && 'max-w-lg',
@@ -95,7 +99,14 @@ export function Modal({ open, onClose, title, children, footer, className, overl
                 </div>
               )}
               {/* Body scrolls; header/footer stay pinned. min-h-0 lets it shrink in the flex column. */}
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-8 sm:py-6">{children}</div>
+              <div
+                className={cx(
+                  'min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-8 sm:py-6',
+                  bodyClassName,
+                )}
+              >
+                {children}
+              </div>
               {footer != null && (
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-8 sm:py-4">
                   {footer}
