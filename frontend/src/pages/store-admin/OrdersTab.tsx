@@ -330,12 +330,13 @@ function PendingAcceptQueue({
               initial={false}
               whileHover={{ x: 3 }}
               transition={{ duration: 0.2, ease: EASE_PREMIUM }}
-              className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-bg/80 sm:gap-4 sm:px-5"
+              onClick={() => onOpenDetail(order)}
+              className="flex cursor-pointer items-center gap-3 px-4 py-4 transition-colors hover:bg-bg/80 sm:gap-4 sm:px-5"
             >
               <button
                 type="button"
                 onClick={() => onOpenDetail(order)}
-                className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
+                className="group flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
               >
                 <motion.span
                   className="shrink-0"
@@ -356,14 +357,21 @@ function PendingAcceptQueue({
                   <span className="block text-sm font-semibold tabular-nums text-fg">{formatPrice(order.totalCents)}</span>
                 </span>
               </button>
-              <div className="flex shrink-0 items-center gap-2">
+              <div
+                className="flex shrink-0 items-center gap-2"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
                 <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.16, ease: EASE_PREMIUM }}>
                   <Button
                     size="sm"
                     variant="ghost"
                     loading={busy && busyStatus === 'cancelled'}
                     disabled={rowLocked}
-                    onClick={() => onDecline(order)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onDecline(order)
+                    }}
                     className="text-danger-700 hover:bg-danger-50 hover:text-danger-800"
                   >
                     <XCircle aria-hidden className="size-4" />
@@ -375,7 +383,10 @@ function PendingAcceptQueue({
                     size="sm"
                     loading={busy && busyStatus === 'received'}
                     disabled={rowLocked}
-                    onClick={() => onAccept(order)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onAccept(order)
+                    }}
                   >
                     <CheckCircle2 aria-hidden className="size-4" />
                     Accept
@@ -789,8 +800,10 @@ function OrdersCardSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
     <div className="divide-y divide-border lg:hidden" aria-busy="true" aria-label="Loading orders">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex gap-3 px-4 py-4">
-          <Skeleton className="h-12 w-8 shrink-0 rounded-lg" />
-          <Skeleton className="-ml-1 h-12 w-8 shrink-0 rounded-lg" />
+          <span className="relative h-11 w-11 shrink-0">
+            <Skeleton className="absolute bottom-0 left-0 h-11 w-8 -rotate-6 rounded-md" />
+            <Skeleton className="absolute bottom-0 left-2.5 h-11 w-8 rotate-3 rounded-md" />
+          </span>
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
@@ -816,10 +829,10 @@ function OrdersTableSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
               <tr key={i} className={cx('border-b border-border/60', ORDER_TABLE_ROW_H)}>
                 <td className="px-5 py-4 align-middle">
                   <div className="flex items-center gap-3">
-                    <div className="flex shrink-0">
-                      <Skeleton className="h-11 w-8 rounded-lg" />
-                      <Skeleton className="-ml-1 h-11 w-8 rounded-lg" />
-                    </div>
+                    <span className="relative h-11 w-11 shrink-0">
+                      <Skeleton className="absolute bottom-0 left-0 h-11 w-8 -rotate-6 rounded-md" />
+                      <Skeleton className="absolute bottom-0 left-2.5 h-11 w-8 rotate-3 rounded-md" />
+                    </span>
                     <div className="min-w-0 flex-1">
                       <Skeleton className="h-4 w-3/4" />
                     </div>
@@ -930,9 +943,9 @@ function OrderCard({
   const actions = orderStatusChoices(order)
 
   return (
-    <article className="px-4 py-4">
+    <article className="cursor-pointer px-4 py-4" onClick={onOpenDetail}>
       <div className="flex items-start gap-3">
-        <button type="button" onClick={onOpenDetail} className="flex min-w-0 flex-1 items-start gap-3 text-left">
+        <button type="button" onClick={onOpenDetail} className="group flex min-w-0 flex-1 items-start gap-3 text-left">
           <OrderThumbStack
             order={order}
             fallback={<Package aria-hidden className="size-4 text-fg-muted" />}
@@ -964,7 +977,10 @@ function OrderCard({
             aria-label="Order actions"
             aria-expanded={menuOpen}
             aria-haspopup="menu"
-            onClick={onToggleMenu}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleMenu()
+            }}
             className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-fg-muted hover:bg-bg"
           >
             <EllipsisVertical aria-hidden className="size-5" />
@@ -1000,12 +1016,15 @@ function OrderRow({
   const actions = orderStatusChoices(order)
 
   return (
-    <tr className={cx('border-b border-border/60 transition-colors hover:bg-bg/80', ORDER_TABLE_ROW_H)}>
-      <td className="min-w-0 overflow-hidden px-5 py-4 align-middle">
+    <tr
+      className={cx('cursor-pointer border-b border-border/60 transition-colors hover:bg-bg/80', ORDER_TABLE_ROW_H)}
+      onClick={onOpenDetail}
+    >
+      <td className="min-w-0 overflow-visible px-5 py-4 align-middle">
         <button
           type="button"
           onClick={onOpenDetail}
-          className="flex w-full min-w-0 max-w-full items-center gap-3 text-left"
+          className="group flex w-full min-w-0 max-w-full items-center gap-3.5 text-left"
         >
           <OrderThumbStack
             order={order}
@@ -1046,7 +1065,10 @@ function OrderRow({
           aria-label="Order actions"
           aria-expanded={menuOpen}
           aria-haspopup="menu"
-          onClick={onToggleMenu}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleMenu()
+          }}
           className="inline-flex size-9 items-center justify-center rounded-lg text-fg-muted hover:bg-bg"
         >
           <EllipsisVertical aria-hidden className="size-5" />
