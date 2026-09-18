@@ -18,7 +18,9 @@ export function CatalogResultCard({ card, selected, onSelect, compact = false }:
   // card has no plain price to preview.
   const finishes = finishChoices(card)
   const previewFinish = finishes.hasFoil && !finishes.hasPlain ? 'foil' : 'nonfoil'
-  const selectedClass = selected ? 'border-brand-500 bg-brand-50' : 'border-border bg-surface hover:bg-bg'
+  const selectedClass = selected
+    ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/15'
+    : 'border-border bg-surface hover:border-fg/50 hover:bg-fg/[0.06]'
   const meta = [
     card.setCode?.toUpperCase() ?? '—',
     card.collectorNumber ? `#${card.collectorNumber}` : null,

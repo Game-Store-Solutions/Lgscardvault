@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pin, Search, Sparkles, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pin, Search, X } from 'lucide-react'
 import api, { cardImage, extractErrorMessage, formatPrice, parsePriceInput } from '../../api/client'
 import type { InventoryItem } from '../../api/types'
 import { useDebouncedValue, useInventoryPage, useStore, useStoreGames, useStoreSpotlight } from '../../hooks'
@@ -13,7 +13,6 @@ import {
   Input,
   Button,
   EmptyState,
-  PageHeader,
   SpotlightRailSkeleton,
 } from '../../components/ui'
 import { CardImage, SpotlightCard } from '../../components/cards'
@@ -190,31 +189,13 @@ export default function SpotlightTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
-        <div className="relative px-5 py-6 sm:px-7 sm:py-8">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-500/15 via-transparent to-accent-500/10"
-          />
-          <PageHeader
-            className="relative"
-            title={
-              <span className="inline-flex items-center gap-3">
-                <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
-                  <Sparkles aria-hidden className="size-5" />
-                </span>
-                Spotlight carousel
-              </span>
-            }
-            subtitle="Pin individual singles, set how many cards the rail shows, and keep a price floor for the automatic picks."
-            actions={
-              <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
-                <Sparkles className="size-4" aria-hidden />
-                Save spotlight
-              </Button>
-            }
-          />
-        </div>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
+        <p className="max-w-2xl text-sm text-fg-muted">
+          Pin singles, set how many cards the rail shows, and keep a price floor for automatic picks.
+        </p>
+        <Button onClick={() => updateMutation.mutate()} loading={updateMutation.isPending}>
+          Save spotlight
+        </Button>
       </div>
 
       <Card>
@@ -254,7 +235,7 @@ export default function SpotlightTab({ slug }: { slug: string }) {
             </p>
           ) : liveItems.length === 0 ? (
             <EmptyState
-              icon={Sparkles}
+              icon={Pin}
               title="No spotlight cards yet"
               description="Raise the minimum count, lower the price floor, or pin singles below. The storefront rail stays hidden until there is something to show."
               className="py-10 sm:py-12"

@@ -53,10 +53,10 @@ export default function StoreAdminPage() {
     <div key={location.pathname} className={hidePageHeader ? '' : 'space-y-6'}>
       {!hidePageHeader && (
         <PageHeader
-          title={store?.name ?? slug}
-          subtitle={`${SECTIONS[active].label}${store?.slug ? ` · /${store.slug}` : ''}`}
+          title={SECTIONS[active].label}
+          subtitle={store ? `${store.name}${store.slug ? ` · /${store.slug}` : ''}` : slug}
           actions={
-            <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+            <Link to={`/s/${slug}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
               View storefront
             </Link>
           }

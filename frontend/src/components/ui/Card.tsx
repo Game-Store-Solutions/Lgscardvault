@@ -1,6 +1,7 @@
 import type { ComponentProps, HTMLAttributes, ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { EASE_PREMIUM } from '../motion'
+import { useAdminChrome } from '../layout/AdminChromeContext'
 import { cx } from '../../lib/cx'
 
 export type CardProps = HTMLAttributes<HTMLDivElement> & {
@@ -19,7 +20,8 @@ export type CardProps = HTMLAttributes<HTMLDivElement> & {
  * they must never depend on that.
  */
 export function Card({ className, animateIn = true, ...props }: CardProps) {
-  const entrance = animateIn
+  const inAdmin = useAdminChrome()
+  const entrance = animateIn && !inAdmin
     ? {
         initial: { opacity: 0, y: 12 },
         animate: { opacity: 1, y: 0 },
@@ -30,7 +32,9 @@ export function Card({ className, animateIn = true, ...props }: CardProps) {
   return (
     <motion.div
       className={cx(
-        'rounded-card bg-surface shadow-card ring-[length:var(--store-border-width)] ring-black/[0.04] dark:ring-white/10',
+        inAdmin
+          ? 'rounded-card border border-border bg-surface'
+          : 'rounded-card bg-surface shadow-card ring-[length:var(--store-border-width)] ring-black/[0.04] dark:ring-white/10',
         className,
       )}
       {...entrance}
@@ -53,6 +57,7 @@ export function CardHeader({
   children,
   ...props
 }: CardHeaderProps) {
+  const inAdmin = useAdminChrome()
   const hasSlots = title != null || subtitle != null || actions != null
   return (
     <div
@@ -62,7 +67,11 @@ export function CardHeader({
       {hasSlots ? (
         <>
           <div className="min-w-0">
-            {title != null && <h3 className="text-pretty text-display-xs break-words">{title}</h3>}
+            {title != null && (
+              <h3 className={inAdmin ? 'text-pretty font-display text-base font-bold tracking-tight text-fg' : 'text-pretty text-display-xs break-words'}>
+                {title}
+              </h3>
+            )}
             {subtitle != null && <p className="mt-1 text-sm leading-relaxed text-fg-muted">{subtitle}</p>}
           </div>
           {actions != null && (

@@ -892,6 +892,22 @@ textarea {
   --frame-glass: 100%;
 }
 
+/*
+ * Store / platform admin console — tighter radii, hairline panels, no card
+ * lift. Tokens cascade into rounded-card / rounded-btn / shadow-card so every
+ * admin tab picks this up without a per-page restyle.
+ */
+.admin-console {
+  --radius-card: 0.5rem;
+  --radius-btn: 0.375rem;
+  --radius-input: 0.375rem;
+  --shadow-card: none;
+}
+
+.admin-console button[aria-pressed] {
+  border-radius: 0.375rem;
+}
+
 .store-theme .border {
   border-width: var(--store-border-width, 1px);
 }

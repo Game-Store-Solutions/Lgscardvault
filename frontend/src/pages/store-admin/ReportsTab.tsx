@@ -20,7 +20,7 @@ import {
 } from '../../lib/reports'
 import type { RevenueChartType } from '../../components/reports/ReportCharts'
 import { DateRangeCalendar } from '../../components/reports/DateRangeCalendar'
-import { AnimatePresence, EASE_PREMIUM, HoverLift, motion, Reveal, Stagger, StaggerItem } from '../../components/motion'
+import { AnimatePresence, EASE_PREMIUM, motion, Reveal, Stagger, StaggerItem } from '../../components/motion'
 import { cx } from '../../lib/cx'
 import {
   Card,
@@ -77,15 +77,13 @@ function ChartFallback({ label = 'Loading chart…' }: { label?: string }) {
 
 function MetricCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <HoverLift>
-      <Card>
-        <CardBody>
-          <p className="text-sm text-fg-muted">{label}</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-fg">{value}</p>
-          {hint && <p className="mt-1 text-xs text-fg-muted">{hint}</p>}
-        </CardBody>
-      </Card>
-    </HoverLift>
+    <Card>
+      <CardBody className="py-4">
+        <p className="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-fg-muted">{label}</p>
+        <p className="mt-2 font-display text-2xl font-bold tabular-nums text-fg">{value}</p>
+        {hint && <p className="mt-1 text-xs text-fg-muted">{hint}</p>}
+      </CardBody>
+    </Card>
   )
 }
 
@@ -239,10 +237,10 @@ export default function ReportsTab({ slug }: { slug: string }) {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.18, ease: EASE_PREMIUM }}
                   className={cx(
-                    'rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors',
+                    'rounded border px-3 py-1.5 text-sm font-semibold transition-colors',
                     preset === item.id
-                      ? 'border-brand-500 bg-brand-500 text-white shadow-sm'
-                      : 'border-border bg-surface text-fg-muted hover:border-brand-400 hover:text-fg',
+                      ? 'border-fg bg-fg text-bg'
+                      : 'border-border bg-surface text-fg-muted hover:border-fg/40 hover:text-fg',
                   )}
                 >
                   {item.label}
