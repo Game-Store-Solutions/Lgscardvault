@@ -22,22 +22,13 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
   const finishLabel = finishName(item.card, item.isFoil, item.finish)
   const variants = variantChips(notes.variant)
   return (
-    // The whole tile opens the manage-item modal; the action buttons stop
-    // the click so delete never falls through to edit.
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label={`Manage ${item.card.name}`}
-      onClick={onEdit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onEdit()
-        }
-      }}
-      className="group flex cursor-pointer gap-4 rounded-card border border-border bg-surface p-4 shadow-card transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_16px_40px_-16px_rgb(16_24_40_/0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-    >
-      <div className="flex min-w-0 flex-1 flex-col">
+    <div className="group relative flex gap-4 rounded-card border border-border bg-surface p-4 transition-colors hover:border-fg/50 hover:bg-fg/[0.06]">
+      <button
+        type="button"
+        aria-label={`Manage ${item.card.name}`}
+        onClick={onEdit}
+        className="flex min-w-0 flex-1 flex-col pr-16 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -47,34 +38,6 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
             <p className="mt-0.5 text-xs uppercase tracking-wide text-fg-muted">
               {item.card.setCode?.toUpperCase() ?? '-'} · #{item.card.collectorNumber ?? '-'}
             </p>
-          </div>
-          <div className="flex flex-shrink-0 gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                onEdit()
-              }}
-              aria-label={`Edit ${item.card.name}`}
-              title="Edit item"
-            >
-              <Pencil className="size-4" aria-hidden />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-              }}
-              loading={deleting}
-              aria-label={`Remove ${item.card.name}`}
-              title="Remove item"
-              className="text-danger-700"
-            >
-              <Trash2 className="size-4" aria-hidden />
-            </Button>
           </div>
         </div>
 
@@ -114,6 +77,28 @@ export function InventoryResultCard({ item, onEdit, onDelete, deleting }: Invent
             </p>
           </div>
         </div>
+      </button>
+      <div className="absolute right-4 top-4 flex gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onEdit}
+          aria-label={`Edit ${item.card.name}`}
+          title="Edit item"
+        >
+          <Pencil className="size-4" aria-hidden />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          loading={deleting}
+          aria-label={`Remove ${item.card.name}`}
+          title="Remove item"
+          className="text-danger-700"
+        >
+          <Trash2 className="size-4" aria-hidden />
+        </Button>
       </div>
     </div>
   )

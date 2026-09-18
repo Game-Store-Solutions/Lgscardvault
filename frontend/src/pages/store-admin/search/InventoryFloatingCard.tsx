@@ -23,62 +23,31 @@ export function InventoryFloatingCard({ item, onEdit, onDelete, deleting }: Inve
   const variants = variantChips(notes.variant)
 
   return (
-    <div className="min-w-0">
-      <div className="relative">
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label={`Manage ${item.card.name}`}
-          className="block w-full overflow-hidden rounded-xl bg-bg shadow-sm ring-1 ring-border transition-[opacity,transform] duration-200 hover:-translate-y-1 hover:opacity-95 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-        >
+    <div className="group relative min-w-0 rounded-md p-1.5 -m-1.5 transition-colors hover:bg-fg/[0.06]">
+      <button
+        type="button"
+        aria-label={`Manage ${item.card.name}`}
+        onClick={onEdit}
+        className="absolute inset-0 z-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      />
+      <div className="relative z-[1] pointer-events-none">
+        <div className="relative overflow-hidden rounded-md bg-bg ring-1 ring-border transition-[box-shadow] group-hover:ring-fg/55">
           <CardImage
             src={image}
-            alt={item.card.name}
+            alt=""
             showLabel={false}
             fit="cover"
             className="aspect-[63/88] w-full"
           />
-        </button>
-
-        <div className="absolute right-1.5 top-1.5 flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit()
-            }}
-            aria-label={`Edit ${item.card.name}`}
-            title="Edit item"
-            className="size-9 bg-surface/95 p-0 shadow-sm ring-1 ring-border hover:bg-bg"
-          >
-            <Pencil className="size-4" aria-hidden />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete()
-            }}
-            loading={deleting}
-            aria-label={`Remove ${item.card.name}`}
-            title="Remove item"
-            className="size-9 bg-surface/95 p-0 text-danger-700 shadow-sm ring-1 ring-border hover:bg-bg"
-          >
-            <Trash2 className="size-4" aria-hidden />
-          </Button>
+          <span className="absolute bottom-1.5 left-1.5 rounded-full bg-surface/95 px-2 py-0.5 text-[11px] font-bold text-fg shadow-sm ring-1 ring-border">
+            {formatPrice(item.priceCents)}
+          </span>
+          <span className="absolute bottom-1.5 right-1.5 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
+            {item.quantity} in stock
+          </span>
         </div>
 
-        <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-full bg-surface/95 px-2 py-0.5 text-[11px] font-bold text-fg shadow-sm ring-1 ring-border">
-          {formatPrice(item.priceCents)}
-        </span>
-        <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
-          {item.quantity} in stock
-        </span>
-      </div>
-
-      <div className="mt-2 min-w-0">
+        <div className="mt-2 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: accent }} />
           <h3 className="truncate font-display text-sm font-bold tracking-tight text-fg">{item.card.name}</h3>
@@ -110,6 +79,30 @@ export function InventoryFloatingCard({ item, onEdit, onDelete, deleting }: Inve
         <p className="mt-1.5 text-[11px] text-fg-muted">
           Market {formatScryfallPrice(item.card, item.isFoil ? 'foil' : 'nonfoil')}
         </p>
+        </div>
+      </div>
+      <div className="absolute right-3 top-3 z-10 flex gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onEdit}
+          aria-label={`Edit ${item.card.name}`}
+          title="Edit item"
+          className="size-9 bg-surface/95 p-0 shadow-sm ring-1 ring-border hover:bg-bg"
+        >
+          <Pencil className="size-4" aria-hidden />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          loading={deleting}
+          aria-label={`Remove ${item.card.name}`}
+          title="Remove item"
+          className="size-9 bg-surface/95 p-0 text-danger-700 shadow-sm ring-1 ring-border hover:bg-bg"
+        >
+          <Trash2 className="size-4" aria-hidden />
+        </Button>
       </div>
     </div>
   )

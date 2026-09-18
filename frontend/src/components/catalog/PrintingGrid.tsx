@@ -21,10 +21,10 @@ export function PrintingGrid({
   size?: 'sm' | 'md' | 'lg'
 }) {
   const compact = size === 'sm'
-  // lg: fewer columns so art stays readable in sell/trade pickers.
+  // lg: a bit larger than the compact picker; fixed track so tiles do not stretch full-row.
   const gridClass =
     size === 'lg'
-      ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
+      ? 'grid grid-cols-[repeat(auto-fill,minmax(16.75rem,16.75rem))] justify-start gap-3.5'
       : compact
         ? 'grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2'
         : 'grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3'

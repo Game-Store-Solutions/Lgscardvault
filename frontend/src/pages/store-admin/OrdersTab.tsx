@@ -594,7 +594,7 @@ export default function OrdersTab({ slug }: { slug: string }) {
   return (
     <div className="-mt-4 w-full min-w-0 space-y-5 pb-10 pt-2 sm:space-y-6">
       <header className="min-w-0">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Order Management</h1>
+        <h1 className="font-display text-xl font-bold tracking-tight text-fg sm:text-2xl">Orders</h1>
         <p className="mt-1 text-sm text-fg-muted">Today’s order totals and live queue — compared to yesterday.</p>
       </header>
 
@@ -607,14 +607,12 @@ export default function OrdersTab({ slug }: { slug: string }) {
       <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <StatCard
           icon={ClipboardList}
-          iconClass="bg-brand-50 text-brand-600"
           label="Orders today"
           value={String(stats.newOrders)}
           trend={stats.newTrend}
         />
         <StatCard
           icon={Package}
-          iconClass="bg-warning-50 text-warning-700"
           label="Pending today"
           value={String(stats.pending)}
           trend={stats.pendingTrend}
@@ -622,14 +620,12 @@ export default function OrdersTab({ slug }: { slug: string }) {
         />
         <StatCard
           icon={CheckCircle2}
-          iconClass="bg-success-50 text-success-700"
           label="Ready / delivered today"
           value={String(stats.fulfilled)}
           trend={stats.fulfilledTrend}
         />
         <StatCard
           icon={XCircle}
-          iconClass="bg-danger-50 text-danger-700"
           label="Canceled today"
           value={String(stats.canceled)}
           trend={stats.canceledTrend}
@@ -876,14 +872,12 @@ function OrdersTableSkeleton({ rows = PAGE_SIZE }: { rows?: number }) {
 
 function StatCard({
   icon: Icon,
-  iconClass,
   label,
   value,
   trend,
   trendNegative = false,
 }: {
   icon: LucideIcon
-  iconClass: string
   label: string
   value: string
   trend: number | null
@@ -893,26 +887,24 @@ function StatCard({
   const positive = trend !== null && trend >= 0
   const badgeClass = showTrend
     ? positive && !trendNegative
-      ? 'bg-brand-100 text-brand-700'
-      : 'bg-danger-50 text-danger-700'
+      ? 'text-success-700'
+      : 'text-danger-700'
     : ''
 
   return (
-    <div className="flex items-center gap-3 rounded-card border border-border bg-surface p-4 shadow-card sm:gap-4 sm:p-5">
-      <span className={cx('grid size-10 shrink-0 place-items-center rounded-2xl sm:size-12', iconClass)}>
-        <Icon aria-hidden className="size-5 sm:size-6" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-fg-muted sm:text-sm">{label}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <p className="font-display text-xl font-bold text-fg sm:text-2xl">{value}</p>
-          {showTrend && (
-            <span className={cx('rounded-md px-1.5 py-0.5 text-xs font-bold', badgeClass)}>
-              {trend > 0 ? '+' : ''}
-              {trend}%
-            </span>
-          )}
-        </div>
+    <div className="border border-border bg-surface px-4 py-3">
+      <p className="flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-fg-muted">
+        <Icon aria-hidden className="size-3.5" />
+        {label}
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
+        <p className="font-display text-xl font-bold tabular-nums text-fg sm:text-2xl">{value}</p>
+        {showTrend && (
+          <span className={cx('text-xs font-bold tabular-nums', badgeClass)}>
+            {trend > 0 ? '+' : ''}
+            {trend}%
+          </span>
+        )}
       </div>
     </div>
   )

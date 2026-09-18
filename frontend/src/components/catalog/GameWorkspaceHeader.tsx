@@ -1,4 +1,3 @@
-import { Layers, Package } from 'lucide-react'
 import type { CatalogGame, StoreGameStats } from '../../api/types'
 import { GameSelector } from './GameSelector'
 import { Card, CardBody } from '../ui'
@@ -37,25 +36,15 @@ export function GameWorkspaceHeader({
 
   return (
     <Card>
-      <CardBody className="space-y-4 py-4">
+      <CardBody className="space-y-5 px-6 py-5">
         <GameSelector games={games} value={value} onChange={onChange} label={label} />
 
         {activeGame && (
           <div>
-            <h2 className="font-display text-lg font-bold tracking-tight text-fg">{activeGame.name}</h2>
-            <dl className="mt-2 grid gap-3 sm:grid-cols-2">
-              <Stat
-                icon={Layers}
-                label="Singles"
-                value={stats?.singles.listings}
-                loading={loading}
-              />
-              <Stat
-                icon={Package}
-                label="Sealed products"
-                value={stats?.sealed.units}
-                loading={loading}
-              />
+            <h2 className="font-display text-base font-bold tracking-tight text-fg sm:hidden">{activeGame.name}</h2>
+            <dl className="flex flex-wrap gap-x-12 gap-y-3 sm:pt-0">
+              <Stat label="Singles" value={stats?.singles.listings} loading={loading} />
+              <Stat label="Sealed products" value={stats?.sealed.units} loading={loading} />
             </dl>
           </div>
         )}
@@ -65,26 +54,19 @@ export function GameWorkspaceHeader({
 }
 
 function Stat({
-  icon: Icon,
   label,
   value,
   loading,
 }: {
-  icon: typeof Layers
   label: string
   value?: number
   loading?: boolean
 }) {
   return (
-    <div className="rounded-card border border-border bg-bg px-4 py-3">
-      <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-fg-muted">
-        <Icon aria-hidden className="size-3.5" />
-        {label}
-      </dt>
-      <dd className="mt-1">
-        <span className="font-display text-2xl font-extrabold text-fg">
-          {loading || undefined === value ? '—' : NUMBER.format(value)}
-        </span>
+    <div>
+      <dt className="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-fg-muted">{label}</dt>
+      <dd className="mt-1 font-display text-xl font-bold tabular-nums text-fg">
+        {loading || undefined === value ? '—' : NUMBER.format(value)}
       </dd>
     </div>
   )

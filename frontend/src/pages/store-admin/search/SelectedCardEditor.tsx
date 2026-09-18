@@ -1,6 +1,8 @@
 import { ChevronLeft, Plus } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { CardSummary } from '../../../api/types'
 import { Button, Input } from '../../../components/ui'
+import { CardText, ManaCost } from '../../../components/mtg/ManaSymbol'
 import { plainCardText } from '../../../lib/cardText'
 import { finishOptions, isFoilFinish } from '../../../lib/finishes'
 import { listingMarketSummary } from '../../../lib/marketFinishes'
@@ -78,15 +80,18 @@ export function SelectedCardEditor({
 
       <div className="mt-4 grid gap-3 rounded-card border border-border bg-surface p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Meta label="Market price" value={marketPrice} />
-        {isMagic && card.manaCost && <Meta label="Mana cost" value={card.manaCost} />}
+        {isMagic && card.manaCost && (
+          <Meta label="Mana cost" value={<ManaCost cost={card.manaCost} className="size-5" />} />
+        )}
         {card.typeLine && <Meta label="Type" value={card.typeLine} />}
         {card.rarity && <Meta label="Rarity" value={card.rarity} />}
         {card.power && <Meta label="Power" value={card.power} />}
         {card.releasedAt && <Meta label="Released" value={card.releasedAt} />}
         {card.artist && <Meta label="Artist" value={card.artist} />}
         {card.oracleText && (
-          // Rules text is multi-line; preserve the line breaks it arrives with.
-          <p className="whitespace-pre-line text-fg sm:col-span-2 lg:col-span-4">{plainCardText(card.oracleText)}</p>
+          <p className="whitespace-pre-line text-fg sm:col-span-2 lg:col-span-4">
+            <CardText text={plainCardText(card.oracleText)} symbolClassName="size-[1.05em]" />
+          </p>
         )}
       </div>
 
@@ -144,11 +149,11 @@ export function SelectedCardEditor({
   )
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <p className="text-xs uppercase text-fg-muted">{label}</p>
-      <p className="font-bold text-fg">{value}</p>
+      <div className="font-bold text-fg">{value}</div>
     </div>
   )
 }
