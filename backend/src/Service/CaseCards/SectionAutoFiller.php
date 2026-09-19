@@ -36,11 +36,15 @@ final class SectionAutoFiller
     /**
      * Listings the section should contain, highest price first, at most
      * $limit. Each returned listing has at least one copy free after the
-     * store's other sections' unsold allocations are honored.
+     * store's other sections' unsold allocations are honored. $excludeItemIds
+     * are skipped so cards already in this section are not duplicated by a
+     * later auto-fill.
+     *
+     * @param list<int> $excludeItemIds
      *
      * @return list<InventoryItem>
      */
-    public function pickListings(StoreSection $section, int $limit): array
+    public function pickListings(StoreSection $section, int $limit, array $excludeItemIds = []): array
     {
         $store = $section->getStore();
         if (!$store instanceof Store || $limit < 1) {
@@ -49,6 +53,7 @@ final class SectionAutoFiller
 
         $claimedElsewhere = $this->sectionCards->remainingAllocatedByItem($store, $section);
         $colorCode = $section->getAutoColorIdentity();
+        $excluded = array_fill_keys($excludeItemIds, true);
 
         $picked = [];
         for ($offset = 0; $offset < self::MAX_SCANNED_ROWS && count($picked) < $limit; $offset += self::BATCH_SIZE) {
@@ -67,7 +72,11 @@ final class SectionAutoFiller
             }
 
             foreach ($batch as $item) {
-                $freeStock = $item->getQuantity() - ($claimedElsewhere[$item->getId()] ?? 0);
+                $itemId = (int) $item->getId();
+                if (isset($excluded[$itemId])) {
+                    continue;
+                }
+                $freeStock = $item->getQuantity() - ($claimedElsewhere[$itemId] ?? 0);
                 if ($freeStock < 1) {
                     continue;
                 }

@@ -51,6 +51,7 @@ final class SectionSerializer
                 'remaining' => $card->remaining(),
                 'stockedAt' => $card->getStockedAt()?->format(DATE_ATOM),
                 'needsStocking' => $card->needsStocking(),
+                'addedManually' => $card->isAddedManually(),
                 'inventoryItem' => $this->serializeInventoryItem($item),
             ];
         }

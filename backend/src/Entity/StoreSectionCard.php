@@ -58,6 +58,14 @@ class StoreSectionCard
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $stockedAt = null;
 
+    /**
+     * True when the owner placed this listing via "Add cards from inventory".
+     * Auto-fill never removes or overwrites any existing row; this flag is
+     * so the admin UI can mark hand-picked cards.
+     */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $addedManually = false;
+
     public function getId(): ?int { return $this->id; }
 
     public function getSection(): ?StoreSection { return $this->section; }
@@ -77,6 +85,9 @@ class StoreSectionCard
 
     public function getStockedAt(): ?\DateTimeImmutable { return $this->stockedAt; }
     public function setStockedAt(?\DateTimeImmutable $stockedAt): static { $this->stockedAt = $stockedAt; return $this; }
+
+    public function isAddedManually(): bool { return $this->addedManually; }
+    public function setAddedManually(bool $addedManually): static { $this->addedManually = $addedManually; return $this; }
 
     /** Copies still available to sell from this section's pool. */
     public function remaining(): int

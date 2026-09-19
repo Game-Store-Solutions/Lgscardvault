@@ -749,7 +749,7 @@ function SectionEditor({
                 </span>
               )}
               <span className="text-xs text-fg-muted">
-                Pulls 1 copy per card; cards already promised to other sections are skipped. Re-pull any time. Sold cards stay tracked. You can also search and add or remove specific cards below.
+                Fills empty slots up to the card count without removing cards already in the section. One copy per new card; copies already in other sections are skipped.
               </span>
             </div>
           </div>
@@ -837,6 +837,7 @@ function SectionEditor({
                         pending={updatePool.isPending && updatePool.variables?.cardId === entry.id}
                         onCommit={(quantity) => updatePool.mutate({ cardId: entry.id, quantity })}
                       />
+                      {entry.addedManually && <Badge tone="neutral">Hand-picked</Badge>}
                       {entry.needsStocking && <Badge tone="warning">Needs stocking</Badge>}
                     </div>
                     {updatePool.isError && updatePool.variables?.cardId === entry.id ? (

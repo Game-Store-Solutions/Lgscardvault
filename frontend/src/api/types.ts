@@ -524,6 +524,8 @@ export interface StoreSectionCard {
   stockedAt?: string | null
   /** True when the card still needs to be placed in the physical case. */
   needsStocking?: boolean
+  /** True when the owner added this listing by hand; auto-fill will not replace it. */
+  addedManually?: boolean
   inventoryItem: {
     id: number
     priceCents: number

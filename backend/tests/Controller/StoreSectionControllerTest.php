@@ -182,6 +182,7 @@ final class StoreSectionControllerTest extends WebTestCase
         self::assertSame(2, $body['cards'][0]['quantity']);
         self::assertSame(0, $body['cards'][0]['soldQuantity']);
         self::assertSame(2, $body['cards'][0]['remaining']);
+        self::assertTrue($body['cards'][0]['addedManually']);
         self::assertSame(2, $body['availableQuantity']);
 
         // Pool size is editable, clamped at the sold count (0 here).
@@ -462,6 +463,77 @@ final class StoreSectionControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertCount(0, $body['cards'], 'the only copy is already promised to section A');
+    }
+
+    public function testAutoFillFillsRemainingSlotsWithoutReplacingExistingCards(): void
+    {
+        $store = $this->fixtures->store();
+        $case = $this->fixtures->storeCase($store);
+        $cheap = $this->fixtures->inventoryItem($store, $this->fixtures->card(601, ['rarity' => 'rare']), 3, priceCents: 100);
+        $midLow = $this->fixtures->inventoryItem($store, $this->fixtures->card(602, ['rarity' => 'rare']), 3, priceCents: 200);
+        $mid = $this->fixtures->inventoryItem($store, $this->fixtures->card(603, ['rarity' => 'rare']), 3, priceCents: 300);
+        $midHigh = $this->fixtures->inventoryItem($store, $this->fixtures->card(604, ['rarity' => 'rare']), 3, priceCents: 400);
+        $top = $this->fixtures->inventoryItem($store, $this->fixtures->card(605, ['rarity' => 'rare']), 3, priceCents: 500);
+        $this->authenticate($store->getOwner());
+        $section = $this->createSection($store, $case, 'Rares', StoreSection::MODE_AUTO);
+        $base = "/api/stores/{$store->getSlug()}/sections/{$section->getId()}";
+
+        $this->jsonRequest('POST', "$base/items", ['inventoryItemId' => $cheap->getId()]);
+        self::assertResponseIsSuccessful();
+
+        $body = $this->jsonRequest('POST', "$base/auto-fill", [
+            'autoRarity' => 'rare',
+            'cardLimit' => 3,
+        ]);
+        self::assertResponseIsSuccessful();
+        $ids = array_map(static fn (array $card): int => $card['inventoryItem']['id'], $body['cards']);
+        self::assertCount(3, $ids);
+        self::assertContains($cheap->getId(), $ids);
+        self::assertContains($top->getId(), $ids);
+        self::assertContains($midHigh->getId(), $ids);
+
+        $byItem = [];
+        foreach ($body['cards'] as $card) {
+            $byItem[$card['inventoryItem']['id']] = $card;
+        }
+        self::assertTrue($byItem[$cheap->getId()]['addedManually']);
+        self::assertFalse($byItem[$top->getId()]['addedManually']);
+        $firstTopId = $byItem[$top->getId()]['id'];
+
+        // Extra copies on an existing row must survive a re-pull.
+        $this->jsonRequest('PATCH', "$base/items/{$firstTopId}", ['quantity' => 3]);
+        self::assertResponseIsSuccessful();
+
+        $body = $this->jsonRequest('POST', "$base/auto-fill", [
+            'autoRarity' => 'rare',
+            'cardLimit' => 3,
+        ]);
+        $byItem = [];
+        foreach ($body['cards'] as $card) {
+            $byItem[$card['inventoryItem']['id']] = $card;
+        }
+        self::assertCount(3, $body['cards']);
+        self::assertSame(3, $byItem[$top->getId()]['quantity']);
+        self::assertSame($firstTopId, $byItem[$top->getId()]['id']);
+        self::assertTrue($byItem[$cheap->getId()]['addedManually']);
+
+        // Raising the limit fills empty slots; cards already in the section stay.
+        $body = $this->jsonRequest('POST', "$base/auto-fill", [
+            'autoRarity' => 'rare',
+            'cardLimit' => 5,
+        ]);
+        self::assertResponseIsSuccessful();
+        $ids = array_map(static fn (array $card): int => $card['inventoryItem']['id'], $body['cards']);
+        self::assertCount(5, $ids);
+        self::assertContains($cheap->getId(), $ids);
+        self::assertContains($top->getId(), $ids);
+        self::assertContains($midHigh->getId(), $ids);
+        self::assertContains($mid->getId(), $ids);
+        self::assertContains($midLow->getId(), $ids);
+        self::assertSame(3, array_values(array_filter(
+            $body['cards'],
+            static fn (array $card): bool => $card['inventoryItem']['id'] === $top->getId(),
+        ))[0]['quantity']);
     }
 
     public function testPublicCasesListWithoutAuth(): void
