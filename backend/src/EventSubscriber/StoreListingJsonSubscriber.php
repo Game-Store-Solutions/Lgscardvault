@@ -11,8 +11,8 @@ use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * ApiPlatform omits some Store booleans/arrays from GET /stores/{slug}.
- * Patch in listing, feature flags, hero layout, and community events so the
- * storefront and admin settings see the same values the settings PATCH already returns.
+ * Patch in listing, feature flags, hero layout, storefront template, and community
+ * events so the storefront and admin settings see the same values the settings PATCH already returns.
  */
 #[AsEventListener(event: KernelEvents::RESPONSE, priority: -16)]
 final readonly class StoreListingJsonSubscriber
@@ -55,6 +55,7 @@ final readonly class StoreListingJsonSubscriber
         $payload['features'] = $store->getFeatures();
         $payload['communityEvents'] = $store->getCommunityEvents();
         $payload['heroLayout'] = $store->getHeroLayout();
+        $payload['storefrontTemplate'] = $store->getStorefrontTemplate();
 
         $response->setContent(json_encode($payload, JSON_THROW_ON_ERROR));
         if ($response instanceof JsonResponse) {

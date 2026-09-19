@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Image, LayoutGrid, Layers, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
+import { Image, LayoutGrid, LayoutTemplate, Layers, Palette, Rows3, Square, Store as StoreIcon } from 'lucide-react'
 import { HeroLayoutPicker } from '../../components/store/hero/HeroLayoutPicker'
 import { normalizeHeroLayout } from '../../components/store/hero/heroLayouts'
+import { StorefrontTemplatePicker } from '../../components/store/templates'
 import api, { extractErrorMessage, httpStatus } from '../../api/client'
-import type { ApiError, CardDisplayStyle, HeroLayout, Store } from '../../api/types'
+import type { ApiError, CardDisplayStyle, HeroLayout, Store, StorefrontTemplate } from '../../api/types'
 import { useStore } from '../../hooks'
 import { Button, Card, CardBody, CardHeader, Input, TabPanel, Tabs, Textarea } from '../../components/ui'
 import { StorePreview, ThemeModeSwitch } from '../../components/store'
@@ -43,6 +44,7 @@ import {
 } from '../../lib/heroImageOpacity'
 import { BackgroundPresetPicker } from '../../components/store/backgrounds'
 import { StoreMarketingToolkit } from '../../components/store/StoreMarketingToolkit'
+import { normalizeStorefrontTemplate } from '../../lib/storefrontTemplates'
 import {
   PAGE_BACKGROUND_DEFAULTS,
   getSavedBackgroundColors,
@@ -82,6 +84,7 @@ interface BrandingForm {
   tagline: string
   cardDisplayStyle: CardDisplayStyle
   heroLayout: HeroLayout
+  storefrontTemplate: StorefrontTemplate
   hoursText: string
   contactEmail: string
   websiteUrl: string
@@ -104,6 +107,7 @@ interface DarkColorsForm {
 }
 
 const BRANDING_SECTIONS = [
+  { id: 'template', label: 'Template', icon: LayoutTemplate },
   { id: 'colors', label: 'Colors', icon: Palette },
   { id: 'backgrounds', label: 'Backgrounds', icon: Layers },
   { id: 'borders', label: 'Borders', icon: Square },
@@ -153,6 +157,7 @@ const EMPTY: BrandingForm = {
   tagline: '',
   cardDisplayStyle: 'gallery',
   heroLayout: 'cinematic',
+  storefrontTemplate: 'vault',
   hoursText: '',
   contactEmail: '',
   websiteUrl: '',
@@ -216,6 +221,7 @@ function fromStore(store: Store): BrandingForm {
     tagline: store.tagline ?? '',
     cardDisplayStyle: store.cardDisplayStyle ?? 'gallery',
     heroLayout: store.heroLayout ?? 'cinematic',
+    storefrontTemplate: normalizeStorefrontTemplate(store.storefrontTemplate),
     hoursText: store.hoursText ?? '',
     contactEmail: store.contactEmail ?? '',
     websiteUrl: store.websiteUrl ?? '',
@@ -235,7 +241,7 @@ export default function BrandingTab({ slug }: { slug: string }) {
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null)
   const [formDirty, setFormDirty] = useState(false)
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light')
-  const [section, setSection] = useState<BrandingSection>('colors')
+  const [section, setSection] = useState<BrandingSection>('template')
   const formRef = useRef(form)
   formRef.current = form
   const heroSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -492,6 +498,41 @@ export default function BrandingTab({ slug }: { slug: string }) {
     heroLayoutMutation.mutate(heroLayout)
   }
 
+  const templateMutation = useMutation({
+    mutationFn: async (storefrontTemplate: StorefrontTemplate) => {
+      const { data } = await api.patch<Store>(`/stores/${slug}/settings`, { storefrontTemplate })
+      return data
+    },
+    onMutate: async (storefrontTemplate) => {
+      await queryClient.cancelQueries({ queryKey: ['store', slug] })
+      const previous = queryClient.getQueryData<Store>(['store', slug])
+      queryClient.setQueryData<Store>(['store', slug], (current) =>
+        current ? { ...current, storefrontTemplate } : current,
+      )
+      return { previous }
+    },
+    onError: (_error, _template, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['store', slug], context.previous)
+        set('storefrontTemplate', normalizeStorefrontTemplate(context.previous.storefrontTemplate))
+      }
+    },
+    onSuccess: async (saved, storefrontTemplate) => {
+      queryClient.setQueryData<Store>(['store', slug], (current) => ({
+        ...(current ?? {}),
+        ...saved,
+        storefrontTemplate,
+      } as Store))
+      setFormDirty(false)
+      await queryClient.invalidateQueries({ queryKey: ['store', slug] })
+    },
+  })
+
+  function chooseStorefrontTemplate(storefrontTemplate: StorefrontTemplate) {
+    setForm((current) => ({ ...current, storefrontTemplate }))
+    templateMutation.mutate(storefrontTemplate)
+  }
+
   return (
     <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)]">
       <div className="min-w-0 space-y-6">
@@ -501,6 +542,29 @@ export default function BrandingTab({ slug }: { slug: string }) {
           onChange={(id) => setSection(id as BrandingSection)}
           tabs={[...BRANDING_SECTIONS]}
         />
+
+        <TabPanel when="template" value={section} className="pt-5">
+          <Card>
+            <CardHeader
+              title="Storefront template"
+              subtitle="Same inventory, search, and checkout. Campaign and Studio change the public home shell. Browse, cart, and checkout stay boxed."
+              actions={
+                <DisplaySaveStatus
+                  saving={templateMutation.isPending}
+                  saved={templateMutation.isSuccess}
+                  error={templateMutation.isError}
+                />
+              }
+            />
+            <CardBody>
+              <StorefrontTemplatePicker
+                selected={normalizeStorefrontTemplate(form.storefrontTemplate)}
+                disabled={templateMutation.isPending}
+                onSelect={chooseStorefrontTemplate}
+              />
+            </CardBody>
+          </Card>
+        </TabPanel>
 
         <TabPanel when="colors" value={section} className="space-y-6 pt-5">
           <Card>
