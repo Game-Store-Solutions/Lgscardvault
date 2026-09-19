@@ -319,6 +319,15 @@ class Store
     private string $heroLayout = 'cinematic';
 
     /**
+     * Public store home shell. Vault is today's boxed storefront (default).
+     * Campaign and Studio restyle the same home sections without a page builder.
+     */
+    #[ORM\Column(length: 32, options: ['default' => 'vault'])]
+    #[Assert\Choice(choices: ['vault', 'campaign', 'studio'])]
+    #[Groups(['store:read', 'store:admin'])]
+    private string $storefrontTemplate = 'vault';
+
+    /**
      * Optional dark-mode palette: the same seven branding color keys
      * (primaryColor … borderColor), applied INSTEAD of the base palette when
      * the shopper's theme toggle is dark. Null = derive dark styling from
@@ -1107,6 +1116,18 @@ class Store
     public function setHeroLayout(string $heroLayout): static
     {
         $this->heroLayout = $heroLayout;
+
+        return $this;
+    }
+
+    public function getStorefrontTemplate(): string
+    {
+        return $this->storefrontTemplate;
+    }
+
+    public function setStorefrontTemplate(string $storefrontTemplate): static
+    {
+        $this->storefrontTemplate = $storefrontTemplate;
 
         return $this;
     }

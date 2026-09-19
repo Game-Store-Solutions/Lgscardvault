@@ -9,6 +9,8 @@ export interface ApiError {
 
 export type CardDisplayStyle = 'gallery' | 'marketplace'
 
+export type StorefrontTemplate = 'vault' | 'campaign' | 'studio'
+
 export type StoreFeatureKey =
   | 'events'
   | 'sellTrade'
@@ -128,6 +130,8 @@ export interface Store {
   tagline?: string | null
   cardDisplayStyle?: CardDisplayStyle
   heroLayout?: HeroLayout
+  /** Public store home shell. Vault is the boxed default. */
+  storefrontTemplate?: StorefrontTemplate
   /** Optional dark-mode palette (same keys as the base colors); used when the shopper's theme is dark. */
   darkColors?: Partial<Record<'primaryColor' | 'accentColor' | 'backgroundColor' | 'surfaceColor' | 'textColor' | 'mutedColor' | 'borderColor', string>> | null
   /** Raw sell/trade rate settings; resolve effective rates via GET /stores/{slug}/trade-rates. */

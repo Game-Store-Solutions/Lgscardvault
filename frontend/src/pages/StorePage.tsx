@@ -23,12 +23,15 @@ import { CardRow, CardTile, MarketplaceCard, SpotlightCard } from '../components
 import { buildHeroCardPool } from '../components/store/hero/heroCardPool'
 import { normalizeHeroLayout } from '../components/store/hero/heroLayouts'
 import { StoreHero } from '../components/store/StoreHero'
+import { StoreHomeLayout, type StoreHomeShortcut } from '../components/store/templates'
+import { useAppShellFlush } from '../components/layout/AppShellLayout'
 import { resolveHeroImageOpacity, resolveHeroImagePosition, resolveHeroImageUrl } from '../lib/heroImageOpacity'
 import { TradePromoBanner } from '../components/store/TradePromoBanner'
 import { StorePageLoader } from '../components/store/StorePageLoader'
 import { SealedSpotlightRow } from '../components/store/SealedSpotlightRow'
 import { cx } from '../lib/cx'
 import { isStoreFeatureEnabled } from '../lib/storeFeatures'
+import { normalizeStorefrontTemplate } from '../lib/storefrontTemplates'
 import { colorIdentityKey } from '../lib/mtg'
 import { gameSearchVocab, isManaPipGame } from '../lib/gameSearch'
 import { finishChoices } from '../lib/finishes'
@@ -194,6 +197,8 @@ export default function StorePage() {
     [spotlightItems, heroStockItems],
   )
   const heroLayout = normalizeHeroLayout(store?.heroLayout ?? 'cinematic')
+  const template = normalizeStorefrontTemplate(store?.storefrontTemplate)
+  useAppShellFlush(template !== 'vault')
   const locationLabel = [store?.city, store?.region].filter(Boolean).join(', ') || null
 
   useEffect(() => {
@@ -482,8 +487,95 @@ export default function StorePage() {
     return <StorePageLoader label="Loading store…" />
   }
 
+  const shortcutItems: StoreHomeShortcut[] = QUICK_ACTIONS.filter(({ feature, path }) => {
+    if (kioskMode && path === 'sell') return false
+    return !feature || isStoreFeatureEnabled(store, feature)
+  }).map(({ label, path, action }) => ({
+    label,
+    to: path ? `/s/${slug}/${path}` : undefined,
+    onClick: action === 'search' ? scrollToSearchSection : undefined,
+  }))
+
+  const heroActions = !kioskMode ? (
+    <>
+      {isStoreFeatureEnabled(store, 'events') && (
+        <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+          <Calendar aria-hidden className="size-4" />
+          Event calendar
+        </Link>
+      )}
+      {user && (
+        <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+          <UserCircle aria-hidden className="size-4" />
+          My account
+        </Link>
+      )}
+      {canManage && (
+        <Link to={`/s/${slug}/admin`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+          <StoreIcon aria-hidden className="size-4" />
+          Admin workspace
+        </Link>
+      )}
+    </>
+  ) : undefined
+
+  const chrome = {
+    slug,
+    name: store?.name ?? slug,
+    tagline: store?.tagline,
+    heading: store?.heroHeading?.trim() || store?.name || slug,
+    subheading:
+      store?.heroSubheading ||
+      'Browse available Magic singles and compare printings, condition, colors, and prices.',
+    locationLabel,
+    logoUrl: store?.logoUrl,
+    heroImageUrl: resolveHeroImageUrl(store?.heroImageUrl, store?.darkHeroImageUrl, storefrontIsDark),
+    heroImageOpacity: resolveHeroImageOpacity(
+      store?.heroImageOpacity,
+      store?.darkHeroImageOpacity,
+      storefrontIsDark,
+    ),
+    heroImagePositionY: resolveHeroImagePosition(
+      store?.heroImagePosition,
+      store?.darkHeroImagePosition,
+      storefrontIsDark,
+    ),
+    heroImagePositionX: resolveHeroImagePosition(
+      store?.heroImagePositionX,
+      store?.darkHeroImagePositionX,
+      storefrontIsDark,
+    ),
+    heroImagePositionMobileX: store?.heroImagePositionMobileX,
+    heroImagePositionMobileY: store?.heroImagePositionMobileY,
+    primaryColor: store?.primaryColor,
+    accentColor: store?.accentColor,
+    verified: store?.status === 'approved',
+    stats: {
+      listings: shelf?.listings ?? resultTotal,
+      cards: shelf?.copies ?? 0,
+      sets: availableSets.length,
+    },
+    gameOptions,
+    gameFilter,
+    onGameChange: setGameFilter,
+    onShopSingles: scrollToSearchSection,
+    shortcuts: shortcutItems,
+    spotlightItems,
+    spotlightLoading,
+    pinnedIds: store?.spotlightPinnedInventoryIds ?? [],
+    spotlightMinPriceCents: store?.spotlightMinPriceCents ?? DEFAULT_SPOTLIGHT_MIN_PRICE_CENTS,
+    spotlightEnabled,
+    railRef,
+    scrollRail,
+    actions: heroActions,
+  }
+
   return (
-    <div className="storefront-atmosphere relative space-y-6 sm:space-y-10">
+    <StoreHomeLayout
+      template={template}
+      chrome={chrome}
+      slots={{
+        hero: (
       <StoreHero
         name={store?.name ?? slug}
         slug={slug}
@@ -524,35 +616,11 @@ export default function StorePage() {
           sets: availableSets.length,
         }}
         showcaseCards={heroShowcaseCards}
-        actions={
-          !kioskMode ? (
-            <>
-              {isStoreFeatureEnabled(store, 'events') && (
-                <Link to={`/s/${slug}/events`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                  <Calendar aria-hidden className="size-4" />
-                  Event calendar
-                </Link>
-              )}
-              {user && (
-                <Link to={`/account?store=${slug}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                  <UserCircle aria-hidden className="size-4" />
-                  My account
-                </Link>
-              )}
-              {canManage && (
-                <Link to={`/s/${slug}/admin`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-                  <StoreIcon aria-hidden className="size-4" />
-                  Admin workspace
-                </Link>
-              )}
-            </>
-          ) : undefined
-        }
+        actions={heroActions}
       />
-
-      {isStoreFeatureEnabled(store, 'sellTrade') && !kioskMode && <TradePromoBanner slug={slug} showSellLink />}
-
-      {/* Slim inventory counts — Event calendar lives in hero CTAs / quick tiles */}
+        ),
+        promo: isStoreFeatureEnabled(store, 'sellTrade') && !kioskMode ? <TradePromoBanner slug={slug} showSellLink /> : null,
+        stats: (
       <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-sm text-fg-muted">
         <span>
           <span className="font-bold text-fg">{shelf?.listings ?? resultTotal}</span> listings
@@ -570,19 +638,18 @@ export default function StorePage() {
           <span className="font-bold text-fg">{availableSets.length}</span> sets
         </span>
       </p>
-
-      {/* Quick actions. Themed shortcut tiles over the spotlight */}
-      <section className="space-y-4 sm:space-y-5">
+        ),
+        intro: (
         <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed text-fg/75 sm:text-base">
           {kioskMode
             ? 'Browse in-stock singles, pick a card, add it to your cart, and place your order.'
             : 'Browse thousands of in-stock singles, build decks, sell or trade your collection.'}
         </p>
+        ),
+        shortcuts: (
         <div className="grid grid-cols-3 gap-2.5 sm:gap-3 lg:grid-cols-6">
-          {QUICK_ACTIONS.filter(({ feature, path }) => {
-            if (kioskMode && path === 'sell') return false
-            return !feature || isStoreFeatureEnabled(store, feature)
-          }).map(({ label, icon: Icon, path, action }) => {
+          {shortcutItems.map(({ label, to, onClick }) => {
+            const Icon = QUICK_ACTIONS.find((action) => action.label === label)?.icon ?? Search
             const tileClass =
               'group flex flex-col items-center justify-center gap-2 rounded-card px-2 py-4 text-fg store-frame store-frame-tile ui-lift hover:border-brand-500/40 sm:gap-3 sm:px-4 sm:py-8 dark:bg-white/[0.04]'
             const content = (
@@ -593,8 +660,8 @@ export default function StorePage() {
                 <span className="px-0.5 text-center text-[11px] font-bold leading-snug sm:text-sm">{label}</span>
               </>
             )
-            return path ? (
-              <Link key={label} to={`/s/${slug}/${path}`} className={tileClass}>
+            return to ? (
+              <Link key={label} to={to} className={tileClass}>
                 {content}
               </Link>
             ) : (
@@ -602,26 +669,22 @@ export default function StorePage() {
                 key={label}
                 type="button"
                 className={tileClass}
-                onClick={action === 'search' ? scrollToSearchSection : undefined}
+                onClick={onClick}
               >
                 {content}
               </button>
             )
           })}
         </div>
-      </section>
-
-      {/* Game switcher. Only when this store actually carries more than one */}
-      {gamesLoading ? (
+        ),
+        games: gamesLoading ? (
         <div className="h-10 sm:h-9" aria-hidden />
       ) : gameOptions.length > 1 ? (
         <section aria-label="Choose a game">
           <GameSelector games={gameOptions} value={gameFilter} onChange={setGameFilter} label="Browse by game" />
         </section>
-      ) : null}
-
-      {/* Spotlight. Holographic cards in a lively persistent rail */}
-      {spotlightEnabled && (spotlightLoading || spotlightItems.length > 0) && (
+      ) : null,
+        spotlight: spotlightEnabled && (spotlightLoading || spotlightItems.length > 0) && (
         <section>
           <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
             <div className="min-w-0">
@@ -682,11 +745,9 @@ export default function StorePage() {
             </div>
           )}
         </section>
-      )}
-
-      {/* Sealed spotlight. Scoped to the same game as everything else */}
-      {isStoreFeatureEnabled(store, 'sealed') && <SealedSpotlightRow slug={slug} gameCode={gameFilter} />}
-
+      ),
+        sealed: isStoreFeatureEnabled(store, 'sealed') ? <SealedSpotlightRow slug={slug} gameCode={gameFilter} /> : null,
+        browse: (
       <div ref={searchSectionRef} id="store-search" className="scroll-mt-24 grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-20 rounded-card store-frame store-frame-card">
@@ -839,9 +900,8 @@ export default function StorePage() {
           )}
         </main>
       </div>
-
-      {/* Advanced filters. Mobile bottom-sheet drawer */}
-      {advancedOpen && (
+        ),
+        filtersDrawer: advancedOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
@@ -873,7 +933,8 @@ export default function StorePage() {
             </div>
           </div>
         </div>
-      )}
-    </div>
+      ) : null,
+      }}
+    />
   )
 }

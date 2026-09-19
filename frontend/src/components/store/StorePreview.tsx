@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useMemo, useState } from 'react'
 import { Heart, ImageOff, Moon, Search, ShoppingCart, Sun } from 'lucide-react'
-import type { CardDisplayStyle, HeroLayout, StoreCommunityEvents } from '../../api/types'
+import type { CardDisplayStyle, HeroLayout, StoreCommunityEvents, StorefrontTemplate } from '../../api/types'
 import { Badge, Button, FilterPill } from '../ui'
 import { GENERIC_MTG_CARDS } from './hero/heroCardPool'
 import { normalizeHeroLayout } from './hero/heroLayouts'
@@ -17,6 +17,7 @@ import {
 } from '../../lib/pageBackgrounds'
 import { PageBackgroundLayer } from './backgrounds/PageBackgroundLayer'
 import { cx } from '../../lib/cx'
+import { normalizeStorefrontTemplate } from '../../lib/storefrontTemplates'
 
 /** Fallbacks that mirror the platform default theme (index.css). */
 const FALLBACK_BG = '#f7f8fa'
@@ -90,6 +91,7 @@ export interface StorePreviewBranding {
   tagline?: string | null
   cardDisplayStyle?: CardDisplayStyle
   heroLayout?: HeroLayout
+  storefrontTemplate?: StorefrontTemplate
   showcaseCards?: import('./hero/heroCardPool').HeroCardImage[]
 }
 
@@ -268,6 +270,8 @@ export function StorePreview({
 
   const marketplace = branding.cardDisplayStyle === 'marketplace'
   const heroLayout = normalizeHeroLayout(branding.heroLayout ?? 'cinematic')
+  const template = normalizeStorefrontTemplate(branding.storefrontTemplate)
+  const previewHeading = branding.heroHeading?.trim() || storeName
   const previewShowcase = useMemo(() => GENERIC_MTG_CARDS, [])
   const previewBackgrounds = resolvePageBackgrounds(branding.pageBackgrounds)
   const previewBackgroundPreset = resolveActiveBackgroundPreset(previewBackgrounds, previewMode === 'dark')
@@ -288,6 +292,7 @@ export function StorePreview({
           previewMode === 'dark' ? 'dark' : 'preview-light',
         )}
         data-page-background={previewBackgroundPreset}
+        data-storefront-template={template}
       >
       <div className="pointer-events-none absolute inset-0 z-0 bg-bg" aria-hidden />
       <PageBackgroundLayer
@@ -297,7 +302,30 @@ export function StorePreview({
         className="absolute inset-0 z-0"
         preview
       />
-      <div className="relative z-[1] space-y-4 p-5">
+      <div className={cx('relative z-[1]', template === 'vault' ? 'space-y-4 p-5' : 'space-y-0')}>
+      {template === 'campaign' ? (
+        <div className="bg-fg px-5 py-8 text-white">
+          {branding.tagline ? (
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/70">{branding.tagline}</p>
+          ) : null}
+          <p className="mt-2 font-display text-3xl font-extrabold leading-none tracking-tight sm:text-4xl">{previewHeading}</p>
+          <p className="mt-3 max-w-sm text-sm text-white/75">{branding.heroSubheading || 'Shop in-stock singles from live inventory.'}</p>
+          <Button size="sm" className="mt-5">
+            Shop in-stock singles
+          </Button>
+        </div>
+      ) : template === 'studio' ? (
+        <div className="relative min-h-[10rem] overflow-hidden bg-bg px-5 py-8">
+          {branding.heroImageUrl ? (
+            <img src={branding.heroImageUrl} alt="" className="absolute inset-0 size-full object-cover opacity-40" />
+          ) : null}
+          <div className="relative">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-fg-muted">{branding.tagline || storeName}</p>
+            <p className="mt-2 font-display text-2xl font-semibold tracking-tight text-fg sm:text-3xl">{previewHeading}</p>
+            <p className="mt-2 max-w-sm text-sm text-fg-muted">{branding.heroSubheading || 'Selected work, then inventory.'}</p>
+          </div>
+        </div>
+      ) : (
       <StoreHero
         name={storeName}
         tagline={branding.tagline}
@@ -334,7 +362,9 @@ export function StorePreview({
         stats={{ listings: 706, cards: 2160, sets: 130 }}
         verified
       />
+      )}
 
+      <div className={cx(template === 'vault' ? '' : 'space-y-4 p-5')}>
       <div className="flex flex-wrap items-center gap-2">
         <FilterPill active>Foil</FilterPill>
         <FilterPill>Rare</FilterPill>
@@ -402,6 +432,7 @@ export function StorePreview({
         <Button variant="secondary" className="flex-1">
           Add to want list
         </Button>
+      </div>
       </div>
       </div>
     </div>

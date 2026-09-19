@@ -1075,3 +1075,42 @@ textarea {
 .ui-overlay-scroll::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Phase 1 opt-in storefront shells (Campaign / Studio). Vault keeps boxed chrome. */
+.storefront-campaign .campaign-headline {
+  font-size: clamp(2.75rem, 9vw, 6.75rem);
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+  font-weight: 800;
+  font-family: var(--font-display);
+}
+
+.storefront-studio .studio-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.storefront-studio .studio-headline {
+  font-size: clamp(2.15rem, 5.5vw, 4.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+  font-family: var(--font-display);
+}
+
+@keyframes store-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.store-marquee-track {
+  animation: store-marquee 32s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-marquee-track {
+    animation: none;
+  }
+}

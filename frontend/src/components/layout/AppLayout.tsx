@@ -15,6 +15,7 @@ import { BrandLogo } from '../BrandLogo'
 import { KioskExitModal } from '../kiosk/KioskExitModal'
 import { DEFAULT_APP_SHELL, FLUSH_APP_SHELL, FULL_WIDTH_APP_SHELL, STOREFRONT_SHELL } from '../../lib/layoutShell'
 import { manageableStores } from '../../lib/manageableStores'
+import { normalizeStorefrontTemplate } from '../../lib/storefrontTemplates'
 import { AppShellLayoutProvider, useAppShellLayout } from './AppShellLayout'
 import { SkipToContent } from './SkipToContent'
 import { PageTransition, EASE_PREMIUM } from '../motion'
@@ -177,6 +178,14 @@ export default function AppLayout() {
   )
 
   // Persistent, always-visible cart affordance (top-right) for the active store.
+  const shopSinglesLink = storeSlug && normalizeStorefrontTemplate(kioskStore?.storefrontTemplate) !== 'vault' && (
+    <Link
+      to={`/s/${storeSlug}#store-search`}
+      className="hidden h-9 items-center rounded-btn border border-border bg-surface px-3 text-xs font-bold uppercase tracking-[0.14em] text-fg-muted transition-colors hover:text-brand-600 sm:inline-flex"
+    >
+      Shop singles
+    </Link>
+  )
   const cartLink = storeSlug && (
     <Link
       to={`/s/${storeSlug}/cart`}
@@ -211,6 +220,7 @@ export default function AppLayout() {
                 </span>
               </span>
               <div className="flex items-center gap-2">
+                {shopSinglesLink}
                 {cartLink}
                 {lockedSlug && (
                   <Button variant="secondary" size="sm" onClick={() => setExitModalOpen(true)}>
@@ -452,6 +462,7 @@ export default function AppLayout() {
 
           {/* Notifications — always when signed in (every store’s alerts) */}
           {user && <NotificationBell />}
+          {shopSinglesLink}
           {cartLink}
 
           {/* Theme toggle (desktop) */}

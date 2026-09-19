@@ -19,6 +19,7 @@ final readonly class StoreSettingsUpdater
     private const HEX = '/^#[0-9a-fA-F]{6}$/';
     private const URL = '#^(https?://|/)#';
     private const CARD_DISPLAY_STYLES = ['gallery', 'marketplace'];
+    public const STOREFRONT_TEMPLATES = ['vault', 'campaign', 'studio'];
     public const SPOTLIGHT_ITEMS_CAP = 24;
     private const HERO_LAYOUTS = [
         'cinematic', 'living-inventory', 'trading-table', 'event-board', 'floating-cards',
@@ -181,6 +182,14 @@ final readonly class StoreSettingsUpdater
             }
             $layout = self::HERO_LAYOUT_ALIASES[$layout] ?? $layout;
             $store->setHeroLayout($layout);
+        }
+
+        if (array_key_exists('storefrontTemplate', $payload)) {
+            $template = strtolower($this->stringValue($payload['storefrontTemplate']));
+            if (!in_array($template, self::STOREFRONT_TEMPLATES, true)) {
+                throw new \InvalidArgumentException('storefrontTemplate must be vault, campaign, or studio.');
+            }
+            $store->setStorefrontTemplate($template);
         }
 
         foreach (self::COLOR_FIELDS as $key => $setter) {
@@ -385,6 +394,7 @@ final readonly class StoreSettingsUpdater
             'tagline' => $store->getTagline(),
             'cardDisplayStyle' => $store->getCardDisplayStyle(),
             'heroLayout' => $store->getHeroLayout(),
+            'storefrontTemplate' => $store->getStorefrontTemplate(),
             'darkColors' => $store->getDarkColors(),
             'tradeRates' => $store->getTradeRates(),
             'hoursText' => $store->getHoursText(),
