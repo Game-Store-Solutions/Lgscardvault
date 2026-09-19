@@ -10,7 +10,7 @@ This is a separate area from the price-threshold **Spotlight** rail (see [stores
 |--------|-------|-------|
 | `StoreCase` | `store_cases` | A named physical display case. Store-scoped, positioned, cascades away with the store. |
 | `StoreSection` | `store_sections` | A labeled area inside a case (`case_id`, CASCADE). `mode` is `manual` or `auto`; auto criteria: `auto_min_price_cents`, `auto_max_price_cents`, `auto_rarity`, `auto_color_identity` (canonical code), `auto_set_code`, `auto_card_type`. Keeps a redundant `store_id` for scoping. |
-| `StoreSectionCard` | `store_section_cards` | One `InventoryItem` in a section's pool: `quantity` (copies allocated to the case, default 1 = one display slot) and `sold_quantity`. `remaining = quantity - sold` is what the section can still sell. Pool size cannot exceed free inventory stock (on-hand minus other sections' unsold claims). Unique on `(section_id, inventory_item_id)`. |
+| `StoreSectionCard` | `store_section_cards` | One `InventoryItem` in a section's pool: `quantity` (copies allocated to the case, default 1 = one display slot) and `sold_quantity`. `remaining = quantity - sold` is what the section can still sell. `added_manually` marks picker-added rows so auto-fill never replaces them. Pool size cannot exceed free inventory stock (on-hand minus other sections' unsold claims). Unique on `(section_id, inventory_item_id)`. |
 | `OrderLine` (additions) | `order_lines` | Case provenance: `section_card_id` (SET NULL — pool restore on cancel), `case_name` + `section_title` snapshots (survive dismantled cases on paperwork), `case_quantity` (copies of the line pulled from the case). |
 
 Existing v1 sections were migrated into a default "Display Case" per store (`Version20260720032341`).
@@ -36,7 +36,7 @@ Canonical codes are stored on the section; unknown terms 422 with examples. `lab
 - color identity (a JSON column) filters in PHP over the batches;
 - **cross-section accounting**: unsold copies claimed by the store's *other* sections (`StoreSectionCardRepository::remainingAllocatedByItem`) are subtracted from stock, so two sections never promise the same physical copy and refills only use remaining eligible inventory.
 
-Re-pulls **merge** rather than replace: matching cards keep their pool counts, new matches are added, stale rows *with sales* are kept but frozen (`quantity = sold`) so pending pull sheets and history survive, stale rows without sales are removed.
+Re-pulls **fill remaining slots only**: cards already in the section (hand-picked or previously pulled) keep their pool counts and are never replaced; new matches are appended one copy each until `cardLimit` is reached. Listings already in the section are skipped so a later pull cannot duplicate them.
 
 ## Purchase lifecycle (`SectionSaleAllocator`)
 
@@ -81,9 +81,9 @@ All mutations require `STORE_MANAGE`; public reads back the storefront.
 ## Frontend
 
 - **Storefront** (`CaseCardsPage`, `/s/{slug}/case-cards`): cases as headings, sections as labeled rails of holographic tiles; sold-out pool cards, empty sections, and empty cases are hidden.
-- **Admin** (`CaseCardsTab`): create/delete cases; per-case section creation; drag-handle reorder of sections within a case (updates storefront order and sale-pool priority); per-section filter row (color datalist, rarity, set, type, price range) with "Pull from inventory"; per-card pool editing ("In case" count capped by free inventory stock, sold/remaining badges); add-from-inventory quantity picker; pull-sheet modal with print.
+- **Admin** (`CaseCardsTab`): create/delete cases; per-case section creation; drag-handle reorder of sections within a case (updates storefront order and sale-pool priority); per-section filter row (color datalist, rarity, set, type, price range) with "Pull from inventory" (keeps cards already in the section and fills remaining slots up to the card count); per-card pool editing ("In case" count capped by free inventory stock, sold/remaining badges); add-from-inventory quantity picker; pull-sheet modal with print.
 - **Orders** (`OrderLineList`, `printOrderSheet`): case badges on screen and on the printed sheet.
 
 ## Tests
 
-`ColorIdentityParserTest` (34 unit tests over the vocabulary/matching/labels); `StoreSectionControllerTest` (case CRUD, sections require a case, pool-tracked manual add/edit, auto-fill by color term / set+type, unknown-term 422, cross-section claim exclusion, public anonymous read, authorization boundary); `CasePurchaseFlowTest` (purchase depletes the pool and stamps the line, oversell prevention past the pool, pull sheet across place→fulfil, cancel restores the pool).
+`ColorIdentityParserTest` (34 unit tests over the vocabulary/matching/labels); `StoreSectionControllerTest` (case CRUD, sections require a case, pool-tracked manual add/edit, auto-fill by color term / set+type, re-pull fills remaining slots without replacing existing or hand-picked cards, unknown-term 422, cross-section claim exclusion, public anonymous read, authorization boundary); `CasePurchaseFlowTest` (purchase depletes the pool and stamps the line, oversell prevention past the pool, pull sheet across place→fulfil, cancel restores the pool).

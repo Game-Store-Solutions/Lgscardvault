@@ -201,12 +201,19 @@ final class StoreSectionController extends AbstractController
 
         $poolQuantity = max(1, (int) (is_array($payload) ? ($payload['quantity'] ?? 1) : 1));
 
-        $existing = $this->existingInventoryItemIds($section);
+        /** @var array<int, StoreSectionCard> $existingByItem */
+        $existingByItem = $this->existingCardsByItem($section);
         $position = $this->sectionCardRepository->nextPosition($section);
         $added = 0;
+        $promoted = 0;
 
         foreach ($ids as $itemId) {
-            if (isset($existing[$itemId])) {
+            if (isset($existingByItem[$itemId])) {
+                // A later pull must not sweep a card the owner just pinned.
+                if (!$existingByItem[$itemId]->isAddedManually()) {
+                    $existingByItem[$itemId]->setAddedManually(true);
+                    ++$promoted;
+                }
                 continue;
             }
             if ($section->isAtCardLimit()) {
@@ -227,12 +234,13 @@ final class StoreSectionController extends AbstractController
                 ], 422);
             }
 
-            $section->addCard($this->makeCard($item, $position++, $poolQuantity));
-            $existing[$itemId] = true;
+            $placed = $this->makeCard($item, $position++, $poolQuantity, true);
+            $section->addCard($placed);
+            $existingByItem[$itemId] = $placed;
             ++$added;
         }
 
-        if ($added > 0) {
+        if ($added > 0 || $promoted > 0) {
             $this->entityManager->flush();
             $this->entityManager->refresh($section);
         }
@@ -316,16 +324,15 @@ final class StoreSectionController extends AbstractController
     }
 
     /**
-     * Auto fill — the "Pull from inventory" button. Picks up to AUTO_FILL_MAX
-     * listings matching the section's filters (price, rarity, set, type, color
-     * identity), skipping stock already claimed by the store's other sections,
-     * and merges them into the pool:
+     * Auto fill — the "Pull from inventory" button. Does not remove or replace
+     * cards already in the section. It only appends matching inventory until
+     * the section's card limit is reached (default AUTO_FILL_MAX):
      *
-     *  - matching listings already in the section keep their pool counts;
-     *  - new matches are added with one allocated copy (one display slot);
-     *  - stale rows with sales are kept but frozen (pool = sold) so pending
-     *    pull sheets and history stay intact;
-     *  - stale rows with no sales are removed.
+     *  - existing rows (hand-picked or previously pulled) keep their pool
+     *    counts and stay put;
+     *  - remaining slots are filled one copy per new matching listing;
+     *  - listings already in this section, or whose last free copy is claimed
+     *    by another section, are skipped.
      */
     #[Route('/{id}/auto-fill', name: 'api_store_sections_auto_fill', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
@@ -352,40 +359,25 @@ final class StoreSectionController extends AbstractController
             return $this->json(['detail' => 'Minimum price cannot exceed maximum price.'], 422);
         }
 
-        $picked = $this->autoFiller->pickListings($section, $section->getCardLimit() ?? self::AUTO_FILL_MAX);
+        $limit = $section->getCardLimit() ?? self::AUTO_FILL_MAX;
 
-        /** @var array<int, StoreSectionCard> $existingByItem */
-        $existingByItem = [];
+        $excludeItemIds = [];
         foreach ($section->getCards() as $card) {
             $itemId = $card->getInventoryItem()?->getId();
             if (null !== $itemId) {
-                $existingByItem[$itemId] = $card;
+                $excludeItemIds[] = $itemId;
             }
         }
 
-        $position = 0;
-        $keptItemIds = [];
+        $picked = $this->autoFiller->pickListings(
+            $section,
+            max(0, $limit - $section->occupiedSlotCount()),
+            $excludeItemIds,
+        );
+
+        $position = $this->sectionCardRepository->nextPosition($section);
         foreach ($picked as $item) {
-            $itemId = (int) $item->getId();
-            $keptItemIds[$itemId] = true;
-            if (isset($existingByItem[$itemId])) {
-                $existingByItem[$itemId]->setPosition($position++);
-            } else {
-                $section->addCard($this->makeCard($item, $position++, 1));
-            }
-        }
-
-        foreach ($existingByItem as $itemId => $card) {
-            if (isset($keptItemIds[$itemId])) {
-                continue;
-            }
-            if ($card->getSoldQuantity() > 0) {
-                // Sold-from rows stay for pull sheets/history but stop selling.
-                $card->setQuantity($card->getSoldQuantity());
-                $card->setPosition($position++);
-            } else {
-                $section->removeCard($card);
-            }
+            $section->addCard($this->makeCard($item, $position++, 1));
         }
 
         $this->entityManager->flush();
@@ -626,26 +618,27 @@ final class StoreSectionController extends AbstractController
         return false;
     }
 
-    /** @return array<int, true> inventory item ids already placed in the section */
-    private function existingInventoryItemIds(StoreSection $section): array
+    /** @return array<int, StoreSectionCard> inventory item id → existing section card */
+    private function existingCardsByItem(StoreSection $section): array
     {
-        $ids = [];
+        $cards = [];
         foreach ($section->getCards() as $card) {
             $item = $card->getInventoryItem();
             if ($item instanceof InventoryItem && null !== $item->getId()) {
-                $ids[$item->getId()] = true;
+                $cards[$item->getId()] = $card;
             }
         }
 
-        return $ids;
+        return $cards;
     }
 
-    private function makeCard(InventoryItem $item, int $position, int $poolQuantity): StoreSectionCard
+    private function makeCard(InventoryItem $item, int $position, int $poolQuantity, bool $addedManually = false): StoreSectionCard
     {
         $card = new StoreSectionCard();
         $card->setInventoryItem($item);
         $card->setPosition($position);
         $card->setQuantity($poolQuantity);
+        $card->setAddedManually($addedManually);
 
         return $card;
     }
