@@ -67,23 +67,29 @@ export function CampaignHome({ chrome, slots }: StoreHomeLayoutProps) {
         </div>
       </section>
 
-      <div className="overflow-hidden border-y border-border bg-fg py-3 text-white">
-        <div className="store-marquee-track flex w-max gap-10 whitespace-nowrap px-6 text-xs font-bold uppercase tracking-[0.28em]">
-          {marquee.map((game, i) => (
-            <button
-              key={`${game.code}-${i}`}
-              type="button"
-              onClick={() => chrome.gameOptions.length > 1 && chrome.onGameChange(game.code)}
-              className={cx(
-                'transition-colors',
-                chrome.gameFilter === game.code ? 'text-white' : 'text-white/55 hover:text-white',
-              )}
-            >
-              {game.name}
-            </button>
-          ))}
+      {chrome.gameOptions.length > 1 ? (
+        <div className="overflow-hidden border-y border-border bg-fg py-3 text-white">
+          <div className="store-marquee-track flex w-max gap-10 whitespace-nowrap px-6 text-xs font-bold uppercase tracking-[0.28em]">
+            {marquee.map((game, i) => (
+              <button
+                key={`${game.code}-${i}`}
+                type="button"
+                onClick={() => chrome.onGameChange(game.code)}
+                className={cx(
+                  'transition-colors',
+                  chrome.gameFilter === game.code ? 'text-white' : 'text-white/55 hover:text-white',
+                )}
+              >
+                {game.name}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : chrome.gameOptions[0] ? (
+        <div className="border-y border-border bg-fg py-3 text-center text-xs font-bold uppercase tracking-[0.28em] text-white/70">
+          {chrome.gameOptions[0].name}
+        </div>
+      ) : null}
 
       {slots.promo}
 
